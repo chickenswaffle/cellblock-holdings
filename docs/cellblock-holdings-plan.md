@@ -200,6 +200,8 @@ Each is one Claude Code session. Each ends green tests + something visible on sc
 - Prisoner inspection panel.
 - **DoD:** 50 prisoners run a full day/night cycle — sleep in beds, eat in canteen, don't clip walls. Perf: 200 agents at 10 ticks/sec under 8ms/tick (measure headless).
 
+**M2 shipped 2026-07-18.** Measured 0.75ms/tick average with 200 agents (10x under budget) with a straightforward single-level A* — the room-graph hierarchical pathfinding this section originally called for wasn't needed at this scale; revisit only if a later milestone's profiling says otherwise. Scope simplifications, deliberate: WORK and PROGRAM schedule blocks are stand-ins for SOCIAL/RECREATION/HYGIENE (same as FREE) since job assignment and reform programs are M3/M5 territory; SHOWER restores hygiene while in-cell since no dedicated shower object/zone is defined anywhere in the doc. Both are easy to special-case later without touching the schedule system itself.
+
 ### M3 — Staff & jobs
 - Guards (patrol, respond, escort, search), Workers (build queue), Support roles.
 - `payroll.gd`, hiring UI, fatigue.

@@ -22,6 +22,14 @@ Angled orthogonal `Camera3D` (Cities Skylines-ish, ~35° pitch, no rotation yet)
 - Tile picking for build/zone tools also goes through `CameraRig.ground_point()` (a ray-plane intersection against y=0), not pixel math — this is what makes tile picking work correctly regardless of camera zoom/pitch.
 - Gotcha already hit once: edge-scroll fired on its own before any real mouse movement, because the OS/engine's default cursor position can sit inside the edge margin at startup. `camera_rig.gd` gates edge-scroll on `_mouse_seen` (only set true by a real `InputEventMouseMotion`) — don't remove that guard.
 
+## Agents (M2)
+
+`Prisoner.pos` is **tile-center convention**: pos `(5.5, 7.5)` means tile `(5,7)`, matching how `StructuresRenderer3D` places walls/objects at `tile + 0.5`. `tile_pos()` uses `floori`, not `roundi` — floori is the correct inverse of "+0.5" regardless of floating-point rounding mode; roundi is not. Every place that sets `pos` directly (`Intake.intake()`, `step_along_path()`'s waypoint target) must add the `+0.5` offset — skipping it once (a real bug hit while building this) puts the agent exactly on a tile edge, which is exactly where wall geometry is, so they render inside/behind walls and look invisible.
+
+`UtilityAI` picks actions by scoring `need_deficit × 1/(1+distance) × RNG noise` per candidate need for the current `ScheduleSystem` block, described in `docs/cellblock-holdings-plan.md` §M2. `NeedSystem.minute_tick()` runs once per sim-minute (not per tick — decay/satisfaction rates are defined per minute); movement (`step_along_path`) and the traveling→performing transition run every tick in `SimWorld.tick()`.
+
+`Pathfinder.find_path()` is a hand-rolled 8-way A* with its own binary min-heap (`Pathfinder._MinHeap`, an inner class) — GDScript has no built-in heap. Diagonal moves check both flanking orthogonal edges to avoid cutting through a wall corner. Room detection (`RoomDetector`) and pathfinding use *different* edge-passability rules on purpose: `grid.edge_open()` treats a door as blocking (a door still separates two rooms) while `grid.edge_passable()` treats it as passable at a cost multiplier (`Pathfinder.DOOR_COST_MULTIPLIER`) — don't unify these, they answer different questions.
+
 ## Verify visually
 
 `godot --path . -- --screenshot=/tmp/shot.png` boots the game windowed, saves a PNG after 30 frames, and quits. For build-mode features that need a pre-built scene to show up in the screenshot (no way to script mouse drag headlessly), add a temporary `--demo-room`-style flag to `bootstrap.gd` that enqueues BuildOrders programmatically, screenshot, then remove the temporary code before committing — don't leave debug-only branches in.

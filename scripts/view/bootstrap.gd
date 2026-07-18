@@ -30,8 +30,10 @@ var zone_tool: ZoneTool
 var _camera_rig: CameraRig
 var _terrain: TerrainRenderer3D
 var _structures: StructuresRenderer3D
+var _agents: AgentRenderer3D
 var _drag_preview: MeshInstance3D
 var _hud_label: Label
+var _inspected_id: int = -1
 var _screenshot_path := ""
 var _screenshot_frames := 0
 
@@ -39,6 +41,7 @@ var _screenshot_frames := 0
 func _ready() -> void:
 	world = SimWorld.new(12345)
 	_scatter_placeholder_floors()
+	_build_starter_facility()
 
 	_setup_environment()
 
@@ -51,6 +54,11 @@ func _ready() -> void:
 	_structures.name = "Structures"
 	add_child(_structures)
 	_structures.setup(world)
+
+	_agents = AgentRenderer3D.new()
+	_agents.name = "Agents"
+	add_child(_agents)
+	_agents.setup(world)
 
 	_drag_preview = MeshInstance3D.new()
 	_drag_preview.name = "DragPreview"
@@ -67,7 +75,7 @@ func _ready() -> void:
 
 	_camera_rig = CameraRig.new()
 	_camera_rig.name = "CameraRig"
-	_camera_rig.position = Vector3(world.grid.width, 0.0, world.grid.height) * 0.5
+	_camera_rig.position = Vector3(24.0, 0.0, 18.0) # centered on the starter facility
 	add_child(_camera_rig)
 
 	_build_hud()
@@ -159,6 +167,12 @@ func _sync_tool_mode() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if tool_mode == ToolMode.NONE:
+		var mb_inspect := event as InputEventMouseButton
+		if mb_inspect != null and mb_inspect.button_index == MOUSE_BUTTON_LEFT and mb_inspect.pressed:
+			var ground_inspect = _camera_rig.ground_point(mb_inspect.position)
+			if ground_inspect != null:
+				var found := world.nearest_prisoner(Vector2(ground_inspect.x, ground_inspect.z), 1.5)
+				_inspected_id = found.id if found != null else -1
 		return
 	var mb := event as InputEventMouseButton
 	if mb != null:
@@ -218,6 +232,70 @@ func _scatter_placeholder_floors() -> void:
 			g.set_floor(x, y, SimTile.FloorType.GRASS)
 
 
+## The leased site's existing infrastructure — set up directly (not queued
+## through construction) since it's what the player inherits on day one,
+## not something they're actively building. 4 cells, a canteen, a small
+## yard, and enough intake to fill half the cells.
+func _build_starter_facility() -> void:
+	var g := world.grid
+	var bx := 15
+	var by := 15
+
+	for i in range(4):
+		var x0 := bx + i * 4
+		var x1 := x0 + 2
+		_room_box(x0, by, x1, by + 2, SimTile.FloorType.TILE)
+		g.set_door(x0 + 1, by + 2, SimTile.WALL_S, true)
+		g.place_object(x0, by, ObjectDef.Type.BED)
+		g.place_object(x1, by, ObjectDef.Type.TOILET)
+
+	var cx0 := bx
+	var cx1 := bx + 9
+	var cy0 := by + 5
+	var cy1 := by + 9
+	_room_box(cx0, cy0, cx1, cy1, SimTile.FloorType.CONCRETE)
+	g.set_door(cx0 + 4, cy0, SimTile.WALL_N, true)
+	g.place_object(cx0 + 2, cy0 + 2, ObjectDef.Type.TABLE)
+	g.place_object(cx0 + 6, cy0 + 2, ObjectDef.Type.TABLE)
+
+	var yx0 := bx + 11
+	var yx1 := bx + 18
+	var yy0 := by + 5
+	var yy1 := by + 12
+	_room_box(yx0, yy0, yx1, yy1, SimTile.FloorType.CONCRETE)
+	g.set_door(yx0, yy0 + 3, SimTile.WALL_W, true)
+	g.place_object(yx0 + 3, yy0 + 3, ObjectDef.Type.WEIGHT_BENCH)
+
+	world.tick() # force one room-detection pass before zoning
+
+	for i in range(4):
+		var x0 := bx + i * 4
+		var room := world.room_at(x0 + 1, by + 1)
+		if room != null:
+			world.zone_room(room.id, ZoneValidator.Kind.CELL)
+	var canteen := world.room_at(cx0 + 1, cy0 + 1)
+	if canteen != null:
+		world.zone_room(canteen.id, ZoneValidator.Kind.CANTEEN)
+	var yard := world.room_at(yx0 + 1, yy0 + 1)
+	if yard != null:
+		world.zone_room(yard.id, ZoneValidator.Kind.YARD)
+
+	for i in range(6):
+		Intake.intake(world)
+
+
+func _room_box(x0: int, y0: int, x1: int, y1: int, floor_type: int) -> void:
+	var g := world.grid
+	for x in range(x0, x1 + 1):
+		g.set_wall(x, y0, SimTile.WALL_N, true)
+		g.set_wall(x, y1, SimTile.WALL_S, true)
+		for y in range(y0, y1 + 1):
+			g.set_floor(x, y, floor_type)
+	for y in range(y0, y1 + 1):
+		g.set_wall(x0, y, SimTile.WALL_W, true)
+		g.set_wall(x1, y, SimTile.WALL_E, true)
+
+
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	layer.name = "HudLayer"
@@ -264,4 +342,48 @@ func _update_hud() -> void:
 				if r != null:
 					lines.append("room: %d tiles, sealed=%s, valid=%s" % [r.tiles.size(), r.sealed, r.zone_valid])
 
+	lines.append("prisoners: %d   [click] inspect nearest" % world.prisoners.size())
+	if tool_mode == ToolMode.NONE:
+		var p := world.prisoner_at(_inspected_id)
+		if p != null:
+			lines.append("— %s, age %d, %d days left%s" % [p.pname, p.age, p.sentence_days, _trait_suffix(p.traits)])
+			lines.append("  %s   hunger %.0f%% sleep %.0f%% hygiene %.0f%% social %.0f%% rec %.0f%%" % [
+				_action_desc(p),
+				p.needs.get_value(Needs.Kind.HUNGER) * 100.0,
+				p.needs.get_value(Needs.Kind.SLEEP) * 100.0,
+				p.needs.get_value(Needs.Kind.HYGIENE) * 100.0,
+				p.needs.get_value(Needs.Kind.SOCIAL) * 100.0,
+				p.needs.get_value(Needs.Kind.RECREATION) * 100.0,
+			])
+
 	_hud_label.text = "\n".join(lines)
+
+
+const TRAIT_NAMES := {
+	Prisoner.Trait.VOLATILE: "Volatile", Prisoner.Trait.CUNNING: "Cunning",
+	Prisoner.Trait.INSTITUTIONALIZED: "Institutionalized", Prisoner.Trait.FRAIL: "Frail",
+	Prisoner.Trait.CONNECTED: "Connected", Prisoner.Trait.PENITENT: "Penitent",
+}
+const NEED_NAMES := {
+	Needs.Kind.HUNGER: "eating", Needs.Kind.SLEEP: "sleeping", Needs.Kind.HYGIENE: "washing up",
+	Needs.Kind.SOCIAL: "socializing", Needs.Kind.RECREATION: "recreating",
+	Needs.Kind.SAFETY: "staying safe", Needs.Kind.DIGNITY: "keeping dignity",
+}
+
+
+static func _trait_suffix(traits: int) -> String:
+	var names := []
+	for t in TRAIT_NAMES:
+		if (traits & t) != 0:
+			names.append(TRAIT_NAMES[t])
+	return "" if names.is_empty() else " [%s]" % ", ".join(names)
+
+
+static func _action_desc(p: Prisoner) -> String:
+	match p.action_state:
+		Prisoner.ActionState.TRAVELING:
+			return "walking to %s" % NEED_NAMES.get(p.action_need, "somewhere")
+		Prisoner.ActionState.PERFORMING:
+			return NEED_NAMES.get(p.action_need, "idle")
+		_:
+			return "idle"

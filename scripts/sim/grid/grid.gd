@@ -82,6 +82,23 @@ func edge_open(x: int, y: int, dx: int, dy: int) -> bool:
 	return not tile_at(x, y).has_wall(SimTile.WALL_N)
 
 
+## Same edge test as edge_open, but doors count as passable too (at a cost
+## the pathfinder applies separately). Room detection uses edge_open —
+## a door still separates two rooms — pathfinding uses this.
+func edge_passable(x: int, y: int, dx: int, dy: int) -> bool:
+	assert(absi(dx) + absi(dy) == 1)
+	if not in_bounds(x + dx, y + dy):
+		return false
+	var flag := SimTile.WALL_E if dx == 1 else (SimTile.WALL_W if dx == -1 else (SimTile.WALL_S if dy == 1 else SimTile.WALL_N))
+	var t := tile_at(x, y)
+	return not t.has_wall(flag) or t.has_door(flag)
+
+
+func edge_is_door(x: int, y: int, dx: int, dy: int) -> bool:
+	var flag := SimTile.WALL_E if dx == 1 else (SimTile.WALL_W if dx == -1 else (SimTile.WALL_S if dy == 1 else SimTile.WALL_N))
+	return tile_at(x, y).has_door(flag)
+
+
 func set_zone(tiles: Array[Vector2i], zone_kind: int) -> void:
 	for t in tiles:
 		tile_at(t.x, t.y).zone_kind = zone_kind
