@@ -1,12 +1,13 @@
 class_name SimGrid
 extends RefCounted
 ## Flat-array tile grid for one site. Index = y * width + x.
-## grid_version increments on any structural change (walls/floors) so
-## cached paths and room data can invalidate cheaply.
+## grid_version increments on any structural change (walls/floors/doors/
+## objects) so cached rooms and paths can invalidate cheaply.
 
 var width: int
 var height: int
 var tiles: Array[SimTile] = []
+var objects: Array[PlacedObject] = []
 var grid_version: int = 0
 
 
@@ -32,33 +33,42 @@ func set_floor(x: int, y: int, floor_type: int) -> void:
 	grid_version += 1
 
 
+## (dx, dy) of the neighbor across this edge, and the neighbor's opposite flag.
+static func _edge_neighbor(flag: int) -> Array:
+	match flag:
+		SimTile.WALL_N:
+			return [0, -1, SimTile.WALL_S]
+		SimTile.WALL_S:
+			return [0, 1, SimTile.WALL_N]
+		SimTile.WALL_E:
+			return [1, 0, SimTile.WALL_W]
+		_:
+			return [-1, 0, SimTile.WALL_E]
+
+
 ## Set or clear a wall on one edge of a tile, mirrored onto the neighbor's
 ## opposite edge so both tiles agree about the shared seam.
 func set_wall(x: int, y: int, flag: int, present: bool) -> void:
 	tile_at(x, y).set_wall(flag, present)
-	var nx := x
-	var ny := y
-	var opposite := 0
-	match flag:
-		SimTile.WALL_N:
-			ny -= 1
-			opposite = SimTile.WALL_S
-		SimTile.WALL_S:
-			ny += 1
-			opposite = SimTile.WALL_N
-		SimTile.WALL_E:
-			nx += 1
-			opposite = SimTile.WALL_W
-		SimTile.WALL_W:
-			nx -= 1
-			opposite = SimTile.WALL_E
-	if in_bounds(nx, ny):
-		tile_at(nx, ny).set_wall(opposite, present)
+	var edge := _edge_neighbor(flag)
+	if in_bounds(x + edge[0], y + edge[1]):
+		tile_at(x + edge[0], y + edge[1]).set_wall(edge[2], present)
+	grid_version += 1
+
+
+## Set or clear a door on an edge. Implies a wall on that edge (a door is an
+## openable wall segment, not a hole) — mirrored the same way as set_wall.
+func set_door(x: int, y: int, flag: int, present: bool) -> void:
+	tile_at(x, y).set_door(flag, present)
+	var edge := _edge_neighbor(flag)
+	if in_bounds(x + edge[0], y + edge[1]):
+		tile_at(x + edge[0], y + edge[1]).set_door(edge[2], present)
 	grid_version += 1
 
 
 ## True if an agent can step between two orthogonally adjacent tiles
-## (no wall on the shared edge).
+## (no wall on the shared edge). Doors still block — pathfinding (M2) will
+## use a separate, looser check that treats doors as passable at a cost.
 func edge_open(x: int, y: int, dx: int, dy: int) -> bool:
 	assert(absi(dx) + absi(dy) == 1)
 	if not in_bounds(x + dx, y + dy):
@@ -72,16 +82,48 @@ func edge_open(x: int, y: int, dx: int, dy: int) -> bool:
 	return not tile_at(x, y).has_wall(SimTile.WALL_N)
 
 
+func set_zone(tiles: Array[Vector2i], zone_kind: int) -> void:
+	for t in tiles:
+		tile_at(t.x, t.y).zone_kind = zone_kind
+	grid_version += 1
+
+
+func object_at(x: int, y: int) -> PlacedObject:
+	for o in objects:
+		if o.x == x and o.y == y:
+			return o
+	return null
+
+
+func place_object(x: int, y: int, object_type: int) -> void:
+	assert(object_at(x, y) == null, "tile already occupied")
+	objects.append(PlacedObject.new(object_type, x, y))
+	grid_version += 1
+
+
+func remove_object(x: int, y: int) -> void:
+	for i in range(objects.size()):
+		if objects[i].x == x and objects[i].y == y:
+			objects.remove_at(i)
+			grid_version += 1
+			return
+
+
 func to_dict() -> Dictionary:
 	var tile_data: Array = []
 	tile_data.resize(tiles.size())
 	for i in range(tiles.size()):
 		tile_data[i] = tiles[i].to_dict()
+	var object_data: Array = []
+	object_data.resize(objects.size())
+	for i in range(objects.size()):
+		object_data[i] = objects[i].to_dict()
 	return {
 		"width": width,
 		"height": height,
 		"grid_version": grid_version,
 		"tiles": tile_data,
+		"objects": object_data,
 	}
 
 
@@ -96,3 +138,8 @@ func from_dict(d: Dictionary) -> void:
 		var t := SimTile.new()
 		t.from_dict(tile_data[i])
 		tiles[i] = t
+	var object_data: Array = d.get("objects", [])
+	objects.clear()
+	objects.resize(object_data.size())
+	for i in range(object_data.size()):
+		objects[i] = PlacedObject.from_dict(object_data[i])

@@ -1,4 +1,4 @@
 .godot/
-build/
+/build/
 *.tmp
 .DS_Store

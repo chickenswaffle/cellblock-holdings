@@ -11,7 +11,8 @@ Full design + milestone plan: [`docs/cellblock-holdings-plan.md`](docs/cellblock
 ## Status
 
 - ✅ **M0 — Skeleton**: pure sim core (`SimWorld`, seeded xorshift RNG, fixed-tick clock, event bus, edge-walled grid), code-built view (camera rig, `TileMapLayer` renderer with runtime placeholder tileset), headless GUT tests incl. determinism (same seed × 1000 ticks → identical state hash) and a sim-purity scan that fails if anything under `scripts/sim/` touches the engine.
-- ⬜ M1 — Build mode · M2 — Prisoners · M3 — Staff · M4 — Conflict · M5 — Franchise · M6 — Board & oversight · M7 — Save/load · M8 — Content & juice
+- ✅ **M1 — Build mode**: walls/doors/floors via a sequential `ConstructionQueue` (money deducted on completion, not order), flood-fill `RoomDetector` (border-leak sealed check, doors block same as walls), `ZoneValidator` + 8 zone kinds with per-kind required objects, `Ledger`, drag-rectangle build tool + click-to-zone tool, wall/zone/object rendering. 54 tests green, incl. 5 room-detection fixtures (nested rooms, door-in-corner, border-sealed) and an end-to-end SimWorld test matching the milestone's literal DoD.
+- ⬜ M2 — Prisoners · M3 — Staff · M4 — Conflict · M5 — Franchise · M6 — Board & oversight · M7 — Save/load · M8 — Content & juice
 
 ## Architecture in one paragraph
 
@@ -26,4 +27,5 @@ godot --path .        # main scene
 ./run-tests.sh        # headless GUT tests (set GODOT_BIN if godot isn't on PATH)
 ```
 
-Controls: WASD/arrows/middle-drag to pan, wheel to zoom, Space pause, 1/2/3 speed.
+Controls: WASD/arrows/middle-drag to pan, wheel to zoom, Space pause, 1/2/3 speed (camera mode).
+Building: **Q/E** cycle tool (camera → wall → door → floor → object → zone), **Esc** back to camera-only. Left-drag to build a wall perimeter or paint floor, left-click to place a door/object/zone, right-click to demolish. Number keys pick the sub-type for whichever tool is active (floor 1-4, object 1-9, zone 1-8).

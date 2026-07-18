@@ -10,10 +10,8 @@ if [ ! -x "$GODOT_BIN" ]; then
   exit 1
 fi
 
-# First run on a fresh checkout needs an import pass so scripts/resources
-# are registered before GUT loads them.
-if [ ! -d ".godot" ]; then
-  "$GODOT_BIN" --headless --path . --import >/dev/null 2>&1 || true
-fi
+# New/renamed class_name scripts need an import pass to land in the global
+# class cache before GUT loads them — cheap enough to always run.
+"$GODOT_BIN" --headless --path . --import >/dev/null 2>&1 || true
 
 exec "$GODOT_BIN" --headless --path . -s addons/gut/gut_cmdln.gd -gexit -gdir=res://tests
