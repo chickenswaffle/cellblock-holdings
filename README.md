@@ -1,5 +1,7 @@
 # Cellblock Holdings
 
+[![Play in browser](https://img.shields.io/badge/%E2%96%B6%EF%B8%8E%20%20PLAY%20IN%20BROWSER-2ea44f?style=for-the-badge)](https://chickenswaffle.github.io/cellblock-holdings/)
+
 A tile-based prison management sim where you don't play a warden — you play the **franchise owner**. Build prisons, staff them, keep the population from tearing itself apart, and answer to a board that only reads spreadsheets.
 
 **Stack:** Godot 4.4 · GDScript · 2D · no external deps (GUT vendored for tests).
