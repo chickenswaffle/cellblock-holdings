@@ -10,8 +10,17 @@ Godot 4.4 prison-franchise management sim. Full design + milestones: `docs/cellb
 - `SimWorld.tick()` is the only mutation entry point. Fixed timestep 10 ticks/sec; speed changes ticks-per-frame in the view, never tick size. The sim never sees `delta`.
 - Sim → view communication via `SimEventBus` (plain observer list). View reads sim state, never writes it.
 - Every sim class implements `to_dict()`/`from_dict()`; state must be reachable from `SimWorld` or it doesn't exist. Determinism tests hash `SimWorld.to_dict()` JSON.
-- Godot 4.4 APIs only: `TileMapLayer` not `TileMap`, own A* not `AStarGrid2D`.
+- Godot 4.4 APIs only: own A* not `AStarGrid2D`.
 - `class_name` + typed vars everywhere.
+
+## View layer is 3D (post-M1 pivot)
+
+Angled orthogonal `Camera3D` (Cities Skylines-ish, ~35° pitch, no rotation yet), everything code-authored — no imported 3D models. `1 world unit = 1 tile`, sim `(x, y)` maps to 3D `(x, 0, y)` (Y is up). Key pieces:
+- `terrain_renderer_3d.gd` — one ground `PlaneMesh`, one draw call. Floor type per tile is baked into a small texture (`assets/shaders/terrain.gdshader` reads it) and sampled with linear filtering, which blends smoothly across tile boundaries "for free" instead of needing per-tile geometry.
+- `structures_renderer_3d.gd` — walls/doors/each object type are batched into their own `MultiMeshInstance3D` (rebuilt whenever `grid.grid_version` changes), so draw calls stay flat regardless of count. Zone tint reuses the terrain's texture-blend trick on a second, slightly-elevated plane.
+- `camera_rig.gd` — pan/zoom/edge-scroll. Middle-drag panning raycasts the ground plane (`ground_point()`) so the point under the cursor stays under the cursor at any zoom — don't replace this with a hand-derived screen-to-world scale factor, the pitch's foreshortening makes that error-prone (learned the hard way: a fixed-angle guess first read as "basically top-down" until verified against the actual foreshortening ratio in a screenshot).
+- Tile picking for build/zone tools also goes through `CameraRig.ground_point()` (a ray-plane intersection against y=0), not pixel math — this is what makes tile picking work correctly regardless of camera zoom/pitch.
+- Gotcha already hit once: edge-scroll fired on its own before any real mouse movement, because the OS/engine's default cursor position can sit inside the edge margin at startup. `camera_rig.gd` gates edge-scroll on `_mouse_seen` (only set true by a real `InputEventMouseMotion`) — don't remove that guard.
 
 ## Verify visually
 

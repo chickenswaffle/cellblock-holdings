@@ -1,9 +1,9 @@
 class_name Bootstrap
-extends Node2D
-## Builds the whole runtime scene in code: sim, camera, renderers, input
-## tools. Owns the fixed-timestep loop — accumulates real delta into whole
-## sim ticks at TICKS_PER_SECOND. The sim never sees delta; speed controls
-## change ticks-per-frame, never tick size.
+extends Node3D
+## Builds the whole runtime scene in code: sim, lighting, camera, renderers,
+## input tools. Owns the fixed-timestep loop — accumulates real delta into
+## whole sim ticks at TICKS_PER_SECOND. The sim never sees delta; speed
+## controls change ticks-per-frame, never tick size.
 
 const TICKS_PER_SECOND := 10.0
 const SPEEDS: Array[float] = [1.0, 3.0, 10.0]
@@ -27,9 +27,10 @@ var tool_mode: int = ToolMode.NONE
 var build_tool: BuildTool
 var zone_tool: ZoneTool
 
-var _renderer: TilemapRenderer
-var _walls: WallRenderer
-var _drag_preview: Node2D
+var _camera_rig: CameraRig
+var _terrain: TerrainRenderer3D
+var _structures: StructuresRenderer3D
+var _drag_preview: MeshInstance3D
 var _hud_label: Label
 var _screenshot_path := ""
 var _screenshot_frames := 0
@@ -39,34 +40,57 @@ func _ready() -> void:
 	world = SimWorld.new(12345)
 	_scatter_placeholder_floors()
 
-	_renderer = TilemapRenderer.new()
-	_renderer.name = "TilemapRenderer"
-	add_child(_renderer)
-	_renderer.setup(world.grid)
+	_setup_environment()
 
-	_walls = WallRenderer.new()
-	_walls.name = "WallRenderer"
-	add_child(_walls)
-	_walls.setup(world)
+	_terrain = TerrainRenderer3D.new()
+	_terrain.name = "Terrain"
+	add_child(_terrain)
+	_terrain.setup(world.grid)
 
-	_drag_preview = Node2D.new()
+	_structures = StructuresRenderer3D.new()
+	_structures.name = "Structures"
+	add_child(_structures)
+	_structures.setup(world)
+
+	_drag_preview = MeshInstance3D.new()
 	_drag_preview.name = "DragPreview"
-	_drag_preview.draw.connect(_draw_drag_preview)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(1, 1, 1, 0.3)
+	_drag_preview.material_override = mat
+	_drag_preview.visible = false
 	add_child(_drag_preview)
 
 	build_tool = BuildTool.new(world)
 	zone_tool = ZoneTool.new(world)
 
-	var cam := CameraRig.new()
-	cam.name = "CameraRig"
-	cam.position = Vector2(world.grid.width, world.grid.height) * TilemapRenderer.TILE_PX * 0.5
-	add_child(cam)
+	_camera_rig = CameraRig.new()
+	_camera_rig.name = "CameraRig"
+	_camera_rig.position = Vector3(world.grid.width, 0.0, world.grid.height) * 0.5
+	add_child(_camera_rig)
 
 	_build_hud()
 
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot="):
 			_screenshot_path = arg.trim_prefix("--screenshot=")
+func _setup_environment() -> void:
+	var env := Environment.new()
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Color(0.55, 0.68, 0.78)
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(0.65, 0.7, 0.78)
+	env.ambient_light_energy = 0.9
+	var world_env := WorldEnvironment.new()
+	world_env.environment = env
+	add_child(world_env)
+
+	var sun := DirectionalLight3D.new()
+	sun.rotation_degrees = Vector3(-55, -35, 0)
+	sun.light_energy = 1.1
+	sun.shadow_enabled = true
+	add_child(sun)
 
 
 func _process(delta: float) -> void:
@@ -76,7 +100,7 @@ func _process(delta: float) -> void:
 			world.tick()
 			_accumulator -= 1.0
 	_update_hud()
-	_drag_preview.queue_redraw()
+	_update_drag_preview()
 
 	if _screenshot_path != "":
 		_screenshot_frames += 1
@@ -138,8 +162,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var mb := event as InputEventMouseButton
 	if mb != null:
-		var tile := _mouse_tile()
-		var frac := _mouse_local_frac()
+		var ground = _camera_rig.ground_point(mb.position)
+		if ground == null:
+			return
+		var tile := Vector2i(floori(ground.x), floori(ground.z))
+		var frac := Vector2(fposmod(ground.x, 1.0), fposmod(ground.z, 1.0))
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			if mb.pressed:
 				if tool_mode == ToolMode.ZONE:
@@ -153,17 +180,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
 			build_tool.remove_at(tile, frac)
 	elif event is InputEventMouseMotion and build_tool.dragging:
-		build_tool.update_drag(_mouse_tile())
-
-
-func _mouse_tile() -> Vector2i:
-	var p := get_global_mouse_position() / TilemapRenderer.TILE_PX
-	return Vector2i(floori(p.x), floori(p.y))
-
-
-func _mouse_local_frac() -> Vector2:
-	var p := get_global_mouse_position() / TilemapRenderer.TILE_PX
-	return Vector2(fposmod(p.x, 1.0), fposmod(p.y, 1.0))
+		var ground = _camera_rig.ground_point((event as InputEventMouseMotion).position)
+		if ground != null:
+			build_tool.update_drag(Vector2i(floori(ground.x), floori(ground.z)))
 
 
 static func _digit_pressed(keycode: int) -> int:
@@ -172,19 +191,16 @@ static func _digit_pressed(keycode: int) -> int:
 	return -1
 
 
-func _draw_drag_preview() -> void:
+func _update_drag_preview() -> void:
 	if not build_tool.dragging:
+		_drag_preview.visible = false
 		return
+	_drag_preview.visible = true
 	var rect := build_tool.drag_rect()
-	var px := TilemapRenderer.TILE_PX
-	_drag_preview.draw_rect(
-		Rect2(rect.position * px, rect.size * px),
-		Color(1, 1, 1, 0.25), true
-	)
-	_drag_preview.draw_rect(
-		Rect2(rect.position * px, rect.size * px),
-		Color(1, 1, 1, 0.8), false, 2.0
-	)
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(rect.size.x, rect.size.y)
+	_drag_preview.mesh = plane
+	_drag_preview.position = Vector3(rect.position.x + rect.size.x / 2.0, 0.05, rect.position.y + rect.size.y / 2.0)
 
 
 ## Placeholder terrain so the map isn't a flat brown square: a concrete pad
@@ -240,10 +256,12 @@ func _update_hud() -> void:
 		lines.append("cost preview: $%d" % build_tool.preview_cost())
 
 	if tool_mode == ToolMode.ZONE:
-		var t := _mouse_tile()
-		if world.grid.in_bounds(t.x, t.y):
-			var r := world.room_at(t.x, t.y)
-			if r != null:
-				lines.append("room: %d tiles, sealed=%s, valid=%s" % [r.tiles.size(), r.sealed, r.zone_valid])
+		var ground = _camera_rig.ground_point(get_viewport().get_mouse_position())
+		if ground != null:
+			var t := Vector2i(floori(ground.x), floori(ground.z))
+			if world.grid.in_bounds(t.x, t.y):
+				var r := world.room_at(t.x, t.y)
+				if r != null:
+					lines.append("room: %d tiles, sealed=%s, valid=%s" % [r.tiles.size(), r.sealed, r.zone_valid])
 
 	_hud_label.text = "\n".join(lines)

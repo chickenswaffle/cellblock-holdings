@@ -4,14 +4,15 @@
 
 A tile-based prison management sim where you don't play a warden — you play the **franchise owner**. Build prisons, staff them, keep the population from tearing itself apart, and answer to a board that only reads spreadsheets.
 
-**Stack:** Godot 4.4 · GDScript · 2D · no external deps (GUT vendored for tests).
+**Stack:** Godot 4.4 · GDScript · 3D (angled orthogonal camera, procedurally generated geometry — no imported 3D assets) · no external deps (GUT vendored for tests).
 
 Full design + milestone plan: [`docs/cellblock-holdings-plan.md`](docs/cellblock-holdings-plan.md)
 
 ## Status
 
 - ✅ **M0 — Skeleton**: pure sim core (`SimWorld`, seeded xorshift RNG, fixed-tick clock, event bus, edge-walled grid), code-built view (camera rig, `TileMapLayer` renderer with runtime placeholder tileset), headless GUT tests incl. determinism (same seed × 1000 ticks → identical state hash) and a sim-purity scan that fails if anything under `scripts/sim/` touches the engine.
-- ✅ **M1 — Build mode**: walls/doors/floors via a sequential `ConstructionQueue` (money deducted on completion, not order), flood-fill `RoomDetector` (border-leak sealed check, doors block same as walls), `ZoneValidator` + 8 zone kinds with per-kind required objects, `Ledger`, drag-rectangle build tool + click-to-zone tool, wall/zone/object rendering. 54 tests green, incl. 5 room-detection fixtures (nested rooms, door-in-corner, border-sealed) and an end-to-end SimWorld test matching the milestone's literal DoD.
+- ✅ **M1 — Build mode**: walls/doors/floors via a sequential `ConstructionQueue` (money deducted on completion, not order), flood-fill `RoomDetector` (border-leak sealed check, doors block same as walls), `ZoneValidator` + 8 zone kinds with per-kind required objects, `Ledger`, drag-rectangle build tool + click-to-zone tool. 54 tests green, incl. 5 room-detection fixtures (nested rooms, door-in-corner, border-sealed) and an end-to-end SimWorld test matching the milestone's literal DoD.
+- ✅ **Rendering pivot — 2D → 3D**: replaced the flat top-down tilemap with a true-3D view: one shader-blended ground mesh (soft natural terrain instead of a hard grid), an angled Cities-Skylines-style orthogonal camera, real-time lighting/shadows, and procedurally generated 3D geometry for walls/doors/zone tint/objects (all still code-authored, no imported models). Sim layer untouched — this only replaced `scripts/view/`.
 - ⬜ M2 — Prisoners · M3 — Staff · M4 — Conflict · M5 — Franchise · M6 — Board & oversight · M7 — Save/load · M8 — Content & juice
 
 ## Architecture in one paragraph

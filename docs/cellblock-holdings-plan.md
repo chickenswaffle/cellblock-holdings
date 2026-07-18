@@ -2,7 +2,9 @@
 
 A tile-based prison management sim where you don't play a warden — you play the **franchise owner**. Build prisons, staff them, keep the population from tearing itself apart, and answer to a board that only reads spreadsheets.
 
-**Stack:** Godot 4.4 · GDScript · 2D (TileMapLayer + pooled Node2D agents) · no external deps. Save via Godot JSON. Tests via GUT (Godot Unit Test) run headless.
+**Stack:** Godot 4.4 · GDScript · 3D, angled orthogonal camera (procedurally generated low-poly geometry — no external 3D assets, everything code-authored) · no external deps. Save via Godot JSON. Tests via GUT (Godot Unit Test) run headless.
+
+**Rendering pivot (post-M1):** M0/M1 shipped as flat top-down 2D (`TileMapLayer` + `Node2D`), per the original stack line below. After playing it, the visual direction changed to true 3D — a Cities Skylines-ish angled camera, procedurally generated terrain/walls/objects, real-time lighting — while keeping the same principle: everything stays code-authored (procedural meshes/shaders as text), no binary 3D asset pipeline. The sim layer was untouched by this; only `scripts/view/` was rewritten. Every "2D"/`TileMapLayer`/`Node2D`/`Camera2D` reference below is historical (M0/M1's original rendering) — current view-layer code is 3D (`MeshInstance3D`, `MultiMeshInstance3D`, `Camera3D`, `.gdshader` files in `assets/shaders/`). See the repo's `CLAUDE.md` for the current architecture.
 
 **Why Godot over Unity/web:** for an agent-built project the axis that matters is *how much of the work is text the agent can author vs. clicks in an editor it can't touch*. Godot scenes (`.tscn`) and resources (`.tres`) are **plain text** — Claude Code authors and diffs them directly. It runs fully headless for CI. That removes the single biggest friction point (Unity's binary scenes) while still being a real engine with a scene tree and tooling. The whole simulation is engine-agnostic pure GDScript anyway, so the engine only owns the thin rendering layer.
 

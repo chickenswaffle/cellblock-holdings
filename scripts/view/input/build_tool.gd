@@ -6,8 +6,6 @@ extends RefCounted
 ## the caller (bootstrap.gd) owns screen<->tile conversion and drawing the
 ## live drag preview.
 
-const TILE_PX := TilemapRenderer.TILE_PX
-
 enum Mode { WALL, DOOR, FLOOR, OBJECT }
 
 var world: SimWorld
