@@ -32,6 +32,7 @@ var on_lockdown: Callable
 var on_overlay_toggled: Callable
 var on_edge_scroll_toggled: Callable
 var on_recenter: Callable
+var on_rotate: Callable
 
 var _root: Control
 var _tool_buttons: Array[Button] = []
@@ -56,6 +57,8 @@ var _inspector: PanelContainer
 var _inspector_text: Label
 var _faction_label: Label
 var _hint: Label
+var _build_panel: PanelContainer
+var _build_text: Label
 
 
 func setup(p_world: SimWorld) -> void:
@@ -74,6 +77,7 @@ func setup(p_world: SimWorld) -> void:
 	_build_staff_panel()
 	_build_incident_panel()
 	_build_inspector()
+	_build_preview_panel()
 	_build_hint()
 
 
@@ -131,7 +135,17 @@ func _build_top_bar() -> void:
 	_overlay_button.pressed.connect(func() -> void: on_overlay_toggled.call())
 	row.add_child(_overlay_button)
 
-	var recenter := UiTheme.button("Recenter", "Jump back to the facility  [Home]")
+	# Plain words rather than rotation glyphs: ⟲/⟳ aren't in the default
+	# font and render as dots.
+	var rotate_left := UiTheme.button("Turn L", "Rotate the view left  [,]  — or right-drag")
+	rotate_left.pressed.connect(func() -> void: on_rotate.call(-45.0))
+	row.add_child(rotate_left)
+
+	var rotate_right := UiTheme.button("Turn R", "Rotate the view right  [.]  — or right-drag")
+	rotate_right.pressed.connect(func() -> void: on_rotate.call(45.0))
+	row.add_child(rotate_right)
+
+	var recenter := UiTheme.button("Recenter", "Jump back to the facility, facing north  [Home]")
 	recenter.pressed.connect(func() -> void: on_recenter.call())
 	row.add_child(recenter)
 
@@ -273,11 +287,47 @@ func _build_inspector() -> void:
 	col.add_child(_inspector_text)
 
 
+## Live readout for whatever area is being dragged out: how much of it there
+## is, what it costs, and how long the crew will take. Sits just above the
+## hint so it never covers the selection itself.
+func _build_preview_panel() -> void:
+	_build_panel = UiTheme.panel(UiTheme.BG_RAISED)
+	_build_panel.visible = false
+	_root.add_child(_build_panel)
+	_build_text = UiTheme.label("", UiTheme.TEXT, 13)
+	_build_panel.add_child(_build_text)
+	UiTheme.pin(_build_panel, 0, 1, 0, 52)
+
+
+## Called by Bootstrap every frame while a build drag is live.
+func show_build_preview(info: Dictionary) -> void:
+	_build_panel.visible = true
+	var count: int = info["count"]
+	if count == 0:
+		_build_text.text = "Nothing to build here"
+		_build_text.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
+		return
+	var affordable: bool = info["affordable"]
+	_build_text.text = "%d %s   ·   $%s   ·   %s" % [
+		count, info["noun"], _thousands(info["cost"]), info["duration"],
+	]
+	_build_text.add_theme_color_override(
+		"font_color", UiTheme.TEXT if affordable else UiTheme.BAD
+	)
+	if not affordable:
+		_build_text.text += "   — can't afford it"
+
+
+func hide_build_preview() -> void:
+	_build_panel.visible = false
+
+
 func _build_hint() -> void:
 	var panel := UiTheme.panel()
 	_root.add_child(panel)
 	_hint = UiTheme.label(
-		"WASD / middle-drag pan · wheel zoom · Home recenter", UiTheme.TEXT_DIM, 11
+		"WASD / middle-drag pan · wheel zoom · right-drag or , . rotate · PgUp/PgDn tilt · Home recenter",
+		UiTheme.TEXT_DIM, 11
 	)
 	panel.add_child(_hint)
 	UiTheme.pin(panel, 1, 1)

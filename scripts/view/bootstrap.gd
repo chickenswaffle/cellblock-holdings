@@ -10,6 +10,7 @@ const SPEEDS: Array[float] = [1.0, 3.0, 10.0]
 
 enum ToolMode { NONE, WALL, DOOR, FLOOR, OBJECT, ZONE }
 
+const WALL_STYLE_NAMES := ["room outline", "single wall"]
 const FLOOR_NAMES := ["dirt", "concrete", "tile", "grass"]
 const OBJECT_NAMES := [
 	"bed", "toilet", "table", "bench", "phone",
@@ -111,6 +112,8 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot="):
 			_screenshot_path = arg.trim_prefix("--screenshot=")
+
+
 func _setup_environment() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
@@ -259,14 +262,20 @@ func _unhandled_input(event: InputEvent) -> void:
 			if mb.pressed:
 				if tool_mode == ToolMode.ZONE:
 					zone_tool.click(tile)
-				elif tool_mode == ToolMode.DOOR or tool_mode == ToolMode.OBJECT:
+				elif tool_mode == ToolMode.DOOR:
 					build_tool.click(tile, frac)
 				else:
+					# Objects drag too now, so a press starts a drag and a
+					# release with no movement still places exactly one.
 					build_tool.begin_drag(tile)
 			else:
 				build_tool.end_drag()
-		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
-			build_tool.remove_at(tile, frac)
+		elif mb.button_index == MOUSE_BUTTON_RIGHT and not mb.pressed:
+			# Demolish on *release*, and only when the camera didn't claim
+			# this as an orbit — right-drag turns the view, right-click
+			# knocks something down, and they share a button.
+			if not _camera_rig.orbiting:
+				build_tool.remove_at(tile, frac)
 	elif event is InputEventMouseMotion and build_tool.dragging:
 		var ground = _camera_rig.ground_point((event as InputEventMouseMotion).position)
 		if ground != null:
@@ -279,16 +288,68 @@ static func _digit_pressed(keycode: int) -> int:
 	return -1
 
 
+## Colour of the selection box: green when the order is valid and paid for,
+## red when it isn't. Tinting the actual area is the fastest way to answer
+## "what exactly am I about to build" — far quicker to read than the numbers.
+const PREVIEW_OK := Color(0.30, 0.85, 0.45, 0.35)
+const PREVIEW_BAD := Color(0.92, 0.30, 0.25, 0.38)
+## A worker delivers one work unit per tick at full rate.
+const WORK_PER_WORKER_TICK := 1.0
+
+
 func _update_drag_preview() -> void:
 	if not build_tool.dragging:
 		_drag_preview.visible = false
+		_hud.hide_build_preview()
 		return
-	_drag_preview.visible = true
+
 	var rect := build_tool.drag_rect()
+	var summary := build_tool.preview_summary()
+	var buildable: bool = summary["count"] > 0 and summary["affordable"]
+
+	_drag_preview.visible = true
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(rect.size.x, rect.size.y)
 	_drag_preview.mesh = plane
-	_drag_preview.position = Vector3(rect.position.x + rect.size.x / 2.0, 0.05, rect.position.y + rect.size.y / 2.0)
+	_drag_preview.position = Vector3(
+		rect.position.x + rect.size.x / 2.0, 0.06, rect.position.y + rect.size.y / 2.0
+	)
+	var mat := _drag_preview.material_override as StandardMaterial3D
+	if mat != null:
+		mat.albedo_color = PREVIEW_OK if buildable else PREVIEW_BAD
+
+	summary["noun"] = _preview_noun(summary["count"])
+	summary["duration"] = _estimate_duration(summary["work"])
+	_hud.show_build_preview(summary)
+
+
+func _preview_noun(count: int) -> String:
+	var plural := count != 1
+	match tool_mode:
+		ToolMode.WALL:
+			return "wall sections" if plural else "wall section"
+		ToolMode.FLOOR:
+			return "floor tiles" if plural else "floor tile"
+		ToolMode.OBJECT:
+			return "%ss" % OBJECT_NAMES[build_tool.object_type] if plural else OBJECT_NAMES[build_tool.object_type]
+		_:
+			return "items" if plural else "item"
+
+
+## Turn queued worker-ticks into wall-clock sim time, given who is actually
+## on shift. With nobody rostered the honest answer isn't a number — it's
+## that this will sit in the queue untouched until you hire someone.
+func _estimate_duration(work: float) -> String:
+	if work <= 0.0:
+		return "—"
+	var workers := world.on_duty_count(Staff.Role.WORKER)
+	if workers == 0:
+		return "no workers on shift"
+	var ticks := work / (float(workers) * WORK_PER_WORKER_TICK)
+	var minutes := int(ticks / float(SimClock.TICKS_PER_SIM_MINUTE))
+	if minutes < 60:
+		return "~%d min" % maxi(1, minutes)
+	return "~%dh %02dm" % [minutes / 60, minutes % 60]
 
 
 ## Placeholder terrain so the map isn't a flat brown square: a concrete pad
@@ -416,7 +477,10 @@ func _build_hud() -> void:
 	_hud.on_overlay_toggled = _toggle_overlay
 	_hud.on_edge_scroll_toggled = func() -> void:
 		_camera_rig.edge_scroll_enabled = not _camera_rig.edge_scroll_enabled
-	_hud.on_recenter = func() -> void: _camera_rig.recenter()
+	_hud.on_recenter = func() -> void:
+		_camera_rig.recenter()
+		_camera_rig.reset_angle()
+	_hud.on_rotate = func(degrees: float) -> void: _camera_rig.rotate_by(degrees)
 
 
 func _toggle_overlay() -> void:
@@ -435,6 +499,8 @@ func _select_tool(mode: int) -> void:
 ## The HUD renders these as buttons; Q/E cycle them.
 func _subtype_options() -> Array:
 	match tool_mode:
+		ToolMode.WALL:
+			return WALL_STYLE_NAMES
 		ToolMode.FLOOR:
 			return FLOOR_NAMES
 		ToolMode.OBJECT:
@@ -447,6 +513,8 @@ func _subtype_options() -> Array:
 
 func _subtype_index() -> int:
 	match tool_mode:
+		ToolMode.WALL:
+			return build_tool.wall_style
 		ToolMode.FLOOR:
 			return build_tool.floor_type
 		ToolMode.OBJECT:
@@ -462,6 +530,8 @@ func _select_subtype(index: int) -> void:
 	if index < 0 or index >= options.size():
 		return
 	match tool_mode:
+		ToolMode.WALL:
+			build_tool.wall_style = index
 		ToolMode.FLOOR:
 			build_tool.floor_type = index
 		ToolMode.OBJECT:

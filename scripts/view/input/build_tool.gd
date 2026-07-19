@@ -1,15 +1,22 @@
 class_name BuildTool
 extends RefCounted
-## Wall/door/floor/object placement. Drag-rectangle for walls (perimeter of
-## the dragged box) and floor (fills the box); single click for doors
-## (nearest edge to the click point) and objects. Pure input->intent logic;
-## the caller (bootstrap.gd) owns screen<->tile conversion and drawing the
-## live drag preview.
+## Turns drags and clicks into BuildOrders. Pure input->intent logic; the
+## caller (bootstrap.gd) owns screen<->tile conversion and drawing the live
+## preview.
+##
+## Everything except doors is a drag: walls draw a room outline or a single
+## run, floors fill the box, and objects fill it too so you can lay a row of
+## beds in one gesture. A drag that never moves is just a one-tile drag, so
+## click-to-place still works without a separate code path.
 
 enum Mode { WALL, DOOR, FLOOR, OBJECT }
+## Wall drags either enclose the box (for making rooms) or run along one edge
+## of it (for dividing or extending what's already there).
+enum WallStyle { OUTLINE, LINE }
 
 var world: SimWorld
 var mode: int = Mode.WALL
+var wall_style: int = WallStyle.OUTLINE
 var floor_type: int = SimTile.FloorType.CONCRETE
 var object_type: int = ObjectDef.Type.BED
 
@@ -23,7 +30,7 @@ func _init(p_world: SimWorld) -> void:
 
 
 func begin_drag(tile: Vector2i) -> void:
-	if mode == Mode.DOOR or mode == Mode.OBJECT:
+	if mode == Mode.DOOR:
 		return
 	dragging = true
 	drag_start = tile
@@ -49,9 +56,11 @@ func preview_orders() -> Array[BuildOrder]:
 		return []
 	match mode:
 		Mode.WALL:
-			return _perimeter_orders(drag_rect())
+			return _line_orders() if wall_style == WallStyle.LINE else _perimeter_orders(drag_rect())
 		Mode.FLOOR:
 			return _fill_orders(drag_rect())
+		Mode.OBJECT:
+			return _object_orders(drag_rect())
 		_:
 			return []
 
@@ -63,16 +72,38 @@ func preview_cost() -> int:
 	return total
 
 
-## Click (no drag) — used by DOOR and OBJECT modes.
+## Worker-ticks the current selection would add to the queue. The caller
+## turns this into an estimated duration using how many workers are on shift.
+func preview_work() -> float:
+	var total := 0.0
+	for o in preview_orders():
+		total += o.work_total
+	return total
+
+
+## What the player is about to get, for the on-screen readout.
+func preview_summary() -> Dictionary:
+	var orders := preview_orders()
+	var cost := 0
+	var work := 0.0
+	for o in orders:
+		cost += o.cost
+		work += o.work_total
+	return {
+		"count": orders.size(),
+		"cost": cost,
+		"work": work,
+		"affordable": cost <= world.ledger.balance,
+		"rect": drag_rect(),
+	}
+
+
+## Click (no drag) — doors only; everything else goes through the drag path.
 func click(tile: Vector2i, local_frac: Vector2) -> void:
-	match mode:
-		Mode.DOOR:
-			var flag := _nearest_edge(local_frac)
-			var order := BuildOrder.make_door(tile.x, tile.y, flag)
-			world.construction_queue.enqueue(order, world.ledger)
-		Mode.OBJECT:
-			if world.grid.in_bounds(tile.x, tile.y) and world.grid.object_at(tile.x, tile.y) == null:
-				world.construction_queue.enqueue(BuildOrder.make_object(tile.x, tile.y, object_type), world.ledger)
+	if mode != Mode.DOOR:
+		return
+	var flag := _nearest_edge(local_frac)
+	world.construction_queue.enqueue(BuildOrder.make_door(tile.x, tile.y, flag), world.ledger)
 
 
 func end_drag() -> void:
@@ -109,20 +140,65 @@ func _perimeter_orders(rect: Rect2i) -> Array[BuildOrder]:
 	if not world.grid.in_bounds(x0, y0) or not world.grid.in_bounds(x1, y1):
 		return out
 	for x in range(x0, x1 + 1):
-		out.append(BuildOrder.make_wall(x, y0, SimTile.WALL_N))
-		out.append(BuildOrder.make_wall(x, y1, SimTile.WALL_S))
+		_append_wall(out, x, y0, SimTile.WALL_N)
+		_append_wall(out, x, y1, SimTile.WALL_S)
 	for y in range(y0, y1 + 1):
-		out.append(BuildOrder.make_wall(x0, y, SimTile.WALL_W))
-		out.append(BuildOrder.make_wall(x1, y, SimTile.WALL_E))
+		_append_wall(out, x0, y, SimTile.WALL_W)
+		_append_wall(out, x1, y, SimTile.WALL_E)
 	return out
+
+
+## A single wall run along whichever axis the player dragged furthest — for
+## dividing a room or extending an existing block, where a full outline would
+## be wrong. Horizontal runs sit on the north edge, vertical on the west, so
+## the result is predictable from the drag alone.
+func _line_orders() -> Array[BuildOrder]:
+	var out: Array[BuildOrder] = []
+	var dx := absi(drag_end.x - drag_start.x)
+	var dy := absi(drag_end.y - drag_start.y)
+	if dx >= dy:
+		var y := drag_start.y
+		for x in range(mini(drag_start.x, drag_end.x), maxi(drag_start.x, drag_end.x) + 1):
+			_append_wall(out, x, y, SimTile.WALL_N)
+	else:
+		var x := drag_start.x
+		for y in range(mini(drag_start.y, drag_end.y), maxi(drag_start.y, drag_end.y) + 1):
+			_append_wall(out, x, y, SimTile.WALL_W)
+	return out
+
+
+## Skips walls that already exist, so dragging over part of a finished
+## building doesn't charge you twice for what's already standing.
+func _append_wall(out: Array[BuildOrder], x: int, y: int, flag: int) -> void:
+	if not world.grid.in_bounds(x, y):
+		return
+	if world.grid.tile_at(x, y).has_wall(flag):
+		return
+	out.append(BuildOrder.make_wall(x, y, flag))
 
 
 func _fill_orders(rect: Rect2i) -> Array[BuildOrder]:
 	var out: Array[BuildOrder] = []
 	for y in range(rect.position.y, rect.position.y + rect.size.y):
 		for x in range(rect.position.x, rect.position.x + rect.size.x):
-			if world.grid.in_bounds(x, y):
-				out.append(BuildOrder.make_floor(x, y, floor_type))
+			if not world.grid.in_bounds(x, y):
+				continue
+			if world.grid.tile_at(x, y).floor_type == floor_type:
+				continue # already this surface
+			out.append(BuildOrder.make_floor(x, y, floor_type))
+	return out
+
+
+## One object per free tile in the box — drag out a row of beds in a single
+## gesture. Tiles that already hold something are skipped rather than
+## rejecting the whole drag.
+func _object_orders(rect: Rect2i) -> Array[BuildOrder]:
+	var out: Array[BuildOrder] = []
+	for y in range(rect.position.y, rect.position.y + rect.size.y):
+		for x in range(rect.position.x, rect.position.x + rect.size.x):
+			if not world.grid.in_bounds(x, y) or world.grid.object_at(x, y) != null:
+				continue
+			out.append(BuildOrder.make_object(x, y, object_type))
 	return out
 
 

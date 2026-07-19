@@ -38,8 +38,8 @@ Everything is clickable — the keyboard shortcuts below are also printed on the
 
 | | |
 |---|---|
-| **Camera** | WASD/arrows or middle-drag to pan, wheel to zoom, **Home** to recenter. Edge-scrolling is off by default; there's a toggle in the top bar. |
-| **Build** | **1**–**5** pick a tool (wall, door, floor, object, zone), **Esc** returns to camera. **Q**/**E** cycle the active tool's sub-type. Left-drag builds a wall run or paints floor, left-click places a door/object/zone, right-click demolishes. |
+| **Camera** | WASD/arrows or middle-drag to pan, wheel to zoom, **Home** to recenter. Right-drag or **,**/**.** turns the view a full 360°, **PgUp**/**PgDn** tilt. Panning follows wherever you're facing. Edge-scrolling is off by default; there's a toggle in the top bar. |
+| **Build** | **1**–**5** pick a tool (wall, door, floor, object, zone), **Esc** returns to camera. **Q**/**E** cycle the active tool's sub-type. Drag out an area and it highlights green (or red if you can't afford it) while a readout tells you how many pieces, what it costs, and how long your crew will take. Walls drag as a room outline or a single run — pick which in the type palette — so you can extend and divide existing buildings. Objects drag too: pull out a row of beds in one gesture. Right-click demolishes. |
 | **Time** | **Space** pauses, **−**/**+** change speed. |
 | **Staff** | Hire and fire from the staff panel. Nothing you queue gets built until a worker is on shift to build it. |
 | **Conflict** | **T** toggles the tension overlay. While an incident is running: **F** force, **G** solitary, **N** negotiate, **B** transfer, **K** concede, **L** lockdown. |

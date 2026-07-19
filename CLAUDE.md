@@ -70,6 +70,10 @@ Bootstrap checks `_hud.pointer_over_ui()` in `_unhandled_input` and feeds `Camer
 
 ## Camera
 
+Full 360° yaw plus adjustable pitch. Rotation works by spinning the **rig**, not the camera: the camera is a child at a fixed local offset that always looks back at the rig's origin, so rotating the parent orbits it around whatever it's centred on with no trigonometry. `ground_point()` projects from the camera's real transform, so tile picking survives any angle without special-casing — don't replace it with hand-derived screen math.
+
+Two things rotation drags along with it: **WASD panning is rotated by yaw** (once the view turns, "W" has to mean "away from me"), and **right-drag is shared between orbiting and demolishing** — the rig sets `orbiting` once the pointer actually moves, and Bootstrap demolishes on right-button *release* only when that flag is clear.
+
 `CameraRig.position` is clamped to the map by `_clamp_to_bounds()`, and **every pan path must go through `_pan_by()`** so nothing can bypass it. Before that existed, WASD/edge-scroll/drag could pan arbitrarily far off the grid and leave the player staring at empty background with no landmark — the camera has to be *incapable* of losing the player. `tests/test_camera_rig.gd` covers this. `TerrainRenderer3D` also lays a large backdrop plane past the grid so the map edge reads as ground rather than void; that's the second line of defence, not the first.
 
 ## Verify visually
