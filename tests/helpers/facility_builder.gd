@@ -8,7 +8,15 @@ extends RefCounted
 const BEDS_PER_DORM := 5
 
 
-## grid should be at least (2 + dorm_count*8 + 5) wide and ~25 tall.
+## Minimum grid width build() needs. The canteen alone is 40 tiles wide
+## regardless of dorm count, and the yard sits past it — build() on anything
+## narrower writes walls off the edge of the map, which surfaces as a wall of
+## `tile_at` assertion failures rather than anything that names the cause.
+static func min_width(dorm_count: int) -> int:
+	var canteen_width := maxi(40, dorm_count * 2)
+	return maxi(2 + dorm_count * 8 + 5, 2 + canteen_width + 4 + 20 + 2)
+
+
 static func build_box(grid: SimGrid, x0: int, y0: int, x1: int, y1: int) -> void:
 	for x in range(x0, x1 + 1):
 		grid.set_wall(x, y0, SimTile.WALL_N, true)
@@ -21,6 +29,8 @@ static func build_box(grid: SimGrid, x0: int, y0: int, x1: int, y1: int) -> void
 ## dorm_count dorms of BEDS_PER_DORM beds each = dorm_count*5 total capacity.
 static func build(world: SimWorld, dorm_count: int) -> void:
 	var g := world.grid
+	assert(g.width >= min_width(dorm_count),
+		"grid too narrow for %d dorms — needs %d wide" % [dorm_count, min_width(dorm_count)])
 	for i in range(dorm_count):
 		var x0 := 2 + i * 8
 		var x1 := x0 + 5

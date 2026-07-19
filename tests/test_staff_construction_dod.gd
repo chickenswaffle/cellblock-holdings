@@ -80,11 +80,17 @@ func test_off_shift_workers_do_not_build() -> void:
 
 
 func test_dismissing_a_worker_returns_their_order_to_the_pool() -> void:
-	var world := _world_with_queue(6, 1)
+	# Several orders, and we look up whichever one the worker actually holds:
+	# indexing orders[0] would race the worker finishing it.
+	var world := _world_with_queue(6, 3)
 	var worker := Crew.staff_up(world, Staff.Role.WORKER, 1, Vector2i(2, 2))[0]
-	for i in range(200):
+	var order: BuildOrder = null
+	for i in range(400):
 		world.tick()
-	var order: BuildOrder = world.construction_queue.orders[0]
+		order = world.construction_queue.order_by_id(worker.job_order_id)
+		if order != null and order.work_remaining < order.work_total:
+			break
+	assert_not_null(order, "worker should be holding an order mid-build")
 	assert_eq(order.claimed_by, worker.id, "worker should have claimed it")
 	var partial := order.work_remaining
 	assert_lt(partial, order.work_total, "and started on it")

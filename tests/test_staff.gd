@@ -92,7 +92,8 @@ func test_a_worker_past_the_break_threshold_stops_working() -> void:
 		world.tick()
 	assert_eq(w.state, Staff.State.RESTING, "exhausted worker takes a break")
 	assert_eq(w.job_order_id, -1, "and gives up the job while they do")
-	assert_eq(world.construction_queue.orders[0].claimed_by, -1, "so someone else could take it")
+	for order in world.construction_queue.orders:
+		assert_eq(order.claimed_by, -1, "so someone else could take the work")
 
 
 func test_going_off_shift_parks_staff_at_the_gate() -> void:

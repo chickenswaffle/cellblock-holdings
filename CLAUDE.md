@@ -4,7 +4,7 @@ Godot 4.4 prison-franchise management sim. Full design + milestones: `docs/cellb
 
 ## Rules (non-negotiable)
 
-- Run `./run-tests.sh` after every change. Local Godot binary: `/Users/trading/ClaudeWorkspace/tools/Godot.app/Contents/MacOS/Godot` (override with `GODOT_BIN`).
+- Run `./run-tests.sh --fast` after every change, and the full `./run-tests.sh` before committing (see "Tests: fast vs full" below). Local Godot binary: `/Users/trading/ClaudeWorkspace/tools/Godot.app/Contents/MacOS/Godot` (override with `GODOT_BIN`).
 - Everything under `scripts/sim/` is **pure GDScript**: `RefCounted` only — no `Node`, no `get_tree()`, no `_process`, no `randf()`/`randi()`/`RandomNumberGenerator`, no Godot signals, no `Input`/`OS`/`Time`/`Engine`. `tests/test_sim_purity.gd` enforces this; fix the file, never the test.
 - All randomness via `SimWorld.rng` (`SimRng`, seeded xorshift64*). Hex int literals must fit in signed 64-bit.
 - `SimWorld.tick()` is the only mutation entry point. Fixed timestep 10 ticks/sec; speed changes ticks-per-frame in the view, never tick size. The sim never sees `delta`.
@@ -39,6 +39,24 @@ Movement lives in `SimAgent` (`scripts/sim/agents/sim_agent.gd`), which both `Pr
 **Construction requires workers.** `ConstructionQueue` no longer ticks itself — it's a work pool and `StaffSystem` is the only thing that calls `apply_work()`. A test that enqueues a `BuildOrder` and ticks `SimWorld` will now sit there forever unless it hires a worker: use `tests/helpers/crew.gd` (`Crew.staff_up()` + `Crew.set_hour()` to land inside the day shift, `Crew.run_until_built()`). Two traps that already bit while writing these tests: ticking long enough to cross 18:00 hands the job to the night shift, and a single wall is only 40 worker-ticks, so "tick 300 then assert they're still WORKING" fails because they already finished.
 
 Fatigue is the cross-cutting stat — it slows `move_speed()`, cuts `work_rate()`, erodes `effective_nerve()` (M4 reads that), and past `BREAK_AT_FATIGUE` sends anyone to a staff room. `SimWorld.guard_presence(room)` is the other thing M4 is meant to consume.
+
+## Conflict (M4)
+
+Everything under `scripts/sim/conflict/`. The chain runs in a fixed order every sim minute and the order is the design: **conditions → `GrievanceSystem` → `TensionField` → `IncidentSystem`**. Factions and contraband tick hourly.
+
+**Room ids are not stable — key persistent per-room state off `RoomInfo.key()`.** `RoomDetector` hands out ids in scan order, so building one wall anywhere renumbers half the map. `key()` is the room's topmost-leftmost tile. `TensionField`, faction territory and contraband stashes all use it; `room_adjacency()` is keyed by id because it's rebuilt in the same pass as the rooms.
+
+**Two constants define the tension model's character**: `RESPONSE_RATE` (how fast a room expresses its own pressure) and `DIFFUSION_RATE` (how fast it leaks to neighbours). Their *ratio* is the largest gap two connected rooms can sustain (~0.37 today). A past bug let diffusion run into the unsealed outdoors, which touches everything and holds no tension — that pinned every room at `RESPONSE_RATE/DIFFUSION_RATE` (~0.09) regardless of conditions and nothing ever sparked. `TensionField` now only exchanges with sealed rooms, and `test_tension_field.gd` has a regression test for it. If tension ever looks suspiciously uniform or capped, suspect a sink first.
+
+**The incident ladder is a branching graph** (`IncidentSystem._next_rung`), not `kind + 1`. The weapon rungs require contraband and are a detour, not a gate — a brawl with no weapons around escalates straight to faction war or block riot. Gating riots behind contraband breaks the M4 DoD for any facility without a visitation room.
+
+**Don't cache per-room queries on SimWorld keyed by time.** Prisoners are added, removed and moved mid-tick, so a tick-stamped occupancy cache silently serves stale data to whatever runs next in the same tick (this shipped briefly and was caught by a unit test). `prisoners_in_room()` always scans; callers that need every room at once build `occupancy_index()` once and pass it, the same pattern as `GrievanceSystem.crowding_by_prisoner()`. Caches keyed off `grid.grid_version` (`room_capacity`, `room_center`, `room_adjacency`) are fine — only building invalidates those.
+
+## Tests: fast vs full
+
+`./run-tests.sh --fast` skips `tests/slow/` and takes ~45s; the bare `./run-tests.sh` includes them and takes ~6 minutes. `tests/slow/` is the M4 riot DoD (20 seeds × 5 sim-days × 2 scenarios) and the 200-agent perf test. Use `--fast` while iterating, always run the full suite before committing. The slow tests are slow because they simulate ~100 prison-days — the dominant cost is M2's A*, which scales with map area, which is why the DoD test builds its own compact 28×16 facility instead of using `FacilityBuilder`'s 80-wide one.
+
+Two trap patterns when writing whole-sim tests, both hit for real: **ticking past a shift boundary** hands the job to the night shift and inverts your assertion, and **assuming an order/incident is still in progress** after N ticks when the underlying work takes fewer (look the entity up by id and assert it exists, don't index `[0]`).
 
 ## Verify visually
 

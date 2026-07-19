@@ -27,6 +27,13 @@ const HIRE_KEYS := {
 }
 const ROLE_NAMES := ["guard", "worker", "support"]
 
+## Resolution options for the worst open incident. F/G/N/B/K rather than
+## anything mnemonic-friendly, because the good letters are already taken by
+## the camera and build tools.
+const RESOLUTION_KEYS := [KEY_F, KEY_G, KEY_N, KEY_B, KEY_K]
+const RESOLUTION_LABELS := "[F] force  [G] solitary  [N] negotiate  [B] separate  [K] concede"
+const MANUAL_LOCKDOWN_MINUTES := 240
+
 var world: SimWorld
 var paused := false
 var speed_index := 0
@@ -41,6 +48,7 @@ var _terrain: TerrainRenderer3D
 var _structures: StructuresRenderer3D
 var _agents: AgentRenderer3D
 var _staff_renderer: StaffRenderer3D
+var _tension_overlay: TensionOverlay3D
 var _drag_preview: MeshInstance3D
 var _hud_label: Label
 var _inspected_id: int = -1
@@ -74,6 +82,11 @@ func _ready() -> void:
 	_staff_renderer.name = "Staff"
 	add_child(_staff_renderer)
 	_staff_renderer.setup(world)
+
+	_tension_overlay = TensionOverlay3D.new()
+	_tension_overlay.name = "TensionOverlay"
+	add_child(_tension_overlay)
+	_tension_overlay.setup(world)
 
 	_drag_preview = MeshInstance3D.new()
 	_drag_preview.name = "DragPreview"
@@ -155,6 +168,18 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		_sync_tool_mode()
 		return
 
+	if key.keycode == KEY_T:
+		_tension_overlay.visible = not _tension_overlay.visible
+		if _tension_overlay.visible:
+			_tension_overlay.refresh()
+		return
+	if key.keycode == KEY_L:
+		IncidentSystem.begin_lockdown(world, MANUAL_LOCKDOWN_MINUTES)
+		return
+	if key.keycode in RESOLUTION_KEYS:
+		_resolve_worst(key.keycode)
+		return
+
 	# Explicit type, not `:=` — Dictionary.get() infers Variant, which this
 	# project treats as a hard parse error.
 	var role: int = HIRE_KEYS.get(key.keycode, -1)
@@ -176,6 +201,26 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			build_tool.object_type = digit - 1
 		elif tool_mode == ToolMode.ZONE and digit >= 1 and digit <= ZONE_NAMES.size():
 			zone_tool.zone_kind = digit - 1
+
+
+## Every resolution key acts on the worst open incident — with one incident
+## list and no selection UI yet, "deal with the worst thing happening" is the
+## only unambiguous target. Per-incident selection lands with M7's UI pass.
+func _resolve_worst(keycode: int) -> void:
+	var inc := world.worst_incident()
+	if inc == null:
+		return
+	match keycode:
+		KEY_F:
+			IncidentSystem.resolve_force(world, inc)
+		KEY_G:
+			IncidentSystem.resolve_solitary(world, inc)
+		KEY_N:
+			IncidentSystem.resolve_negotiate(world, inc)
+		KEY_B:
+			IncidentSystem.resolve_separate(world, inc)
+		KEY_K:
+			IncidentSystem.resolve_concede(world, inc)
 
 
 func _fire(role: int) -> void:
@@ -409,6 +454,8 @@ func _update_hud() -> void:
 			"   ⚠ no workers on shift" if world.on_duty_count(Staff.Role.WORKER) == 0 else "",
 		])
 
+	lines.append_array(_conflict_lines())
+
 	lines.append("prisoners: %d   [click] inspect nearest" % world.prisoners.size())
 	if tool_mode == ToolMode.NONE:
 		var p := world.prisoner_at(_inspected_id)
@@ -424,6 +471,38 @@ func _update_hud() -> void:
 			])
 
 	_hud_label.text = "\n".join(lines)
+
+
+## The conflict readout: how tense the place is, what's actively going wrong,
+## and what the player can do about it right now.
+func _conflict_lines() -> Array:
+	var lines := []
+	lines.append("tension: peak %.0f%%  avg %.0f%%   [T] overlay %s%s" % [
+		world.tension.peak() * 100.0,
+		world.tension.mean() * 100.0,
+		"ON" if _tension_overlay.visible else "off",
+		"   contraband %.2f" % world.contraband.total() if world.contraband.total() > 0.01 else "",
+	])
+
+	if not world.factions.is_empty():
+		var parts := []
+		for f in world.factions:
+			parts.append("%s %d (str %.0f%%)" % [
+				f.fname, FactionSystem.members(world, f.id).size(), f.strength * 100.0,
+			])
+		lines.append("factions: " + ", ".join(parts))
+
+	if world.is_locked_down():
+		lines.append("*** LOCKDOWN — %d min remaining ***" % world.lockdown_minutes)
+
+	var open := IncidentSystem.open_incidents(world)
+	if not open.is_empty():
+		var worst := world.worst_incident()
+		lines.append("INCIDENTS: %d open — worst: %s (%d in it)" % [
+			open.size(), worst.label().to_upper(), worst.participants.size(),
+		])
+		lines.append("  %s   [L] lockdown" % RESOLUTION_LABELS)
+	return lines
 
 
 ## "on duty / on the books" per role — the gap between those two numbers is

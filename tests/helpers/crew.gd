@@ -29,6 +29,30 @@ static func set_hour(world: SimWorld, hour: int) -> void:
 	world.clock.tick_count = hour * 60 * SimClock.TICKS_PER_SIM_MINUTE
 
 
+## Double-bunk extra prisoners into cells that are already full — the
+## overcrowding half of M4's DoD. Intake refuses to place anyone without a
+## free bed (correctly), so overcrowding has to be constructed deliberately:
+## these arrivals share someone else's bunk, which is exactly what pushes
+## GrievanceSystem's crowding term up.
+static func overcrowd(world: SimWorld, extra: int) -> int:
+	var bunks: Array[Vector2i] = []
+	for o in world.grid.objects:
+		if o.object_type != ObjectDef.Type.BED:
+			continue
+		var room := world.room_at(o.x, o.y)
+		if room != null and room.sealed and room.zone_kind == ZoneValidator.Kind.CELL:
+			bunks.append(Vector2i(o.x, o.y))
+	if bunks.is_empty():
+		return 0
+
+	for i in range(extra):
+		var p := Intake.generate_prisoner(world)
+		p.cell_bed_pos = bunks[i % bunks.size()]
+		p.place_at_tile(p.cell_bed_pos)
+		world.prisoners.append(p)
+	return extra
+
+
 ## Tick until the construction queue drains or max_ticks passes. Returns the
 ## ticks actually spent, so tests can assert building took real time.
 static func run_until_built(world: SimWorld, max_ticks: int) -> int:

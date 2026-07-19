@@ -225,6 +225,20 @@ Each is one Claude Code session. Each ends green tests + something visible on sc
 - Contraband supply graph + searches + snitches. Lockdown.
 - **DoD:** An understaffed, overcrowded prison reliably riots within 5 sim-days; a well-run one doesn't. Both true across 20 seeds — write that as a test.
 
+**M4 shipped 2026-07-19.** DoD holds across all 20 seeds in both directions (`tests/slow/test_riot_dod.gd`), with a third test asserting the two scenarios diverge *for the right reason* — the failing prison must actually get tense and aggrieved, or "the well-run one doesn't riot" would pass for free.
+
+The causal chain, in the fixed order it runs each sim minute: conditions → `GrievanceSystem` → `TensionField` → `IncidentSystem`. Changing that order changes the game, not just the frame something lands on.
+
+Notes on what the build taught us:
+
+- **The tension field's sink bug is the one to remember.** Diffusion originally ran across every adjacency, including the unsealed outdoors — which touches nearly every room and holds no tension of its own. Every room drained into it and the whole field pinned itself at `RESPONSE_RATE / DIFFUSION_RATE` (~0.09) no matter how catastrophic conditions got. Local pressure was reading 0.54 while actual tension sat at 0.087, and *nothing* ever sparked. Tension now only moves between built, sealed rooms. The ratio of those two constants is also what sets how far apart connected rooms can sit (~0.37 with current values); raise diffusion and the facility homogenises into one meaningless number.
+- **The ladder is a graph, not a line.** The design doc draws it on two rows and that turns out to be load-bearing. Gating the weapon rungs behind contraband made riots impossible in any facility without a visitation room — which would have silently broken this DoD. A brawl with no knives in the block now escalates straight to faction war or block riot; the weapon rungs are a *worse detour* taken when contraband is around, not a toll gate.
+- **Room ids are not stable.** `RoomDetector` renumbers in scan order, so building one wall renumbers half the map. Anything persisting per-room state (tension, faction territory, contraband stashes) keys off `RoomInfo.key()` — the room's topmost-leftmost tile — instead. A room that genuinely splits or merges gets a new key, which is the honest answer.
+- **Guard presence is the DoD's load-bearing number.** `TensionField.GUARD_CALM` is what makes staffing buy calm; without it "understaffed prisons riot" is a coin flip rather than a mechanic. Guards also damp escalation multiplicatively and drive de-escalation, so the same lever reads at three points on the chain.
+- **Support staff got the negotiation monopoly.** Negotiating is the only resolution that lowers grievance for real, and it requires a support staffer on duty — so it's unavailable exactly when the player has cut costs to the bone. That's the intended trap, and it also gives the M3 support role a second reason to exist.
+- **Deferred deliberately:** hostage situations exist as a rung but nothing drives them yet (they want a negotiation minigame, which is UI work); "escort" and "search" guard behaviours are player/automatic actions rather than autonomous guard AI; and the incident UI acts on the *worst* open incident because there's no selection UI until M7.
+- **Perf:** the conflict layer is cheap (tension ~70µs/sim-minute, incidents ~8µs); the cost of the DoD test is M2's A*, which scales with map area. Hence the compact purpose-built facility in that test, and `tests/slow/`.
+
 ### M5 — Franchise
 - `portfolio.gd`, HQ map, site acquisition, contracts.
 - `abstract_sim.gd` for background facilities + **the calibration test** (§3.7).

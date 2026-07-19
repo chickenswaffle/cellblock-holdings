@@ -10,7 +10,8 @@ const STAFFED_CANTEEN_MULTIPLIER := 1.6
 
 
 static func minute_tick(world: SimWorld) -> void:
-	var block := world.schedule.block_at_hour(world.clock.hour_of_day())
+	# current_block(), not the raw timetable — a lockdown overrides it.
+	var block := world.current_block()
 	for p in world.prisoners:
 		p.needs.decay_one_minute()
 		if p.action_state == Prisoner.ActionState.PERFORMING:

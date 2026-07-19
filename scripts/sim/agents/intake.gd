@@ -30,6 +30,7 @@ static func generate_prisoner(world: SimWorld) -> Prisoner:
 	]
 	p.age = world.rng.randi_between(19, 65)
 	p.sentence_days = world.rng.randi_between(30, 3650)
+	p.admitted_day = world.clock.day()
 	for t in ALL_TRAITS:
 		if world.rng.chance(TRAIT_CHANCE):
 			p.traits |= t
