@@ -58,6 +58,20 @@ Everything under `scripts/sim/conflict/`. The chain runs in a fixed order every 
 
 Two trap patterns when writing whole-sim tests, both hit for real: **ticking past a shift boundary** hands the job to the night shift and inverts your assertion, and **assuming an order/incident is still in progress** after N ticks when the underlying work takes fewer (look the entity up by id and assert it exists, don't index `[0]`).
 
+## HUD (scripts/view/ui/)
+
+`GameHud` builds every panel in code and Bootstrap wires callables into it (`on_hire`, `on_resolve`, …); Bootstrap owns the sim and tools, the HUD owns layout. `UiTheme` is the single source of colour/spacing.
+
+Rules the HUD is built to, worth keeping: **every action is a clickable button with its shortcut printed on it**; **an action that can't be taken right now is `disabled` with a tooltip explaining why**, never a button that silently no-ops; and panels that aren't relevant aren't on screen. One key means one thing globally — the pre-UI scheme overloaded the digits to mean speed *or* floor type *or* object type *or* zone kind depending on the active tool, which is why it was unusable.
+
+**Use `UiTheme.pin(control, h, v)` to place panels, not `set_anchors_and_offsets_preset(..., PRESET_MODE_MINSIZE, ...)`.** The preset snapshots minimum size at the moment it's called, so a panel whose children are added afterwards (or that grows at runtime, like the sub-type palette) ends up clipped or collapsed to zero size — both shipped in the first pass of this HUD and had to be fixed. `pin()` anchors a zero-size rect and sets the grow direction, so the container keeps sizing itself.
+
+Bootstrap checks `_hud.pointer_over_ui()` in `_unhandled_input` and feeds `CameraRig.pointer_over_ui` so clicking a panel never also builds in the world behind it, and reaching for a button never pans the camera.
+
+## Camera
+
+`CameraRig.position` is clamped to the map by `_clamp_to_bounds()`, and **every pan path must go through `_pan_by()`** so nothing can bypass it. Before that existed, WASD/edge-scroll/drag could pan arbitrarily far off the grid and leave the player staring at empty background with no landmark — the camera has to be *incapable* of losing the player. `tests/test_camera_rig.gd` covers this. `TerrainRenderer3D` also lays a large backdrop plane past the grid so the map edge reads as ground rather than void; that's the second line of defence, not the first.
+
 ## Verify visually
 
 `godot --path . -- --screenshot=/tmp/shot.png` boots the game windowed, saves a PNG after 30 frames, and quits. For build-mode features that need a pre-built scene to show up in the screenshot (no way to script mouse drag headlessly), add a temporary `--demo-room`-style flag to `bootstrap.gd` that enqueues BuildOrders programmatically, screenshot, then remove the temporary code before committing — don't leave debug-only branches in.

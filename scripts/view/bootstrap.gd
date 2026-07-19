@@ -9,7 +9,6 @@ const TICKS_PER_SECOND := 10.0
 const SPEEDS: Array[float] = [1.0, 3.0, 10.0]
 
 enum ToolMode { NONE, WALL, DOOR, FLOOR, OBJECT, ZONE }
-const MODE_NAMES := ["camera", "wall", "door", "floor", "object", "zone"]
 
 const FLOOR_NAMES := ["dirt", "concrete", "tile", "grass"]
 const OBJECT_NAMES := [
@@ -18,20 +17,18 @@ const OBJECT_NAMES := [
 ]
 const ZONE_NAMES := ["cell", "canteen", "yard", "workshop", "solitary", "medical", "staff room", "visitation"]
 
-## Hiring works in any tool mode (the digit keys are already spoken for by
-## speed and sub-type selection). Shift+key fires the newest of that role.
-const HIRE_KEYS := {
-	KEY_Z: Staff.Role.GUARD,
-	KEY_X: Staff.Role.WORKER,
-	KEY_C: Staff.Role.SUPPORT,
-}
 const ROLE_NAMES := ["guard", "worker", "support"]
 
-## Resolution options for the worst open incident. F/G/N/B/K rather than
-## anything mnemonic-friendly, because the good letters are already taken by
-## the camera and build tools.
-const RESOLUTION_KEYS := [KEY_F, KEY_G, KEY_N, KEY_B, KEY_K]
-const RESOLUTION_LABELS := "[F] force  [G] solitary  [N] negotiate  [B] separate  [K] concede"
+## Incident resolutions. Hiring has no shortcut on purpose — it's never
+## time-critical, so it lives on the staff panel's buttons rather than
+## spending three letters of an already-crowded keyboard.
+const RESOLUTION_KEYS := {
+	KEY_F: "force",
+	KEY_G: "solitary",
+	KEY_N: "negotiate",
+	KEY_B: "separate",
+	KEY_K: "concede",
+}
 const MANUAL_LOCKDOWN_MINUTES := 240
 
 var world: SimWorld
@@ -50,7 +47,7 @@ var _agents: AgentRenderer3D
 var _staff_renderer: StaffRenderer3D
 var _tension_overlay: TensionOverlay3D
 var _drag_preview: MeshInstance3D
-var _hud_label: Label
+var _hud: GameHud
 var _inspected_id: int = -1
 var _screenshot_path := ""
 var _screenshot_frames := 0
@@ -105,6 +102,9 @@ func _ready() -> void:
 	_camera_rig.name = "CameraRig"
 	_camera_rig.position = Vector3(24.0, 0.0, 18.0) # centered on the starter facility
 	add_child(_camera_rig)
+	# Bounds so panning can never lose the map, and a home to come back to.
+	_camera_rig.set_bounds(world.grid.width, world.grid.height)
+	_camera_rig.set_home(_camera_rig.position)
 
 	_build_hud()
 
@@ -150,76 +150,70 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if key == null or not key.pressed or key.echo:
 		return
 
+	# One key, one meaning, everywhere. The old scheme overloaded the digits
+	# to mean speed OR floor type OR object type OR zone kind depending on
+	# the active tool, which meant you couldn't know what a key would do
+	# without first reading the HUD to find out what mode you were in.
 	if key.keycode == KEY_SPACE:
 		paused = not paused
 		return
 	if key.keycode == KEY_ESCAPE:
-		tool_mode = ToolMode.NONE
-		build_tool.cancel_drag()
+		_select_tool(ToolMode.NONE)
 		return
-	if key.keycode == KEY_Q:
-		tool_mode = (tool_mode - 1 + ToolMode.size()) % ToolMode.size()
-		build_tool.cancel_drag()
-		_sync_tool_mode()
+	if key.keycode == KEY_HOME:
+		_camera_rig.recenter()
 		return
-	if key.keycode == KEY_E:
-		tool_mode = (tool_mode + 1) % ToolMode.size()
-		build_tool.cancel_drag()
-		_sync_tool_mode()
-		return
-
 	if key.keycode == KEY_T:
-		_tension_overlay.visible = not _tension_overlay.visible
-		if _tension_overlay.visible:
-			_tension_overlay.refresh()
+		_toggle_overlay()
 		return
 	if key.keycode == KEY_L:
 		IncidentSystem.begin_lockdown(world, MANUAL_LOCKDOWN_MINUTES)
 		return
-	if key.keycode in RESOLUTION_KEYS:
-		_resolve_worst(key.keycode)
+
+	# Q/E cycle the active tool's sub-type (floor/object/zone kind).
+	if key.keycode == KEY_Q:
+		_cycle_subtype(-1)
+		return
+	if key.keycode == KEY_E:
+		_cycle_subtype(1)
 		return
 
-	# Explicit type, not `:=` — Dictionary.get() infers Variant, which this
-	# project treats as a hard parse error.
-	var role: int = HIRE_KEYS.get(key.keycode, -1)
-	if role >= 0:
-		if key.shift_pressed:
-			_fire(role)
-		else:
-			Hiring.hire(world, role)
+	# +/- change speed; digits are exclusively tool selection now.
+	if key.keycode == KEY_MINUS:
+		speed_index = maxi(0, speed_index - 1)
+		return
+	if key.keycode == KEY_EQUAL or key.keycode == KEY_PLUS:
+		speed_index = mini(SPEEDS.size() - 1, speed_index + 1)
+		paused = false
+		return
+
+	var action: String = RESOLUTION_KEYS.get(key.keycode, "")
+	if action != "":
+		_resolve_worst(action)
 		return
 
 	var digit := _digit_pressed(key.keycode)
-	if digit >= 0:
-		if tool_mode == ToolMode.NONE:
-			if digit <= SPEEDS.size():
-				speed_index = digit - 1
-		elif tool_mode == ToolMode.FLOOR and digit >= 1 and digit <= FLOOR_NAMES.size():
-			build_tool.floor_type = digit - 1
-		elif tool_mode == ToolMode.OBJECT and digit >= 1 and digit <= OBJECT_NAMES.size():
-			build_tool.object_type = digit - 1
-		elif tool_mode == ToolMode.ZONE and digit >= 1 and digit <= ZONE_NAMES.size():
-			zone_tool.zone_kind = digit - 1
+	if digit >= 1 and digit < ToolMode.size():
+		_select_tool(digit) # 1..5 -> wall, door, floor, object, zone
 
 
-## Every resolution key acts on the worst open incident — with one incident
-## list and no selection UI yet, "deal with the worst thing happening" is the
-## only unambiguous target. Per-incident selection lands with M7's UI pass.
-func _resolve_worst(keycode: int) -> void:
+## Resolutions act on the worst open incident — with no per-incident
+## selection UI yet, "deal with the worst thing happening" is the only
+## unambiguous target. Per-incident selection lands with M7's UI pass.
+func _resolve_worst(action: String) -> void:
 	var inc := world.worst_incident()
 	if inc == null:
 		return
-	match keycode:
-		KEY_F:
+	match action:
+		"force":
 			IncidentSystem.resolve_force(world, inc)
-		KEY_G:
+		"solitary":
 			IncidentSystem.resolve_solitary(world, inc)
-		KEY_N:
+		"negotiate":
 			IncidentSystem.resolve_negotiate(world, inc)
-		KEY_B:
+		"separate":
 			IncidentSystem.resolve_separate(world, inc)
-		KEY_K:
+		"concede":
 			IncidentSystem.resolve_concede(world, inc)
 
 
@@ -242,6 +236,10 @@ func _sync_tool_mode() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Clicking a HUD panel must never also build, demolish or deselect in the
+	# world behind it.
+	if _hud != null and _hud.pointer_over_ui():
+		return
 	if tool_mode == ToolMode.NONE:
 		var mb_inspect := event as InputEventMouseButton
 		if mb_inspect != null and mb_inspect.button_index == MOUSE_BUTTON_LEFT and mb_inspect.pressed:
@@ -397,137 +395,100 @@ func _room_box(x0: int, y0: int, x1: int, y1: int, floor_type: int) -> void:
 		g.set_wall(x1, y, SimTile.WALL_E, true)
 
 
+
+
 func _build_hud() -> void:
-	var layer := CanvasLayer.new()
-	layer.name = "HudLayer"
-	add_child(layer)
-	_hud_label = Label.new()
-	_hud_label.position = Vector2(12, 8)
-	_hud_label.add_theme_color_override("font_color", Color.WHITE)
-	_hud_label.add_theme_color_override("font_shadow_color", Color.BLACK)
-	_hud_label.add_theme_constant_override("shadow_offset_x", 1)
-	_hud_label.add_theme_constant_override("shadow_offset_y", 1)
-	layer.add_child(_hud_label)
+	_hud = GameHud.new()
+	_hud.name = "Hud"
+	add_child(_hud)
+	_hud.setup(world)
+	_hud.on_tool_selected = _select_tool
+	_hud.on_subtype_selected = _select_subtype
+	_hud.on_speed_selected = func(index: int) -> void:
+		speed_index = index
+		paused = false
+	_hud.on_pause_toggled = func() -> void: paused = not paused
+	_hud.on_hire = func(role: int) -> void: Hiring.hire(world, role)
+	_hud.on_fire = _fire
+	_hud.on_resolve = _resolve_worst
+	_hud.on_lockdown = func() -> void:
+		IncidentSystem.begin_lockdown(world, MANUAL_LOCKDOWN_MINUTES)
+	_hud.on_overlay_toggled = _toggle_overlay
+	_hud.on_edge_scroll_toggled = func() -> void:
+		_camera_rig.edge_scroll_enabled = not _camera_rig.edge_scroll_enabled
+	_hud.on_recenter = func() -> void: _camera_rig.recenter()
+
+
+func _toggle_overlay() -> void:
+	_tension_overlay.visible = not _tension_overlay.visible
+	if _tension_overlay.visible:
+		_tension_overlay.refresh()
+
+
+func _select_tool(mode: int) -> void:
+	tool_mode = mode
+	build_tool.cancel_drag()
+	_sync_tool_mode()
+
+
+## Sub-type options for whichever tool is active, or [] if it has none.
+## The HUD renders these as buttons; Q/E cycle them.
+func _subtype_options() -> Array:
+	match tool_mode:
+		ToolMode.FLOOR:
+			return FLOOR_NAMES
+		ToolMode.OBJECT:
+			return OBJECT_NAMES
+		ToolMode.ZONE:
+			return ZONE_NAMES
+		_:
+			return []
+
+
+func _subtype_index() -> int:
+	match tool_mode:
+		ToolMode.FLOOR:
+			return build_tool.floor_type
+		ToolMode.OBJECT:
+			return build_tool.object_type
+		ToolMode.ZONE:
+			return zone_tool.zone_kind
+		_:
+			return -1
+
+
+func _select_subtype(index: int) -> void:
+	var options := _subtype_options()
+	if index < 0 or index >= options.size():
+		return
+	match tool_mode:
+		ToolMode.FLOOR:
+			build_tool.floor_type = index
+		ToolMode.OBJECT:
+			build_tool.object_type = index
+		ToolMode.ZONE:
+			zone_tool.zone_kind = index
+
+
+func _cycle_subtype(step: int) -> void:
+	var options := _subtype_options()
+	if options.is_empty():
+		return
+	_select_subtype(posmod(_subtype_index() + step, options.size()))
 
 
 func _update_hud() -> void:
-	var c := world.clock
-	var lines := []
-	lines.append("Day %d  %02d:%02d   %s   $%d   [Space] pause  [1/2/3] speed %.0fx" % [
-		c.day(), c.hour_of_day(), c.minute_of_day() % 60,
-		"PAUSED" if paused else "running",
-		world.ledger.balance,
-		SPEEDS[speed_index],
-	])
-	lines.append("[Q/E] tool: %s   [Esc] camera-only   LMB build  RMB demolish" % MODE_NAMES[tool_mode])
-
-	match tool_mode:
-		ToolMode.FLOOR:
-			lines.append("floor [1-4]: %s" % FLOOR_NAMES[build_tool.floor_type])
-		ToolMode.OBJECT:
-			lines.append("object [1-9]: %s ($%d)" % [OBJECT_NAMES[build_tool.object_type], ObjectDef.cost_of(build_tool.object_type)])
-		ToolMode.ZONE:
-			lines.append("zone [1-8]: %s" % ZONE_NAMES[zone_tool.zone_kind])
-		ToolMode.WALL, ToolMode.DOOR:
-			pass
-
-	if build_tool.dragging:
-		lines.append("cost preview: $%d" % build_tool.preview_cost())
-
-	if tool_mode == ToolMode.ZONE:
-		var ground = _camera_rig.ground_point(get_viewport().get_mouse_position())
-		if ground != null:
-			var t := Vector2i(floori(ground.x), floori(ground.z))
-			if world.grid.in_bounds(t.x, t.y):
-				var r := world.room_at(t.x, t.y)
-				if r != null:
-					lines.append("room: %d tiles, sealed=%s, valid=%s" % [r.tiles.size(), r.sealed, r.zone_valid])
-
-	lines.append(_staff_line())
-	lines.append("[Z/X/C] hire guard/worker/support  [Shift+] fire   payroll $%d/day%s" % [
-		Payroll.daily_cost(world.staff),
-		"   ⚠ PAYROLL MISSED" if _payroll_is_in_arrears() else "",
-	])
-	if not world.construction_queue.orders.is_empty():
-		lines.append("build queue: %d order(s)%s" % [
-			world.construction_queue.orders.size(),
-			"   ⚠ no workers on shift" if world.on_duty_count(Staff.Role.WORKER) == 0 else "",
-		])
-
-	lines.append_array(_conflict_lines())
-
-	lines.append("prisoners: %d   [click] inspect nearest" % world.prisoners.size())
-	if tool_mode == ToolMode.NONE:
-		var p := world.prisoner_at(_inspected_id)
-		if p != null:
-			lines.append("— %s, age %d, %d days left%s" % [p.pname, p.age, p.sentence_days, _trait_suffix(p.traits)])
-			lines.append("  %s   hunger %.0f%% sleep %.0f%% hygiene %.0f%% social %.0f%% rec %.0f%%" % [
-				_action_desc(p),
-				p.needs.get_value(Needs.Kind.HUNGER) * 100.0,
-				p.needs.get_value(Needs.Kind.SLEEP) * 100.0,
-				p.needs.get_value(Needs.Kind.HYGIENE) * 100.0,
-				p.needs.get_value(Needs.Kind.SOCIAL) * 100.0,
-				p.needs.get_value(Needs.Kind.RECREATION) * 100.0,
-			])
-
-	_hud_label.text = "\n".join(lines)
-
-
-## The conflict readout: how tense the place is, what's actively going wrong,
-## and what the player can do about it right now.
-func _conflict_lines() -> Array:
-	var lines := []
-	lines.append("tension: peak %.0f%%  avg %.0f%%   [T] overlay %s%s" % [
-		world.tension.peak() * 100.0,
-		world.tension.mean() * 100.0,
-		"ON" if _tension_overlay.visible else "off",
-		"   contraband %.2f" % world.contraband.total() if world.contraband.total() > 0.01 else "",
-	])
-
-	if not world.factions.is_empty():
-		var parts := []
-		for f in world.factions:
-			parts.append("%s %d (str %.0f%%)" % [
-				f.fname, FactionSystem.members(world, f.id).size(), f.strength * 100.0,
-			])
-		lines.append("factions: " + ", ".join(parts))
-
-	if world.is_locked_down():
-		lines.append("*** LOCKDOWN — %d min remaining ***" % world.lockdown_minutes)
-
-	var open := IncidentSystem.open_incidents(world)
-	if not open.is_empty():
-		var worst := world.worst_incident()
-		lines.append("INCIDENTS: %d open — worst: %s (%d in it)" % [
-			open.size(), worst.label().to_upper(), worst.participants.size(),
-		])
-		lines.append("  %s   [L] lockdown" % RESOLUTION_LABELS)
-	return lines
-
-
-## "on duty / on the books" per role — the gap between those two numbers is
-## what a player staffing only the day shift needs to see.
-func _staff_line() -> String:
-	var parts := []
-	for role in [Staff.Role.GUARD, Staff.Role.WORKER, Staff.Role.SUPPORT]:
-		parts.append("%s %d/%d" % [ROLE_NAMES[role], world.on_duty_count(role), world.staff_count(role)])
-	return "staff on duty: %s   avg fatigue %.0f%%" % [", ".join(parts), _average_fatigue() * 100.0]
-
-
-func _average_fatigue() -> float:
-	if world.staff.is_empty():
-		return 0.0
-	var total := 0.0
-	for s in world.staff:
-		total += s.fatigue
-	return total / float(world.staff.size())
-
-
-func _payroll_is_in_arrears() -> bool:
-	for s in world.staff:
-		if s.unpaid_days > 0:
-			return true
-	return false
+	_camera_rig.pointer_over_ui = _hud.pointer_over_ui()
+	_hud.refresh({
+		"paused": paused,
+		"speed_index": speed_index,
+		"tool_mode": tool_mode,
+		"subtype_options": _subtype_options(),
+		"subtype_index": _subtype_index(),
+		"overlay_on": _tension_overlay.visible,
+		"edge_scroll": _camera_rig.edge_scroll_enabled,
+		"inspected_id": _inspected_id,
+	})
 
 
 const TRAIT_NAMES := {
@@ -535,26 +496,3 @@ const TRAIT_NAMES := {
 	Prisoner.Trait.INSTITUTIONALIZED: "Institutionalized", Prisoner.Trait.FRAIL: "Frail",
 	Prisoner.Trait.CONNECTED: "Connected", Prisoner.Trait.PENITENT: "Penitent",
 }
-const NEED_NAMES := {
-	Needs.Kind.HUNGER: "eating", Needs.Kind.SLEEP: "sleeping", Needs.Kind.HYGIENE: "washing up",
-	Needs.Kind.SOCIAL: "socializing", Needs.Kind.RECREATION: "recreating",
-	Needs.Kind.SAFETY: "staying safe", Needs.Kind.DIGNITY: "keeping dignity",
-}
-
-
-static func _trait_suffix(traits: int) -> String:
-	var names := []
-	for t in TRAIT_NAMES:
-		if (traits & t) != 0:
-			names.append(TRAIT_NAMES[t])
-	return "" if names.is_empty() else " [%s]" % ", ".join(names)
-
-
-static func _action_desc(p: Prisoner) -> String:
-	match p.action_state:
-		Prisoner.ActionState.TRAVELING:
-			return "walking to %s" % NEED_NAMES.get(p.action_need, "somewhere")
-		Prisoner.ActionState.PERFORMING:
-			return NEED_NAMES.get(p.action_need, "idle")
-		_:
-			return "idle"

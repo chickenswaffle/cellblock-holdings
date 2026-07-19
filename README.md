@@ -34,7 +34,12 @@ godot --path .        # main scene
 
 `tests/slow/` holds the M4 riot DoD (20 seeds × 5 sim-days × 2 scenarios) and the 200-agent perf test. They're slow because they simulate ~100 prison-days, and they're the two tests most likely to catch a real regression in the balance of the sim — so the default run includes them.
 
-Controls: WASD/arrows/middle-drag to pan, wheel to zoom, Space pause, 1/2/3 speed (camera mode).
-Building: **Q/E** cycle tool (camera → wall → door → floor → object → zone), **Esc** back to camera-only. Left-drag to build a wall perimeter or paint floor, left-click to place a door/object/zone, right-click to demolish. Number keys pick the sub-type for whichever tool is active (floor 1-4, object 1-9, zone 1-8).
-Staffing: **Z/X/C** hire a guard/worker/support, **Shift+Z/X/C** fire the newest of that role. Nothing you queue gets built until a worker is on shift to build it.
-Conflict: **T** toggles the tension overlay. When an incident is running, **F** force / **G** solitary / **N** negotiate / **B** separate & transfer / **K** concede act on the worst one, and **L** calls a lockdown.
+Everything is clickable — the keyboard shortcuts below are also printed on the buttons, and any action you can't currently take is greyed out with a tooltip saying why ("No support staffer on duty").
+
+| | |
+|---|---|
+| **Camera** | WASD/arrows or middle-drag to pan, wheel to zoom, **Home** to recenter. Edge-scrolling is off by default; there's a toggle in the top bar. |
+| **Build** | **1**–**5** pick a tool (wall, door, floor, object, zone), **Esc** returns to camera. **Q**/**E** cycle the active tool's sub-type. Left-drag builds a wall run or paints floor, left-click places a door/object/zone, right-click demolishes. |
+| **Time** | **Space** pauses, **−**/**+** change speed. |
+| **Staff** | Hire and fire from the staff panel. Nothing you queue gets built until a worker is on shift to build it. |
+| **Conflict** | **T** toggles the tension overlay. While an incident is running: **F** force, **G** solitary, **N** negotiate, **B** transfer, **K** concede, **L** lockdown. |
