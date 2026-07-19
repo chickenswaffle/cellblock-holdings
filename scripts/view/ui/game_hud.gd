@@ -33,6 +33,8 @@ var on_overlay_toggled: Callable
 var on_edge_scroll_toggled: Callable
 var on_recenter: Callable
 var on_rotate: Callable
+var on_confirm_build: Callable
+var on_cancel_build: Callable
 
 var _root: Control
 var _tool_buttons: Array[Button] = []
@@ -59,6 +61,9 @@ var _faction_label: Label
 var _hint: Label
 var _build_panel: PanelContainer
 var _build_text: Label
+var _confirm_button: Button
+var _cancel_button: Button
+var _confirm_row: HBoxContainer
 
 
 func setup(p_world: SimWorld) -> void:
@@ -294,19 +299,46 @@ func _build_preview_panel() -> void:
 	_build_panel = UiTheme.panel(UiTheme.BG_RAISED)
 	_build_panel.visible = false
 	_root.add_child(_build_panel)
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 6)
+	_build_panel.add_child(col)
 	_build_text = UiTheme.label("", UiTheme.TEXT, 13)
-	_build_panel.add_child(_build_text)
+	_build_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(_build_text)
+
+	# Confirm/cancel only appear once the drag is released and the selection
+	# is parked — during the drag itself they'd be unclickable noise.
+	_confirm_row = HBoxContainer.new()
+	_confirm_row.add_theme_constant_override("separation", UiTheme.GAP)
+	_confirm_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_confirm_row.visible = false
+	col.add_child(_confirm_row)
+
+	_confirm_button = UiTheme.button("✓  Build", "Queue this work  [Enter]")
+	_confirm_button.pressed.connect(func() -> void: on_confirm_build.call())
+	_confirm_row.add_child(_confirm_button)
+
+	_cancel_button = UiTheme.button("✗  Cancel", "Discard this selection  [Esc]")
+	_cancel_button.pressed.connect(func() -> void: on_cancel_build.call())
+	_confirm_row.add_child(_cancel_button)
+
 	UiTheme.pin(_build_panel, 0, 1, 0, 52)
 
 
-## Called by Bootstrap every frame while a build drag is live.
+## Called by Bootstrap every frame while a selection is live or parked.
 func show_build_preview(info: Dictionary) -> void:
 	_build_panel.visible = true
+	var awaiting: bool = info.get("awaiting_confirm", false)
+	_confirm_row.visible = awaiting
+
 	var count: int = info["count"]
 	if count == 0:
 		_build_text.text = "Nothing to build here"
 		_build_text.add_theme_color_override("font_color", UiTheme.TEXT_DIM)
+		_confirm_row.visible = false
 		return
+
 	var affordable: bool = info["affordable"]
 	_build_text.text = "%d %s   ·   $%s   ·   %s" % [
 		count, info["noun"], _thousands(info["cost"]), info["duration"],
@@ -316,6 +348,12 @@ func show_build_preview(info: Dictionary) -> void:
 	)
 	if not affordable:
 		_build_text.text += "   — can't afford it"
+	elif not awaiting:
+		_build_text.text += "   ·   release to confirm"
+	_confirm_button.disabled = not affordable
+	_confirm_button.tooltip_text = (
+		"Queue this work  [Enter]" if affordable else "You can't afford this"
+	)
 
 
 func hide_build_preview() -> void:

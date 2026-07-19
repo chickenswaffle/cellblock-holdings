@@ -87,13 +87,13 @@ func refresh() -> void:
 		for x in range(grid.width):
 			var t := grid.tile_at(x, y)
 			if t.has_wall(SimTile.WALL_N):
-				(door_xforms if t.has_door(SimTile.WALL_N) else wall_xforms).append(_edge_transform(x, y, SimTile.WALL_N))
+				(door_xforms if t.has_door(SimTile.WALL_N) else wall_xforms).append(edge_transform(x, y, SimTile.WALL_N))
 			if t.has_wall(SimTile.WALL_W):
-				(door_xforms if t.has_door(SimTile.WALL_W) else wall_xforms).append(_edge_transform(x, y, SimTile.WALL_W))
+				(door_xforms if t.has_door(SimTile.WALL_W) else wall_xforms).append(edge_transform(x, y, SimTile.WALL_W))
 			if x == grid.width - 1 and t.has_wall(SimTile.WALL_E):
-				(door_xforms if t.has_door(SimTile.WALL_E) else wall_xforms).append(_edge_transform(x, y, SimTile.WALL_E))
+				(door_xforms if t.has_door(SimTile.WALL_E) else wall_xforms).append(edge_transform(x, y, SimTile.WALL_E))
 			if y == grid.height - 1 and t.has_wall(SimTile.WALL_S):
-				(door_xforms if t.has_door(SimTile.WALL_S) else wall_xforms).append(_edge_transform(x, y, SimTile.WALL_S))
+				(door_xforms if t.has_door(SimTile.WALL_S) else wall_xforms).append(edge_transform(x, y, SimTile.WALL_S))
 
 	_apply_transforms(_walls_mmi, wall_xforms)
 	_apply_transforms(_doors_mmi, door_xforms)
@@ -120,7 +120,10 @@ func _apply_transforms(mmi: MultiMeshInstance3D, xforms: Array) -> void:
 	mmi.multimesh = mm
 
 
-func _edge_transform(x: int, y: int, flag: int) -> Transform3D:
+## Static so the build-preview ghost can draw walls exactly where the real
+## renderer will put them — a preview that disagrees with the result is worse
+## than no preview.
+static func edge_transform(x: int, y: int, flag: int) -> Transform3D:
 	var basis: Basis
 	var origin: Vector3
 	match flag:

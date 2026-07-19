@@ -23,6 +23,8 @@ var object_type: int = ObjectDef.Type.BED
 var dragging := false
 var drag_start := Vector2i.ZERO
 var drag_end := Vector2i.ZERO
+## Selection released but not yet confirmed. Nothing is spent until it is.
+var pending_orders: Array[BuildOrder] = []
 
 
 func _init(p_world: SimWorld) -> void:
@@ -83,7 +85,7 @@ func preview_work() -> float:
 
 ## What the player is about to get, for the on-screen readout.
 func preview_summary() -> Dictionary:
-	var orders := preview_orders()
+	var orders := ghost_orders()
 	var cost := 0
 	var work := 0.0
 	for o in orders:
@@ -106,16 +108,44 @@ func click(tile: Vector2i, local_frac: Vector2) -> void:
 	world.construction_queue.enqueue(BuildOrder.make_door(tile.x, tile.y, flag), world.ledger)
 
 
+## Releasing the drag does NOT commit — it parks the selection awaiting a
+## yes/no. Queueing straight off the mouse-up meant an imprecise drag spent
+## real money with no chance to look at it first; now the area, the ghost
+## geometry and the price all stay on screen until confirmed.
 func end_drag() -> void:
 	if not dragging:
 		return
-	for o in preview_orders():
-		world.construction_queue.enqueue(o, world.ledger)
+	pending_orders = preview_orders()
 	dragging = false
+
+
+func has_pending() -> bool:
+	return not pending_orders.is_empty()
+
+
+## Commit the parked selection to the construction queue.
+func confirm_pending() -> int:
+	var queued := 0
+	for o in pending_orders:
+		if world.construction_queue.enqueue(o, world.ledger):
+			queued += 1
+	pending_orders = [] as Array[BuildOrder]
+	return queued
+
+
+func cancel_pending() -> void:
+	pending_orders = [] as Array[BuildOrder]
 
 
 func cancel_drag() -> void:
 	dragging = false
+	cancel_pending()
+
+
+## Orders to draw as ghost geometry right now: the live drag if there is one,
+## otherwise whatever is parked awaiting confirmation.
+func ghost_orders() -> Array[BuildOrder]:
+	return preview_orders() if dragging else pending_orders
 
 
 ## Instant demolish (no queue, no refund) — right-click in WALL/DOOR/OBJECT
@@ -150,20 +180,28 @@ func _perimeter_orders(rect: Rect2i) -> Array[BuildOrder]:
 
 ## A single wall run along whichever axis the player dragged furthest — for
 ## dividing a room or extending an existing block, where a full outline would
-## be wrong. Horizontal runs sit on the north edge, vertical on the west, so
-## the result is predictable from the drag alone.
+## be wrong.
+##
+## Which *side* of the row or column the wall lands on follows the drag: the
+## wall goes on the boundary you dragged across. Drag right and slightly
+## down, and it lands on the south edge of the row you started in; drag
+## slightly up and it lands on the north. A perfectly straight drag has no
+## such hint, so it falls back to the near edge (north/west), which is the
+## edge nearest the tile you started from.
 func _line_orders() -> Array[BuildOrder]:
 	var out: Array[BuildOrder] = []
 	var dx := absi(drag_end.x - drag_start.x)
 	var dy := absi(drag_end.y - drag_start.y)
 	if dx >= dy:
 		var y := drag_start.y
+		var flag := SimTile.WALL_S if drag_end.y > drag_start.y else SimTile.WALL_N
 		for x in range(mini(drag_start.x, drag_end.x), maxi(drag_start.x, drag_end.x) + 1):
-			_append_wall(out, x, y, SimTile.WALL_N)
+			_append_wall(out, x, y, flag)
 	else:
 		var x := drag_start.x
+		var flag := SimTile.WALL_E if drag_end.x > drag_start.x else SimTile.WALL_W
 		for y in range(mini(drag_start.y, drag_end.y), maxi(drag_start.y, drag_end.y) + 1):
-			_append_wall(out, x, y, SimTile.WALL_W)
+			_append_wall(out, x, y, flag)
 	return out
 
 

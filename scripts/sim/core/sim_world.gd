@@ -112,6 +112,12 @@ func _run_bus_arrival() -> void:
 			break
 
 
+## Re-derive rooms right now. The view calls this after painting zones so the
+## player sees the result immediately rather than on the next tick.
+func refresh_rooms() -> void:
+	_refresh_rooms()
+
+
 func _refresh_rooms() -> void:
 	rooms = RoomDetector.detect(grid)
 	_rooms_grid_version = grid.grid_version

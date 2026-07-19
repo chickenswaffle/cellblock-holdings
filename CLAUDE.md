@@ -68,6 +68,16 @@ Rules the HUD is built to, worth keeping: **every action is a clickable button w
 
 Bootstrap checks `_hud.pointer_over_ui()` in `_unhandled_input` and feeds `CameraRig.pointer_over_ui` so clicking a panel never also builds in the world behind it, and reaching for a button never pans the camera.
 
+## Build & zone tools
+
+**Construction is two-step.** `BuildTool.end_drag()` parks the selection in `pending_orders` and spends nothing; `confirm_pending()` commits, `cancel_pending()` discards. Don't "simplify" this back into committing on mouse-up — an imprecise drag spending real money with no chance to look at it first is the thing this replaced.
+
+`BuildGhostRenderer3D` draws the pending orders as translucent geometry using `StructuresRenderer3D.edge_transform()` — the *same* function the real renderer uses. Keep it that way: a preview that computes its own positions can drift out of agreement with the result, which is worse than no preview. The area tint alone can't answer "which side of the row does this wall land on", which is the question players actually have mid-drag.
+
+A line-style wall lands on the edge the drag crossed (drag down → south edge of the starting row; a perfectly straight drag falls back to north/west). Orders for walls/floors that already exist are filtered out, so dragging over part of a finished block only bills the new work.
+
+**Zoning has a deliberate special case**: a drag landing wholly inside a single *sealed* room designates the whole room, not the rectangle. A room whose tiles disagree resolves to "mixed" and counts as unzoned, so a sloppy drag across most of a finished cell block would otherwise silently un-designate it. The sealed check matters — the unwalled outdoors is one enormous region and snapping to it would zone half the map. Zoning is free, instant and reversible, so unlike construction it commits on release with no confirmation step.
+
 ## Camera
 
 Full 360° yaw plus adjustable pitch. Rotation works by spinning the **rig**, not the camera: the camera is a child at a fixed local offset that always looks back at the rig's origin, so rotating the parent orbits it around whatever it's centred on with no trigonometry. `ground_point()` projects from the camera's real transform, so tile picking survives any angle without special-casing — don't replace it with hand-derived screen math.

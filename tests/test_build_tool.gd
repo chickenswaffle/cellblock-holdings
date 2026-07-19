@@ -40,6 +40,49 @@ func test_outline_drag_encloses_the_box() -> void:
 	assert_true(flags.has(Vector2i(4, 4)), "corner included")
 
 
+func test_line_wall_lands_on_the_edge_you_dragged_across() -> void:
+	var world := _world()
+	var t := _tool(world, BuildTool.Mode.WALL)
+	t.wall_style = BuildTool.WallStyle.LINE
+
+	# Rightwards and a touch downwards: the boundary crossed is the south
+	# edge of the row we started on.
+	_drag(t, Vector2i(3, 5), Vector2i(8, 6))
+	for o in t.preview_orders():
+		assert_eq(o.wall_flag, SimTile.WALL_S, "dragged down -> south edge")
+		assert_eq(o.y, 5, "still anchored to the starting row")
+
+	# Rightwards and a touch upwards -> north edge instead.
+	_drag(t, Vector2i(3, 5), Vector2i(8, 4))
+	for o in t.preview_orders():
+		assert_eq(o.wall_flag, SimTile.WALL_N, "dragged up -> north edge")
+
+	# Downwards and a touch right -> east edge of the starting column.
+	_drag(t, Vector2i(3, 5), Vector2i(4, 11))
+	for o in t.preview_orders():
+		assert_eq(o.wall_flag, SimTile.WALL_E, "dragged right -> east edge")
+		assert_eq(o.x, 3)
+
+	# Downwards and a touch left -> west edge.
+	_drag(t, Vector2i(5, 5), Vector2i(4, 11))
+	for o in t.preview_orders():
+		assert_eq(o.wall_flag, SimTile.WALL_W, "dragged left -> west edge")
+
+
+func test_a_perfectly_straight_line_drag_falls_back_to_the_near_edge() -> void:
+	var world := _world()
+	var t := _tool(world, BuildTool.Mode.WALL)
+	t.wall_style = BuildTool.WallStyle.LINE
+
+	_drag(t, Vector2i(3, 5), Vector2i(8, 5))
+	for o in t.preview_orders():
+		assert_eq(o.wall_flag, SimTile.WALL_N, "no vertical hint -> north")
+
+	_drag(t, Vector2i(3, 5), Vector2i(3, 11))
+	for o in t.preview_orders():
+		assert_eq(o.wall_flag, SimTile.WALL_W, "no horizontal hint -> west")
+
+
 func test_line_drag_runs_along_the_dominant_axis() -> void:
 	var world := _world()
 	var t := _tool(world, BuildTool.Mode.WALL)
@@ -49,15 +92,13 @@ func test_line_drag_runs_along_the_dominant_axis() -> void:
 	var horizontal := t.preview_orders()
 	assert_eq(horizontal.size(), 6, "one per column of the run")
 	for o in horizontal:
-		assert_eq(o.wall_flag, SimTile.WALL_N, "horizontal runs sit on the north edge")
-		assert_eq(o.y, 5, "and stay on the row the drag started from")
+		assert_eq(o.y, 5, "stays on the row the drag started from")
 
 	_drag(t, Vector2i(3, 5), Vector2i(4, 11)) # taller than wide -> vertical
 	var vertical := t.preview_orders()
 	assert_eq(vertical.size(), 7)
 	for o in vertical:
-		assert_eq(o.wall_flag, SimTile.WALL_W, "vertical runs sit on the west edge")
-		assert_eq(o.x, 3)
+		assert_eq(o.x, 3, "stays on the column the drag started from")
 
 
 func test_a_line_drag_can_divide_an_existing_room() -> void:
@@ -157,23 +198,59 @@ func test_summary_flags_an_unaffordable_selection() -> void:
 	assert_false(t.preview_summary()["affordable"], "and the preview turns red on this")
 
 
-func test_nothing_is_queued_until_the_drag_ends() -> void:
+func test_releasing_a_drag_parks_it_instead_of_spending() -> void:
 	var world := _world()
 	var t := _tool(world, BuildTool.Mode.WALL)
 	_drag(t, Vector2i(2, 2), Vector2i(5, 5))
 	assert_eq(world.construction_queue.orders.size(), 0, "still deciding")
+
 	t.end_drag()
-	assert_gt(world.construction_queue.orders.size(), 0, "committed on release")
 	assert_false(t.dragging)
+	assert_true(t.has_pending(), "released, awaiting a yes/no")
+	assert_eq(world.construction_queue.orders.size(), 0, "an imprecise drag must not spend money on its own")
 
 
-func test_cancelling_a_drag_queues_nothing() -> void:
+func test_confirming_commits_the_parked_selection() -> void:
+	var world := _world()
+	var t := _tool(world, BuildTool.Mode.WALL)
+	_drag(t, Vector2i(2, 2), Vector2i(5, 5))
+	t.end_drag()
+	var expected := t.pending_orders.size()
+
+	assert_eq(t.confirm_pending(), expected, "everything queued")
+	assert_eq(world.construction_queue.orders.size(), expected)
+	assert_false(t.has_pending(), "and the selection is consumed")
+
+
+func test_cancelling_a_parked_selection_queues_nothing() -> void:
+	var world := _world()
+	var t := _tool(world, BuildTool.Mode.WALL)
+	_drag(t, Vector2i(2, 2), Vector2i(5, 5))
+	t.end_drag()
+	t.cancel_pending()
+	assert_false(t.has_pending())
+	assert_eq(world.construction_queue.orders.size(), 0)
+	assert_eq(t.confirm_pending(), 0, "nothing left to confirm")
+
+
+func test_cancelling_mid_drag_leaves_nothing_parked() -> void:
 	var world := _world()
 	var t := _tool(world, BuildTool.Mode.WALL)
 	_drag(t, Vector2i(2, 2), Vector2i(5, 5))
 	t.cancel_drag()
 	t.end_drag()
+	assert_false(t.has_pending())
 	assert_eq(world.construction_queue.orders.size(), 0)
+
+
+func test_ghost_shows_the_live_drag_then_the_parked_selection() -> void:
+	var world := _world()
+	var t := _tool(world, BuildTool.Mode.WALL)
+	_drag(t, Vector2i(2, 2), Vector2i(5, 5))
+	var during := t.ghost_orders().size()
+	assert_gt(during, 0, "something to draw while dragging")
+	t.end_drag()
+	assert_eq(t.ghost_orders().size(), during, "and the same thing while it waits for confirmation")
 
 
 func test_drags_off_the_edge_of_the_map_are_rejected_cleanly() -> void:

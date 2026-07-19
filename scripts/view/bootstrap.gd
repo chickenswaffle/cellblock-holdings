@@ -48,6 +48,7 @@ var _agents: AgentRenderer3D
 var _staff_renderer: StaffRenderer3D
 var _tension_overlay: TensionOverlay3D
 var _drag_preview: MeshInstance3D
+var _ghost: BuildGhostRenderer3D
 var _hud: GameHud
 var _inspected_id: int = -1
 var _screenshot_path := ""
@@ -86,6 +87,10 @@ func _ready() -> void:
 	add_child(_tension_overlay)
 	_tension_overlay.setup(world)
 
+	_ghost = BuildGhostRenderer3D.new()
+	_ghost.name = "BuildGhost"
+	add_child(_ghost)
+
 	_drag_preview = MeshInstance3D.new()
 	_drag_preview.name = "DragPreview"
 	var mat := StandardMaterial3D.new()
@@ -112,6 +117,7 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--screenshot="):
 			_screenshot_path = arg.trim_prefix("--screenshot=")
+
 
 
 func _setup_environment() -> void:
@@ -161,7 +167,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		paused = not paused
 		return
 	if key.keycode == KEY_ESCAPE:
+		# Esc backs out one step at a time: drop a parked selection first,
+		# and only leave the tool if there wasn't one.
+		if build_tool.has_pending():
+			build_tool.cancel_pending()
+			return
 		_select_tool(ToolMode.NONE)
+		return
+	if key.keycode == KEY_ENTER or key.keycode == KEY_KP_ENTER:
+		build_tool.confirm_pending()
 		return
 	if key.keycode == KEY_HOME:
 		_camera_rig.recenter()
@@ -261,13 +275,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			if mb.pressed:
 				if tool_mode == ToolMode.ZONE:
-					zone_tool.click(tile)
+					zone_tool.begin_drag(tile)
 				elif tool_mode == ToolMode.DOOR:
 					build_tool.click(tile, frac)
 				else:
 					# Objects drag too now, so a press starts a drag and a
 					# release with no movement still places exactly one.
 					build_tool.begin_drag(tile)
+			elif tool_mode == ToolMode.ZONE:
+				zone_tool.end_drag()
 			else:
 				build_tool.end_drag()
 		elif mb.button_index == MOUSE_BUTTON_RIGHT and not mb.pressed:
@@ -276,10 +292,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			# knocks something down, and they share a button.
 			if not _camera_rig.orbiting:
 				build_tool.remove_at(tile, frac)
-	elif event is InputEventMouseMotion and build_tool.dragging:
+	elif event is InputEventMouseMotion and (build_tool.dragging or zone_tool.dragging):
 		var ground = _camera_rig.ground_point((event as InputEventMouseMotion).position)
 		if ground != null:
-			build_tool.update_drag(Vector2i(floori(ground.x), floori(ground.z)))
+			var t := Vector2i(floori(ground.x), floori(ground.z))
+			build_tool.update_drag(t)
+			zone_tool.update_drag(t)
 
 
 static func _digit_pressed(keycode: int) -> int:
@@ -293,13 +311,21 @@ static func _digit_pressed(keycode: int) -> int:
 ## "what exactly am I about to build" — far quicker to read than the numbers.
 const PREVIEW_OK := Color(0.30, 0.85, 0.45, 0.35)
 const PREVIEW_BAD := Color(0.92, 0.30, 0.25, 0.38)
+## Zoning is a different kind of action from building, so it gets its own
+## colour rather than reusing the build green.
+const ZONE_PREVIEW := Color(0.35, 0.62, 0.95, 0.38)
 ## A worker delivers one work unit per tick at full rate.
 const WORK_PER_WORKER_TICK := 1.0
 
 
 func _update_drag_preview() -> void:
-	if not build_tool.dragging:
+	if tool_mode == ToolMode.ZONE:
+		_update_zone_preview()
+		return
+
+	if not build_tool.dragging and not build_tool.has_pending():
 		_drag_preview.visible = false
+		_ghost.hide_orders()
 		_hud.hide_build_preview()
 		return
 
@@ -307,6 +333,41 @@ func _update_drag_preview() -> void:
 	var summary := build_tool.preview_summary()
 	var buildable: bool = summary["count"] > 0 and summary["affordable"]
 
+	_drag_preview.visible = build_tool.dragging
+	if build_tool.dragging:
+		var plane := PlaneMesh.new()
+		plane.size = Vector2(rect.size.x, rect.size.y)
+		_drag_preview.mesh = plane
+		_drag_preview.position = Vector3(
+			rect.position.x + rect.size.x / 2.0, 0.06, rect.position.y + rect.size.y / 2.0
+		)
+		var mat := _drag_preview.material_override as StandardMaterial3D
+		if mat != null:
+			mat.albedo_color = PREVIEW_OK if buildable else PREVIEW_BAD
+
+	_ghost.show_orders(build_tool.ghost_orders(), summary["affordable"])
+
+	summary["noun"] = _preview_noun(summary["count"])
+	summary["duration"] = _estimate_duration(summary["work"])
+	summary["awaiting_confirm"] = build_tool.has_pending()
+	_hud.show_build_preview(summary)
+
+
+## Zoning is free and instant, so it gets the area tint but no price, no
+## ghost geometry and no confirmation step.
+func _update_zone_preview() -> void:
+	_ghost.hide_orders()
+	_hud.hide_build_preview()
+	if not zone_tool.dragging:
+		_drag_preview.visible = false
+		return
+	var tiles := zone_tool.preview_tiles()
+	if tiles.is_empty():
+		_drag_preview.visible = false
+		return
+	var rect := Rect2i(tiles[0], Vector2i.ONE)
+	for t in tiles:
+		rect = rect.expand(t).expand(t + Vector2i.ONE)
 	_drag_preview.visible = true
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(rect.size.x, rect.size.y)
@@ -316,11 +377,7 @@ func _update_drag_preview() -> void:
 	)
 	var mat := _drag_preview.material_override as StandardMaterial3D
 	if mat != null:
-		mat.albedo_color = PREVIEW_OK if buildable else PREVIEW_BAD
-
-	summary["noun"] = _preview_noun(summary["count"])
-	summary["duration"] = _estimate_duration(summary["work"])
-	_hud.show_build_preview(summary)
+		mat.albedo_color = ZONE_PREVIEW
 
 
 func _preview_noun(count: int) -> String:
@@ -481,6 +538,8 @@ func _build_hud() -> void:
 		_camera_rig.recenter()
 		_camera_rig.reset_angle()
 	_hud.on_rotate = func(degrees: float) -> void: _camera_rig.rotate_by(degrees)
+	_hud.on_confirm_build = func() -> void: build_tool.confirm_pending()
+	_hud.on_cancel_build = func() -> void: build_tool.cancel_pending()
 
 
 func _toggle_overlay() -> void:
@@ -492,6 +551,7 @@ func _toggle_overlay() -> void:
 func _select_tool(mode: int) -> void:
 	tool_mode = mode
 	build_tool.cancel_drag()
+	zone_tool.cancel_drag()
 	_sync_tool_mode()
 
 
