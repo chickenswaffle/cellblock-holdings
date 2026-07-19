@@ -24,11 +24,21 @@ Angled orthogonal `Camera3D` (Cities Skylines-ish, ~35° pitch, no rotation yet)
 
 ## Agents (M2)
 
+Movement lives in `SimAgent` (`scripts/sim/agents/sim_agent.gd`), which both `Prisoner` and `Staff` extend — pos/path/`step_along_path()`/`tile_pos()`/`set_destination()`/`place_at_tile()`. Never assign `pos` by hand; use `place_at_tile()`, which applies the +0.5 the renderers assume (see below). Subclasses override `move_speed()` — that's how staff fatigue slows people down.
+
 `Prisoner.pos` is **tile-center convention**: pos `(5.5, 7.5)` means tile `(5,7)`, matching how `StructuresRenderer3D` places walls/objects at `tile + 0.5`. `tile_pos()` uses `floori`, not `roundi` — floori is the correct inverse of "+0.5" regardless of floating-point rounding mode; roundi is not. Every place that sets `pos` directly (`Intake.intake()`, `step_along_path()`'s waypoint target) must add the `+0.5` offset — skipping it once (a real bug hit while building this) puts the agent exactly on a tile edge, which is exactly where wall geometry is, so they render inside/behind walls and look invisible.
 
 `UtilityAI` picks actions by scoring `need_deficit × 1/(1+distance) × RNG noise` per candidate need for the current `ScheduleSystem` block, described in `docs/cellblock-holdings-plan.md` §M2. `NeedSystem.minute_tick()` runs once per sim-minute (not per tick — decay/satisfaction rates are defined per minute); movement (`step_along_path`) and the traveling→performing transition run every tick in `SimWorld.tick()`.
 
 `Pathfinder.find_path()` is a hand-rolled 8-way A* with its own binary min-heap (`Pathfinder._MinHeap`, an inner class) — GDScript has no built-in heap. Diagonal moves check both flanking orthogonal edges to avoid cutting through a wall corner. Room detection (`RoomDetector`) and pathfinding use *different* edge-passability rules on purpose: `grid.edge_open()` treats a door as blocking (a door still separates two rooms) while `grid.edge_passable()` treats it as passable at a cost multiplier (`Pathfinder.DOOR_COST_MULTIPLIER`) — don't unify these, they answer different questions.
+
+## Staff (M3)
+
+`Staff` has a role (GUARD/WORKER/SUPPORT) and a shift (DAY 06–18 / NIGHT 18–06, and the night branch wraps midnight — test any hour logic against both). Off-shift staff are parked on `world.gate_tile` with state `OFF_DUTY`; `StaffRenderer3D` skips them, so what you see on the map is who's actually covering the floor. `StaffSystem.tick()` does movement + construction work per tick, `StaffSystem.minute_tick()` does fatigue/shifts/re-decisions per minute — the same split as `NeedSystem`/`UtilityAI`, and for the same reason (rates are defined per minute; arriving at a build site has to resolve per tick).
+
+**Construction requires workers.** `ConstructionQueue` no longer ticks itself — it's a work pool and `StaffSystem` is the only thing that calls `apply_work()`. A test that enqueues a `BuildOrder` and ticks `SimWorld` will now sit there forever unless it hires a worker: use `tests/helpers/crew.gd` (`Crew.staff_up()` + `Crew.set_hour()` to land inside the day shift, `Crew.run_until_built()`). Two traps that already bit while writing these tests: ticking long enough to cross 18:00 hands the job to the night shift, and a single wall is only 40 worker-ticks, so "tick 300 then assert they're still WORKING" fails because they already finished.
+
+Fatigue is the cross-cutting stat — it slows `move_speed()`, cuts `work_rate()`, erodes `effective_nerve()` (M4 reads that), and past `BREAK_AT_FATIGUE` sends anyone to a staff room. `SimWorld.guard_presence(room)` is the other thing M4 is meant to consume.
 
 ## Verify visually
 

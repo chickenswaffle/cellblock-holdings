@@ -208,6 +208,16 @@ Each is one Claude Code session. Each ends green tests + something visible on sc
 - Construction consumes worker-time.
 - **DoD:** Queued buildings get built by workers over time. Guards patrol routes. Payroll debits daily.
 
+**M3 shipped 2026-07-19.** All three DoD clauses have dedicated tests (`test_staff_construction_dod.gd`, `test_guard_patrol.gd`, `test_payroll.gd`). Notes on what was built versus what this section asked for:
+
+- `ConstructionQueue` stopped being a FIFO countdown and became a **claimable work pool** measured in worker-ticks. Orders are still handed out oldest-first (the player queues in the order they want things built), but N workers burn down N orders concurrently. An order nobody can path to is parked under a `BLOCKED_CLAIM` sentinel and freed again the next time the grid changes, so workers don't spin on unreachable sites.
+- Movement moved up into a shared `SimAgent` base (pos/path/`step_along_path`/tile-center convention); `Prisoner` and `Staff` both extend it, which is what stopped M2's tile-center bug from being reintroduced a second time in the staff renderer.
+- **Guard scope, deliberate:** patrol only. Respond/escort/search are all reactions to incidents, and there are no incidents until M4 — building them now would mean building them against an imagined interface. What M4 needs from M3 is already exposed: `SimWorld.guard_presence(room)` and `Staff.effective_nerve()` (base nerve eroded by fatigue).
+- **Patrol routes are derived, not authored** — one waypoint per sealed, zoned room in `StaffAI.PATROL_ZONES` priority order, re-derived on any layout change. A patrol editor is UI work that belongs with M7's UI pass, and an auto-route is honest in the meantime.
+- **Support staff** needed a real reason to exist rather than an inert third hire button, so they work the canteen: a canteen with a support staffer in it serves meals 1.6× faster (`NeedSystem.STAFFED_CANTEEN_MULTIPLIER`). Medical/programs work is M5's.
+- **Payroll is all-or-nothing** — it never part-pays and never overdraws. A missed day banks an unpaid day on every staffer; three of those and they quit. That's the intended teeth on the "salary is the biggest lever on margin" trap.
+- Fatigue is the shared feedback loop: it slows movement and build rate, erodes nerve, and sends anyone past 85% to a staff room. A site with no staff room still lets them rest, just at half the recovery rate — the fix is to build one.
+
 ### M4 — Conflict *(the game shows up here)*
 - Factions + recruitment + territory + relations.
 - `tension_field.gd` w/ diffusion + the tension overlay.

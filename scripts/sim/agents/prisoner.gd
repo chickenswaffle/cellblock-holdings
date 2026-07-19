@@ -1,15 +1,11 @@
 class_name Prisoner
-extends RefCounted
+extends SimAgent
+## An inmate. Movement (pos/path/step_along_path) comes from SimAgent; this
+## class is needs, traits, and the action UtilityAI has assigned.
 
 enum Trait { VOLATILE = 1, CUNNING = 2, INSTITUTIONALIZED = 4, FRAIL = 8, CONNECTED = 16, PENITENT = 32 }
 enum ActionState { IDLE, TRAVELING, PERFORMING }
 
-## Tiles covered per tick. At 10 ticks/sim-minute this is 5 tiles/sim-minute
-## — crossing a 100-tile site takes roughly 20 sim-minutes, a brisk walk
-## across the whole facility, not an instant teleport or a crawl.
-const MOVE_TILES_PER_TICK := 0.5
-
-var id: int
 var pname: String
 var age: int
 var needs := Needs.new()
@@ -20,10 +16,6 @@ var reform: float = 0.0
 var grievance: float = 0.0
 var cell_bed_pos: Vector2i = Vector2i(-1, -1)
 
-var pos: Vector2 = Vector2.ZERO
-var path: Array[Vector2i] = []
-var path_index: int = 0
-
 var action_state: int = ActionState.IDLE
 var action_need: int = -1
 var action_object_pos: Vector2i = Vector2i(-1, -1)
@@ -32,32 +24,6 @@ var action_rate: float = 0.0
 
 func has_trait(t: int) -> bool:
 	return (traits & t) != 0
-
-
-## pos is tile-center convention (tile (5,7) means world 5.5,7.5) — matches
-## where StructuresRenderer3D draws objects/walls, so agents don't end up
-## rendered on top of tile-edge wall geometry. floori (not roundi) is the
-## correct inverse of "+0.5" regardless of floating-point rounding mode.
-func tile_pos() -> Vector2i:
-	return Vector2i(floori(pos.x), floori(pos.y))
-
-
-## Advance one tick along the current path.
-func step_along_path() -> void:
-	if path_index >= path.size():
-		return
-	var target := Vector2(path[path_index]) + Vector2(0.5, 0.5)
-	var to_target := target - pos
-	var dist := to_target.length()
-	if dist <= MOVE_TILES_PER_TICK:
-		pos = target
-		path_index += 1
-	else:
-		pos += to_target.normalized() * MOVE_TILES_PER_TICK
-
-
-func has_arrived() -> bool:
-	return path_index >= path.size()
 
 
 func to_dict() -> Dictionary:

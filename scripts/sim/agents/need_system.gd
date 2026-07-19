@@ -4,10 +4,21 @@ extends RefCounted
 ## defined per minute): decay every prisoner's needs, apply active
 ## satisfaction for whoever is mid-action, and let UtilityAI reassess.
 
+## A canteen with a support staffer working it serves meals this much
+## faster — the reason to hire the role at all (M3).
+const STAFFED_CANTEEN_MULTIPLIER := 1.6
+
+
 static func minute_tick(world: SimWorld) -> void:
 	var block := world.schedule.block_at_hour(world.clock.hour_of_day())
 	for p in world.prisoners:
 		p.needs.decay_one_minute()
 		if p.action_state == Prisoner.ActionState.PERFORMING:
-			p.needs.satisfy_one_minute(p.action_need, p.action_rate)
+			p.needs.satisfy_one_minute(p.action_need, _rate_for(world, p))
 		UtilityAI.reassess(world, p, block)
+
+
+static func _rate_for(world: SimWorld, p: Prisoner) -> float:
+	if p.action_need == Needs.Kind.HUNGER and world.canteen_is_staffed(p.tile_pos()):
+		return p.action_rate * STAFFED_CANTEEN_MULTIPLIER
+	return p.action_rate

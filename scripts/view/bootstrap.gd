@@ -18,6 +18,15 @@ const OBJECT_NAMES := [
 ]
 const ZONE_NAMES := ["cell", "canteen", "yard", "workshop", "solitary", "medical", "staff room", "visitation"]
 
+## Hiring works in any tool mode (the digit keys are already spoken for by
+## speed and sub-type selection). Shift+key fires the newest of that role.
+const HIRE_KEYS := {
+	KEY_Z: Staff.Role.GUARD,
+	KEY_X: Staff.Role.WORKER,
+	KEY_C: Staff.Role.SUPPORT,
+}
+const ROLE_NAMES := ["guard", "worker", "support"]
+
 var world: SimWorld
 var paused := false
 var speed_index := 0
@@ -31,6 +40,7 @@ var _camera_rig: CameraRig
 var _terrain: TerrainRenderer3D
 var _structures: StructuresRenderer3D
 var _agents: AgentRenderer3D
+var _staff_renderer: StaffRenderer3D
 var _drag_preview: MeshInstance3D
 var _hud_label: Label
 var _inspected_id: int = -1
@@ -59,6 +69,11 @@ func _ready() -> void:
 	_agents.name = "Agents"
 	add_child(_agents)
 	_agents.setup(world)
+
+	_staff_renderer = StaffRenderer3D.new()
+	_staff_renderer.name = "Staff"
+	add_child(_staff_renderer)
+	_staff_renderer.setup(world)
 
 	_drag_preview = MeshInstance3D.new()
 	_drag_preview.name = "DragPreview"
@@ -140,6 +155,16 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		_sync_tool_mode()
 		return
 
+	# Explicit type, not `:=` — Dictionary.get() infers Variant, which this
+	# project treats as a hard parse error.
+	var role: int = HIRE_KEYS.get(key.keycode, -1)
+	if role >= 0:
+		if key.shift_pressed:
+			_fire(role)
+		else:
+			Hiring.hire(world, role)
+		return
+
 	var digit := _digit_pressed(key.keycode)
 	if digit >= 0:
 		if tool_mode == ToolMode.NONE:
@@ -151,6 +176,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			build_tool.object_type = digit - 1
 		elif tool_mode == ToolMode.ZONE and digit >= 1 and digit <= ZONE_NAMES.size():
 			zone_tool.zone_kind = digit - 1
+
+
+func _fire(role: int) -> void:
+	var victim := Hiring.newest_of_role(world, role)
+	if victim != null:
+		world.dismiss_staff(victim.id, "fired")
 
 
 func _sync_tool_mode() -> void:
@@ -266,6 +297,19 @@ func _build_starter_facility() -> void:
 	g.set_door(yx0, yy0 + 3, SimTile.WALL_W, true)
 	g.place_object(yx0 + 3, yy0 + 3, ObjectDef.Type.WEIGHT_BENCH)
 
+	# Staff room — without one, tired staff rest where they stand and take
+	# twice as long to recover.
+	var sx0 := bx
+	var sx1 := bx + 4
+	var sy0 := by + 11
+	var sy1 := by + 14
+	_room_box(sx0, sy0, sx1, sy1, SimTile.FloorType.TILE)
+	g.set_door(sx0 + 2, sy0, SimTile.WALL_N, true)
+	g.place_object(sx0 + 2, sy0 + 2, ObjectDef.Type.TABLE)
+
+	# Staff clock in west of the block, on open ground outside every room.
+	world.gate_tile = Vector2i(bx - 2, by + 7)
+
 	world.tick() # force one room-detection pass before zoning
 
 	for i in range(4):
@@ -279,9 +323,21 @@ func _build_starter_facility() -> void:
 	var yard := world.room_at(yx0 + 1, yy0 + 1)
 	if yard != null:
 		world.zone_room(yard.id, ZoneValidator.Kind.YARD)
+	var staff_room := world.room_at(sx0 + 1, sy0 + 1)
+	if staff_room != null:
+		world.zone_room(staff_room.id, ZoneValidator.Kind.STAFF_ROOM)
 
 	for i in range(6):
 		Intake.intake(world)
+
+	# The skeleton crew the lease comes with: two guards (so one covers
+	# nights), two workers to actually build what the player queues, and one
+	# support hand for the canteen. Deliberately not enough — hiring up is
+	# the first real decision the player makes.
+	for i in range(2):
+		Hiring.hire(world, Staff.Role.GUARD)
+		Hiring.hire(world, Staff.Role.WORKER)
+	Hiring.hire(world, Staff.Role.SUPPORT)
 
 
 func _room_box(x0: int, y0: int, x1: int, y1: int, floor_type: int) -> void:
@@ -342,6 +398,17 @@ func _update_hud() -> void:
 				if r != null:
 					lines.append("room: %d tiles, sealed=%s, valid=%s" % [r.tiles.size(), r.sealed, r.zone_valid])
 
+	lines.append(_staff_line())
+	lines.append("[Z/X/C] hire guard/worker/support  [Shift+] fire   payroll $%d/day%s" % [
+		Payroll.daily_cost(world.staff),
+		"   ⚠ PAYROLL MISSED" if _payroll_is_in_arrears() else "",
+	])
+	if not world.construction_queue.orders.is_empty():
+		lines.append("build queue: %d order(s)%s" % [
+			world.construction_queue.orders.size(),
+			"   ⚠ no workers on shift" if world.on_duty_count(Staff.Role.WORKER) == 0 else "",
+		])
+
 	lines.append("prisoners: %d   [click] inspect nearest" % world.prisoners.size())
 	if tool_mode == ToolMode.NONE:
 		var p := world.prisoner_at(_inspected_id)
@@ -357,6 +424,31 @@ func _update_hud() -> void:
 			])
 
 	_hud_label.text = "\n".join(lines)
+
+
+## "on duty / on the books" per role — the gap between those two numbers is
+## what a player staffing only the day shift needs to see.
+func _staff_line() -> String:
+	var parts := []
+	for role in [Staff.Role.GUARD, Staff.Role.WORKER, Staff.Role.SUPPORT]:
+		parts.append("%s %d/%d" % [ROLE_NAMES[role], world.on_duty_count(role), world.staff_count(role)])
+	return "staff on duty: %s   avg fatigue %.0f%%" % [", ".join(parts), _average_fatigue() * 100.0]
+
+
+func _average_fatigue() -> float:
+	if world.staff.is_empty():
+		return 0.0
+	var total := 0.0
+	for s in world.staff:
+		total += s.fatigue
+	return total / float(world.staff.size())
+
+
+func _payroll_is_in_arrears() -> bool:
+	for s in world.staff:
+		if s.unpaid_days > 0:
+			return true
+	return false
 
 
 const TRAIT_NAMES := {

@@ -116,7 +116,7 @@ static func _target_for_need(world: SimWorld, p: Prisoner, need: int) -> Diction
 			var o := _nearest_free_object(world, p, ObjectDef.Type.WEIGHT_BENCH)
 			if o != null:
 				return {"tile": Vector2i(o.x, o.y), "object_pos": Vector2i(o.x, o.y), "rate": 0.1}
-			var t := _nearest_zoned_tile(world, p, ZoneValidator.Kind.YARD)
+			var t := world.nearest_zone_tile(p.pos, ZoneValidator.Kind.YARD)
 			if t.x >= 0:
 				return {"tile": t, "object_pos": Vector2i(-1, -1), "rate": 0.04}
 			return {}
@@ -145,18 +145,4 @@ static func _nearest_free_object(world: SimWorld, p: Prisoner, object_type: int)
 		if d < best_dist:
 			best_dist = d
 			best = o
-	return best
-
-
-static func _nearest_zoned_tile(world: SimWorld, p: Prisoner, zone_kind: int) -> Vector2i:
-	var best := Vector2i(-1, -1)
-	var best_dist := INF
-	for r in world.rooms:
-		if r.zone_kind != zone_kind:
-			continue
-		for t in r.tiles:
-			var d: float = p.pos.distance_squared_to(Vector2(t))
-			if d < best_dist:
-				best_dist = d
-				best = t
 	return best

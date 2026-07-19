@@ -2,15 +2,28 @@ extends GutTest
 ## End-to-end M1 DoD: draw a sealed box with a door -> detected as one room
 ## -> zone it a Cell -> bed + toilet makes it valid. Everything goes through
 ## SimWorld.tick(), the same path the real game uses.
+##
+## Since M3 that path runs through workers, so these worlds get a crew hired
+## and put on the day shift first — an unstaffed site builds nothing.
+
+const MAX_TICKS := 20000
 
 
-func _run_queue_to_completion(world: SimWorld, order_count: int) -> void:
-	for i in range(BuildOrder.BUILD_TICKS * order_count):
-		world.tick()
+func _staffed_world(seed_value: int, w: int, h: int) -> SimWorld:
+	var world := SimWorld.new(seed_value, w, h)
+	world.gate_tile = Vector2i(1, 1)
+	Crew.set_hour(world, 9) # mid day-shift
+	Crew.staff_up(world, Staff.Role.WORKER, 3, Vector2i(1, 1))
+	return world
+
+
+func _run_queue_to_completion(world: SimWorld, _order_count: int) -> void:
+	var ticks := Crew.run_until_built(world, MAX_TICKS)
+	assert_lt(ticks, MAX_TICKS, "workers should have drained the queue")
 
 
 func test_draw_sealed_box_zone_cell_then_furnish() -> void:
-	var world := SimWorld.new(1, 20, 20)
+	var world := _staffed_world(1, 20, 20)
 	var q := world.construction_queue
 	var l := world.ledger
 
@@ -48,7 +61,7 @@ func test_draw_sealed_box_zone_cell_then_furnish() -> void:
 
 
 func test_save_load_preserves_rooms_and_zoning() -> void:
-	var world := SimWorld.new(2, 12, 12)
+	var world := _staffed_world(2, 12, 12)
 	var walls := [
 		BuildOrder.make_wall(2, 2, SimTile.WALL_N), BuildOrder.make_wall(2, 3, SimTile.WALL_S),
 		BuildOrder.make_wall(2, 2, SimTile.WALL_W), BuildOrder.make_wall(2, 3, SimTile.WALL_W),
