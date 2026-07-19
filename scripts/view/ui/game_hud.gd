@@ -65,10 +65,24 @@ var _confirm_button: Button
 var _cancel_button: Button
 var _confirm_row: HBoxContainer
 
+var _contract_label: Label
+var _contract_warn: Label
+var _first_play := true
+
+
+func _on_game_started() -> void:
+	if _first_play:
+		_first_play = false
+		_show_onboarding()
+
 
 func setup(p_world: SimWorld) -> void:
 	world = p_world
 	layer = 10
+
+	# Clear any previous UI so calling setup() multiple times is safe.
+	for c in get_children():
+		c.queue_free()
 
 	_root = Control.new()
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -131,6 +145,12 @@ func _build_top_bar() -> void:
 	_tension_pct = UiTheme.label("0%", UiTheme.TEXT, 12)
 	_tension_pct.custom_minimum_size = Vector2(38, 0)
 	row.add_child(_tension_pct)
+
+	row.add_child(UiTheme.hseparator())
+	_contract_label = UiTheme.label("", UiTheme.GOOD, 12)
+	row.add_child(_contract_label)
+	_contract_warn = UiTheme.label("", UiTheme.WARN, 12)
+	row.add_child(_contract_warn)
 
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -360,6 +380,42 @@ func hide_build_preview() -> void:
 	_build_panel.visible = false
 
 
+func _show_onboarding() -> void:
+	var overlay := PanelContainer.new()
+	overlay.name = "Onboarding"
+	overlay.add_theme_stylebox_override("panel", UiTheme.panel_style(Color(0.05, 0.06, 0.08, 0.92)))
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_root.add_child(overlay)
+
+	var col := VBoxContainer.new()
+	col.set_anchors_preset(Control.PRESET_CENTER)
+	col.add_theme_constant_override("separation", 10)
+	col.size = Vector2(420, 0)
+	col.add_theme_constant_override("hseparation", 0)
+	overlay.add_child(col)
+
+	col.add_child(UiTheme.label("YOUR FIRST DAY", Color(0.85, 0.20, 0.18), 20))
+	col.add_child(UiTheme.label("", UiTheme.TEXT_DIM, 6))
+
+	var tips := [
+		"You've inherited a leased facility on a state contract.",
+		"The contract pays $180/head/day — but demands 60%+ occupancy\nand penalizes excessive incidents.",
+		"Build more cells (tool [1]-[5]) to house more inmates.\nHire workers [Staff panel] to build; hire guards to keep order.",
+		"Keep the tension meter under 60% or things break.\nPress [T] to see per-room pressure.",
+		"Stay profitable. If the contract breaches for 5 days — you're out.",
+	]
+	for t in tips:
+		var l := UiTheme.label(t, Color(0.80, 0.82, 0.88), 13)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		col.add_child(l)
+
+	col.add_child(UiTheme.label("", UiTheme.TEXT_DIM, 10))
+	var got_it := UiTheme.button("GOT IT", "Dismiss this message")
+	got_it.custom_minimum_size = Vector2(200, 36)
+	got_it.pressed.connect(func() -> void: overlay.queue_free())
+	col.add_child(got_it)
+
+
 func _build_hint() -> void:
 	var panel := UiTheme.panel()
 	_root.add_child(panel)
@@ -405,6 +461,21 @@ func _refresh_top_bar(state: Dictionary) -> void:
 	bg.bg_color = Color(0.2, 0.21, 0.24)
 	bg.set_corner_radius_all(3)
 	_tension_meter.add_theme_stylebox_override("background", bg)
+
+	var contract := world.contract
+	if contract.breached:
+		_contract_label.text = "CONTRACT BREACHED"
+		_contract_label.add_theme_color_override("font_color", UiTheme.BAD)
+		_contract_warn.text = ""
+	elif contract.breach_days > 0:
+		var left := Contract.BREACH_DAYS - contract.breach_days
+		_contract_label.text = "CONTRACT WARNING — %d day%s left" % [left, "" if left == 1 else "s"]
+		_contract_label.add_theme_color_override("font_color", UiTheme.WARN)
+		_contract_warn.text = ""
+	else:
+		_contract_label.text = "CONTRACT OK  ·  $%s/day" % _thousands(Contract.PER_DIEM_PER_HEAD * world.prisoners.size())
+		_contract_label.add_theme_color_override("font_color", UiTheme.GOOD)
+		_contract_warn.text = "occupancy %d%%+" % int(Contract.MIN_OCCUPANCY_PCT * 100.0)
 
 	var paused: bool = state.get("paused", false)
 	_pause_button.text = "Resume" if paused else "Pause"

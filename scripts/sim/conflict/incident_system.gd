@@ -130,6 +130,7 @@ static func _open_incident(world: SimWorld, room: RoomInfo, participants: Array)
 		if p.faction_id >= 0 and not (p.faction_id in inc.faction_ids):
 			inc.faction_ids.append(p.faction_id)
 	world.incidents.append(inc)
+	world.incidents_today += 1
 	world.events.emit("incident_started", {
 		"id": inc.id, "kind": inc.kind, "room": [inc.room_key.x, inc.room_key.y],
 	})

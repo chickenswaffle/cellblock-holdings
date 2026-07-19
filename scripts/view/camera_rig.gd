@@ -75,6 +75,10 @@ var _mouse_seen := false
 ## pointer is over UI so reaching for a button never moves the world.
 var pointer_over_ui := false
 
+## Screen shake state.
+var _shake_strength := 0.0
+var _shake_offset := Vector3.ZERO
+
 
 func _ready() -> void:
 	camera = Camera3D.new()
@@ -116,7 +120,7 @@ func _clamp_to_bounds() -> void:
 func _apply_camera_transform() -> void:
 	rotation.y = deg_to_rad(yaw_deg)
 	var pitch := deg_to_rad(pitch_deg)
-	camera.position = Vector3(0.0, sin(pitch) * CAMERA_DISTANCE, cos(pitch) * CAMERA_DISTANCE)
+	camera.position = Vector3(0.0, sin(pitch) * CAMERA_DISTANCE, cos(pitch) * CAMERA_DISTANCE) + _shake_offset
 	camera.look_at(global_position, Vector3.UP)
 	camera.size = zoom_size
 
@@ -136,6 +140,22 @@ func reset_angle() -> void:
 	yaw_deg = 0.0
 	pitch_deg = PITCH_DEG
 	_apply_camera_transform()
+
+
+func shake(strength: float) -> void:
+	_shake_strength = clampf(_shake_strength + strength, 0.0, 8.0)
+
+
+func _tick_shake(delta: float) -> void:
+	if _shake_strength <= 0.0:
+		_shake_offset = Vector3.ZERO
+		return
+	_shake_offset = Vector3(
+		randf_range(-_shake_strength, _shake_strength),
+		randf_range(-_shake_strength, _shake_strength) * 0.5,
+		randf_range(-_shake_strength, _shake_strength),
+	) * 0.12
+	_shake_strength = maxf(0.0, _shake_strength - delta * 3.0)
 
 
 ## Move the rig and keep it legal. Every pan path goes through here.
@@ -218,6 +238,7 @@ func ground_point(screen_pos: Vector2) -> Variant:
 
 
 func _process(delta: float) -> void:
+	_tick_shake(delta)
 	_process_rotation(delta)
 
 	var speed_scale := zoom_size / 24.0
@@ -262,3 +283,5 @@ func _process(delta: float) -> void:
 	if edge != Vector3.ZERO:
 		var facing := edge.normalized().rotated(Vector3.UP, deg_to_rad(yaw_deg))
 		_pan_by(facing * EDGE_SPEED * speed_scale * delta)
+
+	_apply_camera_transform()

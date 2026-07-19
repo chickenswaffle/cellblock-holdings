@@ -41,6 +41,7 @@ var tool_mode: int = ToolMode.NONE
 var build_tool: BuildTool
 var zone_tool: ZoneTool
 
+var _save: SaveManager
 var _camera_rig: CameraRig
 var _terrain: TerrainRenderer3D
 var _structures: StructuresRenderer3D
@@ -53,39 +54,49 @@ var _hud: GameHud
 var _inspected_id: int = -1
 var _screenshot_path := ""
 var _screenshot_frames := 0
+var _title_screen: CanvasLayer
+var _game_over_screen: CanvasLayer
+var _started := false
 
 
 func _ready() -> void:
-	world = SimWorld.new(12345)
-	_scatter_placeholder_floors()
-	_build_starter_facility()
-
 	_setup_environment()
+	_save = SaveManager.new()
 
+	_build_renderers()
+	_build_hud_node()
+	_show_title()
+
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--screenshot="):
+			_screenshot_path = arg.trim_prefix("--screenshot=")
+
+
+## Build the 3D renderers with a placeholder sim — replaced when the player
+## starts or loads a game.
+func _build_renderers() -> void:
+	_setup_environment()
+	var placeholder := SimWorld.new(0)
 	_terrain = TerrainRenderer3D.new()
 	_terrain.name = "Terrain"
 	add_child(_terrain)
-	_terrain.setup(world.grid)
+	_terrain.setup(placeholder.grid)
 
 	_structures = StructuresRenderer3D.new()
 	_structures.name = "Structures"
 	add_child(_structures)
-	_structures.setup(world)
 
 	_agents = AgentRenderer3D.new()
 	_agents.name = "Agents"
 	add_child(_agents)
-	_agents.setup(world)
 
 	_staff_renderer = StaffRenderer3D.new()
 	_staff_renderer.name = "Staff"
 	add_child(_staff_renderer)
-	_staff_renderer.setup(world)
 
 	_tension_overlay = TensionOverlay3D.new()
 	_tension_overlay.name = "TensionOverlay"
 	add_child(_tension_overlay)
-	_tension_overlay.setup(world)
 
 	_ghost = BuildGhostRenderer3D.new()
 	_ghost.name = "BuildGhost"
@@ -101,23 +112,271 @@ func _ready() -> void:
 	_drag_preview.visible = false
 	add_child(_drag_preview)
 
+	_camera_rig = CameraRig.new()
+	_camera_rig.name = "CameraRig"
+	_camera_rig.position = Vector3(40.0, 0.0, 30.0)
+	add_child(_camera_rig)
+	_camera_rig.set_bounds(placeholder.grid.width, placeholder.grid.height)
+	_camera_rig.set_home(_camera_rig.position)
+	_camera_rig.visible = false
+
+
+func _init_world(seed_val: int) -> void:
+	world = SimWorld.new(seed_val)
+	_scatter_placeholder_floors()
+	_build_starter_facility()
+	_save.setup(world)
+	_wire_world()
+
+	_terrain.setup(world.grid)
+	_structures.setup(world)
+	_agents.setup(world)
+	_staff_renderer.setup(world)
+	_tension_overlay.setup(world)
 	build_tool = BuildTool.new(world)
 	zone_tool = ZoneTool.new(world)
 
-	_camera_rig = CameraRig.new()
-	_camera_rig.name = "CameraRig"
-	_camera_rig.position = Vector3(24.0, 0.0, 18.0) # centered on the starter facility
-	add_child(_camera_rig)
-	# Bounds so panning can never lose the map, and a home to come back to.
+	_camera_rig.visible = true
+	_camera_rig.position = Vector3(24.0, 0.0, 18.0)
 	_camera_rig.set_bounds(world.grid.width, world.grid.height)
 	_camera_rig.set_home(_camera_rig.position)
 
-	_build_hud()
+	_hud.setup(world)
+	_started = true
+	paused = false
+	_hud.on_tool_selected = _select_tool
+	_hud.on_subtype_selected = _select_subtype
+	_hud.on_speed_selected = func(index: int) -> void:
+		speed_index = index
+		paused = false
+	_hud.on_pause_toggled = func() -> void: paused = not paused
+	_hud.on_hire = func(role: int) -> void: Hiring.hire(world, role)
+	_hud.on_fire = _fire
+	_hud.on_resolve = _resolve_worst
+	_hud.on_lockdown = func() -> void:
+		IncidentSystem.begin_lockdown(world, MANUAL_LOCKDOWN_MINUTES)
+	_hud.on_overlay_toggled = _toggle_overlay
+	_hud.on_edge_scroll_toggled = func() -> void:
+		_camera_rig.edge_scroll_enabled = not _camera_rig.edge_scroll_enabled
+	_hud.on_recenter = func() -> void:
+		_camera_rig.recenter()
+		_camera_rig.reset_angle()
+	_hud.on_rotate = func(degrees: float) -> void: _camera_rig.rotate_by(degrees)
+	_hud.on_confirm_build = func() -> void: build_tool.confirm_pending()
+	_hud.on_cancel_build = func() -> void: build_tool.cancel_pending()
 
-	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--screenshot="):
-			_screenshot_path = arg.trim_prefix("--screenshot=")
 
+func _load_world() -> bool:
+	world = SimWorld.new(0)
+	_save.setup(world)
+	if not _save.load_save():
+		return false
+	_wire_world()
+
+	_terrain.setup(world.grid)
+	_structures.setup(world)
+	_agents.setup(world)
+	_staff_renderer.setup(world)
+	_tension_overlay.setup(world)
+	build_tool = BuildTool.new(world)
+	zone_tool = ZoneTool.new(world)
+
+	_camera_rig.visible = true
+	_camera_rig.position = Vector3(24.0, 0.0, 18.0)
+	_camera_rig.set_bounds(world.grid.width, world.grid.height)
+	_camera_rig.set_home(_camera_rig.position)
+
+	_hud.setup(world)
+	_hud.on_tool_selected = _select_tool
+	_hud.on_subtype_selected = _select_subtype
+	_hud.on_speed_selected = func(index: int) -> void:
+		speed_index = index
+		paused = false
+	_hud.on_pause_toggled = func() -> void: paused = not paused
+	_hud.on_hire = func(role: int) -> void: Hiring.hire(world, role)
+	_hud.on_fire = _fire
+	_hud.on_resolve = _resolve_worst
+	_hud.on_lockdown = func() -> void:
+		IncidentSystem.begin_lockdown(world, MANUAL_LOCKDOWN_MINUTES)
+	_hud.on_overlay_toggled = _toggle_overlay
+	_hud.on_edge_scroll_toggled = func() -> void:
+		_camera_rig.edge_scroll_enabled = not _camera_rig.edge_scroll_enabled
+	_hud.on_recenter = func() -> void:
+		_camera_rig.recenter()
+		_camera_rig.reset_angle()
+	_hud.on_rotate = func(degrees: float) -> void: _camera_rig.rotate_by(degrees)
+	_hud.on_confirm_build = func() -> void: build_tool.confirm_pending()
+	_hud.on_cancel_build = func() -> void: build_tool.cancel_pending()
+	_started = true
+	paused = false
+	return true
+
+
+func _wire_world() -> void:
+	world.events.subscribe(_on_sim_event)
+
+
+func _on_sim_event(event_name: String, payload: Dictionary) -> void:
+	match event_name:
+		"facility_riot":
+			_camera_rig.shake(4.0)
+			paused = true
+		"incident_escalated":
+			if payload.get("kind", 0) >= Incident.Kind.FIGHT:
+				_camera_rig.shake(1.5)
+		"contract_broken":
+			_camera_rig.shake(6.0)
+			paused = true
+		"incident_started":
+			_camera_rig.shake(0.5)
+		"force_used":
+			_camera_rig.shake(2.0)
+
+
+
+func _show_title() -> void:
+	_title_screen = CanvasLayer.new()
+	_title_screen.name = "TitleScreen"
+	_title_screen.layer = 20
+	add_child(_title_screen)
+
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_title_screen.add_child(root)
+
+	var bg := ColorRect.new()
+	bg.color = Color(0.05, 0.06, 0.08, 0.95)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(bg)
+
+	var col := VBoxContainer.new()
+	col.set_anchors_preset(Control.PRESET_CENTER)
+	col.add_theme_constant_override("separation", 16)
+	col.size = Vector2(360, 0)
+	root.add_child(col)
+
+	var title_lbl := Label.new()
+	title_lbl.text = "CELLBLOCK HOLDINGS"
+	title_lbl.add_theme_color_override("font_color", Color(0.85, 0.20, 0.18))
+	title_lbl.add_theme_font_size_override("font_size", 36)
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(title_lbl)
+
+	var subtitle := Label.new()
+	subtitle.text = "Prison Franchise Management"
+	subtitle.add_theme_color_override("font_color", Color(0.62, 0.66, 0.72))
+	subtitle.add_theme_font_size_override("font_size", 16)
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(subtitle)
+
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 20)
+	col.add_child(spacer)
+
+	if _save.save_exists():
+		var continue_btn := UiTheme.button("CONTINUE", "Resume from your last save")
+		continue_btn.custom_minimum_size = Vector2(240, 40)
+		continue_btn.add_theme_font_size_override("font_size", 18)
+		continue_btn.pressed.connect(_start_continue)
+		col.add_child(continue_btn)
+
+	var new_btn := UiTheme.button("NEW GAME", "Start a new facility")
+	new_btn.custom_minimum_size = Vector2(240, 40)
+	new_btn.add_theme_font_size_override("font_size", 18)
+	new_btn.pressed.connect(_start_new)
+	col.add_child(new_btn)
+
+	var hint := Label.new()
+	hint.text = "WASD/arrows pan · wheel zoom · right-drag or , . rotate\n1-5 build tools · Space pause · Home recenter"
+	hint.add_theme_color_override("font_color", Color(0.50, 0.54, 0.60))
+	hint.add_theme_font_size_override("font_size", 12)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(hint)
+
+
+func _start_continue() -> void:
+	if _load_world():
+		_title_screen.queue_free()
+		_title_screen = null
+		_hud._on_game_started()
+
+
+func _start_new() -> void:
+	if _save.save_exists():
+		_save.delete_save()
+	_init_world(12345)
+	_title_screen.queue_free()
+	_title_screen = null
+	_hud._on_game_started()
+
+
+func _show_game_over() -> void:
+	_save.delete_save()
+	_game_over_screen = CanvasLayer.new()
+	_game_over_screen.name = "GameOverScreen"
+	_game_over_screen.layer = 20
+	add_child(_game_over_screen)
+
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_game_over_screen.add_child(root)
+
+	var bg := ColorRect.new()
+	bg.color = Color(0.05, 0.02, 0.02, 0.92)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(bg)
+
+	var col := VBoxContainer.new()
+	col.set_anchors_preset(Control.PRESET_CENTER)
+	col.add_theme_constant_override("separation", 12)
+	col.size = Vector2(400, 0)
+	root.add_child(col)
+
+	var title := Label.new()
+	title.text = "GAME OVER"
+	title.add_theme_color_override("font_color", Color(0.91, 0.31, 0.26))
+	title.add_theme_font_size_override("font_size", 32)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(title)
+
+	var reason_lbl := Label.new()
+	reason_lbl.text = world.game_over_reason
+	reason_lbl.add_theme_color_override("font_color", Color(0.80, 0.82, 0.85))
+	reason_lbl.add_theme_font_size_override("font_size", 15)
+	reason_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	reason_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(reason_lbl)
+
+	var stats := Label.new()
+	var days := world.clock.day()
+	var rev := Contract.PER_DIEM_PER_HEAD * world.prisoners.size() * maxi(days, 1)
+	var peak := world.tension.peak()
+	stats.text = "Survived %d day%s  ·  Peak tension %.0f%%" % [
+		days, "" if days == 1 else "s", peak * 100.0
+	]
+	stats.add_theme_color_override("font_color", Color(0.62, 0.66, 0.72))
+	stats.add_theme_font_size_override("font_size", 13)
+	stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(stats)
+
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 16)
+	col.add_child(spacer)
+
+	var retry := UiTheme.button("TRY AGAIN", "Start a new game")
+	retry.custom_minimum_size = Vector2(240, 40)
+	retry.add_theme_font_size_override("font_size", 18)
+	retry.pressed.connect(_restart_game)
+	col.add_child(retry)
+
+
+func _restart_game() -> void:
+	_game_over_screen.queue_free()
+	_game_over_screen = null
+	_started = false
+	get_tree().reload_current_scene()
 
 
 func _setup_environment() -> void:
@@ -139,22 +398,31 @@ func _setup_environment() -> void:
 
 
 func _process(delta: float) -> void:
-	if not paused:
+	if not _started:
+		return
+	if world.game_over:
+		paused = true
+	elif not paused:
 		_accumulator += delta * TICKS_PER_SECOND * SPEEDS[speed_index]
 		while _accumulator >= 1.0:
 			world.tick()
 			_accumulator -= 1.0
 	_update_hud()
 	_update_drag_preview()
+	_save.tick(delta)
 
 	if _screenshot_path != "":
 		_screenshot_frames += 1
 		if _screenshot_frames == 30:
 			get_viewport().get_texture().get_image().save_png(_screenshot_path)
 			get_tree().quit()
+	if world.game_over and not _game_over_screen.visible:
+		_show_game_over()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if not _started:
+		return
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo:
 		return
@@ -253,6 +521,8 @@ func _sync_tool_mode() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not _started or world.game_over:
+		return
 	# Clicking a HUD panel must never also build, demolish or deselect in the
 	# world behind it.
 	if _hud != null and _hud.pointer_over_ui():
@@ -488,17 +758,15 @@ func _build_starter_facility() -> void:
 	if staff_room != null:
 		world.zone_room(staff_room.id, ZoneValidator.Kind.STAFF_ROOM)
 
-	for i in range(6):
+	for i in range(10):
 		Intake.intake(world)
 
-	# The skeleton crew the lease comes with: two guards (so one covers
-	# nights), two workers to actually build what the player queues, and one
-	# support hand for the canteen. Deliberately not enough — hiring up is
-	# the first real decision the player makes.
-	for i in range(2):
-		Hiring.hire(world, Staff.Role.GUARD)
-		Hiring.hire(world, Staff.Role.WORKER)
-	Hiring.hire(world, Staff.Role.SUPPORT)
+	# Thin crew, overcrowded population. The first day is a crisis: cells are
+	# over capacity, nobody's covering the canteen, and the single guard on
+	# nights will let fatigue eat their nerve. Hiring up and building more
+	# cells are the immediate problems to solve.
+	Hiring.hire(world, Staff.Role.GUARD)
+	Hiring.hire(world, Staff.Role.WORKER)
 
 
 func _room_box(x0: int, y0: int, x1: int, y1: int, floor_type: int) -> void:
@@ -515,11 +783,10 @@ func _room_box(x0: int, y0: int, x1: int, y1: int, floor_type: int) -> void:
 
 
 
-func _build_hud() -> void:
+func _build_hud_node() -> void:
 	_hud = GameHud.new()
 	_hud.name = "Hud"
 	add_child(_hud)
-	_hud.setup(world)
 	_hud.on_tool_selected = _select_tool
 	_hud.on_subtype_selected = _select_subtype
 	_hud.on_speed_selected = func(index: int) -> void:
@@ -608,6 +875,8 @@ func _cycle_subtype(step: int) -> void:
 
 
 func _update_hud() -> void:
+	if not _started or world == null:
+		return
 	_camera_rig.pointer_over_ui = _hud.pointer_over_ui()
 	_hud.refresh({
 		"paused": paused,
@@ -618,6 +887,12 @@ func _update_hud() -> void:
 		"overlay_on": _tension_overlay.visible,
 		"edge_scroll": _camera_rig.edge_scroll_enabled,
 		"inspected_id": _inspected_id,
+		"game_over": world.game_over,
+		"game_over_reason": world.game_over_reason,
+		"contract_breach_days": world.contract.breach_days,
+		"contract_breached": world.contract.breached,
+		"contract_total_earned": world.contract.total_earned,
+		"contract_total_days": world.contract.total_days,
 	})
 
 

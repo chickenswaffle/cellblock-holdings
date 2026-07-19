@@ -34,10 +34,17 @@ var next_incident_id: int = 0
 var lockdown_minutes: int = 0
 ## Running count for M6's oversight/scrutiny model to consume.
 var solitary_uses: int = 0
+## Incidents sparked today — reset by contract on the day rollover.
+var incidents_today: int = 0
 
 ## Where staff clock in and out. Off-shift staff are parked here rather than
 ## modelled going home; bootstrap moves it next to the facility entrance.
 var gate_tile: Vector2i = Vector2i.ZERO
+
+## Contract / game-over state.
+var contract: Contract
+var game_over: bool = false
+var game_over_reason: String = ""
 
 ## Derived from grid; recomputed on grid_version change, never saved directly.
 var rooms: Array[RoomInfo] = []
@@ -61,6 +68,7 @@ func _init(p_seed: int = 1, grid_w: int = 100, grid_h: int = 100) -> void:
 	ledger = Ledger.new(STARTING_BALANCE)
 	construction_queue = ConstructionQueue.new()
 	payroll = Payroll.new()
+	contract = Contract.new()
 	tension = TensionField.new()
 	contraband = Contraband.new()
 	gate_tile = Vector2i(grid_w / 2, grid_h / 2)
@@ -101,8 +109,18 @@ func tick() -> void:
 			_run_bus_arrival()
 	if clock.minute_of_day() == 0 and clock.tick_count % (SimClock.TICKS_PER_SIM_MINUTE * SimClock.MINUTES_PER_DAY) == 0:
 		payroll.run_day(self)
+		var prev_incidents := incidents_today
+		contract.day_incidents = prev_incidents
+		contract.run_day(self)
+		incidents_today = 0
 		Snitches.day_tick(self)
 		events.emit("day_passed", {"day": clock.day()})
+		if contract.breached:
+			game_over = true
+			game_over_reason = "Contract breached — " + _find_breach_reason()
+
+	if not game_over:
+		_check_riot_game_over()
 
 
 func _run_bus_arrival() -> void:
@@ -412,6 +430,26 @@ func worst_incident() -> Incident:
 	return IncidentSystem.worst_open(self)
 
 
+func _find_breach_reason() -> String:
+	var occ := prisoners.size()
+	var cap := 0
+	for r in rooms:
+		if r.zone_kind == ZoneValidator.Kind.CELL:
+			cap += room_capacity(r)
+	var occ_pct := float(occ) / float(maxi(cap, 1))
+	return "Occupancy %.0f%% (needs %.0f%%), incident rate too high" % [occ_pct * 100.0, Contract.MIN_OCCUPANCY_PCT * 100.0]
+
+
+## Facility riot lasting more than 2 sim-days = game over.
+func _check_riot_game_over() -> void:
+	var MIN_FACILITY_RIOT_AGE := 60 * 48
+	for inc in incidents:
+		if inc.is_open() and inc.kind == Incident.Kind.FACILITY_RIOT and inc.age_minutes >= MIN_FACILITY_RIOT_AGE:
+			game_over = true
+			game_over_reason = "Facility lost to riot — the state seized control"
+			return
+
+
 func has_active_riot() -> bool:
 	for inc in incidents:
 		if inc.is_open() and inc.is_riot():
@@ -477,6 +515,10 @@ func to_dict() -> Dictionary:
 		"next_incident_id": next_incident_id,
 		"lockdown_minutes": lockdown_minutes,
 		"solitary_uses": solitary_uses,
+		"incidents_today": incidents_today,
+		"contract": contract.to_dict(),
+		"game_over": game_over,
+		"game_over_reason": game_over_reason,
 	}
 
 
@@ -510,6 +552,10 @@ func from_dict(d: Dictionary) -> void:
 	next_incident_id = int(d.get("next_incident_id", 0))
 	lockdown_minutes = int(d.get("lockdown_minutes", 0))
 	solitary_uses = int(d.get("solitary_uses", 0))
+	incidents_today = int(d.get("incidents_today", 0))
+	contract.from_dict(d.get("contract", {}))
+	game_over = bool(d.get("game_over", false))
+	game_over_reason = String(d.get("game_over_reason", ""))
 	_refresh_rooms()
 
 
