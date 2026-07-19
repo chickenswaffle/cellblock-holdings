@@ -68,10 +68,12 @@ var _confirm_row: HBoxContainer
 var _contract_label: Label
 var _contract_warn: Label
 var _first_play := true
+## Set by Bootstrap in screenshot mode — onboarding blocks the view.
+var suppress_onboarding := false
 
 
 func _on_game_started() -> void:
-	if _first_play:
+	if _first_play and not suppress_onboarding:
 		_first_play = false
 		_show_onboarding()
 
@@ -387,12 +389,13 @@ func _show_onboarding() -> void:
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.add_child(overlay)
 
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(center)
+
 	var col := VBoxContainer.new()
-	col.set_anchors_preset(Control.PRESET_CENTER)
 	col.add_theme_constant_override("separation", 10)
-	col.size = Vector2(420, 0)
-	col.add_theme_constant_override("hseparation", 0)
-	overlay.add_child(col)
+	center.add_child(col)
 
 	col.add_child(UiTheme.label("YOUR FIRST DAY", Color(0.85, 0.20, 0.18), 20))
 	col.add_child(UiTheme.label("", UiTheme.TEXT_DIM, 6))
@@ -407,6 +410,7 @@ func _show_onboarding() -> void:
 	for t in tips:
 		var l := UiTheme.label(t, Color(0.80, 0.82, 0.88), 13)
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size = Vector2(440, 0)
 		col.add_child(l)
 
 	col.add_child(UiTheme.label("", UiTheme.TEXT_DIM, 10))
@@ -463,19 +467,32 @@ func _refresh_top_bar(state: Dictionary) -> void:
 	_tension_meter.add_theme_stylebox_override("background", bg)
 
 	var contract := world.contract
+	var bed_cap := 0
+	for r in world.rooms:
+		if r.zone_kind == ZoneValidator.Kind.CELL:
+			bed_cap += world.room_capacity(r)
 	if contract.breached:
 		_contract_label.text = "CONTRACT BREACHED"
 		_contract_label.add_theme_color_override("font_color", UiTheme.BAD)
 		_contract_warn.text = ""
 	elif contract.breach_days > 0:
 		var left := Contract.BREACH_DAYS - contract.breach_days
-		_contract_label.text = "CONTRACT WARNING — %d day%s left" % [left, "" if left == 1 else "s"]
+		_contract_label.text = "WARNING %d/%d — %s" % [
+			contract.breach_days, Contract.BREACH_DAYS, contract.last_day_reason]
 		_contract_label.add_theme_color_override("font_color", UiTheme.WARN)
+		_contract_label.tooltip_text = "%d bad day%s left before the state pulls the contract" % [
+			left, "" if left == 1 else "s"]
 		_contract_warn.text = ""
 	else:
-		_contract_label.text = "CONTRACT OK  ·  $%s/day" % _thousands(Contract.PER_DIEM_PER_HEAD * world.prisoners.size())
+		_contract_label.text = "$%s/day  ·  %d/%d beds  ·  %d/%d incidents" % [
+			_thousands(Contract.PER_DIEM_PER_HEAD * world.prisoners.size()),
+			world.prisoners.size(), bed_cap,
+			world.incidents_today, Contract.MAX_INCIDENTS_PER_DAY,
+		]
 		_contract_label.add_theme_color_override("font_color", UiTheme.GOOD)
-		_contract_warn.text = "occupancy %d%%+" % int(Contract.MIN_OCCUPANCY_PCT * 100.0)
+		_contract_label.tooltip_text = "Contract: keep beds %.0f%%+ full and incidents at %d/day or under.\n%d bad days in a row and the state pulls the contract." % [
+			Contract.MIN_OCCUPANCY_PCT * 100.0, Contract.MAX_INCIDENTS_PER_DAY, Contract.BREACH_DAYS]
+		_contract_warn.text = ""
 
 	var paused: bool = state.get("paused", false)
 	_pause_button.text = "Resume" if paused else "Pause"

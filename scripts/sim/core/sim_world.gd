@@ -117,7 +117,7 @@ func tick() -> void:
 		events.emit("day_passed", {"day": clock.day()})
 		if contract.breached:
 			game_over = true
-			game_over_reason = "Contract breached — " + _find_breach_reason()
+			game_over_reason = "The state pulled your contract — " + contract.last_day_reason
 
 	if not game_over:
 		_check_riot_game_over()
@@ -428,16 +428,6 @@ func current_block() -> int:
 ## Highest-severity open incident anywhere, or null.
 func worst_incident() -> Incident:
 	return IncidentSystem.worst_open(self)
-
-
-func _find_breach_reason() -> String:
-	var occ := prisoners.size()
-	var cap := 0
-	for r in rooms:
-		if r.zone_kind == ZoneValidator.Kind.CELL:
-			cap += room_capacity(r)
-	var occ_pct := float(occ) / float(maxi(cap, 1))
-	return "Occupancy %.0f%% (needs %.0f%%), incident rate too high" % [occ_pct * 100.0, Contract.MIN_OCCUPANCY_PCT * 100.0]
 
 
 ## Facility riot lasting more than 2 sim-days = game over.

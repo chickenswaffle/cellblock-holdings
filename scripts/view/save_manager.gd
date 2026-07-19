@@ -38,7 +38,7 @@ func load_save() -> bool:
 	var json := f.get_as_text()
 	if json.is_empty():
 		return false
-	var data := JSON.parse_string(json)
+	var data: Variant = JSON.parse_string(json)
 	if data == null or typeof(data) != TYPE_DICTIONARY:
 		return false
 	_world.from_dict(data)

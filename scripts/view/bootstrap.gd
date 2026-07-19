@@ -71,11 +71,16 @@ func _ready() -> void:
 		if arg.begins_with("--screenshot="):
 			_screenshot_path = arg.trim_prefix("--screenshot=")
 
+	# A screenshot run is for verifying the *game*, not the menu — skip the
+	# title screen straight into a fresh world.
+	if _screenshot_path != "":
+		_hud.suppress_onboarding = true
+		_start_new()
+
 
 ## Build the 3D renderers with a placeholder sim — replaced when the player
 ## starts or loads a game.
 func _build_renderers() -> void:
-	_setup_environment()
 	var placeholder := SimWorld.new(0)
 	_terrain = TerrainRenderer3D.new()
 	_terrain.name = "Terrain"
@@ -250,11 +255,13 @@ func _show_title() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(bg)
 
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(center)
+
 	var col := VBoxContainer.new()
-	col.set_anchors_preset(Control.PRESET_CENTER)
 	col.add_theme_constant_override("separation", 16)
-	col.size = Vector2(360, 0)
-	root.add_child(col)
+	center.add_child(col)
 
 	var title_lbl := Label.new()
 	title_lbl.text = "CELLBLOCK HOLDINGS"
@@ -328,11 +335,13 @@ func _show_game_over() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(bg)
 
+	var center_over := CenterContainer.new()
+	center_over.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_child(center_over)
+
 	var col := VBoxContainer.new()
-	col.set_anchors_preset(Control.PRESET_CENTER)
 	col.add_theme_constant_override("separation", 12)
-	col.size = Vector2(400, 0)
-	root.add_child(col)
+	center_over.add_child(col)
 
 	var title := Label.new()
 	title.text = "GAME OVER"
@@ -347,14 +356,15 @@ func _show_game_over() -> void:
 	reason_lbl.add_theme_font_size_override("font_size", 15)
 	reason_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	reason_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	reason_lbl.custom_minimum_size = Vector2(420, 0)
 	col.add_child(reason_lbl)
 
 	var stats := Label.new()
 	var days := world.clock.day()
-	var rev := Contract.PER_DIEM_PER_HEAD * world.prisoners.size() * maxi(days, 1)
-	var peak := world.tension.peak()
-	stats.text = "Survived %d day%s  ·  Peak tension %.0f%%" % [
-		days, "" if days == 1 else "s", peak * 100.0
+	stats.text = "Survived %d day%s  ·  $%s earned  ·  Peak tension %.0f%%" % [
+		days, "" if days == 1 else "s",
+		GameHud._thousands(world.contract.total_earned),
+		world.tension.peak() * 100.0,
 	]
 	stats.add_theme_color_override("font_color", Color(0.62, 0.66, 0.72))
 	stats.add_theme_font_size_override("font_size", 13)
@@ -398,6 +408,14 @@ func _setup_environment() -> void:
 
 
 func _process(delta: float) -> void:
+	# Screenshot runs before every other gate so headless captures work in
+	# any state — title screen included. No early return: the sim and HUD
+	# must keep running or the capture shows frozen default widgets.
+	if _screenshot_path != "":
+		_screenshot_frames += 1
+		if _screenshot_frames == 30:
+			get_viewport().get_texture().get_image().save_png(_screenshot_path)
+			get_tree().quit()
 	if not _started:
 		return
 	if world.game_over:
@@ -411,12 +429,7 @@ func _process(delta: float) -> void:
 	_update_drag_preview()
 	_save.tick(delta)
 
-	if _screenshot_path != "":
-		_screenshot_frames += 1
-		if _screenshot_frames == 30:
-			get_viewport().get_texture().get_image().save_png(_screenshot_path)
-			get_tree().quit()
-	if world.game_over and not _game_over_screen.visible:
+	if world.game_over and _game_over_screen == null:
 		_show_game_over()
 
 
@@ -758,15 +771,20 @@ func _build_starter_facility() -> void:
 	if staff_room != null:
 		world.zone_room(staff_room.id, ZoneValidator.Kind.STAFF_ROOM)
 
-	for i in range(10):
+	for i in range(4):
 		Intake.intake(world)
+	# ...plus six more with nowhere to sleep. The yard is their bed tonight.
+	for i in range(6):
+		Intake.intake_overflow(world, Vector2i(yx0 + 2 + (i % 4), yy0 + 5 + (i / 4)))
 
-	# Thin crew, overcrowded population. The first day is a crisis: cells are
-	# over capacity, nobody's covering the canteen, and the single guard on
-	# nights will let fatigue eat their nerve. Hiring up and building more
-	# cells are the immediate problems to solve.
+	# Thin crew, overcrowded population. The first day is a crisis: 10 inmates
+	# in 4 cells, one guard, nobody working the canteen. Two workers means
+	# building out of the hole is *possible* — but every dollar spent on
+	# staff and walls is a dollar closer to missing payroll. Hire a support
+	# hand and another guard before the tension meter finds it for you.
 	Hiring.hire(world, Staff.Role.GUARD)
-	Hiring.hire(world, Staff.Role.WORKER)
+	for i in range(2):
+		Hiring.hire(world, Staff.Role.WORKER)
 
 
 func _room_box(x0: int, y0: int, x1: int, y1: int, floor_type: int) -> void:

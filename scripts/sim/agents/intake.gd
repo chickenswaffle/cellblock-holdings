@@ -59,3 +59,17 @@ static func _find_free_bed(world: SimWorld) -> PlacedObject:
 			if room != null and room.sealed and room.zone_kind == ZoneValidator.Kind.CELL:
 				return o
 	return null
+
+
+## Intake WITHOUT a bed: the prisoner owns nothing and sleeps rough wherever
+## they end up. The no-bed case is handled by UtilityAI (they idle through
+## SLEEP blocks), and NeedSystem keeps decaying sleep — so an overflow
+## population is a slow-burn grievance engine, which is exactly what an
+## overcrowded start should be. Returns the prisoner (never null).
+static func intake_overflow(world: SimWorld, drop_tile: Vector2i) -> Prisoner:
+	var p := generate_prisoner(world)
+	p.cell_bed_pos = Vector2i(-1, -1)
+	p.place_at_tile(drop_tile)
+	world.prisoners.append(p)
+	world.events.emit("prisoner_intake", {"id": p.id, "pname": p.pname, "overflow": true})
+	return p
