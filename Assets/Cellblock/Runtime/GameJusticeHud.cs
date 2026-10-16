@@ -135,7 +135,8 @@ namespace Cellblock.Unity
             int today = world.Data.Minute / 1440;
             List<Resident> docket = world.CourtDocket(today), next = world.CourtDocket(today + 1);
             custodyDocket.text = "Hearings today: " + (docket.Count == 0 ? "none" : string.Join(", ", docket.Select(r => r.Name))) +
-                "\nTomorrow: " + (next.Count == 0 ? "none" : string.Join(", ", next.Select(r => r.Name)));
+                "\nTomorrow: " + (next.Count == 0 ? "none" : string.Join(", ", next.Select(r => r.Name))) +
+                (world.FormerResidents.Count == 0 ? "" : "\nRecently released: " + string.Join(", ", world.FormerResidents.Reverse().Take(3).Select(r => r.Name + " (" + JusticeRules.When(r.Legal.ReleaseMinute) + ")")));
             var ranked = world.Data.Residents.Where(r => r.Legal.Ready && world.InCustody(r)).Select(r => new { Resident = r, Risk = world.EscapeRisk(r) })
                 .OrderByDescending(x => x.Risk).ToList();
             int high = ranked.Count(x => x.Risk >= JusticeRules.HighRisk), elevated = ranked.Count(x => x.Risk >= JusticeRules.ElevatedRisk && x.Risk < JusticeRules.HighRisk);
