@@ -71,6 +71,9 @@ namespace Cellblock.Core
         public bool Arrived = true, Working;
         public string TripId = "", ProjectId = "", WorkId = "";
         public int AssignmentRevision = -1;
+        public Point SupplyPoint, WorkFocus;
+        public string WorkPhase = "Idle", WorkKind = "Survey";
+        public int SupplyLoadMinutes, SuppliesUsed;
     }
     [Serializable] public sealed class WorkItem
     {
@@ -291,6 +294,7 @@ namespace Cellblock.Core
         public bool HireCrew()
         {
             if (Data.CashCents < 50000) { Notice = "A crew requires a $500 mobilization payment."; return false; }
+            if (!CanBookTrip("Crew")) { Notice = "All staff/contractor parking bays are reserved. Release a crew or wait for departing transport."; return false; }
             string id = Id();
             var crew = new Crew { Id = id, Name = "Crew " + (Data.Crews.Count + 1), Arrived = false };
             Data.Crews.Add(crew); crew.TripId = BookTrip(id, "Crew");
@@ -566,8 +570,8 @@ namespace Cellblock.Core
                         assignments[item] = assignments.ContainsKey(item) ? assignments[item] + 1 : 1;
                         if (!ReachWork(crew, project, item)) break;
                         crew.Working = true;
-                        item.Remaining = Math.Max(0, item.Remaining - 1);
-                        project.Status = "Construction"; crew.Activity = project.Name + ": construction"; break;
+                        item.Remaining = Math.Max(0, item.Remaining - 1); crew.SuppliesUsed++;
+                        project.Status = "Construction"; crew.Activity = project.Name + ": " + crew.WorkKind.ToLowerInvariant(); break;
                     }
                     if (project.Work.Any(w => w.Remaining > 0)) continue;
                     if (project.DependsOn.Any(id => Data.Projects.Any(p => p.Id == id && !p.Completed)))
@@ -595,8 +599,9 @@ namespace Cellblock.Core
                     if (project.RelocatesDining) Data.Dining = project.Dining;
                     project.Completed = true; project.CompletedMinute = Data.Minute; project.Status = "Operational";
                     InvalidateGeometry(); Notice = project.Name + " completed and handed over.";
-                    crew.Working = false; crew.Activity = "Project handed over"; break;
+                    crew.Working = false; crew.WorkPhase = "Idle"; crew.Activity = "Project handed over"; break;
                 }
+                if (crew.ProjectId == "") crew.WorkPhase = "Idle";
             }
         }
         public void AdvanceMinutes(int count)

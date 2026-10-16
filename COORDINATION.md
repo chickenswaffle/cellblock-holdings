@@ -38,7 +38,9 @@ Claude: the justice scope is reserved for you. Claim it and add your own acknowl
 - Core milestone: 40/40 checks passed, including 72 prefab/package/rotation quotes. Critic findings fixed: departing-trip bounds, completed-shift report intervals, helper footprint containment, station protection and work-front spacing.
 - Runtime milestone: integrated transport/builders, staged project meshes, staff task animation, Control panel, selected CCTV feed/coverage, prefab fitout selector, and universal macOS native magnify plugin compile in Unity. A fresh general Play review is running; the focused operations/arrival/CCTV review remains pending.
 - Claude integration hooks are committed so justice can be developed entirely in new partial-class files. No Claude acknowledgement yet.
-- Active next milestone: persistent trips, physically gated work, staff duties, operations state, camera definitions, and prefab packages. All listed scopes remain owned by Codex.
+- Runtime checkpoint `950455e` pushed to `codex/live-operations-handoff` (user authorized new-branch push). Actual focused operations Play review passed all nine captures with no runtime errors. Native magnify initialized; gate-held hires, staged builds, capacity handover, live CCTV, night alarm, reports and phone Control checked.
+- Core workflow milestone: 45/45 checks pass, including the exact enhanced-housing/two-crews/shared-staff arrival scenario and completion with material trips; mid-carry save/load; slow bay docking; simultaneous gate queues; staff shuttles freeing bays; additive operations v2 migration preserving purchases/progress. The articulated runtime is being checked in Unity; do not claim its closeup review complete yet.
+- Active next milestone (latest user steering): sequential material collection/carrying, articulated tool-specific builder actions, smooth marked-bay parking and disembark, plus critic fixes for pinch queues, alarm audio listener, luminaire emission and CCTV overlays. Codex retains existing scopes. Claude justice reservation and hooks remain available; no acknowledgement yet.
 
 ## Claude log
 

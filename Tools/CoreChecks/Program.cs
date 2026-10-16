@@ -438,6 +438,72 @@ static partial class Program
             World loaded = new World(RoundTrip(world.Data)); loaded.CurrentShift(); loaded.CurrentShift(); loaded.AdvanceMinutes(1);
             Check(loaded.Data.ShiftReports.Count == 1 && loaded.Data.Operations.LastReportMinute == 960, "Opening or loading duplicated a report");
         });
+        Test("builders collect and carry supplies before physical work and resume mid-carry", () => {
+            World world = County(); world.Approve(Wing()); world.HireCrew();
+            int elapsed = 0;
+            while (world.Data.Crews[0].WorkPhase != "Carrying" && elapsed++ < 700) world.AdvanceMinutes(1);
+            Crew crew = world.Data.Crews[0]; Check(crew.WorkPhase == "Carrying" && !crew.Working, "Builder skipped collection or never loaded supplies");
+            float remaining = world.Data.Projects[0].Work.Sum(w => w.Remaining);
+            long cash = world.Data.CashCents;
+            World resumed = new World(RoundTrip(world.Data)); Crew saved = resumed.Data.Crews[0];
+            Check(saved.WorkPhase == "Carrying" && saved.SupplyPoint.Equals(crew.SupplyPoint) && resumed.Data.CashCents == cash, "Mid-carry save lost cargo, depot or money");
+            elapsed = 0;
+            while (!saved.Working && elapsed++ < 300)
+            {
+                Check(resumed.Data.Projects[0].Work.Sum(w => w.Remaining) == remaining, "Travel earned physical work");
+                resumed.AdvanceMinutes(1);
+            }
+            Check(saved.Working && saved.WorkPhase == "Working" && resumed.Data.Projects[0].Work.Sum(w => w.Remaining) < remaining, "Delivered supplies did not enable work");
+            resumed.SetAlarm(true); remaining = resumed.Data.Projects[0].Work.Sum(w => w.Remaining); resumed.AdvanceMinutes(20);
+            Check(!saved.Working && resumed.Data.Projects[0].Work.Sum(w => w.Remaining) == remaining, "Alarm stand-down still advanced tool work");
+        });
+        Test("transport reserves separate marked bays and slows before unloading", () => {
+            World world = County(); world.SetGate(false);
+            for (int i = 0; i < 7; i++) { Check(world.HireStaff("Officer"), world.Notice); world.AdvanceMinutes(11); }
+            Check(world.Data.Trips.Select(t => t.Parking).Distinct().Count() == 7, "Two arrivals reserved the same bay");
+            long cash = world.Data.CashCents; Check(!world.HireCrew() && world.Data.CashCents == cash, "Full parking charged a stranded hire");
+            world.SetGate(true); world.AdvanceMinutes(300);
+            Check(world.Data.Trips.All(t => t.Phase == "Gone") && world.Data.Staff.All(s => s.Arrived), "Staff shuttle did not release its bay after dropping off people");
+            Check(world.HireCrew(), "Returning staff shuttles left recruitment permanently blocked");
+            int parkingMinutes = 0; TransportTrip incoming = world.Data.Trips.Last(); Point previous = incoming.Position;
+            while (incoming.Phase != "Unloading" && parkingMinutes++ < 180)
+            {
+                previous = incoming.Position; bool docking = incoming.Waypoint == 4; world.AdvanceMinutes(1);
+                if (docking) Check(Geometry.Distance(previous, incoming.Position) <= 0.451f, "Vehicle did not slow in final parking approach");
+            }
+            Check(incoming.Phase == "Unloading" && Geometry.Distance(incoming.Position, incoming.Parking) < 0.01f && !world.Data.Crews[0].Arrived, "People disembarked before smooth parking completed");
+            new World(RoundTrip(world.Data));
+        });
+        Test("legacy operations migrate builder workflow once without changing purchases", () => {
+            World world = County(); world.Approve(Wing()); world.HireCrew(); world.AdvanceMinutes(180);
+            State old = RoundTrip(world.Data); old.OperationsVersion = 1; long cash = old.CashCents;
+            float remaining = old.Projects[0].Work.Sum(w => w.Remaining);
+            World loaded = new World(old);
+            Check(old.OperationsVersion == 2 && old.Crews[0].WorkId == "" && old.CashCents == cash && old.Projects[0].Work.Sum(w => w.Remaining) == remaining, "Migration reset paid construction");
+            loaded.AdvanceMinutes(1); string work = old.Crews[0].WorkId;
+            World again = new World(RoundTrip(old)); Check(again.Data.Crews[0].WorkId == work, "Loading repeated workflow migration");
+        });
+        Test("simultaneous crew and staff hires keep headway at a closed gate", () => {
+            World world = County(); world.HireCrew(); world.HireStaff("Officer"); world.SetGate(false);
+            Check(world.Data.Trips[1].DepartureMinute - world.Data.Trips[0].DepartureMinute >= 7, "Vehicles departed inside each other");
+            for (int i = 0; i < 100; i++)
+            {
+                world.AdvanceMinutes(1);
+                TransportTrip a = world.Data.Trips[0], b = world.Data.Trips[1];
+                if (a.Phase != "Boarding" && b.Phase != "Boarding") Check(Geometry.Distance(a.Position, b.Position) >= 5.1f, "Closed-gate queue overlapped vehicles");
+            }
+            world.SetGate(true); world.AdvanceMinutes(250);
+            Check(world.Data.Crews[0].Arrived && world.Data.Staff.Last().Arrived, "Headway queue never discharged");
+        });
+        Test("enhanced housing shared arrivals disembark after a held gate", () => {
+            World world = County(); Check(world.Approve(PrefabCatalog.Create("housing", 2, new Point(2, -8))), world.Notice);
+            world.HireCrew(); world.HireCrew(); world.HireStaff("Caseworker"); world.HireStaff("Technician"); world.SetGate(false);
+            while (!world.Data.Trips.Any(t => t.Phase == "At gate") && world.Data.Minute < 600) world.AdvanceMinutes(1);
+            world.SetGate(true); int elapsed = 0;
+            while ((world.Data.Crews.Any(c => !c.Arrived) || world.Data.Staff.Any(s => !s.Arrived)) && elapsed++ < 300) world.AdvanceMinutes(1);
+            Check(world.Data.Crews.All(c => c.Arrived) && world.Data.Staff.All(s => s.Arrived), "Shared arrivals stalled: " + string.Join(";", world.Data.Trips.Select(t => t.Kind + " " + t.Phase + " " + t.Position + " waypoint " + t.Waypoint)));
+            Finish(world, 6500); Check(world.Capacity == 16 && world.Reconciles(), "Furnished unit failed handover after material trips");
+        });
         RunJusticeChecks();
         Console.WriteLine("\n" + passed + " passed, " + failed + " failed. These checks exercise the C# core; they do not run Unity.");
         Environment.ExitCode = failed == 0 ? 0 : 1;
