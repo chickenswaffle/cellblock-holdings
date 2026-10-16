@@ -11,6 +11,8 @@ namespace Cellblock.Unity
     public sealed partial class GameHud : MonoBehaviour
     {
         partial void BuildJustice();
+        partial void BuildLives();
+        partial void RefreshLives(World world, Resident resident);
         partial void RefreshJustice(World world, Resident resident);
         enum Workspace { Facility, Build, People, Company, Control }
         GameController game;
@@ -79,7 +81,7 @@ namespace Cellblock.Unity
             BuildNavigation();
             inspector = new ScrollView(ScrollViewMode.Vertical); inspector.name = "inspector"; inspector.AddToClassList("inspector");
             ((ScrollView)inspector).horizontalScrollerVisibility = ScrollerVisibility.Hidden; root.Add(inspector);
-            BuildInspector(); BuildCatalog(); BuildPeople(); BuildJustice(); BuildControl();
+            BuildInspector(); BuildCatalog(); BuildPeople(); BuildJustice(); BuildLives(); BuildControl();
             BuildTools();
             BuildCamera();
             status = Panel("status");
@@ -379,7 +381,7 @@ namespace Cellblock.Unity
                 personMetricValues[2].EnableInClassList("negative", staff.Risk >= 30);
                 personEffects.text = PeopleDynamics.StaffEffect(staff) + "\nStaff support adds 8 integrity, relieves 25 pressure, and reduces favoritism by 10.";
             }
-            RefreshJustice(world, selected);
+            RefreshJustice(world, selected); RefreshLives(world, selected);
             var history = world.Data.History.AsEnumerable().Reverse().Take(historyRows.Length).ToArray();
             for (int i = 0; i < historyRows.Length; i++)
             {
@@ -681,7 +683,7 @@ namespace Cellblock.Unity
             desktop.Add(ControlRow("Drag", "Move the view in Select / Inspect mode"));
             desktop.Add(ControlRow("Arrows / WASD", "Move in any direction"));
             desktop.Add(ControlRow("Right drag / Alt + drag", "Orbit around the facility"));
-            desktop.Add(ControlRow("Scroll / Q E / R F", "Zoom / orbit / tilt"));
+            desktop.Add(ControlRow("Pinch / scroll / Q E / R F", "Zoom / orbit / tilt"));
             desktop.Add(ControlRow("Home / Space / Esc", "Center / pause / discard a plan")); columns.Add(desktop);
             var touch = Element("guide-column"); touch.Add(Text("IPHONE / IPAD", "section-label"));
             touch.Add(ControlRow("Tap", "Select an object or place a plan point"));
@@ -760,7 +762,7 @@ namespace Cellblock.Unity
                 : game.Tool == BuildTool.Inspect ? "SELECT / INSPECT" : game.Tool == BuildTool.Meals ? "MEAL SERVICE / choose an installed dining table" : "STRUCTURE / " + game.Tool;
             snap.text = game.Snapping ? "Snap on" : "Snap off"; snap.EnableInClassList("selected", game.Snapping);
             instruction.text = game.Tool == BuildTool.Inspect
-                ? "Drag to move  ·  Arrows / WASD  ·  Right drag to orbit  ·  Scroll to zoom"
+                ? "Drag to move  ·  Arrows / WASD  ·  Right drag to orbit  ·  Pinch / scroll to zoom"
                 : game.Instruction;
             if (Application.isMobilePlatform && game.Tool == BuildTool.Inspect) instruction.text = "Drag to move  ·  Pinch to zoom  ·  Twist to orbit  ·  Tap to inspect";
             placement.text = game.PlacementSummary; placement.style.display = string.IsNullOrEmpty(game.PlacementSummary) ? DisplayStyle.None : DisplayStyle.Flex;

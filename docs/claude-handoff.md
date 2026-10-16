@@ -1,5 +1,7 @@
 # Claude parallel handoff — legal profiles, court transport, custody
 
+For a short copy/paste start message, see `docs/claude-start.txt`.
+
 ## Start here
 
 Repository: `https://github.com/chickenswaffle/cellblock-holdings`

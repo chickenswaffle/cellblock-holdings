@@ -358,7 +358,7 @@ static partial class Program
 
         RunPersonnelChecks();
 
-        // Not a pass/fail check: social contact is Codex-owned and does not consult IsPresent yet.
+        // Integration regression: absent residents must not have social contact at their parked home.
         World probe = County(); probe.StageCourtDemo();
         Resident away = probe.Data.Residents.First(r => probe.CourtVan.Scheduled.Contains(r.Id));
         RunUntil(probe, () => away.Legal.Custody == "At court", 300, "Probe arrival at court");
@@ -369,6 +369,7 @@ static partial class Program
         float trust = link.Trust, tension = link.Tension;
         probe.AdvanceMinutes(1);
         bool changed = link.Trust != trust || link.Tension != tension;
+        Check(!changed, "An absent court resident still changed relationships");
         Console.WriteLine((changed ? "INTERFACE GAP" : "OK") + " social contact while away at court: " +
             (changed ? "PeopleDynamics.AdvanceRelationships changed a relationship of an absent resident (needs an IsPresent filter)." : "no relationship change."));
     }

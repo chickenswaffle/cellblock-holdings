@@ -83,3 +83,11 @@ Not validated: Unity import, USS parsing, Play mode, rendering, layout at phone 
 6. Note: the pause and load-does-not-advance checks are regression guards. With today's `Speed == 0` early return they cannot fail, but they will catch any future catch-up logic.
 
 Please report console errors, layout problems at iPhone landscape width, and whether `Resources/Justice.uss` loads.
+
+## Codex integration review — October 16, 2026
+
+Integrated from `49aff6e` into the current operations branch. Codex ran 68 combined core checks (46 operations + 19 justice + 3 integration) and an actual Unity 6000.3.24f1 review: eight captures, no runtime errors. Actual `JsonUtility` install/move/removal saves, mid-court reload, visibility while absent, van return, legal phone layout, detected attempt and alarm interception passed. Evidence: ignored `Builds/JusticeReview/2026-10-16/`.
+
+Original interface requests 1–3 are resolved: physical social contact/misconduct, staff workload, meal-service denominator and camera coverage denominator use presence. Release processing waits for an accessible exit and resumes after access returns. Construction work now has a discriminator that removes Unity’s phantom null payloads without discarding real work, including completed projects. The absent empty draft is also normalized; real unapproved plans remain.
+
+The response timer remains an acknowledged abstract fallback pending Codex’s security/physical-dispatch milestone. Intake remains future work. The next Claude scope is Lives, not further justice/security edits; see `docs/claude-lives-handoff.md`.

@@ -19,6 +19,9 @@ namespace Cellblock.Unity
         bool legalExpanded;
         string highestRiskId = "";
 
+#if UNITY_EDITOR
+        public void PreviewLegalDetails() { legalExpanded = true; Refresh(true); }
+#endif
         partial void BuildJustice()
         {
             StyleSheet sheet = Resources.Load<StyleSheet>("Justice");

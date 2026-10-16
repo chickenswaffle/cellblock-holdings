@@ -873,8 +873,10 @@ namespace Cellblock.Core
                 else if (legal.Custody == "Release processing")
                 {
                     Point exit = SallyPortPoint();
-                    if (Walk("justice/release/" + resident.Id, ref resident.Position, exit, 0.34f * resident.WalkSpeed) || Stalled(resident, before))
+                    if (Walk("justice/release/" + resident.Id, ref resident.Position, exit, 0.34f * resident.WalkSpeed))
                         Release(resident, resident.Name + " completed the sentence and was released from the facility.");
+                    else if (Stalled(resident, before))
+                        Notice = resident.Name + " is awaiting release: restore a clear route to the sally port.";
                 }
             }
         }

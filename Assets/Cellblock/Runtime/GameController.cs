@@ -40,6 +40,7 @@ namespace Cellblock.Unity
         public Fixture WatchedCamera { get { return World == null ? null : World.Data.Fixtures.FirstOrDefault(f => f.Id == watchedCameraId && f.Kind == "CCTV"); } }
         GameHud hud;
         Camera cameraRig;
+        bool nativeInputWasBlocked = true;
         ConstructionGuides guides;
         Vector3 focus = new Vector3(-5, 0, 0), displayedFocus;
         Vector2 displayedViewCenter = new Vector2(0.5f, 0.5f);
@@ -90,6 +91,7 @@ namespace Cellblock.Unity
             cameraRig.transform.SetParent(transform); cameraRig.tag = "MainCamera"; cameraRig.orthographic = false;
             cameraRig.fieldOfView = 42; cameraRig.nearClipPlane = 0.15f; cameraRig.farClipPlane = 350;
             cameraRig.cullingMask = ~(1 << 30);
+            if (FindFirstObjectByType<AudioListener>() == null) cameraRig.gameObject.AddComponent<AudioListener>();
             trackpad = gameObject.AddComponent<MacTrackpad>();
             cameraRig.allowHDR = true; cameraRig.allowMSAA = true;
             cameraRig.clearFlags = CameraClearFlags.SolidColor; cameraRig.backgroundColor = new Color(0.66f, 0.73f, 0.77f);
@@ -106,7 +108,7 @@ namespace Cellblock.Unity
             if (World != null && !Save()) return false;
             presentationPreview = preview;
             World = Cellblock.Core.World.Start(contract); saveId = Guid.NewGuid().ToString("N");
-            World.Data.Speed = 0;
+            World.Data.Speed = 0; watchedCameraId = ""; nextFeed = 0; nativeInputWasBlocked = true;
             Draft = null; SelectedWall = null; SelectedFixture = null; SelectedResident = null; SelectedStaff = null; hasStart = hasEnd = false;
             accumulator = 0; view.Refresh(World, true); view.Preview(null); SetTool(BuildTool.Inspect); Recenter(); Save();
             return true;
@@ -174,6 +176,11 @@ namespace Cellblock.Unity
         public void Message(string message) { if (World != null) World.Notice = message; }
         void Update()
         {
+            // Always drain AppKit events, including contracts/help and focus transitions.
+            float magnification = trackpad != null ? trackpad.Consume() : 0;
+            bool blocked = World == null || hud == null || hud.BlocksWorldInput || appPaused || unfocused;
+            if (blocked || nativeInputWasBlocked) magnification = 0;
+            nativeInputWasBlocked = blocked;
             if (World == null) return;
             if (!appPaused && (!unfocused || presentationPreview) && !hud.BlocksWorldInput && World.Data.Speed > 0)
             {
@@ -182,7 +189,7 @@ namespace Cellblock.Unity
                 while (accumulator >= 0.2f && steps++ < 8) { World.AdvanceMinutes(1); accumulator -= 0.2f; }
             }
             else accumulator = 0;
-            InputUpdate(); view.Refresh(World); view.SetWatchedCamera(WatchedCamera); hud.Refresh();
+            InputUpdate(magnification); view.Refresh(World); view.SetWatchedCamera(WatchedCamera); hud.Refresh();
             autosave += Time.unscaledDeltaTime;
             if (autosave >= 30) { autosave = 0; Save(false); }
         }
@@ -226,7 +233,8 @@ namespace Cellblock.Unity
         public void HireStaff(string role)
         { if (World != null && World.HireStaff(role)) FrameArrivals(); }
         void FrameArrivals() { focus = new Vector3(-8, 0, -15); distance = 35; pitch = 57; yaw = 20; }
-        public void FocusPoint(Point point) { focus = FacilityView.V(point); distance = 24; }
+        public void FocusPoint(Point point, float zoomDistance = 24) { focus = FacilityView.V(point); distance = Mathf.Clamp(zoomDistance, 10, 110); }
+        public void FocusWork(Point point) { FocusPoint(point, 11); pitch = 38; yaw = 145; planView = false; }
         public void WatchCamera(string id)
         { watchedCameraId = id; if (WatchedCamera != null) { focus = FacilityView.V(WatchedCamera.Position); distance = 19; } hud.Refresh(true); }
         void RefreshCameraFeed()
@@ -237,7 +245,7 @@ namespace Cellblock.Unity
             if (cctvCamera == null)
             {
                 cctvCamera = new GameObject("Selected CCTV feed · one camera").AddComponent<Camera>(); cctvCamera.transform.SetParent(transform);
-                cctvCamera.enabled = false; cctvCamera.fieldOfView = 88.5f; cctvCamera.nearClipPlane = 0.12f; cctvCamera.farClipPlane = 60;
+                cctvCamera.cullingMask = ~(1 << 29); cctvCamera.enabled = false; cctvCamera.fieldOfView = 88.5f; cctvCamera.nearClipPlane = 0.12f; cctvCamera.farClipPlane = 60;
                 cctvCamera.clearFlags = CameraClearFlags.SolidColor; cctvCamera.backgroundColor = Color.black;
                 cctvTexture = new RenderTexture(384, 216, 16) { name = "Selected CCTV monitor" }; cctvTexture.Create();
             }
@@ -290,7 +298,7 @@ namespace Cellblock.Unity
             ClampFocus();
         }
         void ClampFocus() { focus.x = Mathf.Clamp(focus.x, -35, 35); focus.z = Mathf.Clamp(focus.z, -30, 30); focus.y = 0; }
-        void InputUpdate()
+        void InputUpdate(float magnification)
         {
             if (hud.BlocksWorldInput)
             {
@@ -350,7 +358,6 @@ namespace Cellblock.Unity
             if (gesture) { gesture = false; pointerActive = false; pointerOwnedByUI = false; }
             pinchFingerA = pinchFingerB = -1;
             Vector2 cursor = Input.mousePosition;
-            float magnification = trackpad != null ? trackpad.Consume() : 0;
             if (Mathf.Abs(magnification) > 0.00001f && !hud.IsOverUI(cursor))
             { ApplyPinchScale(1 + magnification, cursor); pointerActive = false; }
             if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2))
@@ -604,10 +611,20 @@ namespace Cellblock.Unity
             catch (Exception e) { Message("Save failed: " + e.Message + ". Keep this session open."); if (hud != null) hud.ShowMenuError("Save failed: " + e.Message); Debug.LogError(e); return false; }
         }
 #if UNITY_EDITOR
+        public float PreviewCameraDistance { get { return distance; } }
         public void StartPresentationPreview(string contract)
         {
             if (!CreateCompany(contract, true)) throw new InvalidOperationException("Could not preserve the active company before preview.");
             hud.CloseOverlays(); Recenter(); CameraPosition(true);
+        }
+        public void ReloadPresentationPreview()
+        {
+            if (!presentationPreview) throw new InvalidOperationException("Only disposable previews can use this review helper.");
+            string residentId = SelectedResident == null ? "" : SelectedResident.Id;
+            World = new World(JsonUtility.FromJson<State>(JsonUtility.ToJson(World.Data)));
+            SelectedResident = World.Data.Residents.FirstOrDefault(r => r.Id == residentId); SelectedStaff = null;
+            SelectedWall = null; SelectedFixture = null; accumulator = 0; nextFeed = 0;
+            view.Refresh(World, true); hud.Refresh(true);
         }
         public void PreviewConstruction()
         {
@@ -647,7 +664,7 @@ namespace Cellblock.Unity
                     restored = new World(JsonUtility.FromJson<State>(File.ReadAllText(path + ".bak")));
                     restored.Notice = "Recovered the previous successful save. Your original file is retained.";
                 }
-                World = restored; presentationPreview = false; World.Data.Speed = 0; accumulator = 0; saveId = name.Substring(8, 32);
+                World = restored; watchedCameraId = ""; nextFeed = 0; nativeInputWasBlocked = true; presentationPreview = false; World.Data.Speed = 0; accumulator = 0; saveId = name.Substring(8, 32);
                 Draft = null; CurrentQuote = null; SelectedWall = null; SelectedFixture = null; SelectedResident = null; SelectedStaff = null;
                 view.Refresh(World, true); SetTool(BuildTool.Inspect); Recenter();
                 if (World.Data.DraftPlan != null)
@@ -660,7 +677,7 @@ namespace Cellblock.Unity
             catch (Exception e) { Debug.LogError("Could not load company: " + e.Message); Message("Could not load company: " + e.Message); hud.ShowMenuError("Could not load company: " + e.Message); return false; }
         }
         void OnApplicationPause(bool paused) { appPaused = paused; accumulator = 0; if (paused) Save(false); }
-        void OnApplicationFocus(bool focused) { unfocused = !focused; accumulator = 0; if (!focused) Save(false); }
+        void OnApplicationFocus(bool focused) { unfocused = !focused; accumulator = 0; nativeInputWasBlocked = true; if (trackpad != null) trackpad.Consume(); if (!focused) Save(false); }
         void OnApplicationQuit() { Save(false); }
     }
 }

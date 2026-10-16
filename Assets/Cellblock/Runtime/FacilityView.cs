@@ -12,6 +12,8 @@ namespace Cellblock.Unity
     {
         partial void ResidentVisibility(World world, Resident resident, ref bool visible);
         partial void RefreshJustice(World world, bool force);
+        partial void PrepareResidentPose(Actor actor, Resident resident, World world);
+        partial void AnimateResidentLife(Actor actor, Resident resident, World world);
         Transform structures, planned, ghost, people;
         sealed class Actor
         {
@@ -22,9 +24,11 @@ namespace Cellblock.Unity
             public Point RouteTarget;
             public int RouteIndex, RouteRevision = -1;
             public float NextRouteRefresh;
-            public bool Staff, Seen;
+            public bool Staff, Seen, PoseArms;
             public Resident Motion;
-            public Transform WorkTool;
+            public Transform WorkTool, Cargo, Workbench;
+            public Transform[] Forearms, Hands, Tools, Knees;
+            public float PoseClock;
         }
         readonly Dictionary<string, Actor> actors = new Dictionary<string, Actor>();
         readonly Dictionary<string, Material> materials = new Dictionary<string, Material>();
@@ -153,6 +157,16 @@ namespace Cellblock.Unity
             Box(site, "Visitor parking", new Vector3(-24.5f, 0.005f, -9.6f), new Vector3(9, 0.12f, 13), "asphalt", new Color(0.30f, 0.32f, 0.32f));
             Box(site, "Parking access aisle", new Vector3(-18.2f, 0.005f, -10.6f), new Vector3(3.1f, 0.12f, 16.9f), "asphalt", new Color(0.30f, 0.32f, 0.32f));
             Box(site, "Parking connection", new Vector3(-10.1f, 0.005f, -18.1f), new Vector3(19.4f, 0.12f, 3.1f), "asphalt", new Color(0.30f, 0.32f, 0.32f));
+            Box(site, "Staff and contractor parking apron", new Vector3(-16.6f, 0.006f, -19.2f), new Vector3(23, 0.12f, 8.8f), "asphalt", new Color(0.28f, 0.30f, 0.31f));
+            Box(site, "Returning shuttle aisle", new Vector3(-14.1f, 0.007f, -14), new Vector3(27.8f, 0.12f, 2.5f), "asphalt", new Color(0.28f, 0.30f, 0.31f));
+            for (int i = 0; i < 7; i++)
+            {
+                Point bay = World.ParkingBay(i);
+                for (int side = -1; side <= 1; side += 2)
+                    Box(site, "Contractor bay stripe", V(bay + new Point(side * 1.6f, 0), 0.077f), new Vector3(0.08f, 0.012f, 5), "paint", new Color(0.84f, 0.84f, 0.75f));
+                Box(site, "Contractor wheel stop", V(bay + new Point(0, -2.1f), 0.15f), new Vector3(1.5f, 0.18f, 0.18f), "paving", Concrete);
+                Box(site, "Bay end line", V(bay + new Point(0, 2.5f), 0.078f), new Vector3(3.1f, 0.012f, 0.07f), "paint", new Color(0.84f, 0.84f, 0.75f));
+            }
             for (int i = -15; i <= 15; i++)
                 Box(site, "Center line", new Vector3(i * 6, 0.021f, roadZ), new Vector3(2.8f, 0.015f, 0.10f), "paint", new Color(0.84f, 0.81f, 0.62f));
             for (int side = -1; side <= 1; side += 2)
@@ -723,37 +737,46 @@ namespace Cellblock.Unity
             }
             Capsule(body, "Hips", new Vector3(0, 0.92f, 0), new Vector3(0.32f, 0.13f, 0.24f), "trousers", new Color(0.30f, 0.34f, 0.33f));
             Combine(body);
+            var torso = new GameObject("Waist / upper-body pivot").transform; torso.SetParent(root, false); torso.localPosition = Vector3.up * 0.9f;
+            body.SetParent(torso, false); body.localPosition = Vector3.down * 0.9f;
             var parts = new Transform[4];
+            var forearms = new Transform[2]; var hands = new Transform[2]; var knees = new Transform[2];
             for (int i = 0; i < 4; i++)
             {
                 bool arm = i < 2; float side = i % 2 == 0 ? -1 : 1;
-                var pivot = new GameObject(arm ? "Shoulder" : "Hip").transform; pivot.SetParent(root, false);
-                pivot.localPosition = new Vector3(side * (arm ? 0.23f : 0.09f), arm ? 1.40f : 0.90f, 0);
+                var pivot = new GameObject(arm ? "Shoulder" : "Hip").transform; pivot.SetParent(arm ? torso : root, false);
+                pivot.localPosition = new Vector3(side * (arm ? 0.23f : 0.09f), arm ? 0.50f : 0.90f, 0);
                 if (arm)
                 {
                     Capsule(pivot, "Sleeve", new Vector3(0, -0.15f, 0), new Vector3(0.13f, 0.16f, 0.14f), uniformName, uniform);
-                    Capsule(pivot, "Forearm", new Vector3(0, -0.39f, 0.025f), new Vector3(0.095f, 0.135f, 0.095f), skinName, skin);
-                    Sphere(pivot, "Hand", new Vector3(0, -0.53f, 0.03f), new Vector3(0.085f, 0.12f, 0.07f), skinName, skin);
+                    Combine(pivot);
+                    var elbow = new GameObject("Elbow").transform; elbow.SetParent(pivot, false); elbow.localPosition = new Vector3(0, -0.28f, 0);
+                    Capsule(elbow, "Forearm", new Vector3(0, -0.11f, 0.025f), new Vector3(0.095f, 0.135f, 0.095f), skinName, skin);
+                    Sphere(elbow, "Hand", new Vector3(0, -0.25f, 0.03f), new Vector3(0.085f, 0.12f, 0.07f), skinName, skin);
+                    Combine(elbow); forearms[i] = elbow;
+                    hands[i] = new GameObject("Grip").transform; hands[i].SetParent(elbow, false); hands[i].localPosition = new Vector3(0, -0.25f, 0.05f);
                 }
                 else
                 {
-                    Capsule(pivot, "Trouser leg", new Vector3(0, -0.36f, 0), new Vector3(0.15f, 0.36f, 0.17f), "trousers", new Color(0.30f, 0.34f, 0.33f));
-                    Sphere(pivot, "Work shoe", new Vector3(0, -0.81f, 0.052f), new Vector3(0.16f, 0.14f, 0.29f), "rubber", new Color(0.10f, 0.12f, 0.12f));
+                    Capsule(pivot, "Upper trouser leg", new Vector3(0, -0.20f, 0), new Vector3(0.15f, 0.20f, 0.17f), "trousers", new Color(0.30f, 0.34f, 0.33f));
+                    Combine(pivot);
+                    Transform knee = new GameObject("Knee").transform; knee.SetParent(pivot, false); knee.localPosition = new Vector3(0, -0.40f, 0);
+                    Capsule(knee, "Lower trouser leg", new Vector3(0, -0.19f, 0), new Vector3(0.135f, 0.20f, 0.15f), "trousers", new Color(0.30f, 0.34f, 0.33f));
+                    Sphere(knee, "Work shoe", new Vector3(0, -0.41f, 0.052f), new Vector3(0.16f, 0.14f, 0.29f), "rubber", new Color(0.10f, 0.12f, 0.12f));
+                    Combine(knee); knees[i - 2] = knee;
                 }
-                Combine(pivot); parts[i] = pivot;
+                parts[i] = pivot;
             }
             root.localScale = Vector3.one * (0.96f + index % 4 * 0.025f);
             Transform marker = Cylinder(root, "Selected person", new Vector3(0, 0.015f, 0), new Vector3(0.72f, 0.008f, 0.72f), "handle", Teal);
             marker.gameObject.SetActive(false);
-            var actor = new Actor { Root = root, Body = body, Limbs = parts, Marker = marker, Staff = staff, Motion = new Resident(), Gait = index % 97 * 0.13f, TurnRate = 7 + index % 5 };
+            var actor = new Actor { Root = root, Body = torso, Limbs = parts, Marker = marker, Staff = staff, Motion = new Resident(), Forearms = forearms, Hands = hands, Knees = knees, Gait = index % 97 * 0.13f, TurnRate = 7 + index % 5 };
             if (role == "Builder")
             {
                 Sphere(body, "Hard hat", new Vector3(0, 1.79f, 0), new Vector3(0.28f, 0.16f, 0.29f), "hi-vis", new Color(0.96f, 0.77f, 0.14f));
                 Cylinder(body, "Hat brim", new Vector3(0, 1.77f, 0), new Vector3(0.34f, 0.018f, 0.34f), "hi-vis", new Color(0.96f, 0.77f, 0.14f));
                 Box(body, "Reflective vest band", new Vector3(0, 1.20f, 0.14f), new Vector3(0.34f, 0.06f, 0.018f), "reflective", new Color(0.94f, 0.94f, 0.80f));
-                actor.WorkTool = new GameObject("Hand tool").transform; actor.WorkTool.SetParent(parts[1], false); actor.WorkTool.localPosition = new Vector3(0, -0.50f, 0.04f);
-                Box(actor.WorkTool, "Hammer shaft", new Vector3(0, 0, 0.13f), new Vector3(0.035f, 0.035f, 0.30f), "wood", new Color(0.53f, 0.39f, 0.23f));
-                Box(actor.WorkTool, "Hammer head", new Vector3(0, 0, 0.27f), new Vector3(0.19f, 0.06f, 0.07f), "steel", Steel);
+                CreateBuilderKit(actor);
             }
             actors.Add(id, actor); return actor;
         }
@@ -852,11 +875,21 @@ namespace Cellblock.Unity
             }
             float stride = walking ? Mathf.Clamp01(speed / 1.3f) : 0;
             float swing = Mathf.Sin(actor.Gait) * 21 * stride;
+            for (int leg = 0; leg < 2; leg++) actor.Knees[leg].localRotation = Quaternion.Slerp(actor.Knees[leg].localRotation,
+                Quaternion.Euler(Mathf.Max(0, -Mathf.Sin(actor.Gait + leg * Mathf.PI)) * 38 * stride, 0, 0), dt * 18);
             actor.Body.localPosition = Vector3.Lerp(actor.Body.localPosition,
-                Vector3.up * (walking ? Mathf.Abs(Mathf.Sin(actor.Gait)) * 0.018f * stride : 0), dt * 14);
+                Vector3.up * (0.9f + (walking ? Mathf.Abs(Mathf.Sin(actor.Gait)) * 0.018f * stride : 0)), dt * 14);
+            if (!actor.PoseArms)
+            {
+                actor.Body.localRotation = Quaternion.Slerp(actor.Body.localRotation, Quaternion.identity, dt * 12);
+                for (int arm = 0; arm < 2; arm++) actor.Forearms[arm].localRotation = Quaternion.Slerp(actor.Forearms[arm].localRotation, Quaternion.Euler(-8, 0, 0), dt * 14);
+            }
             for (int j = 0; j < 4; j++)
+            {
+                if (j < 2 && actor.PoseArms) continue;
                 actor.Limbs[j].localRotation = Quaternion.Slerp(actor.Limbs[j].localRotation,
                     Quaternion.Euler(swing * (j % 2 == 0 ? 1 : -1) * (j < 2 ? -0.65f : 1), 0, j < 2 ? (j == 0 ? 4 : -4) : 0), dt * 16);
+            }
         }
 
         public void Refresh(World world, bool force = false)
@@ -890,7 +923,9 @@ namespace Cellblock.Unity
                 if (created) actor = Person(id);
                 actor.Seen = true; actor.Root.gameObject.SetActive(true);
                 actor.Marker.gameObject.SetActive(id == selectedResidentId);
+                PrepareResidentPose(actor, resident, world);
                 MoveActor(actor, resident, world, force || created);
+                AnimateResidentLife(actor, resident, world);
             }
             RefreshWorkers(world, force);
             RefreshOperations(world, force);

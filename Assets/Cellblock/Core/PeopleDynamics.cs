@@ -230,8 +230,8 @@ namespace Cellblock.Core
                 }
                 else
                 {
-                    float load = state.Residents.Count / (float)Math.Max(1, state.Staff.Count(s => s.Role == "Officer" && world.IsOnShift(s)));
-                    float averageStress = state.Residents.Count == 0 ? 45 : state.Residents.Average(r => r.Stress);
+                    float load = state.Residents.Count(world.IsPresent) / (float)Math.Max(1, state.Staff.Count(s => s.Role == "Officer" && world.IsOnShift(s)));
+                    float averageStress = state.Residents.Where(world.IsPresent).Select(r => r.Stress).DefaultIfEmpty(45).Average();
                     float pressureDelta = (load - 4) * 0.055f + (averageStress - 45) * 0.0008f;
                     staff.Pressure = Clamp(staff.Pressure + pressureDelta, 0, 100);
                 }
@@ -242,7 +242,7 @@ namespace Cellblock.Core
                 staff.Integrity = Clamp(staff.Integrity - 6, 0, 100);
                 staff.Pressure = Clamp(staff.Pressure + 9, 0, 100);
                 bool favoritismIncident = Pick(state.Seed, staff.Id, state.Minute / 720 + 41) % 2 == 0 && staff.FavoredGang != "";
-                foreach (Resident resident in state.Residents)
+                foreach (Resident resident in state.Residents.Where(world.IsPresent))
                 {
                     bool excluded = favoritismIncident && resident.Gang != staff.FavoredGang;
                     resident.Safety = Clamp(resident.Safety - (excluded ? 6 : 4), 0, 100);
@@ -265,7 +265,7 @@ namespace Cellblock.Core
                 Resident a = state.Residents[i], b = state.Residents[j];
                 Relationship ab = a.Relationships.FirstOrDefault(r => r.OtherId == b.Id);
                 Relationship ba = b.Relationships.FirstOrDefault(r => r.OtherId == a.Id);
-                if (ab == null || ba == null || Geometry.Distance(a.Position, b.Position) > 2.6f ||
+                if (!world.IsPresent(a) || !world.IsPresent(b) || ab == null || ba == null || Geometry.Distance(a.Position, b.Position) > 2.6f ||
                     !contactRoutes.Clear(a.Position, b.Position)) continue;
                 string before = ab.Kind;
                 bool sameClique = a.Clique != "Independent" && a.Clique == b.Clique;

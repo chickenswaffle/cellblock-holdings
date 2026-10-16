@@ -8,11 +8,13 @@ namespace Cellblock.Unity
 {
     public sealed partial class GameHud
     {
-        VisualElement controlPane, cctvRoster, prefabPackages;
+        VisualElement controlPane, cctvRoster, prefabPackages, crewRoster;
         Button controlTab, lightsControl, alarmControl, gateControl, lockdownControl, cctvControl;
         Label controlStatus, feedStatus, arrivalStatus, reportStatus, staffCost, prefabSummary;
         Image feed;
-        string cameraSignature = "";
+        string cameraSignature = "", crewSignature = "";
+        World crewWorld;
+        readonly Dictionary<string, Button> crewButtons = new Dictionary<string, Button>();
         World cameraWorld;
         readonly Dictionary<string, Button> cameraButtons = new Dictionary<string, Button>(), prefabButtons = new Dictionary<string, Button>();
         readonly List<Button> packageButtons = new List<Button>();
@@ -78,10 +80,13 @@ namespace Cellblock.Unity
             controlPane.Add(Text("ARRIVALS / CREW TRANSPORT", "section-label"));
             controlPane.Add(Action("Hire construction crew · $500", () => { game.HireConstructionCrew(); Refresh(true); }, "primary"));
             arrivalStatus = Text("", "body"); controlPane.Add(arrivalStatus);
-            controlPane.Add(Text("Two builders per crew. Two crews can share a waiting pickup; staff share shuttles. Late hires get a new trip. Arrival, unloading and walking take game time. A closed gate holds arrivals.", "muted"));
+            crewRoster = Element("crew-roster"); controlPane.Add(crewRoster);
+            controlPane.Add(Text("Two builders per crew. Two crews can share a waiting pickup; staff share shuttles. Late hires get a new trip. Arrival, unloading and walking take game time. Seven marked bays are reserved per trip; staff shuttles leave after dropoff. A closed gate holds arrivals. View a crew to watch its current task.", "muted"));
             controlPane.Add(Text("SHIFT REPORTS / EVERY 8 HOURS", "section-label"));
-            reportStatus = Text("", "body"); controlPane.Add(reportStatus);
+            reportStatus = Text("", "body"); reportStatus.AddToClassList("shift-report-output"); controlPane.Add(reportStatus);
         }
+        public void ShowFacility()
+        { workspace = Workspace.Facility; inspectorOpen = true; cameraOpen = false; ((ScrollView)inspector).scrollOffset = Vector2.zero; Refresh(true); }
         public void ShowControl()
         {
             workspace = Workspace.Control; inspectorOpen = true; cameraOpen = false;
@@ -119,12 +124,27 @@ namespace Cellblock.Unity
             }
             feed.image = game.CameraFeed;
             feed.style.display = game.WatchedCamera != null ? DisplayStyle.Flex : DisplayStyle.None;
-            feedStatus.text = world.Data.Fixtures.Any(f => f.Kind == "CCTV") ? world.CameraCoverage() + " / " + world.Data.Residents.Count + " residents currently observed.\n" +
+            feedStatus.text = world.Data.Fixtures.Any(f => f.Kind == "CCTV") ? world.CameraCoverage() + " / " + world.Data.Residents.Count(world.IsPresent) + " residents on site currently observed.\n" +
                 (game.WatchedCamera == null ? "Select a camera to open its live feed." : world.CameraOnline(game.WatchedCamera) ? "LIVE · selected feed / 5 updates per second" : "OFFLINE · check network and condition") :
                 "No operational cameras. Place one indoors or outdoors, approve its installation, and let a crew complete the work.";
             staffCost.text = "Additional staff wages: " + Money(world.Data.Staff.Sum(s => s.DailyCents)) + " / day. Day shift 08:00–20:00; night shift 20:00–08:00. Initial contract staff are included in operations.";
             var trips = world.Data.Trips.Where(t => t.Phase != "Gone").Reverse().Take(5).ToArray();
             arrivalStatus.text = trips.Length == 0 ? "No hired arrivals scheduled." : string.Join("\n", trips.Select(t => (t.Kind == "Crew" ? "PICKUP" : "SHUTTLE") + " · " + t.Phase + " · " + t.Passengers.Count + (t.Kind == "Crew" ? " crews" : " staff")));
+            string crews = string.Join("|", world.Data.Crews.Select(c => c.Id));
+            if (crewWorld != world || crews != crewSignature)
+            {
+                crewWorld = world; crewSignature = crews; crewRoster.Clear(); crewButtons.Clear();
+                foreach (Crew crew in world.Data.Crews)
+                {
+                    string id = crew.Id;
+                    Button watch = Action("", () => { Crew selected = game.World.Data.Crews.FirstOrDefault(c => c.Id == id); if (selected != null) {
+                        TransportTrip trip = game.World.Data.Trips.FirstOrDefault(t => t.Id == selected.TripId);
+                        if (selected.Arrived) game.FocusWork(selected.Position); else game.FocusPoint(trip != null ? trip.Position : selected.Position);
+                    } }, "person-roster-row");
+                    crewRoster.Add(watch); crewButtons.Add(id, watch);
+                }
+            }
+            foreach (Crew crew in world.Data.Crews) crewButtons[crew.Id].text = "View " + crew.Name + " · " + crew.Activity;
             ShiftReport live = world.CurrentShift();
             reportStatus.text = "LIVE SHIFT · " + live.Summary + "\n" + live.Incidents + " incidents · " + live.CoveredResidents + " residents observed · " + live.ActiveProjects + " active projects\n\n" +
                 (world.Data.ShiftReports.Count == 0 ? "First recorded report will be filed at the next 8-hour boundary." : string.Join("\n\n", world.Data.ShiftReports.AsEnumerable().Reverse().Take(3).Select(r =>

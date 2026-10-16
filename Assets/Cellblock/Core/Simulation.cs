@@ -71,6 +71,9 @@ namespace Cellblock.Core
         public bool Arrived = true, Working;
         public string TripId = "", ProjectId = "", WorkId = "";
         public int AssignmentRevision = -1;
+        public Point SupplyPoint, WorkFocus;
+        public string WorkPhase = "Idle", WorkKind = "Survey";
+        public int SupplyLoadMinutes, SuppliesUsed;
     }
     [Serializable] public sealed class WorkItem
     {
@@ -78,7 +81,7 @@ namespace Cellblock.Core
         public Fixture Fixture;
         public float Remaining, Required;
         public int WorkFronts = 1;
-        public string TaskId = "";
+        public string TaskId = "", Kind = "";
         public Point Site;
         public bool HasSite;
     }
@@ -113,7 +116,7 @@ namespace Cellblock.Core
     [Serializable] public sealed partial class State
     {
         public int Version = 1, NextId = 1, Minute = 8 * 60, Speed = 1;
-        public int Seed, OperationsVersion;
+        public int Seed, OperationsVersion, GeometryGeneration;
         public OperationsState Operations = new OperationsState();
         public List<TransportTrip> Trips = new List<TransportTrip>();
         public List<ShiftReport> ShiftReports = new List<ShiftReport>();
@@ -176,11 +179,14 @@ namespace Cellblock.Core
         };
         static partial void HydrateJustice(State state);
         partial void AdvanceJustice();
+        static partial void HydrateLives(State state);
+        partial void AdvanceLives();
+        partial void ChooseResidentActivity(Resident resident, ref Point target);
         partial void UpdateResidentCustody(Resident resident, ref bool skip);
         partial void ResidentPresence(Resident resident, ref bool present);
         public bool IsPresent(Resident resident) { bool present = true; ResidentPresence(resident, ref present); return present; }
         public readonly State Data;
-        public int GeometryRevision { get; private set; }
+        public int GeometryRevision { get { return Data.GeometryGeneration; } }
         public string Notice = "Choose a project, review its quote, and assign a crew.";
         Navigation navigation;
         readonly Dictionary<Resident, Queue<Point>> paths = new Dictionary<Resident, Queue<Point>>();
@@ -200,7 +206,8 @@ namespace Cellblock.Core
             PeopleDynamics.Hydrate(data);
             HydrateOperations(data);
             HydrateJustice(data);
-            if (data.Version != 1 || !Offers.Any(o => o.Id == data.ContractId))
+            HydrateLives(data);
+            if (data.GeometryGeneration < 0 || data.GeometryGeneration == int.MaxValue || data.Version != 1 || !Offers.Any(o => o.Id == data.ContractId))
                 throw new ArgumentException("This save version or contract is not supported.");
             if (data.Walls == null || data.Fixtures == null || data.Residents == null || data.Crews == null ||
                 data.Projects == null || data.Ledger == null || data.Minute < 0 || data.NextId < 1)
@@ -291,6 +298,7 @@ namespace Cellblock.Core
         public bool HireCrew()
         {
             if (Data.CashCents < 50000) { Notice = "A crew requires a $500 mobilization payment."; return false; }
+            if (!CanBookTrip("Crew")) { Notice = "All staff/contractor parking bays are reserved. Release a crew or wait for departing transport."; return false; }
             string id = Id();
             var crew = new Crew { Id = id, Name = "Crew " + (Data.Crews.Count + 1), Arrived = false };
             Data.Crews.Add(crew); crew.TripId = BookTrip(id, "Crew");
@@ -514,21 +522,21 @@ namespace Cellblock.Core
             foreach (Wall wall in plan.Walls)
             {
                 wall.Id = Id(); float work = Geometry.Length(wall) * 20 + (wall.Door >= 0 ? 30 : 0);
-                project.Work.Add(new WorkItem { TaskId = Id(), Site = Geometry.OnLength(wall, 0.5f), HasSite = true, Wall = wall, Required = work, Remaining = work,
+                project.Work.Add(new WorkItem { TaskId = Id(), Site = Geometry.OnLength(wall, 0.5f), HasSite = true, Kind = "Wall", Wall = wall, Required = work, Remaining = work,
                     WorkFronts = Math.Max(1, (int)(Geometry.Length(wall) / 5)) });
             }
             foreach (Fixture fixture in plan.Fixtures)
             {
                 fixture.Id = Id();
-                project.Work.Add(new WorkItem { TaskId = Id(), Site = fixture.Position, HasSite = true, Fixture = fixture, Required = 35, Remaining = 35 });
+                project.Work.Add(new WorkItem { TaskId = Id(), Site = fixture.Position, HasSite = true, Kind = "Fixture", Fixture = fixture, Required = 35, Remaining = 35 });
             }
             foreach (string id in plan.RemoveWalls)
             {
                 float work = Geometry.Length(Data.Walls.First(w => w.Id == id)) * 8;
-                project.Work.Add(new WorkItem { TaskId = Id(), Site = Geometry.OnLength(Data.Walls.First(w => w.Id == id), 0.5f), HasSite = true, Required = work, Remaining = work });
+                project.Work.Add(new WorkItem { TaskId = Id(), Site = Geometry.OnLength(Data.Walls.First(w => w.Id == id), 0.5f), HasSite = true, Kind = "Removal", Required = work, Remaining = work });
             }
             if (plan.RemoveFixtures.Count > 0)
-                project.Work.Add(new WorkItem { TaskId = Id(), Site = Data.Fixtures.First(f => plan.RemoveFixtures.Contains(f.Id)).Position, HasSite = true, Required = plan.RemoveFixtures.Count * 20, Remaining = plan.RemoveFixtures.Count * 20 });
+                project.Work.Add(new WorkItem { TaskId = Id(), Site = Data.Fixtures.First(f => plan.RemoveFixtures.Contains(f.Id)).Position, HasSite = true, Kind = "Removal", Required = plan.RemoveFixtures.Count * 20, Remaining = plan.RemoveFixtures.Count * 20 });
             Book(-quote.MaterialCents, "materials", project.Name + " / " + project.Id);
             Data.Projects.Add(project);
             Notice = Data.Crews.Count == 0 ? "Project approved. Hire a construction crew to begin." : "Project approved. Crews will begin preparation.";
@@ -536,7 +544,7 @@ namespace Cellblock.Core
         }
         void InvalidateGeometry()
         {
-            GeometryRevision++; navigation = null; rooms = null; paths.Clear(); destinations.Clear();
+            Data.GeometryGeneration++; navigation = null; rooms = null; paths.Clear(); destinations.Clear();
         }
         void Construction()
         {
@@ -566,8 +574,8 @@ namespace Cellblock.Core
                         assignments[item] = assignments.ContainsKey(item) ? assignments[item] + 1 : 1;
                         if (!ReachWork(crew, project, item)) break;
                         crew.Working = true;
-                        item.Remaining = Math.Max(0, item.Remaining - 1);
-                        project.Status = "Construction"; crew.Activity = project.Name + ": construction"; break;
+                        item.Remaining = Math.Max(0, item.Remaining - 1); crew.SuppliesUsed++;
+                        project.Status = "Construction"; crew.Activity = project.Name + ": " + crew.WorkKind.ToLowerInvariant(); break;
                     }
                     if (project.Work.Any(w => w.Remaining > 0)) continue;
                     if (project.DependsOn.Any(id => Data.Projects.Any(p => p.Id == id && !p.Completed)))
@@ -595,8 +603,9 @@ namespace Cellblock.Core
                     if (project.RelocatesDining) Data.Dining = project.Dining;
                     project.Completed = true; project.CompletedMinute = Data.Minute; project.Status = "Operational";
                     InvalidateGeometry(); Notice = project.Name + " completed and handed over.";
-                    crew.Working = false; crew.Activity = "Project handed over"; break;
+                    crew.Working = false; crew.WorkPhase = "Idle"; crew.Activity = "Project handed over"; break;
                 }
+                if (crew.ProjectId == "") crew.WorkPhase = "Idle";
             }
         }
         public void AdvanceMinutes(int count)
@@ -608,6 +617,7 @@ namespace Cellblock.Core
                 Data.Minute++;
                 AdvanceOperations();
                 AdvanceJustice();
+                AdvanceLives();
                 MoveResidents();
                 if (Data.Minute % 30 == 0) PeopleDynamics.Advance(this);
                 Data.OperatingRemainder += Contract.DailyOperatingCents / 1440.0;
@@ -618,10 +628,10 @@ namespace Cellblock.Core
                 bool mealtime = (hour >= 7 && hour < 9) || (hour >= 12 && hour < 14) || (hour >= 18 && hour < 20);
                 if (mealtime && Data.Residents.Count > 0)
                 {
-                    int served = 0;
+                    int served = 0, present = Data.Residents.Count(IsPresent);
                     for (int person = 0; person < Data.Residents.Count; person++)
                         if (IsPresent(Data.Residents[person]) && Geometry.Distance(Data.Residents[person].Position, ServiceDestination(person, true)) < 0.8f) served++;
-                    Data.RevenueRemainder += Contract.DailyServiceBonusCents * (served / (double)Data.Residents.Count) / 360.0;
+                    Data.RevenueRemainder += Contract.DailyServiceBonusCents * (present == 0 ? 0 : served / (double)present) / 360.0;
                 }
                 long revenue = (long)Data.RevenueRemainder;
                 Data.ReceivableCents += revenue; Data.RevenueRemainder -= revenue;
@@ -653,6 +663,7 @@ namespace Cellblock.Core
                 bool meals = !Data.Operations.Lockdown && PeopleDynamics.IsMealWindow(Data.Minute + resident.RoutineOffset);
                 bool yard = !Data.Operations.Lockdown && PeopleDynamics.IsYardWindow(Data.Minute + resident.RoutineOffset);
                 Point target = meals || yard ? ServiceDestination(index, meals) : resident.Home;
+                ChooseResidentActivity(resident, ref target);
                 Point prior;
                 Queue<Point> route;
                 bool decisionDue = Data.Minute >= resident.NextDecisionMinute;

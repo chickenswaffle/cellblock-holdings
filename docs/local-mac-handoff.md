@@ -4,7 +4,7 @@ Continue the Unity implementation in `chickenswaffle/cellblock-holdings` using t
 
 ## Get the current source
 
-Use the latest `origin/main` from `https://github.com/chickenswaffle/cellblock-holdings.git`. Inspect the local checkout and its changes before updating it; preserve unrelated user work. Do not reset a dirty checkout or assume the cloud machine can synchronize the Mac automatically.
+For the active parallel handoff use `origin/codex/live-operations-handoff`; read `COORDINATION.md` and `docs/claude-handoff.md` first. The Unity reboot began on `origin/main`. Fetch remote updates from `https://github.com/chickenswaffle/cellblock-holdings.git`. Inspect the local checkout and its changes before updating it; preserve unrelated user work. Do not reset a dirty checkout or assume the cloud machine can synchronize the Mac automatically.
 
 The previously identified local project location is `/Users/trading/Documents/ChatGPT/Cellblock Holdings`; inspect the actual folders. The root `Assets`, `Packages`, and `ProjectSettings` form the Unity project. This is a complete Unity reboot; do not restore the old engine implementation or an archive of it.
 
@@ -17,7 +17,7 @@ Read `README.md`, `CLAUDE.md`, `docs/reboot-vision.md`, and `docs/implementation
 3. Run `bash Tools/open-unity-mac.sh`, open the generated main scene, and enter Play mode. Inspect the output and controls; fix observed problems. Continue through a working local playable milestone.
 4. Use an independent critic subagent for focused design and implementation reviews, as requested by the user. Start from the existing implementation instead of restarting brainstorming. Ask only questions that materially block progress.
 
-The initial cloud milestone passed 27 core checks. The continued local milestone now passes 32 core checks and runs in the installed Unity 6000.3.24f1 editor on this Intel Mac. Project setup and Play mode have run locally. See `docs/implementation-status.md` for current evidence and limits. Native builds and actual phone/tablet performance remain unverified. Use **Cellblock → Open game and Play**, then choose or resume a holding; **Controls** explains camera input and **People** opens individual profiles.
+The initial cloud milestone passed 27 core checks. The continued local milestone now passes 69 core checks and runs in the installed Unity 6000.3.24f1 editor on this Intel Mac. Project setup and Play mode have run locally. See `docs/implementation-status.md` for current evidence and limits. Native builds and actual phone/tablet performance remain unverified. Use **Cellblock → Open game and Play**, then choose or resume a holding; **Controls** explains camera input and **People** opens individual profiles; **Control** manages arrivals, staff, lighting, alarm, gates and live CCTV. Six prefab units have optional fitout packages. Builders physically collect/carry materials and use task-specific tools. One agent owns all Unity runs.
 
 ## Product direction
 

@@ -37,7 +37,7 @@ namespace Cellblock.Core
         public static bool ValidRole(string role) { return role == "Officer" || role == "Caseworker" || role == "Technician"; }
         static void HydrateOperations(State state)
         {
-            if (state.OperationsVersion < 0 || state.OperationsVersion > 1) throw new ArgumentException("Unsupported operations save version.");
+            if (state.OperationsVersion < 0 || state.OperationsVersion > 2) throw new ArgumentException("Unsupported operations save version.");
             if (state.OperationsVersion == 0)
             {
                 state.Operations = new OperationsState(); state.Trips = new List<TransportTrip>(); state.ShiftReports = new List<ShiftReport>();
@@ -56,7 +56,21 @@ namespace Cellblock.Core
                 if (state.Fixtures != null) foreach (Fixture fixture in state.Fixtures) if (fixture != null) fixture.Condition = 100;
                 state.OperationsVersion = 1;
             }
+            if (state.OperationsVersion < 2)
+            {
+                if (state.Crews != null) foreach (Crew crew in state.Crews)
+                {
+                    if (crew == null) continue;
+                    crew.WorkId = ""; crew.AssignmentRevision = -1; crew.WorkPhase = "Idle";
+                    crew.SupplyLoadMinutes = crew.SuppliesUsed = 0;
+                }
+                state.OperationsVersion = 2;
+            }
             if (state.Operations == null || state.Trips == null || state.ShiftReports == null) throw new ArgumentException("Missing operations state.");
+            Plan draft = state.DraftPlan;
+            if (draft != null && draft.Walls != null && draft.Fixtures != null && draft.RemoveWalls != null && draft.RemoveFixtures != null && draft.HomeMoves != null &&
+                draft.Walls.Count == 0 && draft.Fixtures.Count == 0 && draft.RemoveWalls.Count == 0 && draft.RemoveFixtures.Count == 0 && draft.HomeMoves.Count == 0 && !draft.RelocatesDining)
+                state.DraftPlan = null; // JsonUtility can also materialize an absent draft as an empty inline Plan.
             if (state.Projects == null) return;
             foreach (Project project in state.Projects)
             {
@@ -64,6 +78,7 @@ namespace Cellblock.Core
                 for (int i = 0; i < project.Work.Count; i++)
                 {
                     WorkItem work = project.Work[i]; if (work == null) continue;
+                    NormalizeWorkPayload(work);
                     if (string.IsNullOrEmpty(work.TaskId)) work.TaskId = project.Id + "/task-" + i;
                     if (work.HasSite) continue;
                     Wall wall = work.Wall ?? (state.Walls == null ? null : state.Walls.FirstOrDefault(w => project.RemoveWalls != null && project.RemoveWalls.Contains(w.Id)));
@@ -73,13 +88,26 @@ namespace Cellblock.Core
                 }
             }
         }
+        static void NormalizeWorkPayload(WorkItem work)
+        {
+            // Unity's inline serializer materializes null class fields as empty objects.
+            // A stable discriminator distinguishes removal work from those phantom payloads.
+            bool wall = work.Wall != null && !string.IsNullOrEmpty(work.Wall.Id);
+            bool fixture = work.Fixture != null && !string.IsNullOrEmpty(work.Fixture.Id);
+            if (string.IsNullOrEmpty(work.Kind)) work.Kind = wall ? "Wall" : fixture ? "Fixture" : "Removal";
+            if (work.Kind != "Wall" && work.Kind != "Fixture" && work.Kind != "Removal") throw new ArgumentException("Invalid construction payload kind.");
+            if ((work.Kind != "Wall" && wall) || (work.Kind != "Fixture" && fixture)) throw new ArgumentException("Conflicting construction payloads.");
+            if (work.Kind != "Wall") work.Wall = null;
+            if (work.Kind != "Fixture") work.Fixture = null;
+            if ((work.Kind == "Wall" && !wall) || (work.Kind == "Fixture" && !fixture)) throw new ArgumentException("Missing construction payload.");
+        }
         void ValidateOperations()
         {
             if (Data.Operations.LastReportMinute > Data.Minute || Data.ShiftReports.Count > 24 ||
                 Data.ShiftReports.Any(r => r == null || r.Minute < 0 || r.Minute > Data.Minute) ||
                 Data.ShiftReports.Select(r => r.Minute).Distinct().Count() != Data.ShiftReports.Count)
                 throw new ArgumentException("Invalid shift reports.");
-            if (Data.Crews.Any(c => !ValidPoint(c.Position) || !ValidPoint(c.HelperPosition) || !ValidPoint(c.WorkTarget) || !ValidPoint(c.HelperWorkTarget)) ||
+            if (Data.Crews.Any(c => !ValidPoint(c.Position) || !ValidPoint(c.HelperPosition) || !ValidPoint(c.WorkTarget) || !ValidPoint(c.HelperWorkTarget) || !ValidPoint(c.SupplyPoint) || !ValidPoint(c.WorkFocus) || c.SupplyLoadMinutes < 0 || c.SupplyLoadMinutes > 3 || c.SuppliesUsed < 0 || c.SuppliesUsed > 40 || !(new[] { "Idle", "Walking", "Collecting", "Carrying", "Working" }).Contains(c.WorkPhase) || !(new[] { "Survey", "Inspect", "Saw", "Hammer", "Drill", "Install", "Demolish" }).Contains(c.WorkKind)) ||
                 Data.Staff.Any(s => !ValidPoint(s.Station) || !ValidPoint(s.Destination) || s.ShiftStart < 0 || s.ShiftStart > 23 || s.DailyCents < 0))
                 throw new ArgumentException("Invalid staff or crew duty state.");
             var ids = new HashSet<string>(Data.Crews.Select(c => c.Id).Concat(Data.Staff.Select(s => s.Id)));
@@ -97,14 +125,25 @@ namespace Cellblock.Core
                 Data.Staff.Any(s => !s.Arrived && !Data.Trips.Any(t => t.Id == s.TripId && t.Passengers.Contains(s.Id))))
                 throw new ArgumentException("A commuter has no valid arrival trip.");
         }
+        public static Point ParkingBay(int slot) { return new Point(-7 - slot * 3.2f, -20.5f); }
+        int FreeParkingBay()
+        {
+            for (int i = 0; i < 7; i++)
+                if (!Data.Trips.Any(t => t.Phase != "Gone" && Geometry.Distance(t.Parking, ParkingBay(i)) < 2.9f)) return i;
+            return -1;
+        }
+        bool CanBookTrip(string kind)
+        {
+            return Data.Trips.Any(t => t.Kind == kind && t.Phase == "Boarding" && t.DepartureMinute > Data.Minute && t.Passengers.Count < (kind == "Crew" ? 2 : 4)) || FreeParkingBay() >= 0;
+        }
         string BookTrip(string passenger, string kind)
         {
             int capacity = kind == "Crew" ? 2 : 4;
             TransportTrip trip = Data.Trips.LastOrDefault(t => t.Kind == kind && t.Phase == "Boarding" && t.DepartureMinute > Data.Minute && t.Passengers.Count < capacity);
             if (trip == null)
             {
-                trip = new TransportTrip { Id = Id(), Kind = kind, DepartureMinute = Data.Minute + 10,
-                    Parking = new Point(-10 - Data.Trips.Count(t => t.Phase != "Gone") % 3 * 4, -18.1f) };
+                trip = new TransportTrip { Id = Id(), Kind = kind, DepartureMinute = Math.Max(Data.Minute + 10, Data.Trips.Where(t => t.Phase == "Boarding").Select(t => t.DepartureMinute + 7).DefaultIfEmpty(0).Max()),
+                    Parking = ParkingBay(FreeParkingBay()) };
                 Data.Trips.Add(trip);
             }
             trip.Passengers.Add(passenger); return trip.Id;
@@ -128,6 +167,7 @@ namespace Cellblock.Core
         public bool HireStaff(string role)
         {
             if (!ValidRole(role) || Data.CashCents < 50000) { Notice = "Hiring requires a valid role and $500 mobilization."; return false; }
+            if (!CanBookTrip("Staff")) { Notice = "All staff/contractor parking bays are reserved. Wait for a departing vehicle before hiring."; return false; }
             string id = Id(); int count = Data.Staff.Count;
             string[] names = { "Avery Stone", "Harper Quinn", "Dylan Shaw", "Sage Carter", "Parker Wells", "Reese Turner", "Rowan Blake", "Emerson Reed" };
             Point station = role == "Caseworker" ? new Point(-0.1f, 4.8f) : role == "Technician" ? new Point(-2.8f, 5) : new Point(2.8f, -6);
@@ -177,7 +217,7 @@ namespace Cellblock.Core
         public ShiftReport CurrentShift() { return CaptureShift(Data.Minute / 480 * 480); }
         ShiftReport CaptureShift(int start)
         {
-            return new ShiftReport { Minute = Data.Minute, Residents = Data.Residents.Count, StaffOnDuty = Data.Staff.Count(IsOnShift),
+            return new ShiftReport { Minute = Data.Minute, Residents = Data.Residents.Count(IsPresent), StaffOnDuty = Data.Staff.Count(IsOnShift),
                 ActiveProjects = Data.Projects.Count(p => !p.Completed), CompletedProjects = Data.Projects.Count(p => p.Completed && p.CompletedMinute > start && p.CompletedMinute <= Data.Minute),
                 CoveredResidents = CameraCoverage(), CashCents = Data.CashCents,
                 Incidents = Data.History.Count(e => e.Minute > start && e.Minute <= Data.Minute && (e.Category == "contraband" || e.Category == "favoritism" || e.Severity >= 3)),
@@ -203,7 +243,13 @@ namespace Cellblock.Core
         {
             foreach (TransportTrip trip in Data.Trips)
             {
-                if (trip.Phase == "Gone" || trip.Phase == "Parked") continue;
+                if (trip.Phase == "Gone") continue;
+                if (trip.Phase == "Parked")
+                {
+                    // A staff shuttle returns to its fleet after dropoff. The people stay at work.
+                    if (trip.Kind != "Staff" || Data.Minute - trip.ArrivedMinute < 17) continue;
+                    trip.Phase = "Departing"; trip.Waypoint = 0;
+                }
                 if (trip.Phase == "Boarding") { if (Data.Minute < trip.DepartureMinute) continue; trip.Phase = "Driving"; }
                 if (trip.Phase == "Unloading")
                 {
@@ -213,21 +259,29 @@ namespace Cellblock.Core
                     {
                         float passengerOffset = passengerSlot++ * 1.4f;
                         Crew crew = Data.Crews.FirstOrDefault(c => c.Id == id);
-                        if (crew != null) { crew.Arrived = true; crew.Position = NearbyClear(trip.Parking + new Point(passengerOffset, 1.2f), Routes); crew.HelperPosition = NearbyClear(crew.Position + new Point(0.65f, 0), Routes); }
+                        if (crew != null) { crew.Arrived = true; crew.Position = NearbyClear(trip.Parking + new Point(1.30f, passengerOffset + 0.8f), Routes); crew.HelperPosition = NearbyClear(crew.Position + new Point(0, 0.65f), Routes); }
                         StaffMember staff = Data.Staff.FirstOrDefault(s => s.Id == id);
-                        if (staff != null) { staff.Arrived = true; staff.Position = NearbyClear(trip.Parking + new Point(passengerOffset, 1.2f), Routes); staff.NextDutyMinute = 0; }
+                        if (staff != null) { staff.Arrived = true; staff.Position = NearbyClear(trip.Parking + new Point(1.30f, passengerOffset + 0.8f), Routes); staff.NextDutyMinute = 0; }
                     }
                     trip.Phase = "Parked"; continue;
                 }
                 bool leaving = trip.Phase == "Departing";
-                Point[] waypoints = leaving ? new[] { new Point(-2, -18.1f), new Point(-2, -25.5f), new Point(-2, -28.8f), new Point(42, -28.8f) } :
-                    new[] { new Point(-2, -28.8f), new Point(-2, -25.5f), new Point(-2, -20), new Point(-2, -18.1f), trip.Parking };
+                Point[] waypoints = leaving ? new[] { new Point(trip.Parking.X, -14), new Point(-0.7f, -14), new Point(-0.7f, -25.5f), new Point(-0.7f, -30.3f), new Point(42, -30.3f) } :
+                    new[] { new Point(-3.3f, -27.3f), new Point(-3.3f, -26.5f), new Point(-3.3f, -16.4f), new Point(trip.Parking.X, -16.4f), trip.Parking };
                 if (!leaving && trip.Waypoint == 2 && !Data.Operations.GateOpen) { trip.Phase = "At gate"; continue; }
-                if (leaving && trip.Waypoint == 1 && !Data.Operations.GateOpen && trip.Position.Y > -24) continue;
+                if (leaving && trip.Waypoint == 2 && !Data.Operations.GateOpen && trip.Position.Y > -24) continue;
                 if (trip.Phase == "At gate") trip.Phase = "Driving";
                 if (trip.Waypoint >= waypoints.Length) continue;
                 Point target = waypoints[trip.Waypoint], delta = target - trip.Position;
-                trip.Position = delta.Length <= 3.6f ? target : trip.Position + delta * (3.6f / delta.Length);
+                float speed = (!leaving && trip.Waypoint == 4) || (leaving && trip.Waypoint == 0) ? 0.45f : trip.Waypoint >= 2 && !leaving ? 1.2f : 2.6f;
+                Point next = delta.Length <= speed ? target : trip.Position + delta * (speed / delta.Length);
+                bool startingReverse = leaving && trip.Waypoint == 0 && Geometry.Distance(trip.Position, trip.Parking) < 0.1f;
+                if (startingReverse && Data.Trips.Any(t => t != trip && t.Phase == "Driving" && t.Waypoint >= 2 && Geometry.Distance(t.Position, trip.Parking) < 9)) continue;
+                if (leaving && Data.Trips.Any(t => t != trip && t.Phase == "Departing" && t.DepartureMinute < trip.DepartureMinute && Geometry.Distance(t.Position, next) < 5.2f)) continue;
+                if (!leaving && Data.Trips.Any(t => t != trip &&
+                    ((t.DepartureMinute < trip.DepartureMinute && (t.Phase == "Driving" || t.Phase == "At gate")) ||
+                     (t.Phase == "Departing" && t.Waypoint == 0 && Geometry.Distance(t.Position, t.Parking) > 0.1f)) && Geometry.Distance(t.Position, next) < 5.2f)) continue;
+                trip.Position = next;
                 if (Geometry.Distance(trip.Position, target) > 0.01f) continue;
                 trip.Waypoint++;
                 if (trip.Waypoint < waypoints.Length) continue;
@@ -277,12 +331,33 @@ namespace Cellblock.Core
                     if (Routes.Clear(target + offset, target + offset) && PeopleDynamics.ClearStaffStation(target + offset, futureNavigation, FutureFixtures()) && Routes.Find(crew.HelperPosition, target + offset) != null)
                     { crew.HelperWorkTarget = target + offset; break; }
                 crew.WorkId = assignment; crew.AssignmentRevision = GeometryRevision;
+                crew.WorkFocus = work != null ? work.Site : project.Work.FirstOrDefault() != null ? project.Work[0].Site : target;
+                if (work != null && work.Wall != null)
+                    crew.WorkFocus = Enumerable.Range(0, 21).Select(i => work.Wall.At(i / 20f)).OrderBy(p => Geometry.Distance(p, target)).First();
+                TransportTrip truck = Data.Trips.FirstOrDefault(t => t.Id == crew.TripId);
+                Point depot = truck != null ? truck.Parking + new Point(1.35f, 1.2f) : new Point(-3.5f, -13);
+                crew.SupplyPoint = NearbyClear(depot, Routes);
+                crew.WorkPhase = work == null ? "Walking" : "Collecting";
+                crew.SupplyLoadMinutes = 0; crew.SuppliesUsed = 0;
             }
-            bool leader = Walk(crew.Id, ref crew.Position, crew.WorkTarget, 0.38f);
+            crew.WorkKind = work == null ? project.Preparation > 0 ? "Survey" : "Inspect" : work.Wall != null ?
+                1 - work.Remaining / work.Required < 0.32f ? "Saw" : 1 - work.Remaining / work.Required < 0.72f ? "Hammer" : "Drill" : work.Fixture != null ? "Install" : "Demolish";
+            if (work != null && crew.SuppliesUsed >= 40) { crew.WorkPhase = "Collecting"; crew.SupplyLoadMinutes = 0; crew.SuppliesUsed = 0; }
+            if (work != null && crew.WorkPhase == "Collecting")
+            {
+                bool collecting = Walk(crew.Id, ref crew.Position, crew.SupplyPoint, 0.38f);
+                Point helperDepot = NearbyClear(crew.SupplyPoint + new Point(0, 0.65f), Routes);
+                bool helperCollecting = Walk(crew.Id + "/helper", ref crew.HelperPosition, helperDepot, 0.40f);
+                crew.Activity = (collecting && helperCollecting ? "Loading supplies for " : "Collecting supplies for ") + project.Name;
+                project.Status = "Crew collecting materials";
+                if (collecting && helperCollecting && ++crew.SupplyLoadMinutes >= 3) crew.WorkPhase = "Carrying";
+                return false;
+            }
+            bool leader = Walk(crew.Id, ref crew.Position, crew.WorkTarget, crew.WorkPhase == "Carrying" ? 0.30f : 0.38f);
             Point helperTarget = crew.HelperWorkTarget;
-            bool helper = Walk(crew.Id + "/helper", ref crew.HelperPosition, helperTarget, 0.40f);
-            if (!leader || !helper) { crew.Activity = "Walking to " + project.Name; project.Status = "Crew travelling to work front"; return false; }
-            return true;
+            bool helper = Walk(crew.Id + "/helper", ref crew.HelperPosition, helperTarget, crew.WorkPhase == "Carrying" ? 0.32f : 0.40f);
+            if (!leader || !helper) { crew.Activity = (crew.WorkPhase == "Carrying" ? "Carrying materials to " : "Walking to ") + project.Name; project.Status = "Crew travelling to work front"; return false; }
+            crew.WorkPhase = "Working"; return true;
         }
         bool FindWorksite(Crew crew, Project project, WorkItem work, out Point target)
         {
@@ -339,7 +414,7 @@ namespace Cellblock.Core
                 }
                 bool at = Walk(staff.Id, ref staff.Position, staff.Destination, 0.37f);
                 staff.Duty = !at ? staff.Role == "Officer" ? Data.Operations.Alarm ? "Responding to alarm" : "Patrolling" : "Walking to service" :
-                    staff.Role == "Officer" ? Data.Operations.Alarm ? "Alarm welfare check" : "Welfare check" : staff.Role == "Caseworker" ? "Casework" : "Maintaining CCTV";
+                    staff.Role == "Officer" ? Data.Operations.Alarm ? "Alarm welfare check" : "Welfare check" : staff.Role == "Caseworker" ? "Casework" : Data.Fixtures.Any(f => f.Kind == "CCTV") ? "Maintaining CCTV" : "Inspecting utilities";
                 if (!at) continue;
                 if (staff.Role == "Technician")
                     foreach (Fixture camera in Data.Fixtures.Where(f => f.Kind == "CCTV" && Geometry.Distance(Geometry.AccessPoint(f), staff.Position) < 1)) camera.Condition = Math.Min(100, camera.Condition + 0.7f);
