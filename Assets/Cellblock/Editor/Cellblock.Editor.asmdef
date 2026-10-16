@@ -1,0 +1,10 @@
+{
+  "name": "Cellblock.Editor",
+  "rootNamespace": "Cellblock.Editor",
+  "references": [
+    "Cellblock.Core", "Cellblock.Unity",
+    "Unity.RenderPipelines.Universal.Runtime", "Unity.RenderPipelines.Core.Runtime"
+  ],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

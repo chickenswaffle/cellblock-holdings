@@ -1,46 +1,80 @@
 # Cellblock Holdings
 
-[![Play in browser](https://img.shields.io/badge/%E2%96%B6%EF%B8%8E%20%20PLAY%20IN%20BROWSER-2ea44f?style=for-the-badge)](https://chickenswaffle.github.io/cellblock-holdings/)
+A Unity reboot of a prison ownership and management simulation for iPhone, iPad, Mac, and potentially Windows/Steam. The player chooses a contract, takes over an editable starter facility, and connects building decisions to people, construction, and business results.
 
-A tile-based prison management sim where you don't play a warden — you play the **franchise owner**. Build prisons, staff them, keep the population from tearing itself apart, and answer to a board that only reads spreadsheets.
+**Current milestone: construction foundation.** The C# simulation compiles and has automated executable checks. Unity rendering, editor setup, controls, native builds, and device performance have not been run in this cloud task. The presentation uses procedural prototype geometry and people; the [visual study](docs/concepts/visual-direction-study.png) is an art direction reference.
 
-**Stack:** Godot 4.4 · GDScript · 3D (angled orthogonal camera, procedurally generated geometry — no imported 3D assets) · no external deps (GUT vendored for tests).
+## Open on a Mac
 
-Full design + milestone plan: [`docs/cellblock-holdings-plan.md`](docs/cellblock-holdings-plan.md)
+For a local development session continuing this milestone, read [the Mac handoff](docs/local-mac-handoff.md).
 
-## Status
+Use an installed **Unity 6 editor (6000.x)** with a valid local Unity entitlement. The project uses URP 17.0.4, verified against Unity's official 6000.0 package source.
 
-- ✅ **M0 — Skeleton**: pure sim core (`SimWorld`, seeded xorshift RNG, fixed-tick clock, event bus, edge-walled grid), code-built view (camera rig, `TileMapLayer` renderer with runtime placeholder tileset), headless GUT tests incl. determinism (same seed × 1000 ticks → identical state hash) and a sim-purity scan that fails if anything under `scripts/sim/` touches the engine.
-- ✅ **M1 — Build mode**: walls/doors/floors via a sequential `ConstructionQueue` (money deducted on completion, not order), flood-fill `RoomDetector` (border-leak sealed check, doors block same as walls), `ZoneValidator` + 8 zone kinds with per-kind required objects, `Ledger`, drag-rectangle build tool + click-to-zone tool. 54 tests green, incl. 5 room-detection fixtures (nested rooms, door-in-corner, border-sealed) and an end-to-end SimWorld test matching the milestone's literal DoD.
-- ✅ **Rendering pivot — 2D → 3D**: replaced the flat top-down tilemap with a true-3D view: one shader-blended ground mesh (soft natural terrain instead of a hard grid), an angled Cities-Skylines-style orthogonal camera, real-time lighting/shadows, and procedurally generated 3D geometry for walls/doors/zone tint/objects (all still code-authored, no imported models). Sim layer untouched — this only replaced `scripts/view/`.
-- ✅ **M2 — Prisoners**: `Needs` (7 decaying needs), hand-rolled 8-way A* pathfinder (edge-wall blocking, no corner-cutting, doors passable at a cost, own binary heap), a 24-hour `ScheduleSystem`, utility-scored `UtilityAI` action selection (need deficit × availability × distance + RNG noise), `Intake` (procedural name/trait generation, bus arrivals, bed assignment), and a click-to-inspect prisoner panel. 89 tests green, incl. a full 50-prisoner day/night-cycle DoD test and a perf test — 200 agents average **0.75ms/tick**, well under the 8ms budget, so the hierarchical pathfinding the design doc worried about wasn't needed at this scale. The game now boots into a small starter facility (4 cells, a canteen, a yard) with a few prisoners already living in it.
-- ✅ **M3 — Staff & jobs**: three hireable roles (`Staff`) on DAY/NIGHT shifts with `fatigue` and `nerve`. **Construction now costs worker-time**: `ConstructionQueue` became a claimable work pool denominated in worker-ticks, so a queued building only goes up while a worker stands on the site — an unstaffed prison builds nothing, and hiring more workers finishes the same queue sooner. `StaffAI` runs workers (claim → walk → build), guards (auto-derived patrol routes looping the zoned rooms, feeding a `guard_presence()` query M4's tension model will read), and support staff (a staffed canteen serves meals 1.6× faster). Anyone past 85% fatigue walks off to a staff room until they've recovered; exhausted staff move and build slower. `Payroll` debits the whole wage bill daily and can't part-pay — miss three days and your staff quit. 124 tests green, incl. all three DoD clauses.
-- ✅ **M4 — Conflict** *(the game shows up here)*: `GrievanceSystem` turns lived conditions into slow-moving resentment; `TensionField` turns that into per-room pressure that **diffuses between connected rooms** like heat, so trouble spreads along the map's real topology; `IncidentSystem` sparks incidents out of tense rooms and climbs them a branching ladder (grudge → verbal → shove → fight → brawl → weapon/stabbing *or* faction war → block riot → facility riot), with five resolution options that all cost something real — force injures and spikes facility-wide grievance, solitary destroys reform and is counted for M6's oversight, negotiation is the only one that genuinely helps and needs a support staffer on duty, transfers cost money, conceding costs more. Plus procedurally-named `Faction`s with recruitment/territory/relations, a `Contraband` supply graph feeding weapon availability, searches that suppress it and raise grievance either way, informants who get killed if you lean on them, and lockdown. The **tension overlay ships with the model, not after it** — [T] in game. 194 tests, incl. the milestone's literal DoD: an understaffed, overcrowded prison riots within 5 sim-days and a well-run one doesn't, **across all 20 seeds**.
-- ⬜ M5 — Franchise · M6 — Board & oversight · M7 — Save/load · M8 — Content & juice
+From the repository root:
 
-## Architecture in one paragraph
-
-Everything under `scripts/sim/` is pure GDScript (`RefCounted`, no `Node`, no Godot RNG, no signals). `SimWorld.tick()` is the only mutation entry point, run at a fixed 10 ticks/sec; the view (`scripts/view/`) accumulates real frame time into whole ticks and only ever *reads* sim state, reacting to sim events via a plain observer list. All randomness flows through `SimWorld.rng` (seeded xorshift64\*), so the same seed always produces the same prison. Save = serialize `SimWorld` to JSON.
-
-## Running
-
-Open the project in Godot 4.4 and run, or:
-
-```sh
-godot --path .        # main scene
-./run-tests.sh        # all tests incl. the slow whole-sim ones (~6 min)
-./run-tests.sh --fast # skips tests/slow/ (~45 s) — for tight iteration
+```bash
+bash Tools/open-unity-mac.sh
 ```
 
-`tests/slow/` holds the M4 riot DoD (20 seeds × 5 sim-days × 2 scenarios) and the 200-agent perf test. They're slow because they simulate ~100 prison-days, and they're the two tests most likely to catch a real regression in the balance of the sim — so the default run includes them.
+The launcher discovers Unity 6 in Unity Hub's normal installation directory. It records the actual installed editor version in `ProjectSettings/ProjectVersion.txt` when that file does not exist. If Unity is installed elsewhere:
 
-Everything is clickable — the keyboard shortcuts below are also printed on the buttons, and any action you can't currently take is greyed out with a tooltip saying why ("No support staffer on duty").
+```bash
+UNITY_EDITOR='/full/path/to/Unity.app/Contents/MacOS/Unity' bash Tools/open-unity-mac.sh
+```
 
-| | |
-|---|---|
-| **Camera** | WASD/arrows or middle-drag to pan, wheel to zoom, **Home** to recenter. Right-drag or **,**/**.** turns the view a full 360°, **PgUp**/**PgDn** tilt. Panning follows wherever you're facing. Edge-scrolling is off by default; there's a toggle in the top bar. |
-| **Build** | **1**–**5** pick a tool (wall, door, floor, object, zone), **Esc** returns to camera. **Q**/**E** cycle the active tool's sub-type. Drag out an area and it highlights green (red if you can't afford it), with translucent ghosts showing exactly what will be built and a readout of how many pieces, what it costs and how long your crew will take. Release, then **✓ Build** (**Enter**) or **✗ Cancel** (**Esc**) — nothing is spent until you confirm. Walls drag as a room outline or a single run, and a run lands on whichever edge you dragged across, so you can divide and extend existing buildings. Objects drag out a row. Anything already built isn't charged for twice. Right-click demolishes. |
-| **Zoning** | Tool **5**. Click inside a finished room to designate the whole room, or drag a rectangle to mark out an area before any walls exist — lay out where the cells and canteen go, then build around them. Zoning is free and instant, so it needs no confirmation. |
-| **Time** | **Space** pauses, **−**/**+** change speed. |
-| **Staff** | Hire and fire from the staff panel. Nothing you queue gets built until a worker is on shift to build it. |
-| **Conflict** | **T** toggles the tension overlay. While an incident is running: **F** force, **G** solitary, **N** negotiate, **B** transfer, **K** concede, **L** lockdown. |
+Let Unity resolve the packages and compile. The first-import editor script prepares the URP assets, retained shader material, and main scene. If preparation does not run, select **Cellblock → Prepare project**. Open `Assets/Cellblock/Scenes/Main.unity` and press **Play**.
+
+Generated scene/render assets are currently recreated by the setup script and ignored by Git. Unity remains responsible for generating its package lockfile and complete project settings; those should be reviewed and committed after the first actual editor validation. This cloud task does not fabricate editor-generated lockfiles or claim an installed Mac editor version.
+
+For a real editor compile and asset check on the Mac:
+
+```bash
+bash Tools/open-unity-mac.sh --batch-check
+```
+
+That command is an editor preparation check, not a gameplay or device test. The installed editor needs access to Unity's package registry and its package-download destinations. This project does not configure signing credentials or publish a build.
+
+## First construction session
+
+1. Choose a contract. The initial offers differ in starting capital, acquisition cost, population, operating costs, payment timing, and a verified meal-service bonus. They currently share the starter-building kit.
+2. Inspect the facility. Tap a wall or furnishing to expose its editing controls.
+3. Hire a construction crew. Mobilization costs $500; each hired crew costs $800 per game day, including idle time. These are illustrative balancing values.
+4. Select **Prefab wing** and tap the starter building's lower-right outer corner. That attachment is at world position `(2, -8)` and shares its existing boundary and doorway. Pinch/zoom closer for placement. Review the quote and approve.
+5. Add another crew to compare parallel progress. Preparation, limited work fronts, prior projects, and handover prevent unlimited acceleration. Approved construction is shown in ochre; its elements become operational at project handover.
+6. After handover, inspect the wing's curved wall. Use **Bend**, **Move start**, or **Move end** to change the actual component. Doors, bed/table installation, furnishing moves/rotation, and demolition use the same quote/approval flow.
+7. Use **Meal service** on an installed table to change the destination. Routes and service attendance affect verified meal-service earnings. **Company** shows cash, unpaid earnings, costs, and the cash ledger.
+8. Save and resume from the contract menu. Separate company saves remain selectable. Approved jobs and unapproved complete plans persist; an unfinished first/second drawing tap is not a complete plan and is not saved.
+
+Touch: tap to select/place; two fingers pan and pinch. In Inspect mode, a one-finger drag pans. Desktop: click to select/place, wheel to zoom, right/middle drag to pan, Q/E to rotate, Home to recenter, Space to pause/resume, Escape to discard the current unapproved plan.
+
+The game clock is player controlled. Closing, suspending, or unfocusing the game stops progression. Resume does not apply elapsed wall-clock time. Resumed saves start paused.
+
+## Verify the engine-independent core
+
+With .NET 8 installed:
+
+```bash
+bash Tools/check-core.sh
+```
+
+Or set `CELLBLOCK_DOTNET` to the SDK's `dotnet` executable. The check project has no external test-package dependencies. It exercises geometry, routing around furnishings, editable prefab joins, crew progress, handover, resident relocation, service-dependent earnings, contract payment timing, accounting, numeric save validation, and state round trips.
+
+An additional Roslyn syntax check can run without Unity:
+
+```bash
+dotnet run --project Tools/UnitySourceChecks/UnitySourceChecks.csproj --configuration Release -- "$PWD"
+```
+
+It checks C# syntax only. It does not typecheck Unity APIs, validate asset imports, or establish that the Unity project runs.
+
+## Current boundaries
+
+- The supplied starter building and prefabs have one floor. Multistory building, terrain editing, and walk-through controls remain design decisions.
+- Curves are editable quadratic Béziers. Rooms, generated floor surfaces, wall rendering, and navigation share sampled geometry. Navigation uses a lattice and clearance checks, so small passages can be rejected; it is not a complete production navigation mesh.
+- Furniture has footprints and blocks routes. Bed replacements preserve assignments. This is a basic movement and meal-service model, not the planned complete prisoner, employee, health, security, or rehabilitation simulation. The perimeter and landscape are presentation, not a validated security system.
+- Crews are currently a labor/work-front simulation. Worker travel, supplier deliveries, equipment, temporary facilities, and full phased relocation are future work. Existing geometry stays operational until atomic project handover; this abstracts real renovation stages.
+- Materials/disposal are paid on approval and crew labor accrues over game time. Approved-job cancellation, refunds, financing, insolvency recovery, stock markets, and IPOs are not implemented. An overdraft holds construction while operating obligations continue.
+- Construction quotes are estimates of work, not guaranteed calendar completion. All three opening offers use basic meal-service verification; specialist program/security obligations and distinct facility models still need implementation.
+- The realistic asset library and production animation are not implemented. No supported minimum hardware, agent count, sustained frame rate, native player build, or App Store/Steam readiness is claimed.
+
+See [the design brief](docs/reboot-vision.md) for the game direction and [implementation status](docs/implementation-status.md) for the current milestone and validation limits.

@@ -1,4 +1,25 @@
-.godot/
-/build/
 *.tmp
 .DS_Store
+
+# Unity
+/Library/
+/Temp/
+/Obj/
+/Logs/
+/UserSettings/
+/MemoryCaptures/
+/Builds/
+/Assets/Cellblock/Settings/*.asset
+/Assets/Cellblock/Settings/*.asset.meta
+/Assets/Cellblock/Scenes/*.unity
+/Assets/Cellblock/Scenes/*.unity.meta
+/Assets/Cellblock/Resources/BuildingMaterial.mat
+/Assets/Cellblock/Resources/BuildingMaterial.mat.meta
+/*.csproj
+/*.sln
+/*.slnx
+/*.pidb
+/*.user
+/Tools/**/bin/
+/Tools/**/obj/
+/.local-tools/

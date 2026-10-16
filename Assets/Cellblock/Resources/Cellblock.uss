@@ -1,0 +1,37 @@
+:root { color: rgb(231, 234, 228); font-size: 15px; }
+.header, .inspector, .tools, .quote { background-color: rgba(21, 31, 32, 0.96); border-radius: 9px; border-width: 1px; border-color: rgb(64, 79, 78); }
+.header { position: absolute; left: 12px; right: 12px; top: 12px; height: 80px; padding: 12px; flex-direction: row; align-items: center; justify-content: space-between; }
+.identity { min-width: 220px; }
+.header.compact .identity { min-width: 145px; }
+.header.compact .brand { font-size: 15px; letter-spacing: 0.8px; }
+.header.compact .stats { min-width: 115px; }
+.header.compact .cash { font-size: 20px; }
+.header.compact Button { padding-left: 7px; padding-right: 7px; margin: 2px; }
+.brand { font-size: 21px; -unity-font-style: bold; letter-spacing: 2px; }
+.eyebrow { color: rgb(135, 185, 166); font-size: 11px; letter-spacing: 1.3px; margin-top: 5px; margin-bottom: 6px; }
+.cash { font-size: 24px; -unity-font-style: bold; color: rgb(234, 224, 192); }
+.stats { min-width: 170px; }
+.muted { color: rgb(167, 181, 177); font-size: 12px; white-space: normal; margin-top: 3px; }
+.row, .wrap-row { flex-direction: row; align-items: center; }
+.wrap-row { flex-wrap: wrap; }
+Button { background-color: rgb(43, 57, 57); color: rgb(231, 234, 228); border-color: rgb(72, 91, 86); border-width: 1px; border-radius: 5px; min-height: 44px; padding-left: 12px; padding-right: 12px; margin: 3px; -unity-font-style: normal; }
+Button:hover { background-color: rgb(60, 78, 73); }
+Button:active { background-color: rgb(76, 103, 88); }
+Button:disabled { opacity: 0.4; }
+.primary { background-color: rgb(68, 107, 86); color: rgb(246, 246, 232); border-color: rgb(105, 140, 116); }
+.tools { position: absolute; left: 12px; right: 12px; bottom: 12px; min-height: 62px; padding: 6px; }
+.tool-strip { flex-direction: row; }
+.inspector { position: absolute; right: 12px; top: 105px; bottom: 90px; width: 300px; padding: 16px; }
+.inspector.compact { width: 260px; font-size: 13px; padding: 10px; }
+.card-title { font-size: 21px; white-space: normal; margin-bottom: 9px; -unity-font-style: bold; }
+.body { white-space: normal; margin-bottom: 12px; }
+.terms { white-space: normal; color: rgb(207, 212, 196); margin-top: 8px; margin-bottom: 12px; }
+.project-line, .ledger-line { white-space: normal; margin-top: 10px; padding-top: 8px; border-top-width: 1px; border-top-color: rgb(65, 78, 74); font-size: 13px; }
+.status { position: absolute; left: 18px; bottom: 85px; right: 330px; background-color: rgba(21, 31, 32, 0.9); padding: 10px; border-radius: 6px; }
+.instruction { white-space: normal; font-size: 15px; }
+.quote { position: absolute; left: 18px; bottom: 90px; width: 400px; padding: 14px; }
+.menu { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background-color: rgba(16, 25, 27, 0.99); padding: 25px; }
+.menu-title { font-size: 35px; letter-spacing: 4px; margin-bottom: 12px; -unity-font-style: bold; }
+.menu-subtitle { font-size: 23px; color: rgb(167, 200, 182); margin-bottom: 12px; }
+.cards { flex-direction: row; margin-top: 8px; margin-bottom: 15px; }
+.contract-card { flex-grow: 1; flex-basis: 0; background-color: rgb(30, 43, 44); border-color: rgb(65, 83, 78); border-width: 1px; border-radius: 8px; margin-right: 12px; padding: 19px; }

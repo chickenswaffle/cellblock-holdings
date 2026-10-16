@@ -1,0 +1,6 @@
+{
+  "name": "Cellblock.Unity",
+  "rootNamespace": "Cellblock.Unity",
+  "references": ["Cellblock.Core"],
+  "autoReferenced": true
+}

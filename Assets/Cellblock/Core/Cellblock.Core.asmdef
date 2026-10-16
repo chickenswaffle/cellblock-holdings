@@ -1,0 +1,7 @@
+{
+  "name": "Cellblock.Core",
+  "rootNamespace": "Cellblock.Core",
+  "references": [],
+  "autoReferenced": true,
+  "noEngineReferences": true
+}
