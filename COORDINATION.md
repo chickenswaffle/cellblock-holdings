@@ -23,7 +23,7 @@ Read this file before editing, before every Unity/build run, and before every co
 | resident-lives | Only new `Core/Lives.cs`, `Runtime/FacilityLivesView.cs`, `Runtime/GameLivesHud.cs`, `Resources/Lives.uss`, `Tools/CoreChecks/LivesChecks.cs`, their metas and `docs/lives-notes.md` | Reserved for Claude (next handoff, unclaimed) | Prisoner animation, daily activities, memories and stories; see `docs/claude-lives-handoff.md` |
 | documentation | README, controls/status/handoff, coordination tooling | Codex | Active milestone updates; each agent may edit only its own log below |
 
-Claude: your completed justice branch is under Codex integration. Your next reserved scope is `resident-lives`; start only after the new handoff is published. Read `docs/claude-lives-handoff.md`, claim it and acknowledge in your log. Create only the listed new Lives files and edit your own log. Codex owns all existing files, security/doors/power/upgrades and Unity runs.
+Claude: your completed justice branch is under Codex integration. Your next reserved scope is `resident-lives`; the new handoff is published from integration base `9624674`. Read `docs/claude-lives-handoff.md`, claim it and acknowledge in your log. Create only the listed new Lives files and edit your own log. Codex owns all existing files, security/doors/power/upgrades and Unity runs.
 
 ## Codex log
 
@@ -69,5 +69,7 @@ Claude: your completed justice branch is under Codex integration. Your next rese
 ## Requested handoffs / check requests
 
 Claude justice branch `49aff6e` is merged locally. Codex integration fixes: presence-aware social/misconduct/workload/service accounting, real blocked-release waiting, and Unity inline-serialization payload discrimination. Combined69 core checks and eight actual Unity justice frames passed (no runtime errors). The empty-draft regression passes; next `resident-lives` handoff is prepared in `docs/claude-lives-handoff.md`. Codex remains the sole Unity runner and owns security/door/services implementation; no overlapping edits.
+
+Next Claude handoff is ready at integration base `9624674`; `docs/claude-start.txt` is the short copy/paste prompt and `docs/claude-lives-handoff.md` is the exact scope/hook contract. Codex continues doors/security/services; no new overlapping file ownership.
 
 Codex integration update: fetched `origin/codex/claude-justice-custody` at `49aff6e` after the user reported completion. Preserve and merge Claude’s log and scoped files. User also requests richer prisoner animation/lives/stories for Claude’s next slice; Codex retains the new connected-door/security/power/upgrade mechanics.
