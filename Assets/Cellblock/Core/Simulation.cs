@@ -8,10 +8,10 @@ namespace Cellblock.Core
     {
         public string Id = "", Kind = "Bed";
         public Point Position;
-        public float Rotation;
-        public Fixture Copy() { return new Fixture { Id = Id, Kind = Kind, Position = Position, Rotation = Rotation }; }
+        public float Rotation, Condition = 100;
+        public Fixture Copy() { return new Fixture { Id = Id, Kind = Kind, Position = Position, Rotation = Rotation, Condition = Condition }; }
     }
-    [Serializable] public sealed class Resident
+    [Serializable] public sealed partial class Resident
     {
         public string Id = "", Name = "", Temperament = "", Clique = "", Gang = "Unaffiliated";
         public Point Position, Home;
@@ -44,6 +44,11 @@ namespace Cellblock.Core
         public Point Position;
         public float Integrity = 75, Pressure = 35, Favoritism = 0;
         public int LastIncidentMinute = -1000000;
+        public Point Station, Destination;
+        public bool Arrived = true;
+        public string TripId = "", Duty = "On duty";
+        public int NextDutyMinute, LastServiceMinute, ShiftStart = 8;
+        public long DailyCents;
         public float Risk { get { return PeopleDynamics.MisconductRisk(this); } }
     }
     [Serializable] public sealed class HistoryEvent
@@ -62,6 +67,10 @@ namespace Cellblock.Core
     {
         public string Id = "", Name = "", Activity = "Available";
         public long DailyCents = 80000;
+        public Point Position = new Point(-2, -15), HelperPosition = new Point(-1.4f, -15), WorkTarget, HelperWorkTarget;
+        public bool Arrived = true, Working;
+        public string TripId = "", ProjectId = "", WorkId = "";
+        public int AssignmentRevision = -1;
     }
     [Serializable] public sealed class WorkItem
     {
@@ -69,6 +78,9 @@ namespace Cellblock.Core
         public Fixture Fixture;
         public float Remaining, Required;
         public int WorkFronts = 1;
+        public string TaskId = "";
+        public Point Site;
+        public bool HasSite;
     }
     [Serializable] public sealed class HomeMove
     {
@@ -87,6 +99,7 @@ namespace Cellblock.Core
         public List<WorkItem> Work = new List<WorkItem>();
         public float Preparation = 15, Handover = 10;
         public bool Completed;
+        public int CompletedMinute;
         public long MaterialCents;
         public float Progress
         {
@@ -97,10 +110,14 @@ namespace Cellblock.Core
             }
         }
     }
-    [Serializable] public sealed class State
+    [Serializable] public sealed partial class State
     {
         public int Version = 1, NextId = 1, Minute = 8 * 60, Speed = 1;
-        public int Seed;
+        public int Seed, OperationsVersion;
+        public OperationsState Operations = new OperationsState();
+        public List<TransportTrip> Trips = new List<TransportTrip>();
+        public List<ShiftReport> ShiftReports = new List<ShiftReport>();
+        public double StaffRemainder;
         public string ContractId = "county";
         public long OpeningCapitalCents, CashCents, ReceivableCents;
         public double OperatingRemainder, CrewRemainder, RevenueRemainder;
@@ -141,7 +158,7 @@ namespace Cellblock.Core
         public Plan Plan;
     }
 
-    public sealed class World
+    public sealed partial class World
     {
         public static readonly ContractOffer[] Offers = {
             new ContractOffer { Id = "county", Name = "County Intake", City = "Briar County",
@@ -157,6 +174,11 @@ namespace Cellblock.Core
                 CapitalCents = 35000000, AcquisitionCents = 21000000, DailyRevenueCents = 540000,
                 DailyOperatingCents = 410000, DailyServiceBonusCents = 35000, Residents = 10, PaymentDays = 7 }
         };
+        static partial void HydrateJustice(State state);
+        partial void AdvanceJustice();
+        partial void UpdateResidentCustody(Resident resident, ref bool skip);
+        partial void ResidentPresence(Resident resident, ref bool present);
+        public bool IsPresent(Resident resident) { bool present = true; ResidentPresence(resident, ref present); return present; }
         public readonly State Data;
         public int GeometryRevision { get; private set; }
         public string Notice = "Choose a project, review its quote, and assign a crew.";
@@ -176,6 +198,8 @@ namespace Cellblock.Core
         {
             if (data == null) throw new ArgumentException("This save is missing.");
             PeopleDynamics.Hydrate(data);
+            HydrateOperations(data);
+            HydrateJustice(data);
             if (data.Version != 1 || !Offers.Any(o => o.Id == data.ContractId))
                 throw new ArgumentException("This save version or contract is not supported.");
             if (data.Walls == null || data.Fixtures == null || data.Residents == null || data.Crews == null ||
@@ -188,7 +212,7 @@ namespace Cellblock.Core
             }
             if (data.Speed != 0 && data.Speed != 1 && data.Speed != 2 && data.Speed != 4)
                 throw new ArgumentException("Invalid simulation speed.");
-            if (new[] { data.OperatingRemainder, data.CrewRemainder, data.RevenueRemainder }.Any(n => double.IsNaN(n) || double.IsInfinity(n) || n < 0 || n >= 1))
+            if (new[] { data.OperatingRemainder, data.CrewRemainder, data.RevenueRemainder, data.StaffRemainder }.Any(n => double.IsNaN(n) || double.IsInfinity(n) || n < 0 || n >= 1))
                 throw new ArgumentException("Invalid fractional accounting state.");
             if (data.Walls.Any(w => string.IsNullOrEmpty(w.Id)) || data.Fixtures.Any(f => f == null || string.IsNullOrEmpty(f.Id)) ||
                 data.Walls.Select(w => w.Id).Distinct().Count() != data.Walls.Count || data.Fixtures.Select(f => f.Id).Distinct().Count() != data.Fixtures.Count)
@@ -197,7 +221,7 @@ namespace Cellblock.Core
                 !PeopleDynamics.ValidResident(r) || r.Relationships == null || r.Relationships.Any(rel => rel == null || string.IsNullOrEmpty(rel.OtherId) || !FiniteRange(rel.Trust, 0, 100) || !FiniteRange(rel.Tension, 0, 100)) ||
                 r.Relationships.Select(rel => rel.OtherId).Distinct().Count() != r.Relationships.Count || r.Relationships.Any(rel => !data.Residents.Any(other => other.Id == rel.OtherId && other.Id != r.Id))) ||
                 data.Residents.Select(r => r.Id).Distinct().Count() != data.Residents.Count ||
-                data.Staff.Any(s => s == null || string.IsNullOrEmpty(s.Id) || string.IsNullOrEmpty(s.Name) || (s.Role != "Officer" && s.Role != "Caseworker") || !ValidPoint(s.Position) || !FiniteRange(s.Integrity, 0, 100) || !FiniteRange(s.Pressure, 0, 100) || !FiniteRange(s.Favoritism, 0, 100) || s.LastIncidentMinute > data.Minute || s.LastIncidentMinute < -1000000) ||
+                data.Staff.Any(s => s == null || string.IsNullOrEmpty(s.Id) || string.IsNullOrEmpty(s.Name) || !ValidRole(s.Role) || !ValidPoint(s.Position) || !FiniteRange(s.Integrity, 0, 100) || !FiniteRange(s.Pressure, 0, 100) || !FiniteRange(s.Favoritism, 0, 100) || s.LastIncidentMinute > data.Minute || s.LastIncidentMinute < -1000000) ||
                 data.Staff.Select(s => s.Id).Distinct().Count() != data.Staff.Count || data.History.Any(e => e == null || e.Minute < 0 || e.Minute > data.Minute || string.IsNullOrEmpty(e.Description) || e.Severity < 1 || e.Severity > 5) ||
                 data.Fixtures.Any(f => !ValidFixture(f)) || !ValidPoint(data.Dining) || !ValidPoint(data.Yard))
                 throw new ArgumentException("Invalid saved person, crew, service, or furnishing.");
@@ -230,6 +254,7 @@ namespace Cellblock.Core
                 }
             }
             Data = data;
+            ValidateOperations();
             if (!Reconciles()) throw new ArgumentException("The saved ledger does not reconcile.");
             string blocked = CheckRoutes(Data.Walls);
             if (blocked != "") throw new ArgumentException("Invalid saved routes: " + blocked);
@@ -239,7 +264,7 @@ namespace Cellblock.Core
         }
         static bool FiniteRange(float value, float low, float high) { return !float.IsNaN(value) && !float.IsInfinity(value) && value >= low && value <= high; }
         static bool ValidPoint(Point p) { return FiniteRange(p.X, -Geometry.SiteX, Geometry.SiteX) && FiniteRange(p.Y, -Geometry.SiteY, Geometry.SiteY); }
-        static bool ValidFixture(Fixture f) { return f != null && ValidPoint(f.Position) && FiniteRange(f.Rotation, -36000, 36000) && FixtureCatalog.Contains(f.Kind); }
+        static bool ValidFixture(Fixture f) { return f != null && ValidPoint(f.Position) && FiniteRange(f.Rotation, -36000, 36000) && FiniteRange(f.Condition, 0, 100) && FixtureCatalog.Contains(f.Kind); }
         public static World Start(string contractId)
         {
             ContractOffer offer = Offers.First(o => o.Id == contractId);
@@ -267,14 +292,16 @@ namespace Cellblock.Core
         {
             if (Data.CashCents < 50000) { Notice = "A crew requires a $500 mobilization payment."; return false; }
             string id = Id();
-            Data.Crews.Add(new Crew { Id = id, Name = "Crew " + (Data.Crews.Count + 1) });
+            var crew = new Crew { Id = id, Name = "Crew " + (Data.Crews.Count + 1), Arrived = false };
+            Data.Crews.Add(crew); crew.TripId = BookTrip(id, "Crew");
             Book(-50000, "mobilization", "Construction crew mobilization");
-            Notice = "Crew hired: $800 per game day, including idle time. Release it when the work is finished.";
+            Notice = "Crew hired. Two builders are boarding a truck; nearby hires share available seats. $800 per game day, including travel and idle time.";
             return true;
         }
         public bool ReleaseCrew()
         {
             if (Data.Crews.Count == 0) return false;
+            RemovePassenger(Data.Crews[Data.Crews.Count - 1].Id);
             Data.Crews.RemoveAt(Data.Crews.Count - 1);
             Notice = "Crew released. Completed work and purchased materials remain.";
             return true;
@@ -328,7 +355,7 @@ namespace Cellblock.Core
         {
             List<Fixture> checkedFixtures = fixtures ?? Data.Fixtures;
             var routes = new Navigation(walls, checkedFixtures);
-            if (Data.Staff.Any(staff => !PeopleDynamics.ClearStaffStation(staff.Position, routes, checkedFixtures)))
+            if (Data.Staff.Any(staff => !PeopleDynamics.ClearStaffStation(staff.Position, routes, checkedFixtures) || !PeopleDynamics.ClearStaffStation(staff.Station, routes, checkedFixtures)))
                 return "This plan blocks a staff station. Relocate the furnishing or change the wall plan.";
             for (int i = 0; i < Data.Residents.Count; i++)
             {
@@ -409,7 +436,7 @@ namespace Cellblock.Core
             foreach (Fixture fixture in plan.Fixtures)
             {
                 var footprint = Geometry.Footprint(fixture);
-                if (!futureRooms.Any(room => footprint.All(p => Geometry.Contains(room, p))))
+                if (fixture.Kind != "CCTV" && !futureRooms.Any(room => footprint.All(p => Geometry.Contains(room, p))))
                 { result.Message = "The furnishing needs an enclosed room with space around its full footprint."; return result; }
                 if (futureFixtures.Any(other => Geometry.Overlap(footprint, Geometry.Footprint(other))))
                 { result.Message = "The furnishing overlaps another item. Move it or include that item in the renovation."; return result; }
@@ -454,12 +481,12 @@ namespace Cellblock.Core
             Project priorDining = Data.Projects.LastOrDefault(p => !p.Completed && p.RelocatesDining);
             Point finalDining = plan.RelocatesDining ? plan.Dining : priorDining != null ? priorDining.Dining : Data.Dining;
             var futureRoutes = new Navigation(future, futureFixtures);
-            if (Data.Staff.Any(staff => !PeopleDynamics.ClearStaffStation(staff.Position, futureRoutes, futureFixtures)))
+            if (Data.Staff.Any(staff => !PeopleDynamics.ClearStaffStation(staff.Position, futureRoutes, futureFixtures) || !PeopleDynamics.ClearStaffStation(staff.Station, futureRoutes, futureFixtures)))
             { result.Message = "This plan blocks a staff station. Relocate the furnishing or change the wall plan."; return result; }
             foreach (Fixture fixture in plan.Fixtures)
             {
                 Point access = Geometry.AccessPoint(fixture);
-                if (!futureRooms.Any(room => Geometry.Contains(room, access)) || !futureRoutes.Clear(access, access))
+                if ((fixture.Kind != "CCTV" && !futureRooms.Any(room => Geometry.Contains(room, access))) || !futureRoutes.Clear(access, access))
                 { result.Message = "Leave clear access space in front of the furnishing, inside the room."; return result; }
                 bool reachable = Data.Residents.Any(resident =>
                 {
@@ -487,21 +514,21 @@ namespace Cellblock.Core
             foreach (Wall wall in plan.Walls)
             {
                 wall.Id = Id(); float work = Geometry.Length(wall) * 20 + (wall.Door >= 0 ? 30 : 0);
-                project.Work.Add(new WorkItem { Wall = wall, Required = work, Remaining = work,
+                project.Work.Add(new WorkItem { TaskId = Id(), Site = Geometry.OnLength(wall, 0.5f), HasSite = true, Wall = wall, Required = work, Remaining = work,
                     WorkFronts = Math.Max(1, (int)(Geometry.Length(wall) / 5)) });
             }
             foreach (Fixture fixture in plan.Fixtures)
             {
                 fixture.Id = Id();
-                project.Work.Add(new WorkItem { Fixture = fixture, Required = 35, Remaining = 35 });
+                project.Work.Add(new WorkItem { TaskId = Id(), Site = fixture.Position, HasSite = true, Fixture = fixture, Required = 35, Remaining = 35 });
             }
             foreach (string id in plan.RemoveWalls)
             {
                 float work = Geometry.Length(Data.Walls.First(w => w.Id == id)) * 8;
-                project.Work.Add(new WorkItem { Required = work, Remaining = work });
+                project.Work.Add(new WorkItem { TaskId = Id(), Site = Geometry.OnLength(Data.Walls.First(w => w.Id == id), 0.5f), HasSite = true, Required = work, Remaining = work });
             }
             if (plan.RemoveFixtures.Count > 0)
-                project.Work.Add(new WorkItem { Required = plan.RemoveFixtures.Count * 20, Remaining = plan.RemoveFixtures.Count * 20 });
+                project.Work.Add(new WorkItem { TaskId = Id(), Site = Data.Fixtures.First(f => plan.RemoveFixtures.Contains(f.Id)).Position, HasSite = true, Required = plan.RemoveFixtures.Count * 20, Remaining = plan.RemoveFixtures.Count * 20 });
             Book(-quote.MaterialCents, "materials", project.Name + " / " + project.Id);
             Data.Projects.Add(project);
             Notice = Data.Crews.Count == 0 ? "Project approved. Hire a construction crew to begin." : "Project approved. Crews will begin preparation.";
@@ -517,12 +544,18 @@ namespace Cellblock.Core
             var exclusive = new HashSet<Project>();
             foreach (Crew crew in Data.Crews)
             {
-                crew.Activity = "Idle — no available work front";
+                crew.Working = false;
+                if (!crew.Arrived) { crew.Activity = TripStatus(crew.TripId); continue; }
+                if (Data.Operations.Alarm) { crew.Activity = "Alarm stand-down"; continue; }
+                crew.Activity = "On site — awaiting work";
+                crew.ProjectId = "";
                 foreach (Project project in Data.Projects.Where(p => !p.Completed))
                 {
                     if (project.Preparation > 0)
                     {
                         if (!exclusive.Add(project)) continue;
+                        if (!ReachWork(crew, project, null)) break;
+                        crew.Working = true;
                         project.Preparation = Math.Max(0, project.Preparation - 1);
                         project.Status = "Preparing site"; crew.Activity = project.Name + ": preparation"; break;
                     }
@@ -531,6 +564,8 @@ namespace Cellblock.Core
                     if (item != null)
                     {
                         assignments[item] = assignments.ContainsKey(item) ? assignments[item] + 1 : 1;
+                        if (!ReachWork(crew, project, item)) break;
+                        crew.Working = true;
                         item.Remaining = Math.Max(0, item.Remaining - 1);
                         project.Status = "Construction"; crew.Activity = project.Name + ": construction"; break;
                     }
@@ -538,6 +573,8 @@ namespace Cellblock.Core
                     if (project.DependsOn.Any(id => Data.Projects.Any(p => p.Id == id && !p.Completed)))
                     { project.Status = "Handover waits for earlier project"; continue; }
                     if (!exclusive.Add(project)) continue;
+                    if (!ReachWork(crew, project, null)) break;
+                    crew.Working = true;
                     if (project.Handover > 0)
                     {
                         project.Handover = Math.Max(0, project.Handover - 1);
@@ -547,15 +584,18 @@ namespace Cellblock.Core
                     completed.AddRange(project.Work.Where(w => w.Wall != null).Select(w => w.Wall));
                     var completedFixtures = Data.Fixtures.Where(f => !project.RemoveFixtures.Contains(f.Id)).ToList();
                     completedFixtures.AddRange(project.Work.Where(w => w.Fixture != null).Select(w => w.Fixture));
+                    var handoverRoutes = new Navigation(completed, completedFixtures);
+                    if (Data.Crews.Any(c => c.Arrived && (!PeopleDynamics.ClearStaffStation(c.Position, handoverRoutes, completedFixtures) || !PeopleDynamics.ClearStaffStation(c.HelperPosition, handoverRoutes, completedFixtures))))
+                    { project.Status = "Handover held: builders are clearing the new geometry"; continue; }
                     string issue = CheckRoutes(completed, project.HomeMoves, project.RelocatesDining ? (Point?)project.Dining : null, completedFixtures);
                     if (issue != "") { project.Status = "Handover held: " + issue; continue; }
                     Data.Walls = completed;
                     Data.Fixtures = completedFixtures;
                     foreach (HomeMove move in project.HomeMoves) Data.Residents.First(r => r.Name == move.Resident).Home = move.Home;
                     if (project.RelocatesDining) Data.Dining = project.Dining;
-                    project.Completed = true; project.Status = "Operational";
+                    project.Completed = true; project.CompletedMinute = Data.Minute; project.Status = "Operational";
                     InvalidateGeometry(); Notice = project.Name + " completed and handed over.";
-                    crew.Activity = "Project handed over"; break;
+                    crew.Working = false; crew.Activity = "Project handed over"; break;
                 }
             }
         }
@@ -566,10 +606,13 @@ namespace Cellblock.Core
             for (int i = 0; i < count; i++)
             {
                 Data.Minute++;
+                AdvanceOperations();
+                AdvanceJustice();
                 MoveResidents();
                 if (Data.Minute % 30 == 0) PeopleDynamics.Advance(this);
                 Data.OperatingRemainder += Contract.DailyOperatingCents / 1440.0;
                 Data.CrewRemainder += Data.Crews.Sum(c => c.DailyCents) / 1440.0;
+                Data.StaffRemainder += Data.Staff.Sum(s => s.DailyCents) / 1440.0;
                 Data.RevenueRemainder += Contract.DailyRevenueCents / 1440.0;
                 int hour = Data.Minute / 60 % 24;
                 bool mealtime = (hour >= 7 && hour < 9) || (hour >= 12 && hour < 14) || (hour >= 18 && hour < 20);
@@ -577,7 +620,7 @@ namespace Cellblock.Core
                 {
                     int served = 0;
                     for (int person = 0; person < Data.Residents.Count; person++)
-                        if (Geometry.Distance(Data.Residents[person].Position, ServiceDestination(person, true)) < 0.8f) served++;
+                        if (IsPresent(Data.Residents[person]) && Geometry.Distance(Data.Residents[person].Position, ServiceDestination(person, true)) < 0.8f) served++;
                     Data.RevenueRemainder += Contract.DailyServiceBonusCents * (served / (double)Data.Residents.Count) / 360.0;
                 }
                 long revenue = (long)Data.RevenueRemainder;
@@ -587,16 +630,18 @@ namespace Cellblock.Core
                     Book(Data.ReceivableCents, "contract", "Government contract payment");
                     Data.ReceivableCents = 0;
                 }
-                long operating = (long)Data.OperatingRemainder, wages = (long)Data.CrewRemainder;
-                Data.OperatingRemainder -= operating; Data.CrewRemainder -= wages;
+                long operating = (long)Data.OperatingRemainder, wages = (long)Data.CrewRemainder, staffWages = (long)Data.StaffRemainder;
+                Data.OperatingRemainder -= operating; Data.CrewRemainder -= wages; Data.StaffRemainder -= staffWages;
                 Book(-operating, "operations", "Facility operations and staff");
                 Book(-wages, "crew-wages", "Construction crew wages");
+                Book(-staffWages, "staff-wages", "Additional staff wages");
                 if (Data.CashCents >= 0) Construction();
                 else
                 {
                     Notice = "Cash is overdrawn. New construction is held; wages and operating liabilities continue.";
                     foreach (Crew crew in Data.Crews) crew.Activity = "On hold — insufficient cash";
                 }
+                RecordShiftReport();
             }
         }
         void MoveResidents()
@@ -604,8 +649,9 @@ namespace Cellblock.Core
             for (int index = 0; index < Data.Residents.Count; index++)
             {
                 Resident resident = Data.Residents[index];
-                bool meals = PeopleDynamics.IsMealWindow(Data.Minute + resident.RoutineOffset);
-                bool yard = PeopleDynamics.IsYardWindow(Data.Minute + resident.RoutineOffset);
+                bool skip = false; UpdateResidentCustody(resident, ref skip); if (skip) continue;
+                bool meals = !Data.Operations.Lockdown && PeopleDynamics.IsMealWindow(Data.Minute + resident.RoutineOffset);
+                bool yard = !Data.Operations.Lockdown && PeopleDynamics.IsYardWindow(Data.Minute + resident.RoutineOffset);
                 Point target = meals || yard ? ServiceDestination(index, meals) : resident.Home;
                 Point prior;
                 Queue<Point> route;

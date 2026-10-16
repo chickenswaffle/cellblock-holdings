@@ -4,7 +4,7 @@ Read this file before editing, before every Unity/build run, and before every co
 
 ## Rules
 
-1. Use this same checkout. Inspect `git status` and recent commits first. Preserve all existing work and saves. Never reset or stash someone else's changes.
+1. On this Mac, use this same checkout. In a remote/cloud environment, clone the named handoff branch and work on a separate justice branch; the committed ownership table remains authoritative across clones. Local locks only protect processes sharing the same checkout. Inspect `git status` and recent commits first. Preserve all existing work and saves. Never reset or stash someone else's changes.
 2. Claim an unowned scope with `bash Tools/agent-coordination.sh claim <agent> <scope>`. Atomic local locks live in ignored `.collaboration/locks/`. Check actual locks with `bash Tools/agent-coordination.sh status`; the table below is the human-readable intent.
 3. One owner per scope. The owner may subdivide specific files here, but no overlapping edits. Read this file again before touching a new file. If another owner is working there, leave it alone and record a proposed handoff.
 4. **One Unity runner.** The `unity-editor` owner controls Play, imports, screenshots, batch validation, and native builds. Other agents request checks in their log; they do not launch another Unity/build process.
@@ -19,9 +19,10 @@ Read this file before editing, before every Unity/build run, and before every co
 | game-runtime | `Assets/Cellblock/Runtime/`, native trackpad plugin | Codex | Active: workers, vehicles, progress, staff animation, CCTV, pinch |
 | game-ui | `GameHud*`, `Cellblock.uss` | Codex | Active: prison controls, hiring, prefab packages |
 | unity-editor | Installed editor, `Assets/Cellblock/Editor/`, generated settings, all builds | Codex | Active: sole runner |
+| justice | Only new `Core/Justice.cs`, `Runtime/GameJusticeHud.cs`, `Runtime/FacilityJusticeView.cs`, `Resources/Justice.uss`, `Tools/CoreChecks/JusticeChecks.cs`, their metas, and `docs/justice-notes.md` | Reserved for Claude (unclaimed) | Legal profiles, court transport, escape-attempt gameplay; use the hooks in `docs/claude-handoff.md` |
 | documentation | README, controls/status/handoff, coordination tooling | Codex | Active milestone updates; each agent may edit only its own log below |
 
-Claude: choose work outside these scopes or record a requested handoff below. No parallel implementation of the systems listed above.
+Claude: the justice scope is reserved for you. Claim it and add your own acknowledgement below before starting. You may create only the listed new files and edit your own Claude log here. All other existing implementation files remain Codex-owned. Read `docs/claude-handoff.md`.
 
 ## Codex log
 
@@ -30,9 +31,12 @@ Claude: choose work outside these scopes or record a requested handoff below. No
 - User requests: pinch zoom; crews arriving in shared trucks, walking and visibly building; functional animated staff and arrivals; live construction phases; lights/alarm/gate/lockdown/report/CCTV controls; placeable cameras; expanded prefab packages; local milestone commits and shared coordination.
 - Baseline: Unity 6000.3.24f1 on this Mac; 32/32 core checks; 16 actual Play captures with no runtime errors. Prior improvements are local and will be checkpointed before new implementation.
 - Existing local changes belong to the prior Codex playable pass, including Unity-generated settings. Preserve saves and the untracked `ProjectSettings/ShaderGraphSettings 2.asset` until its provenance is clear.
-- Current action: save active company, stop Play safely, create a baseline commit, then implement in bounded milestones. No remote push requested.
+- Current action: save active company, stop Play safely, create a baseline commit, then implement in bounded milestones. Remote push now authorized by the user: publish finished work on a new `codex/` branch for Claude.
 - Review constraints: trips use separate road coordinates; occupants remain on-site in saved navigation; work gates on physical arrival; staged meshes do not become operational before handover; old saves hydrate without duplicate fees; CCTV uses shared wall LOS; report boundaries persist.
-- Next update: record baseline commit and first core milestone/check results here.
+- Baseline checkpoint `aae6f72` committed locally (see latest `Improve local Unity playable, people dynamics, catalog and agent coordination` commit); 32 core checks and 16 Play captures passed before this next systems pass.
+- Core milestone: 40/40 checks passed, including 72 prefab/package/rotation quotes. Critic findings fixed: departing-trip bounds, completed-shift report intervals, helper footprint containment, station protection and work-front spacing.
+- Claude integration hooks are being committed so justice can be developed entirely in new partial-class files. No Claude acknowledgement yet.
+- Active next milestone: persistent trips, physically gated work, staff duties, operations state, camera definitions, and prefab packages. All listed scopes remain owned by Codex.
 
 ## Claude log
 
@@ -40,4 +44,4 @@ _No acknowledgement or active work recorded by Claude yet. Claude must add its o
 
 ## Requested handoffs / check requests
 
-None. Codex is the current Unity runner.
+Claude justice scope is prepared; read `docs/claude-handoff.md`, claim `justice`, and acknowledge here. Codex remains the sole Unity runner. Request a Unity integration check here when your new files compile and tests pass.

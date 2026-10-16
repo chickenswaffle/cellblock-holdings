@@ -122,7 +122,7 @@ namespace Cellblock.Core
                 string id = "staff-" + Hash(names[i], unchecked((uint)state.Seed)).ToString("x8");
                 Point preferred = i == 0 ? new Point(2.8f, -6) : i == 1 ? new Point(2.8f, 5.5f) : new Point(-0.1f, 4.8f);
                 state.Staff.Add(new StaffMember { Id = id, Name = names[i], Role = roles[i],
-                    Position = FindClearStation(preferred, navigation, state.Fixtures),
+                    Position = FindClearStation(preferred, navigation, state.Fixtures), Station = FindClearStation(preferred, navigation, state.Fixtures), ShiftStart = i == 1 ? 20 : 8,
                     Integrity = i == 1 ? 44 : 68 + Pick(state.Seed, id, 21) % 31,
                     Pressure = i == 1 ? 64 : 28 + Pick(state.Seed, id, 22) % 24,
                     FavoredGang = i == 1 ? "Harbor Union" : "", Favoritism = i == 1 ? 55 : 0 });
@@ -204,6 +204,7 @@ namespace Cellblock.Core
         {
             if (staff == null) return "No staff member selected.";
             float risk = MisconductRisk(staff);
+            if (staff.Role == "Technician") return "Travels to operational CCTV and restores camera condition while on duty.";
             if (staff.Role == "Caseworker")
                 return staff.Pressure > 70 ? "High caseload pressure weakens wellbeing support." : "Supports resident stress recovery; protect time for casework.";
             if (risk >= 60) return "Critical misconduct risk: reduce pressure and restore integrity.";
@@ -217,10 +218,11 @@ namespace Cellblock.Core
             AdvanceRelationships(world);
             foreach (StaffMember staff in state.Staff)
             {
+                if (!world.IsOnShift(staff)) continue;
                 if (staff.Role == "Caseworker")
                 {
                     float relief = staff.Pressure < 75 ? 0.35f * staff.Integrity / 100f : 0.08f;
-                    foreach (Resident resident in state.Residents)
+                    foreach (Resident resident in state.Residents.Where(r => world.IsPresent(r) && staff.Duty == "Casework" && Geometry.Distance(r.Position, staff.Position) < 3.2f && world.Routes.Clear(r.Position, staff.Position)))
                     {
                         resident.Stress = Clamp(resident.Stress - relief, 0, 100);
                         resident.Belonging = Clamp(resident.Belonging + relief * 0.28f, 0, 100);
@@ -228,7 +230,7 @@ namespace Cellblock.Core
                 }
                 else
                 {
-                    float load = state.Residents.Count / (float)Math.Max(1, state.Staff.Count(s => s.Role == "Officer"));
+                    float load = state.Residents.Count / (float)Math.Max(1, state.Staff.Count(s => s.Role == "Officer" && world.IsOnShift(s)));
                     float averageStress = state.Residents.Count == 0 ? 45 : state.Residents.Average(r => r.Stress);
                     float pressureDelta = (load - 4) * 0.055f + (averageStress - 45) * 0.0008f;
                     staff.Pressure = Clamp(staff.Pressure + pressureDelta, 0, 100);

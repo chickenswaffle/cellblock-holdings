@@ -10,5 +10,6 @@
   <ItemGroup>
     <Compile Include="../../Assets/Cellblock/Core/*.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="*Checks.cs" Exclude="Program.cs" />
   </ItemGroup>
 </Project>

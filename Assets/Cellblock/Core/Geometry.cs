@@ -248,7 +248,8 @@ namespace Cellblock.Core
             var neighbors = new Dictionary<int, HashSet<int>>();
             Func<Point, int> vertex = p =>
             {
-                string key = Math.Round(p.X * 1000) + ":" + Math.Round(p.Y * 1000);
+                // Integer keys also canonicalize floating-point negative zero after quarter turns.
+                string key = (long)Math.Round(p.X * 1000) + ":" + (long)Math.Round(p.Y * 1000);
                 int index;
                 if (lookup.TryGetValue(key, out index)) return index;
                 index = vertices.Count; vertices.Add(p); lookup.Add(key, index); neighbors[index] = new HashSet<int>();

@@ -4,8 +4,9 @@ using System.Linq;
 using System.Text.Json;
 using Cellblock.Core;
 
-static class Program
+static partial class Program
 {
+    static partial void RunJusticeChecks();
     static int passed, failed;
     static void Check(bool condition, string message) { if (!condition) throw new Exception(message); }
     static void Test(string name, Action test)
@@ -376,6 +377,68 @@ static class Program
             Check(!world.SupportStaff(stable.Id) && world.Data.CashCents == cash,
                 "Support charged for a fully stable staff member with no support need");
         });
+        Test("new hires carpool only before departure and release preserves trip references", () => {
+            World world = County(); Check(world.HireCrew() && world.HireCrew(), world.Notice);
+            Check(world.Data.Trips.Count == 1 && world.Data.Trips[0].Passengers.Count == 2 && world.Data.Crews.All(c => !c.Arrived), "Crews did not share waiting truck");
+            world.AdvanceMinutes(12); Check(world.HireCrew(), world.Notice);
+            Check(world.Data.Trips.Count == 2, "A departed truck accepted a new crew");
+            world.ReleaseCrew(); world.AdvanceMinutes(100); while (world.Data.Crews.Count > 0) world.ReleaseCrew(); world.AdvanceMinutes(100); new World(RoundTrip(world.Data));
+            Check(world.Reconciles(), "Transport fees broke accounting");
+        });
+        Test("closed gate and inbound travel cannot earn construction progress", () => {
+            World world = County(); Check(world.Approve(Wing()) && world.HireCrew(), world.Notice);
+            world.SetGate(false); world.AdvanceMinutes(80);
+            Check(!world.Data.Crews[0].Arrived && world.Data.Trips[0].Phase == "At gate" && world.Data.Projects[0].Progress == 0, "Blocked arrival advanced construction");
+            world.SetGate(true); world.AdvanceMinutes(160);
+            Check(world.Data.Crews[0].Arrived && world.Data.Projects[0].Progress > 0, "Crew failed to arrive, walk and begin work");
+            Check(world.Data.Walls.All(w => w.Id.StartsWith("starter-")), "Partial work became operational");
+        });
+        Test("arrival and physical work resume without duplicate fees or reset progress", () => {
+            World world = County(); world.Approve(Wing()); world.HireCrew(); world.AdvanceMinutes(18);
+            World loaded = new World(RoundTrip(world.Data));
+            Check(loaded.Data.CashCents == world.Data.CashCents && loaded.Data.Trips[0].Position.Equals(world.Data.Trips[0].Position), "Mid-trip load reset travel or charged again");
+            loaded.AdvanceMinutes(180); float remaining = loaded.Data.Projects[0].Work.Sum(w => w.Remaining);
+            World resumed = new World(RoundTrip(loaded.Data)); resumed.AdvanceMinutes(40);
+            Check(resumed.Data.Projects[0].Work.Sum(w => w.Remaining) < remaining && resumed.Reconciles(), "Mid-work resume stalled or broke the ledger");
+        });
+        Test("alarm and lockdown persist without invalidating structural routes", () => {
+            World world = County(); world.SetAlarm(true);
+            Check(world.Data.Operations.Lockdown && !world.Data.Operations.GateOpen, "Alarm did not coordinate restrictions");
+            World loaded = new World(RoundTrip(world.Data)); loaded.AdvanceMinutes(30);
+            Check(loaded.Data.Operations.Alarm && loaded.Data.Residents.All(r => Geometry.Distance(r.Position, r.Home) < 0.01f), "Lockdown did not preserve housing routines");
+            loaded.SetAlarm(false); loaded.SetLockdown(false); loaded.SetGate(true); loaded.AdvanceMinutes(20);
+            Check(loaded.Data.Residents.Any(r => Geometry.Distance(r.Position, r.Home) > 0.1f), "Lifting restrictions did not restore routines");
+        });
+        Test("casework requires an arrived on-duty worker at the resident", () => {
+            World world = County(); world.Data.Residents.RemoveRange(1, world.Data.Residents.Count - 1); world.Data.Residents[0].Relationships.Clear(); world.Data.Staff.Clear();
+            Resident resident = world.Data.Residents[0]; resident.Stress = 80; world.HireStaff("Caseworker");
+            PeopleDynamics.Advance(world); Check(resident.Stress == 80, "A commuter provided remote casework");
+            StaffMember staff = world.Data.Staff[0]; staff.Arrived = true; staff.ShiftStart = 8; staff.Duty = "Casework"; staff.Position = resident.Position;
+            PeopleDynamics.Advance(world); Check(resident.Stress < 80, "Visible casework had no wellbeing effect");
+            float stress = resident.Stress; staff.Position = new Point(-20, 10); PeopleDynamics.Advance(world);
+            Check(resident.Stress == stress, "Distant caseworker still applied global relief");
+        });
+        Test("CCTV honors handover, direction, walls and network power", () => {
+            World world = County(); var camera = new Fixture { Id = "test-cctv", Kind = "CCTV", Position = new Point(-5.4f, -4), Rotation = 0 };
+            Check(!world.CameraOnline(camera), "Uninstalled camera was live"); world.Data.Fixtures.Add(camera);
+            Check(world.CameraSees(camera, new Point(-5.4f, -1)) && !world.CameraSees(camera, new Point(-5.4f, -7)), "Camera direction was ignored");
+            camera.Position = new Point(-1, -2); Check(!world.CameraSees(camera, new Point(-1, 4)), "Camera saw through a solid wall");
+            world.SetCameras(false); Check(!world.CameraSees(camera, new Point(-1, -1)), "Disabled network still observed residents");
+        });
+        Test("prefab packages and quarter turns quote as one editable project", () => {
+            foreach (PrefabDefinition definition in PrefabCatalog.All) for (int package = 0; package < 3; package++) for (int rotation = 0; rotation < 360; rotation += 90)
+            {
+                World world = County(); Plan plan = PrefabCatalog.Create(definition.Id, package, new Point(15, 0), rotation);
+                Quote quote = world.Quote(plan); Check(quote.Valid, definition.Id + "/" + package + "/" + rotation + ": " + quote.Message + " outside=" + string.Join(";", plan.Fixtures.Where(f => !Geometry.Rooms(world.Data.Walls.Concat(plan.Walls).ToList()).Any(room => Geometry.Footprint(f).All(point => Geometry.Contains(room, point)))).Select(f => f.Kind + "@" + f.Position)));
+                Check(package == 0 ? plan.Fixtures.Count == 0 : plan.Fixtures.Count > 0, "Fitout package did not match selection");
+            }
+        });
+        Test("shift report boundary persists and cannot duplicate on reload", () => {
+            World world = County(); world.Data.Staff.Clear(); world.Data.Residents.Clear(); world.AdvanceMinutes(1); PeopleDynamics.Record(world.Data, "contraband", "test", "Completed-shift incident", 3); world.AdvanceMinutes(479); Check(world.Data.ShiftReports.Count == 1 && world.Data.ShiftReports[0].Incidents == 1 && world.CurrentShift().Incidents == 0, "Shift report not filed for the completed interval");
+            World loaded = new World(RoundTrip(world.Data)); loaded.CurrentShift(); loaded.CurrentShift(); loaded.AdvanceMinutes(1);
+            Check(loaded.Data.ShiftReports.Count == 1 && loaded.Data.Operations.LastReportMinute == 960, "Opening or loading duplicated a report");
+        });
+        RunJusticeChecks();
         Console.WriteLine("\n" + passed + " passed, " + failed + " failed. These checks exercise the C# core; they do not run Unity.");
         Environment.ExitCode = failed == 0 ? 0 : 1;
     }

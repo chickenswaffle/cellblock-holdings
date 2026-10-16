@@ -35,11 +35,12 @@ namespace Cellblock.Core
             new FixtureDefinition("Television", "Television cabinet", "Recreation", "A television on a secure low cabinet for a shared recreation space.", 1.15f, 0.52f, 1.42f, 48000, 0, -0.62f),
             new FixtureDefinition("ExerciseBench", "Exercise bench", "Recreation", "Padded exercise station with a supported bar and weight plates.", 1.10f, 1.95f, 1.35f, 73000, 0.90f, 0),
             new FixtureDefinition("Desk", "Administration desk", "Administration", "Office desk with monitor, paperwork, storage drawers and a tucked stool.", 1.9f, 1.2f, 1.35f, 65000, 0, -0.92f),
+            new FixtureDefinition("CCTV", "CCTV camera", "Security", "Pole mounted camera. Rotate its 120° field of view toward traffic. Operational after handover; walls block coverage.", 0.35f, 0.35f, 2.70f, 85000, 0, -0.65f),
             new FixtureDefinition("FilingCabinet", "Records cabinet", "Administration", "Lockable four drawer cabinet for the administration workspace.", 0.58f, 0.66f, 1.35f, 26000, 0, -0.69f)
         };
         static readonly Dictionary<string, FixtureDefinition> byId = Index();
         public static IReadOnlyList<FixtureDefinition> All { get; } = Array.AsReadOnly(entries);
-        public static IReadOnlyList<string> Categories { get; } = Array.AsReadOnly(new[] { "Housing", "Hygiene", "Dining", "Recreation", "Administration" });
+        public static IReadOnlyList<string> Categories { get; } = Array.AsReadOnly(new[] { "Housing", "Hygiene", "Dining", "Recreation", "Administration", "Security" });
         static Dictionary<string, FixtureDefinition> Index()
         {
             var result = new Dictionary<string, FixtureDefinition>(StringComparer.Ordinal);
