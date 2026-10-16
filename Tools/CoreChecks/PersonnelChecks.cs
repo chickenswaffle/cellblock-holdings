@@ -206,6 +206,8 @@ static partial class Program
             Check(new[] { a2, b2 }.All(r => !guarded.Personnel.WriteUps.Any(w => w.SubjectId == r.Id && w.Category == "Fighting") &&
                     guarded.Personnel.WriteUps.Any(w => w.SubjectId == r.Id && w.Category == "Threatening behavior" && w.Severity == 1)) &&
                 a2.Health >= 92 - 0.01f && FileOf(guarded, guard2).FightsStopped >= 1, "An officer at arm's length did not defuse the fight");
+            World demo = County(); HoldOfficersFar(demo); demo.EnsureLegalProfiles();
+            Check(demo.StageFightDemo() && demo.Personnel.Fights == 1 && demo.Personnel.WriteUps.Count(w => w.Category == "Fighting") == 2, "The fight demo did not stage one fight");
         });
         Test("the warden's office reviews write-ups, refers them to court and earns or loses credibility", () => {
             World world = WithWarden(85);

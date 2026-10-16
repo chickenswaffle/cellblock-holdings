@@ -89,6 +89,7 @@ namespace Cellblock.Unity
             legalDetails.Add(Text("Charges, court calendars and outcomes are fictional game rules, not a model of real legal procedure.", "muted"));
             legalCard.Add(legalDetails);
             personCard.Insert(personCard.IndexOf(personEffects) + 1, legalCard);
+            BuildPersonnel();
         }
 
         partial void RefreshJustice(World world, Resident resident)
@@ -97,6 +98,7 @@ namespace Cellblock.Unity
             world.EnsureLegalProfiles();
             RefreshCustodyPanel(world);
             RefreshRosterTags(world);
+            RefreshPersonnel(world, resident);
             legalCard.style.display = resident != null && resident.Legal.Ready ? DisplayStyle.Flex : DisplayStyle.None;
             if (resident == null || !resident.Legal.Ready) return;
             LegalProfile legal = resident.Legal;

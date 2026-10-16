@@ -612,6 +612,14 @@ namespace Cellblock.Core
             Notice = resident.Name + " added to " + staff.Name + "'s caseload."; return true;
         }
 
+        public bool RemoveFromCaseload(string staffId, string residentId)
+        {
+            PersonnelFile file = FileFor(Data.Staff.FirstOrDefault(s => s.Id == staffId));
+            if (file == null || !file.Caseload.Remove(residentId)) return false;
+            if (file.Caseload.Count == 0 && file.Duty == "Counseling") file.Duty = "";
+            Notice = "Caseload updated."; return true;
+        }
+
         // ---- write-ups and the warden's office --------------------------------------------------------
         WriteUp FileWriteUp(string subjectId, string kind, string category, int severity, string text, StaffMember author, string status = "Open")
         {
@@ -961,6 +969,29 @@ namespace Cellblock.Core
                 float chance = (link.Tension >= 82 ? 0.16f : 0.05f) * ((a.Impulsivity + b.Impulsivity) / 120f) * ((a.Stress + b.Stress) / 2 + 20) / 60f;
                 chance *= Personnel.Regime == "Strict" ? 0.7f : Personnel.Regime == "Rehabilitative" ? 1.1f : 1f;
                 if (JusticeRules.Unit(Data.Seed, a.Id + b.Id, "fight", Data.Minute / 30) >= chance) continue;
+                Confront(a, b, link, present);
+            }
+        }
+        // Deterministic demonstration: the tensest present pair meets in the yard and the same rules decide it.
+        public bool StageFightDemo()
+        {
+            var present = Data.Residents.Where(r => IsPresent(r) && r.Legal.Ready && r.Legal.Custody == "In facility" && r.Legal.RestrictedUntil <= Data.Minute).ToList();
+            Resident a = null, b = null; Relationship best = null;
+            foreach (Resident x in present)
+                foreach (Relationship link in x.Relationships)
+                {
+                    Resident y = present.FirstOrDefault(r => r.Id == link.OtherId);
+                    if (y != null && (best == null || link.Tension > best.Tension)) { a = x; b = y; best = link; }
+                }
+            if (best == null) { Notice = "No two residents are available for the fight demo."; return false; }
+            a.Position = NearbyClear(Data.Yard + new Point(1.5f, 1.5f), Routes); b.Position = NearbyClear(a.Position + new Point(0.6f, 0), Routes);
+            ResumeRoutine(a); ResumeRoutine(b);
+            Confront(a, b, best, present);
+            return true;
+        }
+        void Confront(Resident a, Resident b, Relationship link, List<Resident> present)
+        {
+            {
                 a.LastFightMinute = b.LastFightMinute = Data.Minute;
                 Point middle = (a.Position + b.Position) * 0.5f;
                 StaffMember officer = NearestOfficer(middle, 5);
@@ -973,7 +1004,7 @@ namespace Cellblock.Core
                     string calm = officer.Name + " separated " + a.Name + " and " + b.Name + " before it escalated.";
                     FileWriteUp(a.Id, "Resident", "Threatening behavior", 1, calm, officer); FileWriteUp(b.Id, "Resident", "Threatening behavior", 1, calm, officer);
                     PeopleDynamics.Record(Data, "fight", a.Id, calm, 2); Notice = calm;
-                    continue;
+                    return;
                 }
                 float hurtA = 8 + JusticeRules.Unit(Data.Seed, a.Id, "injury", Data.Minute) * 14, hurtB = 8 + JusticeRules.Unit(Data.Seed, b.Id, "injury", Data.Minute) * 14;
                 a.Health = Math.Max(0, a.Health - hurtA); b.Health = Math.Max(0, b.Health - hurtB);

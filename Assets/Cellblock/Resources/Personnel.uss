@@ -1,0 +1,34 @@
+/* Staff and administration. Loaded by GamePersonnelHud; Cellblock.uss and Justice.uss are not modified. */
+.staff-panel { padding: 10px 10px 6px 10px; margin-bottom: 10px; border-width: 1px; border-color: rgb(70, 86, 87); border-radius: 5px; background-color: rgb(34, 44, 47); }
+.staff-heading { color: rgb(187, 164, 132); font-size: 10px; letter-spacing: 1.5px; margin-bottom: 7px; }
+.staff-line { white-space: normal; font-size: 12px; color: rgb(214, 222, 213); margin-bottom: 6px; }
+.staff-file-row { margin-top: 2px; margin-bottom: 10px; padding: 8px 10px 4px 10px; border-left-width: 3px; border-left-color: rgb(120, 150, 150); border-radius: 3px; background-color: rgb(32, 41, 44); }
+
+.personnel-sheet { position: absolute; left: 0; right: 0; top: 0; bottom: 0; padding: 18px; align-items: center; justify-content: center; background-color: rgba(8, 12, 14, 0.84); }
+.personnel-card { width: 100%; max-width: 780px; max-height: 100%; flex-shrink: 1; padding: 14px 16px; border-width: 1px; border-color: rgb(80, 94, 95); border-radius: 8px; background-color: rgb(25, 32, 35); }
+.personnel-head { flex-direction: row; justify-content: space-between; align-items: center; }
+.personnel-title { flex-shrink: 1; white-space: normal; font-size: 15px; letter-spacing: 1.2px; -unity-font-style: bold; color: rgb(236, 232, 218); }
+.personnel-status { white-space: normal; font-size: 11px; color: rgb(146, 165, 165); margin-top: 2px; margin-bottom: 8px; }
+.personnel-tabs { flex-direction: row; flex-wrap: wrap; margin-bottom: 8px; }
+Button.personnel-tab { min-width: 84px; }
+.personnel-scroll { flex-grow: 1; flex-shrink: 1; }
+
+.file-top { flex-direction: row; align-items: flex-start; margin-bottom: 8px; }
+.portrait { width: 104px; height: 124px; flex-shrink: 0; margin-right: 14px; overflow: hidden; border-width: 1px; border-color: rgb(80, 94, 95); border-radius: 4px; background-color: rgb(186, 192, 190); }
+.portrait.small { width: 66px; height: 80px; margin-right: 10px; }
+.file-facts { flex-grow: 1; flex-shrink: 1; }
+.file-name { white-space: normal; font-size: 19px; -unity-font-style: bold; color: rgb(240, 235, 219); margin-bottom: 2px; }
+.file-sub { white-space: normal; font-size: 11px; letter-spacing: 0.6px; color: rgb(205, 180, 140); margin-bottom: 6px; }
+.fact-line { white-space: normal; font-size: 12px; color: rgb(205, 214, 206); margin-bottom: 3px; }
+.resume-line, .record-line { white-space: normal; font-size: 12px; color: rgb(205, 214, 206); padding: 6px 0; border-bottom-width: 1px; border-bottom-color: rgb(55, 67, 69); }
+TextField.rename-field { flex-grow: 1; min-width: 120px; min-height: 40px; margin: 2px; }
+
+.candidate-card { flex-direction: row; align-items: flex-start; padding: 10px; margin-bottom: 8px; border-radius: 5px; background-color: rgb(34, 44, 47); }
+.candidate-info { flex-grow: 1; flex-shrink: 1; }
+.writeup-card { padding: 9px 10px 4px 10px; margin-bottom: 8px; border-left-width: 3px; border-left-color: rgb(196, 152, 82); border-radius: 3px; background-color: rgb(34, 44, 47); }
+.writeup-card.severe { border-left-color: rgb(196, 86, 66); }
+
+.compact .personnel-sheet { padding: 8px; }
+.compact .personnel-card { padding: 10px; }
+.compact .portrait { width: 78px; height: 94px; margin-right: 10px; }
+.compact .file-name { font-size: 16px; }
