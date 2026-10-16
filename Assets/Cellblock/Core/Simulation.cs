@@ -116,7 +116,7 @@ namespace Cellblock.Core
     [Serializable] public sealed partial class State
     {
         public int Version = 1, NextId = 1, Minute = 8 * 60, Speed = 1;
-        public int Seed, OperationsVersion;
+        public int Seed, OperationsVersion, GeometryGeneration;
         public OperationsState Operations = new OperationsState();
         public List<TransportTrip> Trips = new List<TransportTrip>();
         public List<ShiftReport> ShiftReports = new List<ShiftReport>();
@@ -183,7 +183,7 @@ namespace Cellblock.Core
         partial void ResidentPresence(Resident resident, ref bool present);
         public bool IsPresent(Resident resident) { bool present = true; ResidentPresence(resident, ref present); return present; }
         public readonly State Data;
-        public int GeometryRevision { get; private set; }
+        public int GeometryRevision { get { return Data.GeometryGeneration; } }
         public string Notice = "Choose a project, review its quote, and assign a crew.";
         Navigation navigation;
         readonly Dictionary<Resident, Queue<Point>> paths = new Dictionary<Resident, Queue<Point>>();
@@ -203,7 +203,7 @@ namespace Cellblock.Core
             PeopleDynamics.Hydrate(data);
             HydrateOperations(data);
             HydrateJustice(data);
-            if (data.Version != 1 || !Offers.Any(o => o.Id == data.ContractId))
+            if (data.GeometryGeneration < 0 || data.GeometryGeneration == int.MaxValue || data.Version != 1 || !Offers.Any(o => o.Id == data.ContractId))
                 throw new ArgumentException("This save version or contract is not supported.");
             if (data.Walls == null || data.Fixtures == null || data.Residents == null || data.Crews == null ||
                 data.Projects == null || data.Ledger == null || data.Minute < 0 || data.NextId < 1)
@@ -540,7 +540,7 @@ namespace Cellblock.Core
         }
         void InvalidateGeometry()
         {
-            GeometryRevision++; navigation = null; rooms = null; paths.Clear(); destinations.Clear();
+            Data.GeometryGeneration++; navigation = null; rooms = null; paths.Clear(); destinations.Clear();
         }
         void Construction()
         {

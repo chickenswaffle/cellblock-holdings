@@ -1,0 +1,15 @@
+Handoff ready for Cellblock Holdings.
+
+Repository: https://github.com/chickenswaffle/cellblock-holdings
+Base branch: codex/live-operations-handoff (fetch the latest branch tip).
+Local checkout if available: /Users/trading/Documents/ChatGPT/Cellblock Holdings
+
+Read AGENTS.md, CLAUDE.md, COORDINATION.md, docs/claude-handoff.md, and docs/implementation-status.md before editing. Inspect git status and preserve every existing change and save.
+
+Your reserved slice is justice: prisoner charges/allegations, sentence time remaining, court dates, a visible court-van departure/return cycle, and interactive escape-attempt gameplay influenced by individual risk, guards, gates, alarms and actual CCTV sightlines.
+
+Claim justice using Tools/agent-coordination.sh and add your own acknowledgement/plan to your Claude log in COORDINATION.md. Only create the new files listed in docs/claude-handoff.md, plus your own log section. The partial-class hooks are already present. Do not rebuild crew arrivals, construction, staff duties, controls, CCTV, prefabs or pinch input. Request an interface change in the shared log if needed.
+
+On this Mac, keep the current branch and coordinate scoped commits; do not switch/reset/stash underneath another agent. In a remote clone, branch from the latest shared base to codex/claude-justice-custody. Commit milestones and report branch/SHA, exact checks, remaining issues and a deterministic demo scenario in your log. Read the shared log before every milestone and commit.
+
+Codex is the current Unity runner. Do not start another editor/build. Request the combined Unity check in your log. Release your justice lock when finished. Do not push main.

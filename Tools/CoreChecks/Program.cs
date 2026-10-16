@@ -504,6 +504,18 @@ static partial class Program
             Check(world.Data.Crews.All(c => c.Arrived) && world.Data.Staff.All(s => s.Arrived), "Shared arrivals stalled: " + string.Join(";", world.Data.Trips.Select(t => t.Kind + " " + t.Phase + " " + t.Position + " waypoint " + t.Waypoint)));
             Finish(world, 6500); Check(world.Capacity == 16 && world.Reconciles(), "Furnished unit failed handover after material trips");
         });
+        Test("later-project carry survives a save after geometry handover", () => {
+            World world = County(); world.Approve(Wing()); world.HireCrew(); Finish(world);
+            Check(world.GeometryRevision > 0, "First handover did not invalidate geometry");
+            var plan = new Plan { Name = "Later outdoor camera" }; plan.Fixtures.Add(new Fixture { Kind = "CCTV", Position = new Point(-18, 6) });
+            Check(world.Approve(plan), world.Notice); int elapsed = 0;
+            while (world.Data.Crews[0].WorkPhase != "Carrying" && elapsed++ < 800) world.AdvanceMinutes(1);
+            Crew crew = world.Data.Crews[0]; Check(crew.WorkPhase == "Carrying", "No later delivery began");
+            World resumed = new World(RoundTrip(world.Data));
+            Check(resumed.GeometryRevision == world.GeometryRevision && resumed.Data.Crews[0].AssignmentRevision == resumed.GeometryRevision, "Loading lost persistent geometry generation");
+            resumed.AdvanceMinutes(1);
+            Check(resumed.Data.Crews[0].WorkPhase == "Carrying" && resumed.Data.Crews[0].SupplyLoadMinutes == 3, "Loading discarded a delivered supply batch after handover");
+        });
         RunJusticeChecks();
         Console.WriteLine("\n" + passed + " passed, " + failed + " failed. These checks exercise the C# core; they do not run Unity.");
         Environment.ExitCode = failed == 0 ? 0 : 1;

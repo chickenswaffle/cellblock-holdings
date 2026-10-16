@@ -12,10 +12,10 @@ namespace Cellblock.Editor
 {
     // Development-only Play check. Requests live in ignored Temp; preview companies never save.
     [InitializeOnLoad]
-    public static class PresentationPreview
+    public static partial class PresentationPreview
     {
         const string Request = "Temp/CellblockPresentation.request";
-        const string Output = "Temp/CellblockPresentation";
+        static string Output { get { return SessionState.GetString(ModeKey, "") == "operations" ? "Temp/CellblockOperations" : "Temp/CellblockPresentation"; } }
         const string ModeKey = "Cellblock.Presentation.Mode", StageKey = "Cellblock.Presentation.Stage";
         const string WaitKey = "Cellblock.Presentation.Wait", StartKey = "Cellblock.Presentation.Start", ErrorKey = "Cellblock.Presentation.Errors";
         const string PendingKey = "Cellblock.Presentation.Pending", WidthKey = "Cellblock.Presentation.Width", HeightKey = "Cellblock.Presentation.Height";
@@ -23,6 +23,7 @@ namespace Cellblock.Editor
         {
             EditorApplication.update += Tick;
             Application.logMessageReceived += Log;
+            EditorApplication.quitting += ReleaseRefresh;
         }
         [MenuItem("Cellblock/Open game and Play")]
         public static void Play() { RequestRun("play"); }
@@ -31,7 +32,7 @@ namespace Cellblock.Editor
         static void RequestRun(string mode) { Directory.CreateDirectory("Temp"); File.WriteAllText(Request, mode); }
         static void Log(string condition, string stack, LogType type)
         {
-            if (SessionState.GetString(ModeKey, "") != "capture" || !EditorApplication.isPlaying) return;
+            if ((SessionState.GetString(ModeKey, "") != "capture" && SessionState.GetString(ModeKey, "") != "operations") || !EditorApplication.isPlaying) return;
             if (type != LogType.Error && type != LogType.Exception && type != LogType.Assert) return;
             string errors = SessionState.GetString(ErrorKey, "");
             string message = condition.Replace('\n', ' ');
@@ -41,16 +42,23 @@ namespace Cellblock.Editor
         {
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) return;
             string mode = SessionState.GetString(ModeKey, "");
+            if (mode != "" && File.Exists(Request) && File.ReadAllText(Request).Trim() == "edit")
+            {
+                File.Delete(Request); ReleaseRefresh();
+                GameController active = UnityEngine.Object.FindFirstObjectByType<GameController>();
+                if (active != null && !active.Save(false)) { Fail("Could not save before ending review.", false); return; }
+                SessionState.SetString(ModeKey, "stopping"); EditorApplication.isPlaying = false; return;
+            }
             if (mode == "")
             {
                 if (!File.Exists(Request)) return;
                 mode = File.ReadAllText(Request).Trim(); File.Delete(Request);
-                if (mode != "play" && mode != "capture" && mode != "edit") return;
+                if (mode != "play" && mode != "capture" && mode != "edit" && mode != "operations") return;
                 SessionState.SetString(ModeKey, mode); SessionState.SetInt(StageKey, -1);
                 SessionState.SetString(ErrorKey, ""); SessionState.SetFloat(StartKey, (float)EditorApplication.timeSinceStartup);
                 SessionState.SetString(PendingKey, "");
                 Directory.CreateDirectory(Output);
-                if (mode == "capture")
+                if (mode == "capture" || mode == "operations")
                 {
                     foreach (string file in Directory.GetFiles(Output, "*.png")) File.Delete(file);
                     if (File.Exists(Path.Combine(Output, "report.json"))) File.Delete(Path.Combine(Output, "report.json"));
@@ -65,13 +73,13 @@ namespace Cellblock.Editor
             }
             if (mode == "stopping")
             { if (!EditorApplication.isPlayingOrWillChangePlaymode) SessionState.SetString(ModeKey, ""); return; }
-            if (EditorApplication.timeSinceStartup - SessionState.GetFloat(StartKey, 0) > 150)
+            if (EditorApplication.timeSinceStartup - SessionState.GetFloat(StartKey, 0) > (mode == "operations" ? 600 : 150))
             { Fail("Unity presentation check timed out."); return; }
             int stage = SessionState.GetInt(StageKey, -1);
             if (stage == -1)
             {
                 if (EditorApplication.isPlayingOrWillChangePlaymode) return;
-                if (mode == "edit") { SessionState.SetString(ModeKey, ""); Debug.Log("CELLBLOCK_EDIT_MODE_READY"); return; }
+                if (mode == "edit") { ReleaseRefresh(); SessionState.SetString(ModeKey, ""); Debug.Log("CELLBLOCK_EDIT_MODE_READY"); return; }
                 try
                 {
                     for (int i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++)
@@ -85,9 +93,16 @@ namespace Cellblock.Editor
                 catch (Exception error) { Fail(error.ToString()); }
                 return;
             }
-            if (!EditorApplication.isPlaying || EditorApplication.timeSinceStartup < SessionState.GetFloat(WaitKey, 0)) return;
+            if (EditorApplication.timeSinceStartup < SessionState.GetFloat(WaitKey, 0)) return;
+            if (!EditorApplication.isPlaying)
+            {
+                if (!EditorApplication.isPlayingOrWillChangePlaymode) Fail("Unity could not enter Play mode. Resolve the editor compilation errors before retrying.");
+                return;
+            }
+            if ((mode == "capture" || mode == "operations") && !SessionState.GetBool("Cellblock.Review.RefreshHeld", false))
+            { AssetDatabase.DisallowAutoRefresh(); SessionState.SetBool("Cellblock.Review.RefreshHeld", true); }
             EditorApplication.isPaused = false;
-            if (mode == "capture") Application.runInBackground = true;
+            if (mode == "capture" || mode == "operations") Application.runInBackground = true;
             string pending = SessionState.GetString(PendingKey, "");
             if (pending != "")
             {
@@ -102,6 +117,16 @@ namespace Cellblock.Editor
             GameController game = UnityEngine.Object.FindFirstObjectByType<GameController>();
             if (game == null) { Fail("The game controller did not initialize in Play mode."); return; }
             if (mode == "play") { SessionState.SetString(ModeKey, ""); Debug.Log("CELLBLOCK_PLAY_MODE_READY"); return; }
+            if (mode == "operations")
+            {
+                try
+                {
+                    if (!RunOperationsStage(game, stage)) return;
+                    SessionState.SetInt(StageKey, stage + 1); SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + 1.8f);
+                }
+                catch (Exception error) { Fail(error.ToString()); }
+                return;
+            }
             try
             {
                 switch (stage)
@@ -158,6 +183,7 @@ namespace Cellblock.Editor
         static void Require(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
         static void Shot(GameController game, string name)
         {
+            game.GetComponentInChildren<GameHud>().Refresh(true);
             string path = Path.GetFullPath(Path.Combine(Output, name)); SessionState.SetString(PendingKey, path);
             game.CapturePresentationFrame(path);
         }
@@ -171,16 +197,22 @@ namespace Cellblock.Editor
                 errors = errors, captures = Directory.GetFiles(Output, "*.png").Select(Path.GetFullPath).ToArray() };
             File.WriteAllText(Path.Combine(Output, "report.json"), JsonUtility.ToJson(report, true));
             Debug.Log(report.passed ? "CELLBLOCK_PRESENTATION_CHECK_PASSED" : "CELLBLOCK_PRESENTATION_CHECK_FAILED");
-            SessionState.SetString(ModeKey, "stopping"); EditorApplication.isPlaying = false;
+            ReleaseRefresh(); SessionState.SetString(ModeKey, "stopping"); EditorApplication.isPlaying = false;
         }
         static void Fail(string error, bool stopPlay = true)
         {
             Directory.CreateDirectory(Output);
             var report = new Report { passed = false, editor = Application.unityVersion, message = error, errors = new[] { error }, captures = Directory.GetFiles(Output, "*.png").Select(Path.GetFullPath).ToArray() };
             File.WriteAllText(Path.Combine(Output, "report.json"), JsonUtility.ToJson(report, true));
+            ReleaseRefresh();
             SessionState.SetString(ModeKey, stopPlay && EditorApplication.isPlaying ? "stopping" : "");
             if (stopPlay && EditorApplication.isPlaying) EditorApplication.isPlaying = false;
             Debug.LogError("Cellblock presentation review: " + error);
+        }
+        static void ReleaseRefresh()
+        {
+            if (!SessionState.GetBool("Cellblock.Review.RefreshHeld", false)) return;
+            SessionState.SetBool("Cellblock.Review.RefreshHeld", false); AssetDatabase.AllowAutoRefresh();
         }
         static void SetGameSize(int width, int height)
         {

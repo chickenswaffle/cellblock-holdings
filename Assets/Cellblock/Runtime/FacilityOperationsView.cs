@@ -8,12 +8,13 @@ namespace Cellblock.Unity
     public sealed partial class FacilityView
     {
         sealed class ProjectView { public Transform Root; public int Stage; }
-        sealed class TruckView { public Transform Root; public Transform[] Wheels; }
+        sealed class TruckView { public Transform Root; public Transform[] Wheels; public Vector3 Velocity; }
         readonly Dictionary<string, ProjectView> constructionViews = new Dictionary<string, ProjectView>();
         readonly Dictionary<string, TruckView> trucks = new Dictionary<string, TruckView>();
         Transform transportRoot, gateRoot, lightRoot, alarmRoot, feedWalls;
         Light facilitySun, alarmLight;
         readonly List<Light> facilityLights = new List<Light>();
+        readonly List<Renderer> luminaireMeshes = new List<Renderer>();
         AudioSource siren;
         AudioClip sirenClip;
         LineRenderer coverage;
@@ -123,7 +124,7 @@ namespace Cellblock.Unity
                 {
                     string id = crew.Id + "/builder-" + i; Actor actor; bool created = !actors.TryGetValue(id, out actor);
                     if (created) actor = Person(id, true, "Builder");
-                    AnimateWorker(actor, i == 0 ? crew.Position : crew.HelperPosition, world, force || created, crew.Working, "Builder");
+                    AnimateBuilder(actor, crew, i, world, force || created);
                 }
             }
         }
@@ -178,12 +179,13 @@ namespace Cellblock.Unity
             {
                 TruckView truck;
                 if (!trucks.TryGetValue(trip.Id, out truck)) { truck = Truck(transportRoot, trip.Kind); truck.Root.position = V(trip.Position, 0.10f); trucks.Add(trip.Id, truck); }
-                truck.Root.gameObject.SetActive(trip.Phase != "Gone");
+                truck.Root.gameObject.SetActive(trip.Phase != "Gone" && trip.Phase != "Boarding");
                 Vector3 before = truck.Root.position, target = V(trip.Position, 0.10f);
-                truck.Root.position = force ? target : Vector3.Lerp(before, target, 1 - Mathf.Exp(-Time.unscaledDeltaTime * 16));
+                truck.Root.position = force ? target : Vector3.SmoothDamp(before, target, ref truck.Velocity, 0.16f / Mathf.Sqrt(Mathf.Max(1, world.Data.Speed)), Mathf.Infinity, Time.unscaledDeltaTime);
                 Vector3 moved = truck.Root.position - before;
-                if (moved.sqrMagnitude > 0.0001f) truck.Root.rotation = Quaternion.Slerp(truck.Root.rotation, Quaternion.LookRotation(moved), 1 - Mathf.Exp(-Time.unscaledDeltaTime * 12));
-                foreach (Transform wheel in truck.Wheels) wheel.Rotate(0, moved.magnitude * 180, 0, Space.Self);
+                if (moved.sqrMagnitude > 0.0001f) truck.Root.rotation = Quaternion.Slerp(truck.Root.rotation, Quaternion.LookRotation(trip.Phase == "Departing" && trip.Waypoint == 0 ? -moved : moved), 1 - Mathf.Exp(-Time.unscaledDeltaTime * 12));
+                if (trip.Phase == "Unloading" || trip.Phase == "Parked") truck.Root.rotation = Quaternion.Slerp(truck.Root.rotation, Quaternion.Euler(0, 180, 0), 1 - Mathf.Exp(-Time.unscaledDeltaTime * 5));
+                foreach (Transform wheel in truck.Wheels) wheel.Rotate(0, moved.magnitude * (trip.Phase == "Departing" && trip.Waypoint == 0 ? -180 : 180), 0, Space.Self);
             }
             foreach (string id in trucks.Keys.Where(id => !world.Data.Trips.Any(t => t.Id == id)).ToArray())
             { Clear(trucks[id].Root); Destroy(trucks[id].Root.gameObject); trucks.Remove(id); }
@@ -211,19 +213,26 @@ namespace Cellblock.Unity
             float daylight = Mathf.SmoothStep(0, 1, Mathf.Clamp01(Mathf.Sin((hour - 6) / 12 * Mathf.PI) * 2));
             if (facilitySun != null) { facilitySun.intensity = Mathf.Lerp(0.08f, 1.5f, daylight); facilitySun.transform.rotation = Quaternion.Euler(15 + daylight * 35, -32, 0); }
             RenderSettings.ambientIntensity = Mathf.Lerp(0.18f, 1, daylight);
+            RenderSettings.ambientEquatorColor = Color.Lerp(new Color(0.055f, 0.065f, 0.10f), new Color(0.53f, 0.57f, 0.57f), daylight);
+            RenderSettings.ambientGroundColor = Color.Lerp(new Color(0.025f, 0.03f, 0.045f), new Color(0.30f, 0.32f, 0.28f), daylight);
             RenderSettings.ambientSkyColor = Color.Lerp(new Color(0.08f, 0.11f, 0.20f), new Color(0.69f, 0.76f, 0.80f), daylight);
             if (force || lightingRevision != world.GeometryRevision)
             {
-                if (lightRoot == null) lightRoot = Root("Facility luminaires"); Clear(lightRoot); facilityLights.Clear(); lightingRevision = world.GeometryRevision;
+                if (lightRoot == null) lightRoot = Root("Facility luminaires"); Clear(lightRoot); facilityLights.Clear(); luminaireMeshes.Clear(); lightingRevision = world.GeometryRevision;
                 foreach (List<Point> room in world.Rooms)
                 {
                     Point center = room.Aggregate(new Point(), (sum, p) => sum + p) * (1f / room.Count);
-                    Box(lightRoot, "Ceiling luminaire", V(center, 2.9f), new Vector3(1.2f, 0.08f, 0.18f), "lamp", new Color(0.91f, 0.87f, 0.73f));
+                    Transform housing = Box(lightRoot, "Ceiling luminaire", V(center, 2.9f), new Vector3(1.2f, 0.08f, 0.18f), "ceiling-on", new Color(0.91f, 0.87f, 0.73f));
+                    luminaireMeshes.Add(housing.GetComponent<Renderer>());
                     var lamp = new GameObject("Interior light").AddComponent<Light>(); lamp.transform.SetParent(lightRoot, false); lamp.transform.position = V(center, 2.6f);
                     lamp.type = LightType.Point; lamp.range = 10; lamp.intensity = 3; lamp.color = new Color(1, 0.89f, 0.70f); lamp.shadows = LightShadows.None; facilityLights.Add(lamp);
                 }
             }
             foreach (Light lamp in facilityLights) lamp.enabled = world.Data.Operations.Lights;
+            Material luminaireOn = Material("ceiling-on", new Color(0.91f, 0.87f, 0.73f));
+            luminaireOn.EnableKeyword("_EMISSION"); luminaireOn.SetColor("_EmissionColor", new Color(0.73f, 0.69f, 0.55f));
+            Material luminaireOff = Material("ceiling-off", new Color(0.25f, 0.28f, 0.29f));
+            foreach (Renderer housing in luminaireMeshes) housing.sharedMaterial = world.Data.Operations.Lights ? luminaireOn : luminaireOff;
             if (alarmRoot == null)
             {
                 alarmRoot = Root("Alarm beacon"); alarmRoot.position = new Vector3(-2, 3.2f, -8);
@@ -243,6 +252,7 @@ namespace Cellblock.Unity
             if (coverage == null)
             {
                 coverage = new GameObject("Selected CCTV field of view").AddComponent<LineRenderer>(); coverage.transform.SetParent(transform, false);
+                coverage.gameObject.layer = 29;
                 coverage.sharedMaterial = Material("handle", Teal); coverage.startWidth = coverage.endWidth = 0.025f; coverage.useWorldSpace = true;
             }
             coverage.gameObject.SetActive(watchedCamera != null && world.CameraOnline(watchedCamera));
