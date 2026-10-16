@@ -26,6 +26,18 @@ namespace Cellblock.Unity
         public BuildTool Tool { get; private set; }
         public string Instruction { get; private set; }
         FacilityView view;
+        MacTrackpad trackpad;
+        Camera cctvCamera;
+        RenderTexture cctvTexture;
+        float nextFeed;
+        string watchedCameraId = "";
+        int pinchFingerA = -1, pinchFingerB = -1;
+        bool pinchOwnedByUI;
+        public string PrefabId { get; private set; } = "wing";
+        public int PrefabPackage { get; private set; }
+        public bool NativePinchAvailable { get { return trackpad != null && trackpad.Available; } }
+        public Texture CameraFeed { get { return World != null && World.CameraOnline(WatchedCamera) ? cctvTexture : Texture2D.blackTexture; } }
+        public Fixture WatchedCamera { get { return World == null ? null : World.Data.Fixtures.FirstOrDefault(f => f.Id == watchedCameraId && f.Kind == "CCTV"); } }
         GameHud hud;
         Camera cameraRig;
         ConstructionGuides guides;
@@ -77,6 +89,8 @@ namespace Cellblock.Unity
             cameraRig = new GameObject("Management camera").AddComponent<Camera>();
             cameraRig.transform.SetParent(transform); cameraRig.tag = "MainCamera"; cameraRig.orthographic = false;
             cameraRig.fieldOfView = 42; cameraRig.nearClipPlane = 0.15f; cameraRig.farClipPlane = 350;
+            cameraRig.cullingMask = ~(1 << 30);
+            trackpad = gameObject.AddComponent<MacTrackpad>();
             cameraRig.allowHDR = true; cameraRig.allowMSAA = true;
             cameraRig.clearFlags = CameraClearFlags.SolidColor; cameraRig.backgroundColor = new Color(0.66f, 0.73f, 0.77f);
             PresentationLighting.Configure(cameraRig, transform);
@@ -168,11 +182,11 @@ namespace Cellblock.Unity
                 while (accumulator >= 0.2f && steps++ < 8) { World.AdvanceMinutes(1); accumulator -= 0.2f; }
             }
             else accumulator = 0;
-            InputUpdate(); view.Refresh(World); hud.Refresh();
+            InputUpdate(); view.Refresh(World); view.SetWatchedCamera(WatchedCamera); hud.Refresh();
             autosave += Time.unscaledDeltaTime;
             if (autosave >= 30) { autosave = 0; Save(false); }
         }
-        void LateUpdate() { if (cameraRig != null) CameraPosition(); }
+        void LateUpdate() { if (cameraRig != null) CameraPosition(); RefreshCameraFeed(); }
         void CameraPosition(bool immediate = false)
         {
             float blend = immediate ? 1 : 1 - Mathf.Exp(-Time.unscaledDeltaTime * 14);
@@ -201,6 +215,39 @@ namespace Cellblock.Unity
                 distance = Mathf.Clamp(Mathf.Max(bounds.size.x, bounds.size.z) * 0.9f + 17, 26, 65);
             }
         }
+        public void ApplyPinchScale(float scale, Vector2 center)
+        { if (scale > 0 && !float.IsNaN(scale) && !float.IsInfinity(scale)) ZoomAt(Mathf.Log(Mathf.Clamp(scale, 0.2f, 5)) / 0.12f, center); }
+        public void SelectPrefab(string id, int package)
+        { if (Draft != null) { Message("Approve or discard the current plan first."); return; } PrefabId = id; PrefabPackage = package; SetTool(BuildTool.Wing); }
+        public void SetPrefabPackage(int package)
+        { if (Draft != null) return; PrefabPackage = Mathf.Clamp(package, 0, 2); previewTime = 0; hud.Refresh(true); }
+        public void HireConstructionCrew()
+        { if (World != null && World.HireCrew()) FrameArrivals(); }
+        public void HireStaff(string role)
+        { if (World != null && World.HireStaff(role)) FrameArrivals(); }
+        void FrameArrivals() { focus = new Vector3(-8, 0, -15); distance = 35; pitch = 57; yaw = 20; }
+        public void FocusPoint(Point point) { focus = FacilityView.V(point); distance = 24; }
+        public void WatchCamera(string id)
+        { watchedCameraId = id; if (WatchedCamera != null) { focus = FacilityView.V(WatchedCamera.Position); distance = 19; } hud.Refresh(true); }
+        void RefreshCameraFeed()
+        {
+            Fixture fixture = WatchedCamera;
+            if (World == null || fixture == null || !World.CameraOnline(fixture) || !hud.ControlIsVisible || Time.unscaledTime < nextFeed) return;
+            nextFeed = Time.unscaledTime + 0.2f;
+            if (cctvCamera == null)
+            {
+                cctvCamera = new GameObject("Selected CCTV feed · one camera").AddComponent<Camera>(); cctvCamera.transform.SetParent(transform);
+                cctvCamera.enabled = false; cctvCamera.fieldOfView = 88.5f; cctvCamera.nearClipPlane = 0.12f; cctvCamera.farClipPlane = 60;
+                cctvCamera.clearFlags = CameraClearFlags.SolidColor; cctvCamera.backgroundColor = Color.black;
+                cctvTexture = new RenderTexture(384, 216, 16) { name = "Selected CCTV monitor" }; cctvTexture.Create();
+            }
+            cctvCamera.transform.position = FacilityView.V(fixture.Position, 2.62f) + Quaternion.Euler(0, fixture.Rotation, 0) * new Vector3(0, 0, 0.26f);
+            cctvCamera.transform.rotation = Quaternion.Euler(12, fixture.Rotation, 0);
+            cctvCamera.farClipPlane = World.CameraRange + 1;
+            var request = new UnityEngine.Rendering.Universal.UniversalRenderPipeline.SingleCameraRequest { destination = cctvTexture };
+            UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(cctvCamera, request);
+        }
+        void OnDestroy() { if (cctvTexture != null) { cctvTexture.Release(); Destroy(cctvTexture); } }
         public void Orbit(float horizontalDegrees, float verticalDegrees)
         { yaw += horizontalDegrees; pitch = Mathf.Clamp(pitch + verticalDegrees, 28, 78); }
         public void Zoom(float amount) { distance = Mathf.Clamp(distance * Mathf.Exp(-amount * 0.12f), 11, 85); }
@@ -256,21 +303,28 @@ namespace Cellblock.Unity
                 if (Input.touchCount >= 2)
                 {
                     Touch a = Input.GetTouch(0), b = Input.GetTouch(1);
+                    if (pinchFingerA != a.fingerId || pinchFingerB != b.fingerId)
+                    {
+                        pinchFingerA = a.fingerId; pinchFingerB = b.fingerId;
+                        pinchOwnedByUI = (pointerActive && pointerOwnedByUI) || hud.IsOverUI(a.position) || hud.IsOverUI(b.position);
+                        gesture = true; pointerActive = false; return;
+                    }
                     if ((a.phase == TouchPhase.Began && hud.IsOverUI(a.position)) || (b.phase == TouchPhase.Began && hud.IsOverUI(b.position))) pointerOwnedByUI = true;
                     gesture = true;
-                    if (pointerOwnedByUI || hud.IsOverUI(a.position) || hud.IsOverUI(b.position)) return;
+                    if (pinchOwnedByUI) return;
                     Vector2 center = (a.position + b.position) / 2;
                     Vector2 previous = (a.position - a.deltaPosition + b.position - b.deltaPosition) / 2;
                     Pan(previous, center);
                     float before = Vector2.Distance(a.position - a.deltaPosition, b.position - b.deltaPosition);
                     float now = Vector2.Distance(a.position, b.position);
-                    if (before > 5 && now > 5) ZoomAt(Mathf.Log(now / before) / 0.12f, center);
+                    if (before > 5 && now > 5) ApplyPinchScale(now / before, center);
                     Vector2 beforeDirection = (b.position - b.deltaPosition) - (a.position - a.deltaPosition);
                     Vector2 direction = b.position - a.position;
                     if (beforeDirection.sqrMagnitude > 25 && direction.sqrMagnitude > 25)
                         Orbit(-Vector2.SignedAngle(beforeDirection, direction), 0);
                     return;
                 }
+                pinchFingerA = pinchFingerB = -1;
                 Touch touch = Input.GetTouch(0);
                 if (touch.phase == TouchPhase.Began)
                 {
@@ -294,7 +348,11 @@ namespace Cellblock.Unity
                 return;
             }
             if (gesture) { gesture = false; pointerActive = false; pointerOwnedByUI = false; }
+            pinchFingerA = pinchFingerB = -1;
             Vector2 cursor = Input.mousePosition;
+            float magnification = trackpad != null ? trackpad.Consume() : 0;
+            if (Mathf.Abs(magnification) > 0.00001f && !hud.IsOverUI(cursor))
+            { ApplyPinchScale(1 + magnification, cursor); pointerActive = false; }
             if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2))
             {
                 pointerDown = lastPointer = cursor; dragging = false; pointerActive = true; pointerOwnedByUI = hud.IsOverUI(cursor);
@@ -312,7 +370,7 @@ namespace Cellblock.Unity
             if (!holding) pointerActive = false;
             if (!hud.IsOverUI(cursor))
             {
-                if (Mathf.Abs(Input.mouseScrollDelta.y) > 0.001f) ZoomAt(Input.mouseScrollDelta.y, cursor);
+                if (Mathf.Abs(magnification) < 0.00001f && Mathf.Abs(Input.mouseScrollDelta.y) > 0.001f) ZoomAt(Input.mouseScrollDelta.y, cursor);
                 if (!holding) PreviewAt(cursor);
             }
             lastPointer = cursor;
@@ -333,7 +391,7 @@ namespace Cellblock.Unity
             previewTime = Time.unscaledTime + 0.08f;
             Point p; if (!Ground(screen, out p)) return; p = Snap(p);
             Plan preview = null;
-            if (Tool == BuildTool.Wing) preview = Facility.Wing(p);
+            if (Tool == BuildTool.Wing) preview = PrefabCatalog.Create(PrefabId, PrefabPackage, p, PlacementRotation);
             if ((Tool == BuildTool.Wall || Tool == BuildTool.Curve) && hasStart)
             {
                 var wall = new Wall { A = start, B = hasEnd ? end : p, Curved = Tool == BuildTool.Curve && hasEnd, Control = p };
@@ -395,7 +453,7 @@ namespace Cellblock.Unity
                 plan.Walls.Add(new Wall { A = start, B = hasEnd ? end : p, Curved = Tool == BuildTool.Curve, Control = p });
                 SetDraft(plan); return;
             }
-            if (Tool == BuildTool.Wing) { SetDraft(Facility.Wing(p)); return; }
+            if (Tool == BuildTool.Wing) { SetDraft(PrefabCatalog.Create(PrefabId, PrefabPackage, p, PlacementRotation)); return; }
             if (Tool == BuildTool.Meals) { World.DesignateDining(raw); hud.Refresh(true); return; }
             if (Tool == BuildTool.Bed || Tool == BuildTool.Table || Tool == BuildTool.Furnishing)
             {
@@ -470,6 +528,7 @@ namespace Cellblock.Unity
             }
             foreach (StaffMember staff in World.Data.Staff)
             {
+                if (!staff.Arrived) continue;
                 float hit; Vector3 position;
                 if (!view.TryGetPersonPosition(staff.Id, out position)) position = FacilityView.V(staff.Position, 0.14f);
                 if (HitBox(ray, position + Vector3.up * 0.88f, Quaternion.identity, new Vector3(0.58f, 1.85f, 0.58f), out hit) && hit < nearest)
@@ -552,7 +611,7 @@ namespace Cellblock.Unity
         }
         public void PreviewConstruction()
         {
-            hud.ShowBuildCatalog("Structure");
+            hud.ShowBuildCatalog("Structure"); PrefabId = "wing"; PrefabPackage = 0; PlacementRotation = 0;
             SetTool(BuildTool.Wing); SetDraft(Facility.Wing(new Point(2, -8))); hud.Refresh(true);
         }
         public void PreviewFurnishingStudy()

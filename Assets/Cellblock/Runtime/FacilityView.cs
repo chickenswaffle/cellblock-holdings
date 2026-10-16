@@ -8,8 +8,10 @@ namespace Cellblock.Unity
 {
     // Presentation is derived from the simulation. None of these decorative meshes participate
     // in routing, selection, space approval, or the identity of an editable component.
-    public sealed class FacilityView : MonoBehaviour
+    public sealed partial class FacilityView : MonoBehaviour
     {
+        partial void ResidentVisibility(World world, Resident resident, ref bool visible);
+        partial void RefreshJustice(World world, bool force);
         Transform structures, planned, ghost, people;
         sealed class Actor
         {
@@ -21,11 +23,13 @@ namespace Cellblock.Unity
             public int RouteIndex, RouteRevision = -1;
             public float NextRouteRefresh;
             public bool Staff, Seen;
+            public Resident Motion;
+            public Transform WorkTool;
         }
         readonly Dictionary<string, Actor> actors = new Dictionary<string, Actor>();
         readonly Dictionary<string, Material> materials = new Dictionary<string, Material>();
         readonly Dictionary<string, Texture2D> textures = new Dictionary<string, Texture2D>();
-        int revision = -1, previewHash = int.MinValue, projectHash = int.MinValue;
+        int revision = -1, previewHash = int.MinValue;
         string selectedResidentId = "";
         World presentedWorld;
         public bool FullHeight;
@@ -431,7 +435,7 @@ namespace Cellblock.Unity
             }
         }
 
-        void Floor(List<List<Point>> rooms, int index)
+        void Floor(List<List<Point>> rooms, int index, Transform parent = null)
         {
             List<Point> vertices = Geometry.FloorTriangles(rooms, index);
             int[] triangles = Enumerable.Range(0, vertices.Count).ToArray();
@@ -439,7 +443,7 @@ namespace Cellblock.Unity
             var mesh = new Mesh { name = "Generated room floor" };
             mesh.vertices = vertices.Select(p => V(p, 0.13f)).ToArray(); mesh.triangles = triangles;
             mesh.uv = vertices.Select(p => new Vector2(p.X, p.Y)).ToArray(); mesh.RecalculateNormals(); mesh.RecalculateBounds();
-            var floor = new GameObject("Room " + (index + 1)); floor.transform.SetParent(structures, false);
+            var floor = new GameObject("Room " + (index + 1)); floor.transform.SetParent(parent != null ? parent : structures, false);
             floor.AddComponent<MeshFilter>().sharedMesh = mesh;
             floor.AddComponent<MeshRenderer>().sharedMaterial = Material("floor-" + index % 3,
                 index % 3 == 0 ? new Color(0.63f, 0.69f, 0.67f) : index % 3 == 1 ? new Color(0.73f, 0.71f, 0.64f) : new Color(0.68f, 0.72f, 0.71f));
@@ -458,6 +462,14 @@ namespace Cellblock.Unity
             {
                 Color tint = palette == "ghost" ? Teal : Ochre;
                 Box(root, "Exact proposed footprint", new Vector3(0, 0.025f, 0), new Vector3(definition.Width, 0.025f, definition.Depth), palette, tint);
+            }
+            if (fixture.Kind == "CCTV")
+            {
+                Cylinder(root, "Camera mast", new Vector3(0, 1.25f, 0), new Vector3(0.085f, 1.25f, 0.085f), metal, steel);
+                Box(root, "Mounting plate", new Vector3(0, 0.04f, 0), new Vector3(0.32f, 0.08f, 0.32f), metal, steel);
+                Box(root, "Weatherproof camera", new Vector3(0, 2.48f, 0.15f), new Vector3(0.24f, 0.18f, 0.43f), "camera-case", new Color(0.79f, 0.81f, 0.76f));
+                Sphere(root, "Lens", new Vector3(0, 2.48f, 0.38f), new Vector3(0.13f, 0.13f, 0.04f), "screen", new Color(0.045f, 0.08f, 0.09f));
+                Sphere(root, "Status indicator", new Vector3(0.08f, 2.44f, 0.37f), Vector3.one * 0.025f, "handle", Teal);
             }
             if (fixture.Kind == "Bed")
             {
@@ -693,7 +705,7 @@ namespace Cellblock.Unity
             var body = new GameObject("Body").transform; body.SetParent(root, false);
             Color skin = index % 4 == 0 ? new Color(0.43f, 0.29f, 0.21f) : index % 4 == 1 ? new Color(0.65f, 0.45f, 0.32f) : index % 4 == 2 ? new Color(0.77f, 0.60f, 0.45f) : new Color(0.55f, 0.37f, 0.28f);
             string skinName = "skin-" + index % 4;
-            Color uniform = staff ? role == "Officer" ? new Color(0.19f, 0.27f, 0.33f) : new Color(0.39f, 0.47f, 0.43f) :
+            Color uniform = staff ? role == "Builder" ? new Color(0.91f, 0.60f, 0.12f) : role == "Officer" ? new Color(0.19f, 0.27f, 0.33f) : role == "Technician" ? new Color(0.30f, 0.39f, 0.44f) : new Color(0.39f, 0.47f, 0.43f) :
                 index % 2 == 0 ? new Color(0.59f, 0.43f, 0.30f) : new Color(0.54f, 0.40f, 0.29f);
             string uniformName = staff ? "uniform-staff-" + role : "uniform-" + index % 2;
             Capsule(body, "Neck", new Vector3(0, 1.48f, 0), new Vector3(0.115f, 0.085f, 0.115f), skinName, skin);
@@ -733,7 +745,16 @@ namespace Cellblock.Unity
             root.localScale = Vector3.one * (0.96f + index % 4 * 0.025f);
             Transform marker = Cylinder(root, "Selected person", new Vector3(0, 0.015f, 0), new Vector3(0.72f, 0.008f, 0.72f), "handle", Teal);
             marker.gameObject.SetActive(false);
-            var actor = new Actor { Root = root, Body = body, Limbs = parts, Marker = marker, Staff = staff, Gait = index % 97 * 0.13f, TurnRate = 7 + index % 5 };
+            var actor = new Actor { Root = root, Body = body, Limbs = parts, Marker = marker, Staff = staff, Motion = new Resident(), Gait = index % 97 * 0.13f, TurnRate = 7 + index % 5 };
+            if (role == "Builder")
+            {
+                Sphere(body, "Hard hat", new Vector3(0, 1.79f, 0), new Vector3(0.28f, 0.16f, 0.29f), "hi-vis", new Color(0.96f, 0.77f, 0.14f));
+                Cylinder(body, "Hat brim", new Vector3(0, 1.77f, 0), new Vector3(0.34f, 0.018f, 0.34f), "hi-vis", new Color(0.96f, 0.77f, 0.14f));
+                Box(body, "Reflective vest band", new Vector3(0, 1.20f, 0.14f), new Vector3(0.34f, 0.06f, 0.018f), "reflective", new Color(0.94f, 0.94f, 0.80f));
+                actor.WorkTool = new GameObject("Hand tool").transform; actor.WorkTool.SetParent(parts[1], false); actor.WorkTool.localPosition = new Vector3(0, -0.50f, 0.04f);
+                Box(actor.WorkTool, "Hammer shaft", new Vector3(0, 0, 0.13f), new Vector3(0.035f, 0.035f, 0.30f), "wood", new Color(0.53f, 0.39f, 0.23f));
+                Box(actor.WorkTool, "Hammer head", new Vector3(0, 0, 0.27f), new Vector3(0.19f, 0.06f, 0.07f), "steel", Steel);
+            }
             actors.Add(id, actor); return actor;
         }
 
@@ -842,6 +863,12 @@ namespace Cellblock.Unity
         {
             if (!object.ReferenceEquals(presentedWorld, world))
             {
+                foreach (Actor oldActor in actors.Values) { Clear(oldActor.Root); Destroy(oldActor.Root.gameObject); }
+                actors.Clear();
+                foreach (ProjectView oldProject in constructionViews.Values) { Clear(oldProject.Root); Destroy(oldProject.Root.gameObject); }
+                constructionViews.Clear();
+                if (transportRoot != null) Clear(transportRoot); trucks.Clear();
+                watchedCamera = null;
                 presentedWorld = world; force = true; SelectResident(null);
             }
             if (force || revision != world.GeometryRevision)
@@ -852,30 +879,12 @@ namespace Cellblock.Unity
                 foreach (Fixture fixture in world.Data.Fixtures) FixtureView(structures, fixture);
                 Combine(structures);
             }
-            int nextProjectHash = 17;
-            unchecked
-            {
-                foreach (Project project in world.Data.Projects)
-                    if (!project.Completed) nextProjectHash = nextProjectHash * 31 + project.Id.GetHashCode();
-            }
-            if (force || nextProjectHash != projectHash)
-            {
-                Clear(planned); projectHash = nextProjectHash;
-                foreach (Project project in world.Data.Projects)
-                {
-                    if (project.Completed) continue;
-                    foreach (WorkItem item in project.Work)
-                    {
-                        if (item.Wall != null) WallView(planned, item.Wall, "planned");
-                        if (item.Fixture != null) FixtureView(planned, item.Fixture, "planned");
-                    }
-                }
-                Combine(planned);
-            }
+            RefreshConstruction(world, force);
             foreach (Actor actor in actors.Values) actor.Seen = false;
             for (int i = 0; i < world.Data.Residents.Count; i++)
             {
                 Resident resident = world.Data.Residents[i];
+                bool visible = true; ResidentVisibility(world, resident, ref visible); if (!visible) continue;
                 string id = string.IsNullOrEmpty(resident.Id) ? "legacy-" + i : resident.Id;
                 Actor actor; bool created = !actors.TryGetValue(id, out actor);
                 if (created) actor = Person(id);
@@ -883,18 +892,9 @@ namespace Cellblock.Unity
                 actor.Marker.gameObject.SetActive(id == selectedResidentId);
                 MoveActor(actor, resident, world, force || created);
             }
-            foreach (StaffMember member in world.Data.Staff)
-            {
-                Actor actor; bool created = !actors.TryGetValue(member.Id, out actor);
-                if (created) actor = Person(member.Id, true, member.Role);
-                actor.Seen = true; actor.Root.gameObject.SetActive(true);
-                actor.Root.position = V(member.Position, 0.14f);
-                if (created || force) actor.Root.rotation = Quaternion.Euler(0, 170 + IdentitySeed(member.Id) % 21, 0);
-                actor.Marker.gameObject.SetActive(member.Id == selectedResidentId);
-                // Staff currently work at stored stations. Their positions are not invented patrols.
-                actor.Body.localPosition = Vector3.up * (Mathf.Sin(Time.unscaledTime * 1.5f + actor.Gait) * 0.002f);
-                for (int j = 0; j < 2; j++) actor.Limbs[j].localRotation = Quaternion.Euler(0, 0, j == 0 ? 4 : -4);
-            }
+            RefreshWorkers(world, force);
+            RefreshOperations(world, force);
+            RefreshJustice(world, force);
             foreach (Actor actor in actors.Values) if (!actor.Seen) actor.Root.gameObject.SetActive(false);
         }
 
@@ -987,6 +987,7 @@ namespace Cellblock.Unity
 #endif
         void OnDestroy()
         {
+            if (sirenClip != null) Destroy(sirenClip);
             // Include baked scenery and resident parts so leaving Play does not leak generated meshes.
             foreach (MeshFilter filter in GetComponentsInChildren<MeshFilter>(true))
                 if (filter.sharedMesh != null && filter.sharedMesh.name.StartsWith("Generated ")) Destroy(filter.sharedMesh);

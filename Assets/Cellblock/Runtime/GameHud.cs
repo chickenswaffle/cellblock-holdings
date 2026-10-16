@@ -8,9 +8,11 @@ using UnityEngine.UIElements;
 
 namespace Cellblock.Unity
 {
-    public sealed class GameHud : MonoBehaviour
+    public sealed partial class GameHud : MonoBehaviour
     {
-        enum Workspace { Facility, Build, People, Company }
+        partial void BuildJustice();
+        partial void RefreshJustice(World world, Resident resident);
+        enum Workspace { Facility, Build, People, Company, Control }
         GameController game;
         PanelSettings panelSettings;
         int displayWidth, displayHeight;
@@ -77,7 +79,7 @@ namespace Cellblock.Unity
             BuildNavigation();
             inspector = new ScrollView(ScrollViewMode.Vertical); inspector.name = "inspector"; inspector.AddToClassList("inspector");
             ((ScrollView)inspector).horizontalScrollerVisibility = ScrollerVisibility.Hidden; root.Add(inspector);
-            BuildInspector(); BuildCatalog(); BuildPeople();
+            BuildInspector(); BuildCatalog(); BuildPeople(); BuildJustice(); BuildControl();
             BuildTools();
             BuildCamera();
             status = Panel("status");
@@ -137,7 +139,7 @@ namespace Cellblock.Unity
             buildTab = Action("Build", () => SwitchWorkspace(Workspace.Build));
             peopleTab = Action("People", () => SwitchWorkspace(Workspace.People));
             companyTab = Action("Company", () => SwitchWorkspace(Workspace.Company));
-            tabs.Add(facilityTab); tabs.Add(buildTab); tabs.Add(peopleTab); tabs.Add(companyTab); navigation.Add(tabs);
+            tabs.Add(facilityTab); tabs.Add(buildTab); tabs.Add(peopleTab); tabs.Add(companyTab); controlTab = Action("Control", () => SwitchWorkspace(Workspace.Control)); tabs.Add(controlTab); navigation.Add(tabs);
             var utilities = Element("navigation-utilities");
             cameraToggle = Action("Camera", () => { cameraOpen = !cameraOpen; if (compact && cameraOpen) inspectorOpen = false; Layout(); }, "quiet");
             utilities.Add(cameraToggle); utilities.Add(Action("Controls", () => ShowGuide(false), "quiet")); navigation.Add(utilities);
@@ -161,7 +163,7 @@ namespace Cellblock.Unity
             catalogToggle = Action("Structure / category ▾", () => { catalogExpanded = !catalogExpanded; RefreshCatalog(); }, "catalog-category-toggle"); compactHeading.Add(catalogToggle);
             compactHeading.Add(Action("Close", () => { inspectorOpen = false; Layout(); }, "compact-panel-close")); catalogPane.Add(compactHeading);
             var categories = Element("catalog-categories"); catalogCategories = categories; catalogPane.Add(categories);
-            foreach (string category in new[] { "Structure" }.Concat(FixtureCatalog.Categories))
+            foreach (string category in new[] { "Structure", "Prefabs" }.Concat(FixtureCatalog.Categories))
             {
                 string selected = category;
                 Button button = Action(category, () => { catalogCategory = selected; catalogExpanded = false; RefreshCatalog(); }, "category-button");
@@ -170,8 +172,9 @@ namespace Cellblock.Unity
             }
             AddStructureItem("Straight wall", "Draw a start and end point. Connect any angle to the existing building.", "Quoted by length", BuildTool.Wall);
             AddStructureItem("Curved wall", "Choose a start, end, and bend. Edit the curve after handover.", "Quoted by length", BuildTool.Curve);
-            AddStructureItem("Prefab wing", "Attach an editable room package. Every wall remains individually editable.", "Quote on placement", BuildTool.Wing);
+            AddStructureItem("Prefab units →", "Six editable units with optional essential or enhanced furnishing packages.", "Quote on placement", BuildTool.Wing);
             AddStructureItem("Door opening", "Cut an opening in an existing wall. Keep circulation connected.", "Quote on placement", BuildTool.Door);
+            BuildPrefabSelector();
             foreach (FixtureDefinition definition in FixtureCatalog.All)
             {
                 FixtureDefinition item = definition;
@@ -186,7 +189,7 @@ namespace Cellblock.Unity
         }
         void AddStructureItem(string name, string description, string price, BuildTool tool)
         {
-            Button button = CatalogCard(name, description, price, "STRUCTURE", () => ChooseTool(tool));
+            Button button = CatalogCard(name, description, price, "STRUCTURE", () => { if (tool == BuildTool.Wing) ShowBuildCatalog("Prefabs"); else ChooseTool(tool); });
             categoryItems["Structure"].Add(button); toolButtons.Add(tool, button);
         }
         static Button CatalogCard(string title, string description, string price, string detail, System.Action clicked)
@@ -365,7 +368,7 @@ namespace Cellblock.Unity
             }
             else if (staff != null)
             {
-                personTag.text = "STAFF / CONDUCT PROFILE"; personName.text = staff.Name; personSummary.text = staff.Role;
+                personTag.text = "STAFF / CONDUCT PROFILE"; personName.text = staff.Name; personSummary.text = staff.Role + " · " + staff.Duty;
                 personAffiliation.text = "Favored gang  /  " + (string.IsNullOrEmpty(staff.FavoredGang) ? "None recorded" : staff.FavoredGang) + "\nFavoritism  /  " + Mathf.RoundToInt(staff.Favoritism) + "/100";
                 personMetricLabels[0].text = "INTEGRITY"; personMetricLabels[1].text = "PRESSURE"; personMetricLabels[2].text = "RISK INDEX"; personMetricLabels[3].text = "EVENTS";
                 personMetricValues[0].text = Mathf.RoundToInt(staff.Integrity) + "%";
@@ -376,6 +379,7 @@ namespace Cellblock.Unity
                 personMetricValues[2].EnableInClassList("negative", staff.Risk >= 30);
                 personEffects.text = PeopleDynamics.StaffEffect(staff) + "\nStaff support adds 8 integrity, relieves 25 pressure, and reduces favoritism by 10.";
             }
+            RefreshJustice(world, selected);
             var history = world.Data.History.AsEnumerable().Reverse().Take(historyRows.Length).ToArray();
             for (int i = 0; i < historyRows.Length; i++)
             {
@@ -438,7 +442,7 @@ namespace Cellblock.Unity
             fixtureActions.Add(Action("Remove", () => game.RemoveSelection(), "danger")); fixturePane.Add(fixtureActions); facilityPane.Add(fixturePane);
             facilityPane.Add(Text("CONSTRUCTION TEAM", "section-label")); crewInfo = Text("", "body"); facilityPane.Add(crewInfo);
             var hiring = Element("wrap-row");
-            hire = Action("Hire crew · $500", () => { if (game.World != null) game.World.HireCrew(); Refresh(true); }, "primary");
+            hire = Action("Hire crew · $500", () => { game.HireConstructionCrew(); Refresh(true); }, "primary");
             release = Action("Release one", () => { if (game.World != null) game.World.ReleaseCrew(); Refresh(true); }, "quiet");
             hiring.Add(hire); hiring.Add(release); facilityPane.Add(hiring);
             facilityPane.Add(Text("Each crew costs $800 per game day, including idle time.", "muted"));
@@ -508,6 +512,7 @@ namespace Cellblock.Unity
             root.EnableInClassList("narrow", root.resolvedStyle.width < 760);
             root.EnableInClassList("compact-build", compact && workspace == Workspace.Build);
             root.EnableInClassList("compact-people", compact && workspace == Workspace.People);
+            root.EnableInClassList("compact-control", compact && workspace == Workspace.Control);
             RefreshCatalog();
             var safe = Screen.safeArea;
             float scale = Screen.width > 0 ? root.resolvedStyle.width / Screen.width : 1;
@@ -524,11 +529,11 @@ namespace Cellblock.Unity
             float dockOffset = reviewing ? 0 : compact ? 76 : 98;
             if (reviewing) { inspectorOpen = false; cameraOpen = false; }
             cameraToggle.SetEnabled(!reviewing);
-            facilityTab.SetEnabled(!reviewing); buildTab.SetEnabled(!reviewing); peopleTab.SetEnabled(!reviewing); companyTab.SetEnabled(!reviewing);
+            facilityTab.SetEnabled(!reviewing); buildTab.SetEnabled(!reviewing); peopleTab.SetEnabled(!reviewing); companyTab.SetEnabled(!reviewing); controlTab.SetEnabled(!reviewing);
             tools.style.display = building && !menuOpen && !reviewing ? DisplayStyle.Flex : DisplayStyle.None;
             tools.style.left = left; tools.style.right = StyleKeyword.Auto; tools.style.bottom = bottom;
             inspector.style.display = inspectorOpen && !menuOpen ? DisplayStyle.Flex : DisplayStyle.None;
-            float panelWidth = compact ? (root.resolvedStyle.width < 700 ? 280 : 300) : workspace == Workspace.People ? 350 : workspace == Workspace.Build ? 344 : 314;
+            float panelWidth = compact ? (root.resolvedStyle.width < 700 ? 280 : 300) : workspace == Workspace.Control ? 360 : workspace == Workspace.People ? 350 : workspace == Workspace.Build ? 344 : 314;
             float utilityWidth = Mathf.Max(0, root.resolvedStyle.width - left - right - (compact && inspectorOpen ? panelWidth + 16 : 0));
             tools.style.width = Mathf.Min(480, utilityWidth);
             if (compact && inspectorOpen && utilityWidth < 260) tools.style.display = DisplayStyle.None;
@@ -741,14 +746,14 @@ namespace Cellblock.Unity
             foreach (var pair in speedButtons) pair.Value.EnableInClassList("selected", pair.Key == world.Data.Speed);
             foreach (var pair in toolButtons) pair.Value.EnableInClassList("selected", pair.Key == game.Tool);
             foreach (var pair in fixtureButtons) pair.Value.EnableInClassList("selected", game.Tool == BuildTool.Furnishing && pair.Key == game.PlacementFixtureKind);
-            RefreshCatalog(); RefreshPeople(world);
+            RefreshCatalog(); RefreshPeople(world); RefreshControl(world); RefreshPrefabSelector();
             facilityTab.EnableInClassList("selected", workspace == Workspace.Facility);
             buildTab.EnableInClassList("selected", workspace == Workspace.Build);
             companyTab.EnableInClassList("selected", workspace == Workspace.Company);
-            peopleTab.EnableInClassList("selected", workspace == Workspace.People);
+            peopleTab.EnableInClassList("selected", workspace == Workspace.People); controlTab.EnableInClassList("selected", workspace == Workspace.Control);
             FixtureDefinition activeFixture = FixtureCatalog.Get(game.PlacementFixtureKind);
             bool furnishingTool = game.Tool == BuildTool.Furnishing || game.Tool == BuildTool.Bed || game.Tool == BuildTool.Table;
-            buildRotate.style.display = furnishingTool ? DisplayStyle.Flex : DisplayStyle.None;
+            buildRotate.style.display = furnishingTool || game.Tool == BuildTool.Wing ? DisplayStyle.Flex : DisplayStyle.None;
             buildRotate.text = "Rotate 90°";
             activeBuildItem.text = furnishingTool && activeFixture != null
                 ? activeFixture.Name + "  /  " + Money(activeFixture.PriceCents) + " materials  /  " + game.PlacementRotation.ToString("0") + "°"
@@ -761,19 +766,20 @@ namespace Cellblock.Unity
             placement.text = game.PlacementSummary; placement.style.display = string.IsNullOrEmpty(game.PlacementSummary) ? DisplayStyle.None : DisplayStyle.Flex;
             notice.text = world.Notice; notice.style.display = string.IsNullOrEmpty(world.Notice) ? DisplayStyle.None : DisplayStyle.Flex;
             bool company = workspace == Workspace.Company;
-            sectionTitle.text = company ? "COMPANY / ACCOUNTS" : workspace == Workspace.Build ? "BUILD / CATALOG" : workspace == Workspace.People ? "PEOPLE / CULTURE" : "FACILITY / OPERATIONS";
+            sectionTitle.text = workspace == Workspace.Control ? "CONTROL / LIVE OPERATIONS" : company ? "COMPANY / ACCOUNTS" : workspace == Workspace.Build ? "BUILD / CATALOG" : workspace == Workspace.People ? "PEOPLE / CULTURE" : "FACILITY / OPERATIONS";
             FixtureDefinition selectedFixture = game.SelectedFixture != null ? FixtureCatalog.Get(game.SelectedFixture.Kind) : null;
-            facilityTitle.text = company ? "The business" : workspace == Workspace.Build ? "Construction catalog" : workspace == Workspace.People ? "People & culture" : game.SelectedWall != null ? "Wall details" : game.SelectedFixture != null ? (selectedFixture != null ? selectedFixture.Name : game.SelectedFixture.Kind) : world.Contract.Name;
+            facilityTitle.text = workspace == Workspace.Control ? "Prison control" : company ? "The business" : workspace == Workspace.Build ? "Construction catalog" : workspace == Workspace.People ? "People & culture" : game.SelectedWall != null ? "Wall details" : game.SelectedFixture != null ? (selectedFixture != null ? selectedFixture.Name : game.SelectedFixture.Kind) : world.Contract.Name;
             overview.text = world.Data.Residents.Count + " residents  /  " + world.Capacity + " beds  /  " + world.Rooms.Count + " enclosed spaces";
             companyPane.style.display = company ? DisplayStyle.Flex : DisplayStyle.None;
             facilityPane.style.display = workspace == Workspace.Facility ? DisplayStyle.Flex : DisplayStyle.None;
             catalogPane.style.display = workspace == Workspace.Build ? DisplayStyle.Flex : DisplayStyle.None;
             peoplePane.style.display = workspace == Workspace.People ? DisplayStyle.Flex : DisplayStyle.None;
             long crewWages = world.Data.Crews.Sum(c => c.DailyCents);
-            long margin = world.Contract.DailyRevenueCents - world.Contract.DailyOperatingCents - crewWages;
+            long staffWages = world.Data.Staff.Sum(s => s.DailyCents);
+            long margin = world.Contract.DailyRevenueCents - world.Contract.DailyOperatingCents - crewWages - staffWages;
             companyTerms.text = "EARNED / AWAITING PAYMENT\n" + Money(world.Data.ReceivableCents) + "\nPayment cycle: " + world.Contract.PaymentDays + " game days\n\nDAILY COMMITMENTS\nBase contract     + " + Money(world.Contract.DailyRevenueCents) +
                 "\nOperations          − " + Money(world.Contract.DailyOperatingCents) + "\nCrew wages        − " + Money(crewWages) +
-                "\nBase margin        " + (margin >= 0 ? "+ " : "− ") + Money(Math.Abs(margin)) + "\nVerified service   up to " + Money(world.Contract.DailyServiceBonusCents);
+                "\nAdditional staff − " + Money(staffWages) + "\nBase margin        " + (margin >= 0 ? "+ " : "− ") + Money(Math.Abs(margin)) + "\nVerified service   up to " + Money(world.Contract.DailyServiceBonusCents);
             LedgerEntry[] ledger = world.Data.Ledger.AsEnumerable().Reverse().Take(ledgerRows.Length).ToArray();
             for (int i = 0; i < ledgerRows.Length; i++)
             {

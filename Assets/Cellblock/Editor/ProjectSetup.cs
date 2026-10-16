@@ -30,6 +30,13 @@ namespace Cellblock.Editor
         {
             Directory.CreateDirectory("Assets/Cellblock/Scenes"); Directory.CreateDirectory("Assets/Cellblock/Settings");
             AssetDatabase.Refresh();
+            var gestures = AssetImporter.GetAtPath("Assets/Plugins/macOS/CellblockGestures.bundle") as PluginImporter;
+            if (gestures != null && (gestures.GetCompatibleWithAnyPlatform() || !gestures.GetCompatibleWithEditor()))
+            {
+                gestures.SetCompatibleWithAnyPlatform(false); gestures.SetCompatibleWithEditor(true);
+                gestures.SetEditorData("OS", "OSX"); gestures.SetEditorData("CPU", "AnyCPU");
+                gestures.SetCompatibleWithPlatform(BuildTarget.StandaloneOSX, true); gestures.SaveAndReimport();
+            }
             var groundImporter = AssetImporter.GetAtPath("Assets/Cellblock/Resources/Textures/GroundMeadow.png") as TextureImporter;
             if (groundImporter != null && (groundImporter.maxTextureSize != 1024 || groundImporter.filterMode != FilterMode.Trilinear))
             {
