@@ -75,6 +75,11 @@ namespace Cellblock.Core
         // Off-site travel uses road coordinates in CourtRun.Position, never Resident.Position.
         internal static readonly Point[] Inbound = { new Point(-2, -28.8f), new Point(-2, -25.5f), new Point(-2, -20f), VanParking };
         internal static readonly Point[] Outbound = { new Point(-2, -20f), new Point(-2, -25.5f), new Point(-2, -28.8f), CourtBase };
+        public static Point NextWaypoint(CourtRun run)
+        {
+            Point[] route = run.Leaving ? Outbound : Inbound;
+            return route[Math.Max(0, Math.Min(route.Length - 1, run.Waypoint))];
+        }
         public static readonly string[] Custodies = { "In facility", "Escorted", "Boarding", "Aboard", "At court", "Release processing", "Released", "Escaping", "At large", "Awaiting return" };
         static readonly string[] Statuses = { "Pretrial", "Sentenced", "Released" };
         static readonly string[] VanPhases = { "Idle", "Inbound", "At gate", "Boarding", "Outbound", "At court", "Unloading" };
