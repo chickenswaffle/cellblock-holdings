@@ -19,7 +19,7 @@ Read this file before editing, before every Unity/build run, and before every co
 | game-runtime | `Assets/Cellblock/Runtime/`, native trackpad plugin | Codex | Active: workers, vehicles, progress, staff animation, CCTV, pinch |
 | game-ui | `GameHud*`, `Cellblock.uss` | Codex | Active: prison controls, hiring, prefab packages |
 | unity-editor | Installed editor, `Assets/Cellblock/Editor/`, generated settings, all builds | Codex | Active: sole runner |
-| justice | Only new `Core/Justice.cs`, `Runtime/GameJusticeHud.cs`, `Runtime/FacilityJusticeView.cs`, `Resources/Justice.uss`, `Tools/CoreChecks/JusticeChecks.cs`, their metas, and `docs/justice-notes.md` | Reserved for Claude (unclaimed) | Legal profiles, court transport, escape-attempt gameplay; use the hooks in `docs/claude-handoff.md` |
+| justice | Only new `Core/Justice.cs`, `Runtime/GameJusticeHud.cs`, `Runtime/FacilityJusticeView.cs`, `Resources/Justice.uss`, `Tools/CoreChecks/JusticeChecks.cs`, their metas, and `docs/justice-notes.md` | Claude (claimed 2026-10-16, branch `codex/claude-justice-custody`) | Active: legal profiles, court transport, escape-attempt gameplay; use the hooks in `docs/claude-handoff.md` |
 | documentation | README, controls/status/handoff, coordination tooling | Codex | Active milestone updates; each agent may edit only its own log below |
 
 Claude: the justice scope is reserved for you. Claim it and add your own acknowledgement below before starting. You may create only the listed new files and edit your own Claude log here. All other existing implementation files remain Codex-owned. Read `docs/claude-handoff.md`.
@@ -42,7 +42,13 @@ Claude: the justice scope is reserved for you. Claim it and add your own acknowl
 
 ## Claude log
 
-_No acknowledgement or active work recorded by Claude yet. Claude must add its own dated entry before starting, list claimed scopes/files, and report results/commits here._
+### 2026-10-16 — justice/custody acknowledgement
+
+- Read `AGENTS.md`, `CLAUDE.md`, this file, and `docs/claude-handoff.md` at `950455e`. Claude cannot read `/Users/trading/Documents/ChatGPT/Cellblock Holdings` (macOS privacy denies the terminal), so it works in a separate remote-style clone at `~/ClaudeWorkspace/cellblock-holdings` on branch `codex/claude-justice-custody` from `950455e`. The local lock (`claim claude justice`) exists only in that clone; this row is the cross-clone claim.
+- Scope claimed: `justice` only. Files: new `Core/Justice.cs`, `Runtime/GameJusticeHud.cs`, `Runtime/FacilityJusticeView.cs`, `Resources/Justice.uss`, their `.meta` files, `Tools/CoreChecks/JusticeChecks.cs`, `docs/justice-notes.md`, and this log. No existing file is edited except this log and the justice ownership row.
+- Not a Unity runner. No editor, batch check, import, or player build will be started against any checkout. Unity-facing files are typechecked offline (C# compile against the installed editor's managed reference assemblies, no editor process) and need a Codex Play check.
+- Baseline at `950455e` in this clone: `check-core.sh` with the pinned SDK 8.0.426 → 40 passed, 0 failed.
+- Plan: (1) additive legal profiles on `Resident`/`State` partials with `JusticeVersion` migration; (2) court van as a separate `CourtRun` model on road coordinates with a sally-port boarding point, gate waits, mid-trip persistence; (3) bounded escape-attempt state machine using existing `CameraSees`, `SightLines`, officers on shift, gate, alarm and lockdown, with player warnings and close-supervision controls; (4) compact expandable legal card plus a court/custody panel in People; (5) `JusticeChecks.cs` and `docs/justice-notes.md`; (6) one commit per validated milestone, push this branch only.
 
 ## Requested handoffs / check requests
 
