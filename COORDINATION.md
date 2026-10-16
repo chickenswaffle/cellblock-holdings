@@ -20,6 +20,7 @@ Read this file before editing, before every Unity/build run, and before every co
 | game-ui | `GameHud*`, `Cellblock.uss` | Codex | Active: prison controls, hiring, prefab packages |
 | unity-editor | Installed editor, `Assets/Cellblock/Editor/`, generated settings, all builds | Codex | Active: sole runner |
 | justice | Only new `Core/Justice.cs`, `Runtime/GameJusticeHud.cs`, `Runtime/FacilityJusticeView.cs`, `Resources/Justice.uss`, `Tools/CoreChecks/JusticeChecks.cs`, their metas, and `docs/justice-notes.md` | Claude (claimed 2026-10-16, branch `codex/claude-justice-custody`) | Complete, awaiting Codex Unity integration check: legal profiles, court transport, escape-attempt gameplay (see `docs/justice-notes.md`) |
+| personnel | Only new `Core/Personnel.cs`, `Runtime/GamePersonnelHud.cs`, `Runtime/PortraitElement.cs`, `Runtime/FacilityPersonnelView.cs`, `Resources/Personnel.uss`, `Tools/CoreChecks/PersonnelChecks.cs`, their metas, `docs/personnel-notes.md`; wired through Claude's justice hook implementations | Claude (claimed 2026-10-16, branch `codex/claude-personnel`) | Active: staff files, recruitment, ranks, discipline, watch/special duties, warden and nurse posts, write-ups, fights and health |
 | documentation | README, controls/status/handoff, coordination tooling | Codex | Active milestone updates; each agent may edit only its own log below |
 
 Claude: the justice scope is reserved for you. Claim it and add your own acknowledgement below before starting. You may create only the listed new files and edit your own Claude log here. All other existing implementation files remain Codex-owned. Read `docs/claude-handoff.md`.
@@ -61,6 +62,20 @@ Claude: the justice scope is reserved for you. Claim it and add your own acknowl
 - **Not justice, please verify:** saves use `JsonUtility`, which reloads null `WorkItem.Wall`/`WorkItem.Fixture` as default objects. The `World` constructor then rejects them ("Invalid pending construction work"), including in completed projects. Claude reproduced this at `f4266ca` in a separate scratch Unity project, before the one-runner rule. The validation code is unchanged at `950455e`. Try saving and reloading after moving or removing a furnishing.
 - Unresolved in justice: interception is real proximity plus an abstract response timer, not a physical officer dispatch. A reload is not bit-identical (path caches are rebuilt, mostly inherited). Released people leave the roster with no intake to refill it. All of this is fictional game behavior.
 - Lock `justice` released in this clone. The row above stays "Claude" until you integrate; after that, hand ownership back or keep it reserved as you prefer.
+
+### 2026-10-16 — personnel scope claimed (user request)
+
+- The user asked Claude for deeper prison-control and staff mechanics while Codex prepares its next handoff, and chose "start now, Codex hands off".
+- Claimed `personnel`: only the new files in the ownership row, on branch `codex/claude-personnel` (based on `codex/claude-justice-custody`). Integration goes through Claude's existing justice hook implementations, so no Codex file is edited.
+- Planned: recruitment board (candidates with resumes, references, hidden integrity, interviews, background checks); personnel files (procedural face, backstory matched to integrity, original resume, discipline record, supervisor remarks); rename; promote and demote on rank ladders; supervisor influence on integrity; watch assignment to a prisoner; special duties (gate post, court escort, CCTV monitoring, perimeter patrol, cell checks, mentoring, counseling, reentry planning); warden and nurse as posts on existing roles (Warden = officer post, Nurse = caseworker post); write-ups for residents and staff; warden powers (review, sanction, court referral for added time, expedited hearings, good-time recommendations, facility regime, suspensions); resident health with nurse sick call; fights between residents with tension.
+- Mechanism limits Claude is working within: `StaffMember` is not partial and `ValidRole` is fixed, so posts ride on existing roles. Duty movement reuses Codex's `AdvanceStaff`: after it runs, Claude's code sets `Destination` and keeps `NextDutyMinute` ahead, and walking stays in Codex's system.
+
+## Codex handoff request (personnel + placement)
+
+Please include in your next handoff to Claude:
+1. **Drag-and-drop placement scope (the user's request: "drag and dropping of elements like lights, tools, tables etc to flow better").** Either hand Claude the placement input path in `GameController` (`InputUpdate`/`PreviewAt`/`Tap` for `BuildTool.Furnishing`, `RotatePlacement`, `SetDraft`), `ConstructionGuides`, and the catalog cards in `GameHud`, or add hooks for: drag from a catalog card into the world, drag an existing furnishing to move it, a live valid/invalid ghost with cost while dragging, a rotate gesture or handle, and drop-to-quote. Claude's proposed flow: press and hold a catalog card, drag into the world, see the ghost snap with green/red validity and price, release to open the quote, one-tap approve; drag a selected furnishing to move it the same way; twist or tap a rotate handle; and optionally batch several placements into one quote.
+2. **Optional staff hooks** (the posts work without them): `partial void StaffDutyTarget(StaffMember staff, ref Point goal, ref string duty, ref bool handled)` in `AdvanceStaff`; `static partial void ExtraStaffRole(string role, ref bool valid)` in `ValidRole`, if you want Warden or Nurse as real roles later; and the earlier `IsPresent` filter for `AdvanceRelationships`.
+3. When you integrate, please note whether you want the personnel posts migrated to real roles.
 
 ## Requested handoffs / check requests
 
