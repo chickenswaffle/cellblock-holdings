@@ -2,6 +2,14 @@
 
 The active game is a Unity/C# reboot. Read `README.md` and `docs/reboot-vision.md` before changing the design. The root `Assets`, `Packages`, and `ProjectSettings` form the Unity project.
 
+## Shared work with Codex — mandatory
+
+- Read `COORDINATION.md` at the start of every session, before editing files, before running Unity/builds, and before each commit. Follow its current ownership table and handoff notes. Do not rely on an earlier copy.
+- Claim the relevant scope with `bash Tools/agent-coordination.sh claim <agent> <scope>` before working. Never remove another agent's lock. If a scope is owned, work on an unowned scope or coordinate through the shared file/user.
+- Use the `unity-editor` lock for ALL Unity launches, Play reviews, imports that run validation, batch checks, and native builds. One runner only; never start a second editor against the same checkout.
+- Record your intent, files, progress, checks, commit, and next steps in your own section of `COORDINATION.md`. Re-read other sections at every milestone. Preserve other agents' entries and dirty files.
+- Commit completed, validated milestones locally as work proceeds. Stage only your owned changes. Do not reset, stash, revert, overwrite, or include another agent's unfinished work. Do not push unless the user requests it.
+
 ## Current milestone
 
 Prove freeform, editable construction and company consequences on iPhone, iPad, and Mac. The user requires straight/diagonal/curved structures, editable connected prefabs, hired construction crews, contract-led starts, and equal builder/company importance. Windows is conditional on practical, measured support. Time pauses when the app closes; support pause and faster speeds during play.

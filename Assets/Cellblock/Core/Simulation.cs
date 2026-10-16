@@ -13,9 +13,44 @@ namespace Cellblock.Core
     }
     [Serializable] public sealed class Resident
     {
-        public string Name = "";
+        public string Id = "", Name = "", Temperament = "", Clique = "", Gang = "Unaffiliated";
         public Point Position, Home;
         public float Food = 80;
+        // All person and relationship measures use a readable 0..100 scale.
+        public float Patience = 50, Sociability = 50, Impulsivity = 50, Discipline = 50, WalkSpeed = 1;
+        public float Safety = 85, Stress = 20, Belonging = 55;
+        public int RoutineOffset, NextDecisionMinute;
+        public List<Relationship> Relationships = new List<Relationship>();
+    }
+    [Serializable] public sealed class Relationship
+    {
+        public string OtherId = "";
+        public float Trust = 30, Tension = 20;
+        public string Kind
+        {
+            get
+            {
+                if (Tension >= 82) return "Nemesis";
+                if (Tension >= 58) return "Beef";
+                if (Trust >= 72 && Tension < 35) return "Friend";
+                if (Tension >= 40) return "Strained";
+                return "Acquaintance";
+            }
+        }
+    }
+    [Serializable] public sealed class StaffMember
+    {
+        public string Id = "", Name = "", Role = "Officer", FavoredGang = "";
+        public Point Position;
+        public float Integrity = 75, Pressure = 35, Favoritism = 0;
+        public int LastIncidentMinute = -1000000;
+        public float Risk { get { return PeopleDynamics.MisconductRisk(this); } }
+    }
+    [Serializable] public sealed class HistoryEvent
+    {
+        public int Minute;
+        public string Category = "", SubjectId = "", Description = "";
+        public int Severity = 1;
     }
     [Serializable] public sealed class LedgerEntry
     {
@@ -65,6 +100,7 @@ namespace Cellblock.Core
     [Serializable] public sealed class State
     {
         public int Version = 1, NextId = 1, Minute = 8 * 60, Speed = 1;
+        public int Seed;
         public string ContractId = "county";
         public long OpeningCapitalCents, CashCents, ReceivableCents;
         public double OperatingRemainder, CrewRemainder, RevenueRemainder;
@@ -72,6 +108,8 @@ namespace Cellblock.Core
         public List<Wall> Walls = new List<Wall>();
         public List<Fixture> Fixtures = new List<Fixture>();
         public List<Resident> Residents = new List<Resident>();
+        public List<StaffMember> Staff = new List<StaffMember>();
+        public List<HistoryEvent> History = new List<HistoryEvent>();
         public List<Crew> Crews = new List<Crew>();
         public List<Project> Projects = new List<Project>();
         public List<LedgerEntry> Ledger = new List<LedgerEntry>();
@@ -136,7 +174,9 @@ namespace Cellblock.Core
         }
         public World(State data)
         {
-            if (data == null || data.Version != 1 || !Offers.Any(o => o.Id == data.ContractId))
+            if (data == null) throw new ArgumentException("This save is missing.");
+            PeopleDynamics.Hydrate(data);
+            if (data.Version != 1 || !Offers.Any(o => o.Id == data.ContractId))
                 throw new ArgumentException("This save version or contract is not supported.");
             if (data.Walls == null || data.Fixtures == null || data.Residents == null || data.Crews == null ||
                 data.Projects == null || data.Ledger == null || data.Minute < 0 || data.NextId < 1)
@@ -153,8 +193,12 @@ namespace Cellblock.Core
             if (data.Walls.Any(w => string.IsNullOrEmpty(w.Id)) || data.Fixtures.Any(f => f == null || string.IsNullOrEmpty(f.Id)) ||
                 data.Walls.Select(w => w.Id).Distinct().Count() != data.Walls.Count || data.Fixtures.Select(f => f.Id).Distinct().Count() != data.Fixtures.Count)
                 throw new ArgumentException("Duplicate building identifiers.");
-            if (data.Crews.Any(c => c == null || c.DailyCents <= 0) || data.Residents.Any(r => r == null || !ValidPoint(r.Position) || !ValidPoint(r.Home) ||
-                float.IsNaN(r.Food) || float.IsInfinity(r.Food) || r.Food < 0 || r.Food > 100) ||
+            if (data.Crews.Any(c => c == null || c.DailyCents <= 0) || data.Residents.Any(r => r == null || string.IsNullOrEmpty(r.Id) || string.IsNullOrEmpty(r.Name) || !ValidPoint(r.Position) || !ValidPoint(r.Home) ||
+                !PeopleDynamics.ValidResident(r) || r.Relationships == null || r.Relationships.Any(rel => rel == null || string.IsNullOrEmpty(rel.OtherId) || !FiniteRange(rel.Trust, 0, 100) || !FiniteRange(rel.Tension, 0, 100)) ||
+                r.Relationships.Select(rel => rel.OtherId).Distinct().Count() != r.Relationships.Count || r.Relationships.Any(rel => !data.Residents.Any(other => other.Id == rel.OtherId && other.Id != r.Id))) ||
+                data.Residents.Select(r => r.Id).Distinct().Count() != data.Residents.Count ||
+                data.Staff.Any(s => s == null || string.IsNullOrEmpty(s.Id) || string.IsNullOrEmpty(s.Name) || (s.Role != "Officer" && s.Role != "Caseworker") || !ValidPoint(s.Position) || !FiniteRange(s.Integrity, 0, 100) || !FiniteRange(s.Pressure, 0, 100) || !FiniteRange(s.Favoritism, 0, 100) || s.LastIncidentMinute > data.Minute || s.LastIncidentMinute < -1000000) ||
+                data.Staff.Select(s => s.Id).Distinct().Count() != data.Staff.Count || data.History.Any(e => e == null || e.Minute < 0 || e.Minute > data.Minute || string.IsNullOrEmpty(e.Description) || e.Severity < 1 || e.Severity > 5) ||
                 data.Fixtures.Any(f => !ValidFixture(f)) || !ValidPoint(data.Dining) || !ValidPoint(data.Yard))
                 throw new ArgumentException("Invalid saved person, crew, service, or furnishing.");
             var knownWalls = new HashSet<string>(data.Walls.Select(w => w.Id));
@@ -189,10 +233,13 @@ namespace Cellblock.Core
             if (!Reconciles()) throw new ArgumentException("The saved ledger does not reconcile.");
             string blocked = CheckRoutes(Data.Walls);
             if (blocked != "") throw new ArgumentException("Invalid saved routes: " + blocked);
+            var occupiedStations = new Navigation(Data.Walls, Data.Fixtures);
+            if (Data.Staff.Any(staff => !PeopleDynamics.ClearStaffStation(staff.Position, occupiedStations, Data.Fixtures)))
+                throw new ArgumentException("Invalid saved staff station: a staff member is inside a wall or furnishing.");
         }
         static bool FiniteRange(float value, float low, float high) { return !float.IsNaN(value) && !float.IsInfinity(value) && value >= low && value <= high; }
         static bool ValidPoint(Point p) { return FiniteRange(p.X, -Geometry.SiteX, Geometry.SiteX) && FiniteRange(p.Y, -Geometry.SiteY, Geometry.SiteY); }
-        static bool ValidFixture(Fixture f) { return f != null && ValidPoint(f.Position) && FiniteRange(f.Rotation, -36000, 36000) && (f.Kind == "Bed" || f.Kind == "Table" || f.Kind == "Desk"); }
+        static bool ValidFixture(Fixture f) { return f != null && ValidPoint(f.Position) && FiniteRange(f.Rotation, -36000, 36000) && FixtureCatalog.Contains(f.Kind); }
         public static World Start(string contractId)
         {
             ContractOffer offer = Offers.First(o => o.Id == contractId);
@@ -232,6 +279,23 @@ namespace Cellblock.Core
             Notice = "Crew released. Completed work and purchased materials remain.";
             return true;
         }
+        public bool SupportStaff(string staffId)
+        {
+            StaffMember staff = Data.Staff.FirstOrDefault(s => s.Id == staffId);
+            const long supportCost = 250000;
+            if (staff == null) { Notice = "That staff member is no longer on the roster."; return false; }
+            if (staff.Pressure <= 0 && staff.Integrity >= 100 && staff.Favoritism <= 0)
+            { Notice = staff.Name + " has no remaining support need."; return false; }
+            if (Data.CashCents < supportCost) { Notice = "Staff support requires $2,500 in available cash."; return false; }
+            Book(-supportCost, "staff-support", "Training and workload support / " + staff.Name);
+            staff.Pressure = Math.Max(0, staff.Pressure - 25);
+            staff.Integrity = Math.Min(100, staff.Integrity + 8);
+            staff.Favoritism = Math.Max(0, staff.Favoritism - 10);
+            string description = staff.Name + " received training and workload support. Integrity improved, pressure fell, and favoritism risk was reviewed.";
+            PeopleDynamics.Record(Data, "staff-support", staff.Id, description, 1);
+            Notice = description;
+            return true;
+        }
         List<Wall> FutureWalls()
         {
             var walls = Data.Walls.Select(w => w.Copy()).ToList();
@@ -254,18 +318,26 @@ namespace Cellblock.Core
         }
         public Point ServiceDestination(int index, bool meals, Point? dining = null)
         {
-            return meals ? (dining ?? Data.Dining) + new Point(index % 2 == 0 ? -1.5f : 1.5f, (index / 2 % 3 - 1) * 0.65f) :
-                Data.Yard + new Point((index % 3 - 1) * 0.45f, (index / 3 % 3 - 1) * 0.45f);
+            int slot = Math.Max(0, index);
+            // The current contracts top out at 12 residents. Continue the rows for a
+            // larger roster instead of silently recycling somebody else's destination.
+            return meals ? (dining ?? Data.Dining) + new Point(slot % 2 == 0 ? -1.6f : 1.6f, -0.5f - (slot / 2) * 0.5f) :
+                Data.Yard + new Point((slot % 3 - 1) * 1.1f, (slot / 3 - 1.5f) * 0.8f);
         }
         string CheckRoutes(List<Wall> walls, List<HomeMove> moves = null, Point? dining = null, List<Fixture> fixtures = null)
         {
-            var routes = new Navigation(walls, fixtures ?? Data.Fixtures);
+            List<Fixture> checkedFixtures = fixtures ?? Data.Fixtures;
+            var routes = new Navigation(walls, checkedFixtures);
+            if (Data.Staff.Any(staff => !PeopleDynamics.ClearStaffStation(staff.Position, routes, checkedFixtures)))
+                return "This plan blocks a staff station. Relocate the furnishing or change the wall plan.";
             for (int i = 0; i < Data.Residents.Count; i++)
             {
                 Resident resident = Data.Residents[i];
                 HomeMove move = moves == null ? null : moves.LastOrDefault(m => m.Resident == resident.Name);
                 Point home = move == null ? resident.Home : move.Home;
-                if (routes.Find(home, ServiceDestination(i, true, dining)) == null || routes.Find(home, ServiceDestination(i, false)) == null)
+                Point meal = ServiceDestination(i, true, dining), yard = ServiceDestination(i, false);
+                if (!routes.Clear(meal, meal) || !routes.Clear(yard, yard) ||
+                    routes.Find(home, meal) == null || routes.Find(home, yard) == null)
                     return "This plan cuts off " + resident.Name + "'s route to meals or the yard. Add a doorway or another route.";
                 if (routes.Find(resident.Position, ServiceDestination(i, true, dining)) == null)
                     return "A resident is inside the proposed wall or would lose access. Wait or change this stage.";
@@ -330,7 +402,7 @@ namespace Cellblock.Core
                 if (!ValidFixture(fixture) || Math.Abs(fixture.Position.X) >= Geometry.SiteX - 1 || Math.Abs(fixture.Position.Y) >= Geometry.SiteY - 1)
                 { result.Message = "Place the furnishing inside the site."; return result; }
                 plan.Fixtures.Add(fixture.Copy());
-                result.MaterialCents += fixture.Kind == "Bed" ? 45000 : 65000;
+                result.MaterialCents += FixtureCatalog.Get(fixture.Kind).PriceCents;
                 result.CrewMinutes += 35;
             }
             var futureRooms = Geometry.Rooms(future);
@@ -381,6 +453,21 @@ namespace Cellblock.Core
             var futureMoves = Data.Projects.Where(p => !p.Completed).SelectMany(p => p.HomeMoves).Concat(plan.HomeMoves).ToList();
             Project priorDining = Data.Projects.LastOrDefault(p => !p.Completed && p.RelocatesDining);
             Point finalDining = plan.RelocatesDining ? plan.Dining : priorDining != null ? priorDining.Dining : Data.Dining;
+            var futureRoutes = new Navigation(future, futureFixtures);
+            if (Data.Staff.Any(staff => !PeopleDynamics.ClearStaffStation(staff.Position, futureRoutes, futureFixtures)))
+            { result.Message = "This plan blocks a staff station. Relocate the furnishing or change the wall plan."; return result; }
+            foreach (Fixture fixture in plan.Fixtures)
+            {
+                Point access = Geometry.AccessPoint(fixture);
+                if (!futureRooms.Any(room => Geometry.Contains(room, access)) || !futureRoutes.Clear(access, access))
+                { result.Message = "Leave clear access space in front of the furnishing, inside the room."; return result; }
+                bool reachable = Data.Residents.Any(resident =>
+                {
+                    HomeMove move = futureMoves.LastOrDefault(m => m.Resident == resident.Name);
+                    return futureRoutes.Find(move == null ? resident.Home : move.Home, access) != null;
+                });
+                if (!reachable) { result.Message = "This furnishing has no clear route from an occupied resident home."; return result; }
+            }
             string blocked = CheckRoutes(future, futureMoves, finalDining, futureFixtures);
             if (blocked != "") { result.Message = blocked; return result; }
             if (result.MaterialCents > Data.CashCents) { result.Message = "The materials and disposal quote exceeds available cash."; return result; }
@@ -480,6 +567,7 @@ namespace Cellblock.Core
             {
                 Data.Minute++;
                 MoveResidents();
+                if (Data.Minute % 30 == 0) PeopleDynamics.Advance(this);
                 Data.OperatingRemainder += Contract.DailyOperatingCents / 1440.0;
                 Data.CrewRemainder += Data.Crews.Sum(c => c.DailyCents) / 1440.0;
                 Data.RevenueRemainder += Contract.DailyRevenueCents / 1440.0;
@@ -513,27 +601,44 @@ namespace Cellblock.Core
         }
         void MoveResidents()
         {
-            int hour = Data.Minute / 60 % 24;
             for (int index = 0; index < Data.Residents.Count; index++)
             {
                 Resident resident = Data.Residents[index];
-                bool meals = (hour >= 7 && hour < 9) || (hour >= 12 && hour < 14) || (hour >= 18 && hour < 20);
-                bool yard = (hour >= 10 && hour < 12) || (hour >= 15 && hour < 17);
+                bool meals = PeopleDynamics.IsMealWindow(Data.Minute + resident.RoutineOffset);
+                bool yard = PeopleDynamics.IsYardWindow(Data.Minute + resident.RoutineOffset);
                 Point target = meals || yard ? ServiceDestination(index, meals) : resident.Home;
                 Point prior;
                 Queue<Point> route;
-                if (!destinations.TryGetValue(resident, out prior) || Geometry.Distance(prior, target) > 0.1f || !paths.TryGetValue(resident, out route))
+                bool decisionDue = Data.Minute >= resident.NextDecisionMinute;
+                bool hasDestination = destinations.TryGetValue(resident, out prior);
+                bool hasRoute = paths.TryGetValue(resident, out route);
+                if (decisionDue && (!hasDestination || Geometry.Distance(prior, target) > 0.1f || !hasRoute || route.Count == 0))
                 {
                     List<Point> path = Routes.Find(resident.Position, target);
                     paths[resident] = new Queue<Point>(path ?? new List<Point>()); destinations[resident] = target;
                 }
+                if (decisionDue) resident.NextDecisionMinute = Data.Minute + PeopleDynamics.DecisionInterval(resident) + (index * 7 % 11);
+                if (!paths.TryGetValue(resident, out route))
+                { resident.Food = Geometry.Clamp(resident.Food - 0.025f, 0, 100); continue; }
                 route = paths[resident];
-                float remaining = 0.32f;
-                while (remaining > 0 && route.Count > 0)
+                float remaining = 0.32f * resident.WalkSpeed;
+                // Follow one clear waypoint segment per simulation step. Spending leftover
+                // movement on a second segment can shortcut across the corner of a wall.
+                if (route.Count > 0)
                 {
                     Point next = route.Peek(); float distance = Geometry.Distance(resident.Position, next);
-                    if (distance <= remaining) { resident.Position = next; remaining -= distance; route.Dequeue(); }
-                    else { resident.Position += (next - resident.Position) * (remaining / distance); remaining = 0; }
+                    if (distance <= 0.001f) route.Dequeue();
+                    else if (Routes.Clear(resident.Position, next))
+                    {
+                        if (distance <= remaining) { resident.Position = next; route.Dequeue(); }
+                        else resident.Position += (next - resident.Position) * (remaining / distance);
+                    }
+                    else
+                    {
+                        Point destination = destinations[resident];
+                        List<Point> path = Routes.Find(resident.Position, destination);
+                        paths[resident] = new Queue<Point>(path ?? new List<Point>());
+                    }
                 }
                 resident.Food = Geometry.Clamp(resident.Food + (meals && Geometry.Distance(resident.Position, target) < 0.8f ? 0.6f : -0.025f), 0, 100);
             }
@@ -565,6 +670,7 @@ namespace Cellblock.Core
             }
             state.Fixtures.Add(new Fixture { Id = "table-" + state.NextId++, Kind = "Table", Position = new Point(-1, -4) });
             state.Fixtures.Add(new Fixture { Id = "desk-" + state.NextId++, Kind = "Desk", Position = new Point(-1, 4) });
+            PeopleDynamics.Hydrate(state);
         }
         public static Plan Wing(Point origin)
         {

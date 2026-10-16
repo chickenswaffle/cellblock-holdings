@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Cellblock.Unity
 {
-    public enum BuildTool { Inspect, Wall, Curve, Wing, Door, Bed, Table, Meals, MoveStart, MoveEnd, Bend, MoveFixture }
+    public enum BuildTool { Inspect, Wall, Curve, Wing, Door, Bed, Table, Meals, MoveStart, MoveEnd, Bend, MoveFixture, Furnishing }
     public sealed class CompanySave { public string FileName, Title; }
 
     public sealed class GameController : MonoBehaviour
@@ -18,17 +18,28 @@ namespace Cellblock.Unity
         public Quote CurrentQuote { get; private set; }
         public Wall SelectedWall { get; private set; }
         public Fixture SelectedFixture { get; private set; }
+        public Resident SelectedResident { get; private set; }
+        public StaffMember SelectedStaff { get; private set; }
+        public string PlacementFixtureKind { get; private set; } = "Bed";
+        public float PlacementRotation { get; private set; }
         public bool Snapping = true;
         public BuildTool Tool { get; private set; }
         public string Instruction { get; private set; }
         FacilityView view;
         GameHud hud;
         Camera cameraRig;
-        Vector3 focus = new Vector3(-3, 0, 0);
-        float distance = 43, yaw = 36, accumulator, autosave, previewTime;
-        bool appPaused, unfocused, dragging, gesture, hasStart, hasEnd;
+        ConstructionGuides guides;
+        Vector3 focus = new Vector3(-5, 0, 0), displayedFocus;
+        Vector2 displayedViewCenter = new Vector2(0.5f, 0.5f);
+        float distance = 33, yaw = 36, pitch = 52, displayedDistance, displayedYaw, displayedPitch;
+        float accumulator, autosave, previewTime;
+        bool appPaused, unfocused, dragging, gesture, hasStart, hasEnd, pointerOwnedByUI, pointerOrbit, pointerActive;
+        bool planView, presentationPreview;
         Point start, end;
         Vector2 pointerDown, lastPointer;
+        public string PlacementSummary { get; private set; } = "";
+        public string CameraModeLabel { get { return (planView ? "Plan" : "3D") + " · " + Mathf.RoundToInt(pitch) + "°"; } }
+        public string HeightLabel { get { return view != null && view.FullHeight ? "Full walls" : "Cutaway"; } }
         string saveId = "";
         string SaveDirectory { get { return Path.Combine(Application.persistentDataPath, "companies"); } }
         string PointerPath { get { return Path.Combine(SaveDirectory, "last-company.txt"); } }
@@ -57,25 +68,32 @@ namespace Cellblock.Unity
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Bootstrap()
         {
-            if (FindObjectOfType<GameController>() == null) new GameObject("Cellblock Holdings").AddComponent<GameController>();
+            if (FindFirstObjectByType<GameController>() == null) new GameObject("Cellblock Holdings").AddComponent<GameController>();
         }
         void Awake()
         {
             Application.targetFrameRate = 60;
             Screen.orientation = ScreenOrientation.LandscapeLeft;
             cameraRig = new GameObject("Management camera").AddComponent<Camera>();
-            cameraRig.transform.SetParent(transform); cameraRig.orthographic = true;
-            cameraRig.nearClipPlane = 0.1f; cameraRig.farClipPlane = 250;
-            cameraRig.clearFlags = CameraClearFlags.SolidColor; cameraRig.backgroundColor = new Color(0.65f, 0.71f, 0.72f);
+            cameraRig.transform.SetParent(transform); cameraRig.tag = "MainCamera"; cameraRig.orthographic = false;
+            cameraRig.fieldOfView = 42; cameraRig.nearClipPlane = 0.15f; cameraRig.farClipPlane = 350;
+            cameraRig.allowHDR = true; cameraRig.allowMSAA = true;
+            cameraRig.clearFlags = CameraClearFlags.SolidColor; cameraRig.backgroundColor = new Color(0.66f, 0.73f, 0.77f);
+            PresentationLighting.Configure(cameraRig, transform);
             view = new GameObject("Facility presentation").AddComponent<FacilityView>(); view.transform.SetParent(transform); view.Initialize();
+            guides = new GameObject("Construction measurements").AddComponent<ConstructionGuides>(); guides.transform.SetParent(transform); guides.Initialize(cameraRig);
             hud = new GameObject("Management interface").AddComponent<GameHud>(); hud.transform.SetParent(transform); hud.Initialize(this);
-            SetTool(BuildTool.Inspect); CameraPosition(); hud.ShowMenu();
+            view.Refresh(Cellblock.Core.World.Start(Cellblock.Core.World.Offers[0].Id), true);
+            SetTool(BuildTool.Inspect); CameraPosition(true); hud.ShowMenu();
         }
-        public bool StartCompany(string contract)
+        public bool StartCompany(string contract) { return CreateCompany(contract, false); }
+        bool CreateCompany(string contract, bool preview)
         {
             if (World != null && !Save()) return false;
+            presentationPreview = preview;
             World = Cellblock.Core.World.Start(contract); saveId = Guid.NewGuid().ToString("N");
-            Draft = null; SelectedWall = null; SelectedFixture = null; hasStart = hasEnd = false;
+            World.Data.Speed = 0;
+            Draft = null; SelectedWall = null; SelectedFixture = null; SelectedResident = null; SelectedStaff = null; hasStart = hasEnd = false;
             accumulator = 0; view.Refresh(World, true); view.Preview(null); SetTool(BuildTool.Inspect); Recenter(); Save();
             return true;
         }
@@ -86,6 +104,11 @@ namespace Cellblock.Unity
             { Message("Select a wall first."); return; }
             if (tool == BuildTool.MoveFixture && SelectedFixture == null) { Message("Select a furnishing first."); return; }
             Tool = tool; hasStart = hasEnd = false;
+            if (tool != BuildTool.Inspect) { SelectedResident = null; SelectedStaff = null; }
+            if (tool == BuildTool.Wall || tool == BuildTool.Curve || tool == BuildTool.Wing || tool == BuildTool.Door || tool == BuildTool.Bed || tool == BuildTool.Table || tool == BuildTool.Furnishing || tool == BuildTool.Meals)
+            { SelectedWall = null; SelectedFixture = null; }
+            if (tool == BuildTool.Bed) PlacementFixtureKind = "Bed";
+            if (tool == BuildTool.Table) PlacementFixtureKind = "Table";
             switch (tool)
             {
                 case BuildTool.Wall: Instruction = "WALL · Tap a start point, then an end point. Review before construction."; break;
@@ -93,21 +116,52 @@ namespace Cellblock.Unity
                 case BuildTool.Wing: Instruction = "PREFAB WING · Tap its lower-left connection point. Every wall remains editable after construction."; break;
                 case BuildTool.Door: Instruction = "DOOR · Tap an existing wall where the opening should go."; break;
                 case BuildTool.Bed: case BuildTool.Table: Instruction = tool.ToString().ToUpperInvariant() + " · Tap a location, then review the fit-out project."; break;
+                case BuildTool.Furnishing: Instruction = FixtureCatalog.Get(PlacementFixtureKind).Name.ToUpperInvariant() + " · Tap a position. Review the fit, cost, and access before approving."; break;
                 case BuildTool.Meals: Instruction = "MEAL SERVICE · Tap an installed table to move meal service and compare travel times."; break;
                 case BuildTool.MoveStart: case BuildTool.MoveEnd: Instruction = "WALL EDIT · Tap the new endpoint position."; break;
                 case BuildTool.Bend: Instruction = "WALL EDIT · Tap the bend position. Straight walls can become curves."; break;
                 case BuildTool.MoveFixture: Instruction = "MOVE FURNISHING · Tap its new position."; break;
-                default: Instruction = "INSPECT · Tap walls or furnishings to edit. Two fingers pan/pinch; mouse wheel zooms and right-drag pans."; break;
+                default: Instruction = "Drag to move · Arrows / WASD to pan · Right-drag to orbit · Scroll to zoom · Tap a component to edit"; break;
             }
-            if (view != null) view.Preview(null, SelectedWall);
+            PlacementSummary = "";
+            if (guides != null) { if (SelectedFixture != null) guides.ShowFixture(SelectedFixture); else guides.Show(SelectedWall); }
+            if (view != null) view.Preview(null, SelectedWall, SelectedFixture);
+            if (view != null) view.SelectResident(SelectedResident != null ? SelectedResident.Id : SelectedStaff != null ? SelectedStaff.Id : null);
             if (hud != null) hud.Refresh(true);
+        }
+        public void SetFixtureTool(string kind)
+        {
+            if (Draft != null) { Message("Approve or discard the current plan first."); return; }
+            if (!FixtureCatalog.Contains(kind)) { Message("This furnishing is not in the catalog."); return; }
+            PlacementFixtureKind = kind; SetTool(BuildTool.Furnishing);
+        }
+        public void RotatePlacement()
+        {
+            if (Draft != null) return;
+            PlacementRotation = (PlacementRotation + 90) % 360; previewTime = 0;
+            Message("Placement rotated to " + PlacementRotation.ToString("0") + "°. Check the access side before approving."); hud.Refresh(true);
+        }
+        public void InspectResident(string id)
+        {
+            if (World == null || Draft != null) return;
+            SelectedResident = World.Data.Residents.FirstOrDefault(r => r.Id == id); SelectedStaff = null;
+            SelectedWall = null; SelectedFixture = null; Tool = BuildTool.Inspect; guides.Show(null);
+            if (SelectedResident != null) { focus = FacilityView.V(SelectedResident.Position); distance = Mathf.Min(distance, 24); }
+            view.Preview(null); view.SelectResident(SelectedResident == null ? null : SelectedResident.Id); hud.RevealSelection(); hud.Refresh(true);
+        }
+        public void InspectStaff(string id)
+        {
+            if (World == null || Draft != null) return;
+            SelectedStaff = World.Data.Staff.FirstOrDefault(s => s.Id == id); SelectedResident = null;
+            SelectedWall = null; SelectedFixture = null; Tool = BuildTool.Inspect; guides.Show(null);
+            if (SelectedStaff != null) { focus = FacilityView.V(SelectedStaff.Position); distance = Mathf.Min(distance, 24); }
+            view.Preview(null); view.SelectResident(SelectedStaff == null ? null : SelectedStaff.Id); hud.RevealSelection(); hud.Refresh(true);
         }
         public void Message(string message) { if (World != null) World.Notice = message; }
         void Update()
         {
-            CameraPosition();
             if (World == null) return;
-            if (!appPaused && !unfocused && World.Data.Speed > 0)
+            if (!appPaused && (!unfocused || presentationPreview) && !hud.BlocksWorldInput && World.Data.Speed > 0)
             {
                 accumulator += Mathf.Min(Time.unscaledDeltaTime, 0.1f) * World.Data.Speed;
                 int steps = 0;
@@ -118,15 +172,60 @@ namespace Cellblock.Unity
             autosave += Time.unscaledDeltaTime;
             if (autosave >= 30) { autosave = 0; Save(false); }
         }
-        void CameraPosition()
+        void LateUpdate() { if (cameraRig != null) CameraPosition(); }
+        void CameraPosition(bool immediate = false)
         {
-            cameraRig.orthographicSize = distance * 0.46f;
-            Quaternion rotation = Quaternion.Euler(52, yaw, 0);
-            cameraRig.transform.position = focus + rotation * new Vector3(0, 0, -distance * 1.7f);
+            float blend = immediate ? 1 : 1 - Mathf.Exp(-Time.unscaledDeltaTime * 14);
+            displayedFocus = Vector3.Lerp(displayedFocus, focus, blend);
+            displayedDistance = Mathf.Lerp(displayedDistance, distance, blend);
+            displayedYaw = Mathf.LerpAngle(displayedYaw, yaw, blend); displayedPitch = Mathf.Lerp(displayedPitch, pitch, blend);
+            cameraRig.orthographic = planView; cameraRig.orthographicSize = displayedDistance * 0.48f;
+            Quaternion rotation = Quaternion.Euler(displayedPitch, displayedYaw, 0);
+            Vector2 viewCenter = hud == null || hud.BlocksWorldInput ? new Vector2(0.5f, 0.5f) : hud.WorldViewCenter;
+            displayedViewCenter = Vector2.Lerp(displayedViewCenter, viewCenter, blend);
+            float visibleHeight = planView ? cameraRig.orthographicSize * 2 : displayedDistance * 3.1f * Mathf.Tan(cameraRig.fieldOfView * Mathf.Deg2Rad * 0.5f);
+            Vector3 composition = rotation * new Vector3((0.5f - displayedViewCenter.x) * visibleHeight * cameraRig.aspect,
+                (0.5f - displayedViewCenter.y) * visibleHeight, 0);
+            cameraRig.transform.position = displayedFocus + rotation * new Vector3(0, 0, -displayedDistance * 1.55f) + composition;
             cameraRig.transform.rotation = rotation;
         }
-        public void Recenter() { focus = new Vector3(-3, 0, 0); distance = 43; yaw = 36; CameraPosition(); }
-        public void ToggleHeight() { view.FullHeight = !view.FullHeight; view.Refresh(World, true); }
+        public void Recenter()
+        {
+            yaw = 36; pitch = 52; planView = false;
+            focus = new Vector3(-5, 0, 0); distance = 33;
+            if (World != null && World.Data.Walls.Count > 0)
+            {
+                var bounds = new Bounds(FacilityView.V(World.Data.Walls[0].A), Vector3.zero);
+                foreach (Wall wall in World.Data.Walls) foreach (Point point in Geometry.Sample(wall)) bounds.Encapsulate(FacilityView.V(point));
+                focus = bounds.center; focus.y = 0;
+                distance = Mathf.Clamp(Mathf.Max(bounds.size.x, bounds.size.z) * 0.9f + 17, 26, 65);
+            }
+        }
+        public void Orbit(float horizontalDegrees, float verticalDegrees)
+        { yaw += horizontalDegrees; pitch = Mathf.Clamp(pitch + verticalDegrees, 28, 78); }
+        public void Zoom(float amount) { distance = Mathf.Clamp(distance * Mathf.Exp(-amount * 0.12f), 11, 85); }
+        void ZoomAt(float amount, Vector2 screen)
+        {
+            float previous = distance; distance = Mathf.Clamp(distance * Mathf.Exp(-amount * 0.12f), 11, 85);
+            Point anchor;
+            if (Ground(screen, out anchor)) focus += (FacilityView.V(anchor) - displayedFocus) * (1 - distance / previous);
+            ClampFocus();
+        }
+        public void PanCamera(Vector2 axis)
+        {
+            Vector3 right = Quaternion.Euler(0, yaw, 0) * Vector3.right;
+            Vector3 forward = Quaternion.Euler(0, yaw, 0) * Vector3.forward;
+            focus += (right * axis.x + forward * axis.y); ClampFocus();
+        }
+        public void SetViewPreset(bool overhead)
+        { planView = overhead; pitch = overhead ? 78 : 52; if (overhead) yaw = 0; }
+        public void ToggleHeight()
+        {
+            view.FullHeight = !view.FullHeight; if (World != null) view.Refresh(World, true);
+            guides.Height = view.WallHeight + 0.35f;
+            if (SelectedWall != null) guides.Show(SelectedWall);
+            view.Preview(Draft, SelectedWall, SelectedFixture);
+        }
         bool Ground(Vector2 screen, out Point point)
         {
             float enter; Ray ray = cameraRig.ScreenPointToRay(screen);
@@ -141,63 +240,92 @@ namespace Cellblock.Unity
         {
             Point a, b;
             if (Ground(previous, out a) && Ground(current, out b)) focus += FacilityView.V(a - b);
-            focus.x = Mathf.Clamp(focus.x, -23, 23); focus.z = Mathf.Clamp(focus.z, -20, 20);
+            ClampFocus();
         }
+        void ClampFocus() { focus.x = Mathf.Clamp(focus.x, -35, 35); focus.z = Mathf.Clamp(focus.z, -30, 30); focus.y = 0; }
         void InputUpdate()
         {
+            if (hud.BlocksWorldInput)
+            {
+                pointerActive = false; pointerOwnedByUI = true; dragging = false; gesture = Input.touchCount > 0;
+                if (Input.GetKeyDown(KeyCode.Escape)) hud.CloseOverlays();
+                return;
+            }
             if (Input.touchCount > 0)
             {
                 if (Input.touchCount >= 2)
                 {
                     Touch a = Input.GetTouch(0), b = Input.GetTouch(1);
-                    if (hud.IsOverUI(a.position) || hud.IsOverUI(b.position)) return;
+                    if ((a.phase == TouchPhase.Began && hud.IsOverUI(a.position)) || (b.phase == TouchPhase.Began && hud.IsOverUI(b.position))) pointerOwnedByUI = true;
                     gesture = true;
+                    if (pointerOwnedByUI || hud.IsOverUI(a.position) || hud.IsOverUI(b.position)) return;
                     Vector2 center = (a.position + b.position) / 2;
                     Vector2 previous = (a.position - a.deltaPosition + b.position - b.deltaPosition) / 2;
                     Pan(previous, center);
                     float before = Vector2.Distance(a.position - a.deltaPosition, b.position - b.deltaPosition);
                     float now = Vector2.Distance(a.position, b.position);
-                    if (before > 1 && now > 1) distance = Mathf.Clamp(distance * before / now, 14, 85);
+                    if (before > 5 && now > 5) ZoomAt(Mathf.Log(now / before) / 0.12f, center);
+                    Vector2 beforeDirection = (b.position - b.deltaPosition) - (a.position - a.deltaPosition);
+                    Vector2 direction = b.position - a.position;
+                    if (beforeDirection.sqrMagnitude > 25 && direction.sqrMagnitude > 25)
+                        Orbit(-Vector2.SignedAngle(beforeDirection, direction), 0);
                     return;
                 }
                 Touch touch = Input.GetTouch(0);
                 if (touch.phase == TouchPhase.Began)
                 {
-                    pointerDown = lastPointer = touch.position; dragging = false;
-                    if (hud.IsOverUI(touch.position)) gesture = true;
+                    pointerDown = lastPointer = touch.position; dragging = false; pointerActive = true;
+                    pointerOwnedByUI = hud.IsOverUI(touch.position);
+                    if (pointerOwnedByUI) gesture = true;
                 }
                 if (touch.phase == TouchPhase.Moved && !gesture)
                 {
-                    if (Vector2.Distance(pointerDown, touch.position) > 15) dragging = true;
+                    if (Vector2.Distance(pointerDown, touch.position) > Mathf.Max(10, Screen.dpi > 0 ? Screen.dpi * 0.04f : 15)) dragging = true;
                     if (dragging && Tool == BuildTool.Inspect) Pan(lastPointer, touch.position);
                     lastPointer = touch.position;
                     if (!hud.IsOverUI(touch.position)) PreviewAt(touch.position);
                 }
                 if (touch.phase == TouchPhase.Ended)
                 {
-                    if (!gesture && !dragging && !hud.IsOverUI(touch.position)) Tap(touch.position);
-                    gesture = false;
+                    if (pointerActive && !pointerOwnedByUI && !gesture && !dragging && !hud.IsOverUI(touch.position)) Tap(touch.position);
+                    gesture = false; pointerActive = false; pointerOwnedByUI = false;
                 }
-                if (touch.phase == TouchPhase.Canceled) gesture = false;
+                if (touch.phase == TouchPhase.Canceled) { gesture = false; pointerActive = false; pointerOwnedByUI = false; dragging = false; }
                 return;
             }
-            gesture = false;
+            if (gesture) { gesture = false; pointerActive = false; pointerOwnedByUI = false; }
             Vector2 cursor = Input.mousePosition;
-            if (Input.GetMouseButtonDown(0)) { pointerDown = cursor; dragging = false; }
-            if (Input.GetMouseButton(0) && Vector2.Distance(pointerDown, cursor) > 8) dragging = true;
-            if (Input.GetMouseButtonUp(0) && !dragging && !hud.IsOverUI(cursor)) Tap(cursor);
+            if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2))
+            {
+                pointerDown = lastPointer = cursor; dragging = false; pointerActive = true; pointerOwnedByUI = hud.IsOverUI(cursor);
+                pointerOrbit = Input.GetMouseButton(1) || (Input.GetMouseButton(0) && (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)));
+            }
+            bool holding = Input.GetMouseButton(0) || Input.GetMouseButton(1) || Input.GetMouseButton(2);
+            if (pointerActive && holding && Vector2.Distance(pointerDown, cursor) > 6) dragging = true;
+            if (pointerActive && holding && dragging && !pointerOwnedByUI)
+            {
+                Vector2 delta = cursor - lastPointer;
+                if (pointerOrbit) Orbit(delta.x * 0.22f, -delta.y * 0.16f);
+                else if (Input.GetMouseButton(2) || (Input.GetMouseButton(0) && Tool == BuildTool.Inspect)) Pan(lastPointer, cursor);
+            }
+            if (Input.GetMouseButtonUp(0) && pointerActive && !pointerOwnedByUI && !pointerOrbit && !dragging && !hud.IsOverUI(cursor)) Tap(cursor);
+            if (!holding) pointerActive = false;
             if (!hud.IsOverUI(cursor))
             {
-                distance = Mathf.Clamp(distance - Input.mouseScrollDelta.y * 2, 14, 85);
-                if (Input.GetMouseButton(1) || Input.GetMouseButton(2)) Pan(lastPointer, cursor);
-                PreviewAt(cursor);
+                if (Mathf.Abs(Input.mouseScrollDelta.y) > 0.001f) ZoomAt(Input.mouseScrollDelta.y, cursor);
+                if (!holding) PreviewAt(cursor);
             }
             lastPointer = cursor;
             if (Input.GetKeyDown(KeyCode.Escape)) Cancel();
             if (Input.GetKeyDown(KeyCode.Space)) World.Data.Speed = World.Data.Speed == 0 ? 1 : 0;
             if (Input.GetKeyDown(KeyCode.Home)) Recenter();
-            if (Input.GetKey(KeyCode.Q)) yaw -= Time.unscaledDeltaTime * 45;
-            if (Input.GetKey(KeyCode.E)) yaw += Time.unscaledDeltaTime * 45;
+            Vector2 movement = new Vector2((Input.GetKey(KeyCode.RightArrow) || Input.GetKey(KeyCode.D) ? 1 : 0) - (Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.A) ? 1 : 0),
+                (Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.W) ? 1 : 0) - (Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S) ? 1 : 0));
+            float speed = distance * 0.55f * Time.unscaledDeltaTime * (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) ? 2 : 1);
+            if (movement.sqrMagnitude > 0) PanCamera(movement.normalized * speed);
+            float orbit = (Input.GetKey(KeyCode.E) ? 1 : 0) - (Input.GetKey(KeyCode.Q) ? 1 : 0);
+            float tilt = (Input.GetKey(KeyCode.R) ? 1 : 0) - (Input.GetKey(KeyCode.F) ? 1 : 0);
+            Orbit(orbit * Time.unscaledDeltaTime * 55, tilt * Time.unscaledDeltaTime * 35);
         }
         void PreviewAt(Vector2 screen)
         {
@@ -211,7 +339,36 @@ namespace Cellblock.Unity
                 var wall = new Wall { A = start, B = hasEnd ? end : p, Curved = Tool == BuildTool.Curve && hasEnd, Control = p };
                 if (Geometry.Distance(wall.A, wall.B) > 0.1f) { preview = new Plan(); preview.Walls.Add(wall); }
             }
-            if (Tool != BuildTool.Inspect) view.Preview(preview, SelectedWall);
+            if (Tool == BuildTool.Bed || Tool == BuildTool.Table || Tool == BuildTool.Furnishing)
+            {
+                preview = new Plan(); preview.Fixtures.Add(new Fixture { Kind = PlacementFixtureKind, Position = p, Rotation = PlacementRotation });
+            }
+            if (SelectedWall != null && (Tool == BuildTool.MoveStart || Tool == BuildTool.MoveEnd || Tool == BuildTool.Bend))
+            {
+                Wall changed = SelectedWall.Copy();
+                if (Tool == BuildTool.MoveStart) changed.A = p;
+                if (Tool == BuildTool.MoveEnd) changed.B = p;
+                if (Tool == BuildTool.Bend) { changed.Curved = true; changed.Control = p; }
+                preview = new Plan(); preview.Walls.Add(changed);
+            }
+            if (Tool == BuildTool.MoveFixture && SelectedFixture != null)
+            {
+                Fixture changed = SelectedFixture.Copy(); changed.Position = p; preview = new Plan(); preview.Fixtures.Add(changed);
+            }
+            Wall measured = preview != null && preview.Walls.Count > 0 ? preview.Walls[0] : null;
+            if (measured != null)
+            {
+                float angle = Mathf.Atan2(measured.B.Y - measured.A.Y, measured.B.X - measured.A.X) * Mathf.Rad2Deg;
+                PlacementSummary = Geometry.Length(measured).ToString("0.0") + " m" + (measured.Curved ? " · curved" : " · " + Mathf.RoundToInt(Mathf.Repeat(angle, 180)) + "°") + (Snapping ? " · snap on" : " · free placement");
+                guides.Show(measured, Geometry.Validate(measured) != "");
+            }
+            else if (preview != null && preview.Fixtures.Count > 0)
+            {
+                PlacementSummary = FixtureCatalog.Get(preview.Fixtures[0].Kind).Name + " · " + (Snapping ? "0.5 m snap" : "free placement") + " · tap to review";
+                guides.ShowFixture(preview.Fixtures[0]);
+            }
+            else if (Tool != BuildTool.Inspect) { PlacementSummary = hasStart ? "Choose the next point" : "Tap to begin · drag with two fingers to move"; guides.Show(null); }
+            if (Tool != BuildTool.Inspect) view.Preview(preview, SelectedWall, SelectedFixture);
         }
         void Tap(Vector2 screen)
         {
@@ -220,10 +377,15 @@ namespace Cellblock.Unity
             Point raw = p; p = Snap(p);
             if (Tool == BuildTool.Inspect)
             {
-                SelectedWall = NearestWall(raw);
-                SelectedFixture = World.Data.Fixtures.OrderBy(f => Geometry.Distance(f.Position, raw)).FirstOrDefault(f => Geometry.Distance(f.Position, raw) < 1.2f);
-                if (SelectedFixture != null) SelectedWall = null;
-                view.Preview(null, SelectedWall); hud.Refresh(true); return;
+                SelectComponent(screen, raw);
+                if (SelectedWall != null) { guides.Show(SelectedWall); PlacementSummary = Geometry.Length(SelectedWall).ToString("0.0") + " m · " + (SelectedWall.Curved ? "curved wall" : "straight wall"); }
+                else if (SelectedFixture != null) { guides.ShowFixture(SelectedFixture); PlacementSummary = "Selected " + SelectedFixture.Kind.ToLowerInvariant(); }
+                else if (SelectedResident != null) { guides.Show(null); PlacementSummary = SelectedResident.Name + " · " + SelectedResident.Temperament; }
+                else if (SelectedStaff != null) { guides.Show(null); PlacementSummary = SelectedStaff.Name + " · " + SelectedStaff.Role; }
+                else { guides.Show(null); PlacementSummary = ""; }
+                view.Preview(null, SelectedWall, SelectedFixture);
+                view.SelectResident(SelectedResident != null ? SelectedResident.Id : SelectedStaff != null ? SelectedStaff.Id : null);
+                hud.RevealSelection(); hud.Refresh(true); return;
             }
             if (Tool == BuildTool.Wall || Tool == BuildTool.Curve)
             {
@@ -235,16 +397,18 @@ namespace Cellblock.Unity
             }
             if (Tool == BuildTool.Wing) { SetDraft(Facility.Wing(p)); return; }
             if (Tool == BuildTool.Meals) { World.DesignateDining(raw); hud.Refresh(true); return; }
-            if (Tool == BuildTool.Bed || Tool == BuildTool.Table)
+            if (Tool == BuildTool.Bed || Tool == BuildTool.Table || Tool == BuildTool.Furnishing)
             {
-                var plan = new Plan { Name = Tool == BuildTool.Bed ? "Install bed" : "Install table" };
-                plan.Fixtures.Add(new Fixture { Kind = Tool == BuildTool.Bed ? "Bed" : "Table", Position = p }); SetDraft(plan); return;
+                var plan = new Plan { Name = "Install " + FixtureCatalog.Get(PlacementFixtureKind).Name.ToLowerInvariant() };
+                plan.Fixtures.Add(new Fixture { Kind = PlacementFixtureKind, Position = p, Rotation = PlacementRotation }); SetDraft(plan); return;
             }
             if (Tool == BuildTool.Door)
             {
-                Wall wall = NearestWall(raw);
+                Wall wall; float hitDistance; Point wallPoint;
+                FindWall(screen, out wall, out hitDistance, out wallPoint);
+                if (wall == null) { wall = NearestWall(raw); wallPoint = raw; }
                 if (wall == null) { Message("Tap closer to the wall where you want the doorway."); return; }
-                Wall changed = wall.Copy(); changed.Door = Geometry.NearestFraction(wall, raw);
+                Wall changed = wall.Copy(); changed.Door = Geometry.NearestFraction(wall, wallPoint);
                 Replace(wall, changed, "Doorway renovation"); return;
             }
             if (SelectedWall != null)
@@ -265,6 +429,58 @@ namespace Cellblock.Unity
         {
             return World.Data.Walls.OrderBy(w => Geometry.Distance(p, Geometry.OnLength(w, Geometry.NearestFraction(w, p))))
                 .FirstOrDefault(w => Geometry.Distance(p, Geometry.OnLength(w, Geometry.NearestFraction(w, p))) < 0.75f);
+        }
+        static bool HitBox(Ray ray, Vector3 center, Quaternion rotation, Vector3 size, out float distance)
+        {
+            Quaternion inverse = Quaternion.Inverse(rotation);
+            Ray local = new Ray(inverse * (ray.origin - center), inverse * ray.direction);
+            return new Bounds(Vector3.zero, size).IntersectRay(local, out distance);
+        }
+        void FindWall(Vector2 screen, out Wall selected, out float distance, out Point point)
+        {
+            selected = null; distance = float.MaxValue; point = default(Point); Ray ray = cameraRig.ScreenPointToRay(screen);
+            float height = view.WallHeight;
+            foreach (Wall wall in World.Data.Walls)
+                foreach (Segment segment in Geometry.Segments(wall, true))
+                {
+                    Point delta = segment.B - segment.A; float hit;
+                    Quaternion rotation = Quaternion.Euler(0, -Mathf.Atan2(delta.Y, delta.X) * Mathf.Rad2Deg, 0);
+                    if (HitBox(ray, FacilityView.V((segment.A + segment.B) * 0.5f, height * 0.5f + 0.12f), rotation, new Vector3(delta.Length, height, 0.28f), out hit) && hit < distance)
+                    { selected = wall; distance = hit; Vector3 position = ray.GetPoint(hit); point = new Point(position.x, position.z); }
+                }
+        }
+        void SelectComponent(Vector2 screen, Point ground)
+        {
+            Wall wall; float nearest; Point wallPoint; FindWall(screen, out wall, out nearest, out wallPoint);
+            SelectedWall = wall; SelectedFixture = null; SelectedResident = null; SelectedStaff = null; Ray ray = cameraRig.ScreenPointToRay(screen);
+            foreach (Fixture fixture in World.Data.Fixtures)
+            {
+                float hit;
+                FixtureDefinition definition = FixtureCatalog.Get(fixture.Kind);
+                Vector3 size = new Vector3(definition.Width, definition.Height, definition.Depth);
+                if (HitBox(ray, FacilityView.V(fixture.Position, size.y * 0.5f + 0.13f), Quaternion.Euler(0, fixture.Rotation, 0), size, out hit) && hit < nearest)
+                { SelectedFixture = fixture; SelectedWall = null; nearest = hit; }
+            }
+            foreach (Resident resident in World.Data.Residents)
+            {
+                float hit; Vector3 position;
+                if (!view.TryGetPersonPosition(resident.Id, out position)) position = FacilityView.V(resident.Position, 0.14f);
+                if (HitBox(ray, position + Vector3.up * 0.88f, Quaternion.identity, new Vector3(0.58f, 1.85f, 0.58f), out hit) && hit < nearest)
+                { SelectedResident = resident; SelectedFixture = null; SelectedWall = null; nearest = hit; }
+            }
+            foreach (StaffMember staff in World.Data.Staff)
+            {
+                float hit; Vector3 position;
+                if (!view.TryGetPersonPosition(staff.Id, out position)) position = FacilityView.V(staff.Position, 0.14f);
+                if (HitBox(ray, position + Vector3.up * 0.88f, Quaternion.identity, new Vector3(0.58f, 1.85f, 0.58f), out hit) && hit < nearest)
+                { SelectedStaff = staff; SelectedResident = null; SelectedFixture = null; SelectedWall = null; nearest = hit; }
+            }
+            if (SelectedResident == null && SelectedStaff == null && SelectedFixture == null && SelectedWall == null)
+            {
+                string person = view.PickResident(cameraRig, screen);
+                if (person != null) SelectedResident = World.Data.Residents.FirstOrDefault(r => r.Id == person);
+                else SelectedWall = NearestWall(ground);
+            }
         }
         void Replace(Wall old, Wall changed, string name)
         {
@@ -295,22 +511,25 @@ namespace Cellblock.Unity
         void SetDraft(Plan plan)
         {
             Draft = plan; World.Data.DraftPlan = plan; CurrentQuote = World.Quote(plan); hasStart = hasEnd = false;
+            if (plan.Walls.Count > 0) guides.Show(plan.Walls[0], CurrentQuote != null && !CurrentQuote.Valid);
+            else if (plan.Fixtures.Count > 0) guides.ShowFixture(plan.Fixtures[0], CurrentQuote != null && !CurrentQuote.Valid);
             view.Preview(plan); hud.Refresh(true);
         }
         public void Confirm()
         {
             if (Draft == null) return;
             if (!World.Approve(Draft)) { CurrentQuote = World.Quote(Draft); hud.Refresh(true); return; }
-            Draft = null; World.Data.DraftPlan = null; CurrentQuote = null; SelectedWall = null; SelectedFixture = null;
+            Draft = null; World.Data.DraftPlan = null; CurrentQuote = null; SelectedWall = null; SelectedFixture = null; SelectedResident = null; SelectedStaff = null;
+            guides.Show(null); PlacementSummary = "";
             view.Preview(null); SetTool(BuildTool.Inspect); Save(false); hud.Refresh(true);
         }
         public void Cancel()
         {
-            Draft = null; if (World != null) World.Data.DraftPlan = null; CurrentQuote = null; hasStart = hasEnd = false; view.Preview(null, SelectedWall); SetTool(BuildTool.Inspect);
+            Draft = null; if (World != null) World.Data.DraftPlan = null; CurrentQuote = null; hasStart = hasEnd = false; view.Preview(null, SelectedWall, SelectedFixture); SetTool(BuildTool.Inspect);
         }
         public bool Save(bool feedback = true)
         {
-            if (World == null) return true;
+            if (World == null || presentationPreview) return true;
             try
             {
                 Directory.CreateDirectory(SaveDirectory);
@@ -325,6 +544,34 @@ namespace Cellblock.Unity
             }
             catch (Exception e) { Message("Save failed: " + e.Message + ". Keep this session open."); if (hud != null) hud.ShowMenuError("Save failed: " + e.Message); Debug.LogError(e); return false; }
         }
+#if UNITY_EDITOR
+        public void StartPresentationPreview(string contract)
+        {
+            if (!CreateCompany(contract, true)) throw new InvalidOperationException("Could not preserve the active company before preview.");
+            hud.CloseOverlays(); Recenter(); CameraPosition(true);
+        }
+        public void PreviewConstruction()
+        {
+            hud.ShowBuildCatalog("Structure");
+            SetTool(BuildTool.Wing); SetDraft(Facility.Wing(new Point(2, -8))); hud.Refresh(true);
+        }
+        public void PreviewFurnishingStudy()
+        {
+            SelectedResident = null; SelectedStaff = null; SetTool(BuildTool.Inspect);
+            hud.GetComponent<UnityEngine.UIElements.UIDocument>().rootVisualElement.style.display = UnityEngine.UIElements.DisplayStyle.None;
+            view.ShowFurnishingStudy(); focus = new Vector3(11.4f, 0, 15.4f); distance = 16; pitch = 60; yaw = 25;
+        }
+        public void CapturePresentationFrame(string path) { StartCoroutine(CaptureFrame(path)); }
+        System.Collections.IEnumerator CaptureFrame(string path)
+        {
+            yield return new WaitForEndOfFrame();
+            Texture2D frame = ScreenCapture.CaptureScreenshotAsTexture();
+            if (frame == null) { Debug.LogError("Unity did not produce a presentation frame."); yield break; }
+            File.WriteAllBytes(path, frame.EncodeToPNG());
+            Debug.Log("Cellblock captured " + Path.GetFileName(path) + " · " + frame.width + " × " + frame.height);
+            Destroy(frame);
+        }
+#endif
         public bool Load(string fileName = null)
         {
             try
@@ -341,8 +588,8 @@ namespace Cellblock.Unity
                     restored = new World(JsonUtility.FromJson<State>(File.ReadAllText(path + ".bak")));
                     restored.Notice = "Recovered the previous successful save. Your original file is retained.";
                 }
-                World = restored; World.Data.Speed = 0; accumulator = 0; saveId = name.Substring(8, 32);
-                Draft = null; CurrentQuote = null; SelectedWall = null; SelectedFixture = null;
+                World = restored; presentationPreview = false; World.Data.Speed = 0; accumulator = 0; saveId = name.Substring(8, 32);
+                Draft = null; CurrentQuote = null; SelectedWall = null; SelectedFixture = null; SelectedResident = null; SelectedStaff = null;
                 view.Refresh(World, true); SetTool(BuildTool.Inspect); Recenter();
                 if (World.Data.DraftPlan != null)
                 {

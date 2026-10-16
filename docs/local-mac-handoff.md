@@ -17,7 +17,7 @@ Read `README.md`, `CLAUDE.md`, `docs/reboot-vision.md`, and `docs/implementation
 3. Run `bash Tools/open-unity-mac.sh`, open the generated main scene, and enter Play mode. Inspect the output and controls; fix observed problems. Continue through a working local playable milestone.
 4. Use an independent critic subagent for focused design and implementation reviews, as requested by the user. Start from the existing implementation instead of restarting brainstorming. Ask only questions that materially block progress.
 
-The engine-independent core passed 27 cloud checks, and seven C# source files passed a syntax parse. The cloud had no Unity editor: Unity API compilation, imports, Play mode, native builds, and hardware performance remain unverified. Current art is procedural prototype geometry; the concept image is a visual direction reference.
+The initial cloud milestone passed 27 core checks. The continued local milestone now passes 32 core checks and runs in the installed Unity 6000.3.24f1 editor on this Intel Mac. Project setup and Play mode have run locally. See `docs/implementation-status.md` for current evidence and limits. Native builds and actual phone/tablet performance remain unverified. Use **Cellblock → Open game and Play**, then choose or resume a holding; **Controls** explains camera input and **People** opens individual profiles.
 
 ## Product direction
 

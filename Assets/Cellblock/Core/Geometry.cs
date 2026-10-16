@@ -310,7 +310,9 @@ namespace Cellblock.Core
         }
         public static List<Point> Footprint(Fixture fixture)
         {
-            float x = fixture.Kind == "Bed" ? 0.5f : 0.95f, y = fixture.Kind == "Bed" ? 1 : fixture.Kind == "Table" ? 1.1f : 0.6f;
+            FixtureDefinition definition = FixtureCatalog.Get(fixture.Kind);
+            if (definition == null) throw new ArgumentException("Unknown furnishing: " + fixture.Kind);
+            float x = definition.Width / 2, y = definition.Depth / 2;
             double angle = -fixture.Rotation * Math.PI / 180;
             var result = new List<Point>();
             foreach (Point p in new[] { new Point(-x,-y), new Point(x,-y), new Point(x,y), new Point(-x,y) })
@@ -319,8 +321,11 @@ namespace Cellblock.Core
         }
         public static Point AccessPoint(Fixture fixture)
         {
+            FixtureDefinition definition = FixtureCatalog.Get(fixture.Kind);
+            if (definition == null) throw new ArgumentException("Unknown furnishing: " + fixture.Kind);
             double angle = -fixture.Rotation * Math.PI / 180;
-            return fixture.Position + new Point((float)Math.Cos(angle) * 0.8f, (float)Math.Sin(angle) * 0.8f);
+            return fixture.Position + new Point((float)(definition.AccessX * Math.Cos(angle) - definition.AccessY * Math.Sin(angle)),
+                (float)(definition.AccessX * Math.Sin(angle) + definition.AccessY * Math.Cos(angle)));
         }
         public static bool Overlap(IList<Point> a, IList<Point> b)
         {

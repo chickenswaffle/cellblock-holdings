@@ -44,4 +44,4 @@ fi
 if [[ "${1:-}" == --batch-check ]]; then
   exec "$editor_path" -batchmode -nographics -quit -projectPath "$project_root" -executeMethod Cellblock.Editor.ProjectSetup.Validate -logFile -
 fi
-exec "$editor_path" -projectPath "$project_root"
+exec open -na "$bundle_path" --args -projectPath "$project_root"

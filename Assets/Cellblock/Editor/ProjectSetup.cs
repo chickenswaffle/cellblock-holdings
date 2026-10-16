@@ -1,7 +1,9 @@
 using System;
 using System.IO;
+using System.Linq;
 using Cellblock.Unity;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -28,20 +30,45 @@ namespace Cellblock.Editor
         {
             Directory.CreateDirectory("Assets/Cellblock/Scenes"); Directory.CreateDirectory("Assets/Cellblock/Settings");
             AssetDatabase.Refresh();
+            var groundImporter = AssetImporter.GetAtPath("Assets/Cellblock/Resources/Textures/GroundMeadow.png") as TextureImporter;
+            if (groundImporter != null && (groundImporter.maxTextureSize != 1024 || groundImporter.filterMode != FilterMode.Trilinear))
+            {
+                groundImporter.maxTextureSize = 1024; groundImporter.mipmapEnabled = true; groundImporter.wrapMode = TextureWrapMode.Repeat;
+                groundImporter.filterMode = FilterMode.Trilinear; groundImporter.anisoLevel = 2; groundImporter.SaveAndReimport();
+            }
             var pipeline = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(PipelinePath);
+            var renderer = AssetDatabase.LoadAssetAtPath<UniversalRendererData>("Assets/Cellblock/Settings/CellblockRenderer.asset");
+            if (renderer == null)
+            {
+                renderer = ScriptableObject.CreateInstance<UniversalRendererData>();
+                AssetDatabase.CreateAsset(renderer, "Assets/Cellblock/Settings/CellblockRenderer.asset");
+            }
             if (pipeline == null)
             {
-                var renderer = AssetDatabase.LoadAssetAtPath<UniversalRendererData>("Assets/Cellblock/Settings/CellblockRenderer.asset");
-                if (renderer == null)
-                {
-                    renderer = ScriptableObject.CreateInstance<UniversalRendererData>();
-                    AssetDatabase.CreateAsset(renderer, "Assets/Cellblock/Settings/CellblockRenderer.asset");
-                }
                 pipeline = UniversalRenderPipelineAsset.Create(renderer);
                 pipeline.renderScale = 1; pipeline.msaaSampleCount = 2;
                 pipeline.shadowDistance = 55; pipeline.supportsCameraOpaqueTexture = false; pipeline.supportsCameraDepthTexture = false;
                 AssetDatabase.CreateAsset(pipeline, PipelinePath);
             }
+            // Keep the generated renderer's contact shading and sun shadows visible from the management camera.
+            pipeline.shadowDistance = 110; pipeline.supportsCameraDepthTexture = true;
+            ScreenSpaceAmbientOcclusion occlusion = renderer.rendererFeatures.OfType<ScreenSpaceAmbientOcclusion>().FirstOrDefault();
+            if (occlusion == null)
+            {
+                occlusion = ScriptableObject.CreateInstance<ScreenSpaceAmbientOcclusion>(); occlusion.name = "Architectural contact shading";
+                AssetDatabase.AddObjectToAsset(occlusion, renderer); renderer.rendererFeatures.Add(occlusion);
+                var settings = new SerializedObject(occlusion); SerializedProperty values = settings.FindProperty("m_Settings");
+                if (values != null)
+                {
+                    values.FindPropertyRelative("Downsample").boolValue = true;
+                    values.FindPropertyRelative("Intensity").floatValue = 1.1f;
+                    values.FindPropertyRelative("Radius").floatValue = 0.3f;
+                    values.FindPropertyRelative("DirectLightingStrength").floatValue = 0.18f;
+                    settings.ApplyModifiedPropertiesWithoutUndo();
+                }
+                occlusion.Create(); EditorUtility.SetDirty(renderer);
+            }
+            EditorUtility.SetDirty(pipeline);
             if (GraphicsSettings.defaultRenderPipeline == null) GraphicsSettings.defaultRenderPipeline = pipeline;
             if (QualitySettings.renderPipeline == null) QualitySettings.renderPipeline = pipeline;
             if (AssetDatabase.LoadAssetAtPath<Material>(MaterialPath) == null)
@@ -53,11 +80,21 @@ namespace Cellblock.Editor
             if (!File.Exists(ScenePath))
             {
                 Scene active = SceneManager.GetActiveScene();
-                Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
+                bool replaceUntitledStartupScene = string.IsNullOrEmpty(active.path);
+                if (replaceUntitledStartupScene && active.isDirty)
+                    throw new InvalidOperationException("Save the current untitled scene before preparing the Cellblock scene.");
+                if (replaceUntitledStartupScene && SceneManager.sceneCount != 1)
+                    throw new InvalidOperationException("Save the active untitled scene before preparing Cellblock when multiple scenes are open.");
+                Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,
+                    replaceUntitledStartupScene ? NewSceneMode.Single : NewSceneMode.Additive);
                 var root = new GameObject("Cellblock Holdings"); root.AddComponent<GameController>();
-                SceneManager.MoveGameObjectToScene(root, scene); EditorSceneManager.SaveScene(scene, ScenePath);
-                EditorSceneManager.CloseScene(scene, true);
-                if (!active.isDirty && string.IsNullOrEmpty(active.path)) EditorSceneManager.OpenScene(ScenePath);
+                SceneManager.MoveGameObjectToScene(root, scene);
+                if (!EditorSceneManager.SaveScene(scene, ScenePath))
+                {
+                    if (!replaceUntitledStartupScene) EditorSceneManager.CloseScene(scene, true);
+                    throw new IOException("Unity could not save the generated Cellblock main scene.");
+                }
+                if (!replaceUntitledStartupScene) EditorSceneManager.CloseScene(scene, true);
             }
             if (EditorBuildSettings.scenes.Length == 0)
                 EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
@@ -65,7 +102,7 @@ namespace Cellblock.Editor
             PlayerSettings.defaultScreenWidth = 1600; PlayerSettings.defaultScreenHeight = 900;
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.LandscapeLeft;
             PlayerSettings.runInBackground = false;
-            PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.iOS, "com.cellblockholdings.game");
+            PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, "com.cellblockholdings.game");
             PlayerSettings.iOS.targetOSVersionString = "16.0";
             PlayerSettings.colorSpace = ColorSpace.Linear;
             // The prototype uses Unity's built-in touch/mouse API, with no Input System package requirement.

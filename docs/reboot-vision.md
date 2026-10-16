@@ -6,7 +6,7 @@ This describes a new Unity game built around the owner's facility and company de
 ## What the user has established
 
 - Keep the repository name and overhaul the game.
-- Use Unity for the reboot. Unity 6, C#, and URP are the implementation baseline; the installed Mac editor version still needs inspection in a local execution session.
+- Use Unity for the reboot. Unity 6, C#, and URP are the implementation baseline; the local Mac milestone now runs in Unity 6000.3.24f1.
 - Build a highly customizable prison owner simulation: choose a city, acquire land, design a facility, manage people and amenities, hire and train workers, and pursue government contracts.
 - Include a meaningful business journey, potentially including public ownership and outside investments. Teach economics through play.
 - Give mobile and Steam equal consideration from day one, with mobile the main experience. Explicit Apple targets are iPhone, iPad, and Mac; the user already has an Apple Developer account and familiarity with Apple's ecosystem. Include Windows if it is practical and performs well; this is conditional rather than an unconditional launch commitment. The Mac distribution route is still open.
@@ -18,7 +18,7 @@ This describes a new Unity game built around the owner's facility and company de
 - Aim for realistic, polished presentation: believable people, architecture, materials, and animation. The user rejects childish or stick-figure presentation. Narrative tone remains undecided; visual realism does not settle whether the writing is earnest or satirical.
 - Use an independent critic, discuss tradeoffs, and ask questions as the idea develops.
 
-Unity implementation has started at the repository root. The C# core has executable cloud checks, while Unity/editor/device execution is still required. No paid purchase or publication has occurred.
+Unity implementation is active at the repository root. The C# core has executable checks and the project now runs in the local Mac Unity editor; native player and device validation are still required. No paid purchase or publication has occurred.
 
 ## Proposed promise
 
@@ -46,7 +46,7 @@ The player should care about the prison even after unlocking a company dashboard
 
 | Decision | Recommendation | Reason and tradeoff |
 | --- | --- | --- |
-| Engine | Unity 6 with C# and URP 17.0.4 is the current code baseline | The Mac launcher selects an installed Unity 6 editor and records its actual version. Engine APIs and package imports still require editor validation. Simulation performance must be profiled. |
+| Engine | Unity 6 with C# and URP 17.0.4 is the current code baseline | The Mac launcher selects an installed Unity 6 editor and records its actual version. Engine APIs and package imports have passed local editor validation in Unity 6000.3.24f1 with bundled URP 17.3. Simulation performance still needs sustained profiling. |
 | Platforms | iPhone and iPad as primary touch experiences; Mac and Steam participate in the first technical slice, with an early Windows feasibility check | Initial hardware references are iPhone 17 Pro, iPad Pro, and M4 MacBook Air. Include Windows if practical and validated; its launch status is conditional. Validate sustained performance, controls, memory, and input differences. The Mac storefront remains open. |
 | Camera and art | Realistic 3D with believable scale, architectural materials, restrained animation, roof cutaways, and readable close views | This follows the user's visual direction. Fidelity needs a defined mobile rendering budget, strong art direction, and representative on-device scenes. Narrative tone remains open. |
 | Player role | Facility owner and company leader from the first session | Include consequential contract, cash, staffing, and physical design decisions immediately. Multiple facilities and public ownership add complexity later; equal importance does not require all corporate mechanics in the tutorial. |
@@ -281,10 +281,10 @@ Construction and operations use the same game clock. Absence does not advance pa
 
 Resolved direction: mobile and Steam considered together from day one, mainly mobile; explicit iPhone/iPad/Mac intent; conditional interest in Windows; facility building and company management equally important; contract-led opening with a budget and fully editable basic facility; freeform construction and editable connected prefabs; hired construction crews with additional crews accelerating work; realistic, mature visual presentation; initial reference devices iPhone 17 Pro, iPad Pro, and M4 MacBook Air.
 
-Immediate execution prerequisite: access the Unity installation on the current Mac in a local development session, compile/import the project, and run the construction proof. Inspect the actual editor version, Xcode availability, and device connections there. The iPad generation and exact reference-device resources can be checked while connecting the build path. Further design questions include company/world persistence and online requirements, financial failure/recovery, and the definition of a successful owner when profit conflicts with safety or staff welfare. Narrative tone remains deliberately open. Later discussion: scale; session length; fictional versus real places; campaign and sandbox; business model; asset budget; and optional multistory, terrain, or walk-through depth.
+The local editor prerequisite is complete: the project imports and runs in Unity 6000.3.24f1 on this Mac. Next platform checks include Xcode availability, connected devices, native builds, and actual touch/lifecycle behavior. The iPad generation and exact reference-device resources can be checked while connecting the build path. Further design questions include company/world persistence and online requirements, financial failure/recovery, and the definition of a successful owner when profit conflicts with safety or staff welfare. Narrative tone remains deliberately open. Later discussion: scale; session length; fictional versus real places; campaign and sandbox; business model; asset budget; and optional multistory, terrain, or walk-through depth.
 
 ## Current tooling evidence
 
-This chat currently operates in a Linux cloud workspace. No Unity editor/control integration or executable is available in that execution context. App metadata identifies a local project at `/Users/trading/Documents/ChatGPT/Cellblock Holdings`, but the tools cannot execute commands on that Mac or automatically synchronize the cloud checkout into it. The user authorizes local development and reports Unity installed. A local execution connection is still required for editor and device validation.
+The project now runs in Unity 6000.3.24f1 on the local Intel Mac at `/Users/trading/Documents/ChatGPT/Cellblock Holdings`. The Mac has an AMD Radeon Pro 580X. Actual editor preparation, imports, API compilation, and Play mode have run. The core checks pass locally with a verified .NET SDK. Camera, UI, furnishings, and individual/social behavior have been developed from the committed Unity implementation.
 
-This brief describes the broader design. The first implementation source and its exact validation boundaries are recorded in [implementation status](implementation-status.md) and the root README. The standalone core checks pass; Unity compilation, rendering, Play mode, and device performance remain unverified.
+See [implementation status](implementation-status.md) for current evidence and limits. The broader device acceptance criteria, native builds, and sustained performance remain open. Earlier cloud-only limitations describe the prior environment and no longer describe this local session.

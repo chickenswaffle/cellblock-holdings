@@ -36,11 +36,43 @@ static class Program
         });
         Test("starter residents have routes to meals and yard", () => {
             World world = County();
+            var mealSlots = new HashSet<Point>(); var yardSlots = new HashSet<Point>();
             for (int i = 0; i < world.Data.Residents.Count; i++)
             {
                 Resident r = world.Data.Residents[i]; Point meal = world.ServiceDestination(i, true), yard = world.ServiceDestination(i, false);
+                Check(mealSlots.Add(meal) && yardSlots.Add(yard), "Residents share a meal or yard destination");
+                Check(world.Routes.Clear(meal, meal) && world.Routes.Clear(yard, yard), "A service destination overlaps an obstacle");
                 Check(world.Routes.Find(r.Home, meal) != null, r.Name + " cannot reach meals: home=" + r.Home + ", destination=" + meal + ", homeClear=" + world.Routes.Clear(r.Home,r.Home) + ", destinationClear=" + world.Routes.Clear(meal,meal));
                 Check(world.Routes.Find(r.Home, yard) != null, r.Name + " cannot reach the yard");
+            }
+            Check(mealSlots.Count == world.Data.Residents.Count && yardSlots.Count == world.Data.Residents.Count,
+                "Not every resident has a distinct service slot");
+            Check(Enumerable.Range(0, 24).Select(i => world.ServiceDestination(i, true)).Distinct().Count() == 24 &&
+                Enumerable.Range(0, 24).Select(i => world.ServiceDestination(i, false)).Distinct().Count() == 24,
+                "Service destinations recycle when a roster exceeds the current contract size");
+        });
+        Test("all catalog items quote, hand over, block navigation, and survive save/load", () => {
+            foreach (FixtureDefinition definition in FixtureCatalog.All)
+            {
+                World world = County();
+                var plan = new Plan { Name = "Catalog: " + definition.Name };
+                plan.Fixtures.Add(new Fixture { Kind = definition.Id, Position = new Point(-1, -1.3f) });
+                Quote quote = world.Quote(plan);
+                Check(quote.Valid, definition.Id + " quote rejected: " + quote.Message);
+                Check(quote.MaterialCents == definition.PriceCents, definition.Id + " used the wrong material price");
+                Check(world.Approve(plan) && world.HireCrew(), definition.Id + " project could not be approved or staffed");
+                Finish(world);
+                Fixture installed = world.Data.Fixtures.Single(f => f.Kind == definition.Id && Geometry.Distance(f.Position, new Point(-1, -1.3f)) < 0.01f);
+                List<Point> footprint = Geometry.Footprint(installed);
+                Check(footprint.Count == 4, definition.Id + " did not produce a complete footprint");
+                var routes = new Navigation(world.Data.Walls, world.Data.Fixtures);
+                Check(!routes.Clear(installed.Position + new Point(-2, 0), installed.Position + new Point(2, 0)),
+                    definition.Id + " did not block navigation across its footprint");
+                World loaded = new World(RoundTrip(world.Data));
+                Fixture restored = loaded.Data.Fixtures.Single(f => f.Kind == definition.Id && Geometry.Distance(f.Position, new Point(-1, -1.3f)) < 0.01f);
+                Check(Math.Abs(Geometry.Distance(restored.Position, installed.Position)) < 0.001f &&
+                    Math.Abs(Geometry.Area(Geometry.Footprint(restored)) - definition.Width * definition.Depth) < 0.02f,
+                    definition.Id + " geometry changed after save/load");
             }
         });
         Test("room faces retain doors as room boundaries and triangulate their area", () => {
@@ -147,7 +179,7 @@ static class Program
             {
                 Point[] before = world.Data.Residents.Select(r => r.Position).ToArray(); world.AdvanceMinutes(1);
                 for (int i = 0; i < before.Length; i++)
-                    Check(world.Routes.Clear(before[i], world.Data.Residents[i].Position), "Resident crossed a wall");
+                    Check(world.Routes.Clear(before[i], world.Data.Residents[i].Position), "Resident crossed a wall at minute " + world.Data.Minute + " " + before[i].X + "," + before[i].Y + " -> " + world.Data.Residents[i].Position.X + "," + world.Data.Residents[i].Position.Y);
             }
         });
         Test("out-of-bounds and folded curves are rejected", () => {
@@ -199,6 +231,25 @@ static class Program
             var plan = new Plan(); plan.Walls.Add(Facility.Line(target.X, target.Y - 0.4f, target.X, target.Y + 0.4f));
             Check(!world.Quote(plan).Valid, "A wall over a resident's exact meal destination was approved");
         });
+        Test("staff stations cannot overlap furniture and legacy staff migrate around it", () => {
+            World world = County();
+            var plan = new Plan { Name = "Staff station obstruction" };
+            plan.Fixtures.Add(new Fixture { Kind = "Bookshelf", Position = new Point(-5.5f, -0.5f) });
+            world.Data.Staff[0].Position = plan.Fixtures[0].Position;
+            Quote quote = world.Quote(plan);
+            Check(!quote.Valid && quote.Message.Contains("staff station"), "A fixture centered on a staff station was approved");
+
+            State invalid = RoundTrip(world.Data); invalid.Fixtures.Add(new Fixture { Id = "blocked-station", Kind = "Bookshelf", Position = new Point(2.8f, -6) });
+            invalid.Staff[0].Position = invalid.Fixtures.Last().Position;
+            bool rejected = false; try { new World(invalid); } catch (ArgumentException) { rejected = true; }
+            Check(rejected, "A loaded staff member inside a furnishing was accepted");
+
+            State legacy = RoundTrip(world.Data); legacy.Staff.Clear();
+            legacy.Fixtures.Add(new Fixture { Id = "legacy-station", Kind = "Bookshelf", Position = new Point(2.8f, -6) });
+            World migrated = new World(legacy);
+            Check(migrated.Data.Staff.All(s => !Geometry.Contains(Geometry.Footprint(legacy.Fixtures.Last()), s.Position)),
+                "Newly hydrated legacy staff were left inside an existing furnishing");
+        });
         Test("invalid numeric geometry cannot erase collision", () => {
             Wall wall = Facility.Line(0, 0, 4, 0); wall.Door = float.NaN;
             Check(Geometry.Validate(wall) != "", "NaN doorway accepted");
@@ -241,6 +292,89 @@ static class Program
             World loaded = new World(RoundTrip(world.Data));
             Check(loaded.Data.DraftPlan.Walls.Count == 4 && loaded.Quote(loaded.Data.DraftPlan).Valid, "Unapproved plan was lost");
             Check(loaded.Data.CashCents == cash && loaded.Data.Projects.Count == 0, "Saving the draft approved or charged it");
+        });
+        Test("resident identity and relationships are seeded, stable, and staggered", () => {
+            World first = County(), repeat = County();
+            Check(first.Data.Seed == repeat.Data.Seed, "Contract seed changed between identical starts");
+            Check(first.Data.Residents.Count == repeat.Data.Residents.Count && first.Data.Staff.Count == 3, "Resident or staff roster was not initialized");
+            Check(first.Data.Residents.Select(r => r.Id).Distinct().Count() == first.Data.Residents.Count, "Resident identities are not unique");
+            Check(first.Data.Residents.Select(r => r.NextDecisionMinute).Distinct().Count() > 4, "Routine decisions were synchronized");
+            for (int i = 0; i < first.Data.Residents.Count; i++)
+            {
+                Resident a = first.Data.Residents[i], b = repeat.Data.Residents[i];
+                Check(a.Id == b.Id && a.Clique == b.Clique && a.Temperament == b.Temperament && Math.Abs(a.Impulsivity - b.Impulsivity) < 0.001f,
+                    "Seeded profile changed across identical starts");
+                Check(a.Gang == b.Gang, "Seeded gang affiliation changed across identical starts");
+                Check(a.Relationships.Count == first.Data.Residents.Count - 1, "Relationship graph is incomplete");
+                foreach (Relationship relation in a.Relationships)
+                {
+                    Resident other = first.Data.Residents.First(r => r.Id == relation.OtherId);
+                    Relationship reciprocal = other.Relationships.First(r => r.OtherId == a.Id);
+                    Check(Math.Abs(relation.Trust - reciprocal.Trust) < 0.001f && Math.Abs(relation.Tension - reciprocal.Tension) < 0.001f,
+                        "Relationship state is not reciprocal");
+                }
+            }
+            Check(first.Data.Residents.Select(r => r.WalkSpeed).Distinct().Count() > 2, "Residents do not have individual movement pace");
+            var startingPositions = first.Data.Residents.ToDictionary(r => r.Id, r => r.Position);
+            first.AdvanceMinutes(3);
+            int moved = first.Data.Residents.Count(r => Geometry.Distance(r.Position, startingPositions[r.Id]) > 0.02f);
+            Check(moved > 0 && moved < first.Data.Residents.Count, "Initial routine departures were not staggered");
+            first.AdvanceMinutes(35);
+            Check(first.Data.Residents.All(r => Geometry.Distance(r.Position, startingPositions[r.Id]) > 0.02f),
+                "Residents did not eventually leave their initial positions");
+        });
+        Test("version-1 saves hydrate missing people fields without changing money or identities", () => {
+            World source = County(); long cash = source.Data.CashCents; int ledgerCount = source.Data.Ledger.Count;
+            State legacy = RoundTrip(source.Data); legacy.Seed = 0; legacy.Staff.Clear(); legacy.History = null;
+            foreach (Resident resident in legacy.Residents)
+            {
+                resident.Id = ""; resident.Temperament = ""; resident.Clique = ""; resident.Gang = null; resident.Relationships = null;
+                resident.Patience = resident.Sociability = resident.Impulsivity = resident.Discipline = 0;
+                resident.WalkSpeed = 0;
+            }
+            World loaded = new World(legacy);
+            Check(loaded.Data.Version == 1 && loaded.Data.CashCents == cash && loaded.Data.Ledger.Count == ledgerCount,
+                "Hydrating people altered the version-1 ledger");
+            Check(loaded.Data.Staff.Count == 3 && loaded.Data.History != null, "Missing legacy staff/history state was not initialized");
+            Check(loaded.Data.Residents.All(r => r.Id != "" && r.Relationships.Count == loaded.Data.Residents.Count - 1 && r.WalkSpeed >= 0.82f),
+                "Legacy residents did not receive complete safe defaults");
+            Check(loaded.Data.Residents.Select(r => r.Name).SequenceEqual(source.Data.Residents.Select(r => r.Name)) &&
+                loaded.Data.Residents.All(r => !string.IsNullOrEmpty(r.Gang)), "Legacy names or gang defaults were lost");
+            World again = new World(RoundTrip(loaded.Data));
+            Check(again.Data.Residents[0].Id == loaded.Data.Residents[0].Id && again.Data.Staff[0].Id == loaded.Data.Staff[0].Id,
+                "Hydrated identities changed after save/load");
+            State missingResidents = RoundTrip(source.Data); missingResidents.Residents = null;
+            bool rejected = false; try { new World(missingResidents); } catch (ArgumentException) { rejected = true; }
+            Check(rejected, "A save with its original resident list missing loaded as an empty prison");
+            State partialGraph = RoundTrip(source.Data);
+            Relationship preserved = partialGraph.Residents[0].Relationships[0]; preserved.Trust = 61; preserved.Tension = 32;
+            partialGraph.Residents[1].Relationships.Clear();
+            World graphLoaded = new World(partialGraph);
+            Relationship restored = graphLoaded.Data.Residents[0].Relationships.First(r => r.OtherId == graphLoaded.Data.Residents[1].Id);
+            Check(restored.Trust == 61 && restored.Tension == 32, "Filling a partial relationship graph reset an existing relationship");
+        });
+        Test("social thresholds and high-risk guard misconduct create traceable wellbeing consequences", () => {
+            World world = County(); Resident a = world.Data.Residents[0], b = world.Data.Residents[1];
+            a.Position = b.Position; a.Impulsivity = b.Impulsivity = 100; a.Stress = b.Stress = 100;
+            Relationship ab = a.Relationships.First(r => r.OtherId == b.Id), ba = b.Relationships.First(r => r.OtherId == a.Id);
+            ab.Trust = ba.Trust = 10; ab.Tension = ba.Tension = 81.9f; world.Data.Minute = 600;
+            PeopleDynamics.Advance(world);
+            Check(ab.Kind == "Nemesis" && world.Data.History.Any(e => e.Category == "relationship" && e.Description.Contains("nemeses")),
+                "A relationship crossing into nemesis status was not recorded");
+            StaffMember guard = new StaffMember { Id = "guard-test-0", Name = "Officer Test", Role = "Officer", Position = new Point(0, 0), Integrity = 0, Pressure = 100, LastIncidentMinute = -1000 };
+            world.Data.Staff.Add(guard); float priorSafety = a.Safety;
+            PeopleDynamics.Advance(world);
+            Check(world.Data.History.Any(e => (e.Category == "contraband" || e.Category == "favoritism") && e.SubjectId == guard.Id) && a.Safety < priorSafety,
+                "Misconduct risk did not create a logged safety consequence");
+            long cash = world.Data.CashCents; float oldIntegrity = guard.Integrity, oldPressure = guard.Pressure;
+            Check(world.SupportStaff(guard.Id), world.Notice);
+            Check(world.Data.CashCents == cash - 250000 && guard.Integrity == oldIntegrity + 8 && guard.Pressure == oldPressure - 25,
+                "Staff support did not apply its quoted financial and safety controls");
+            Check(world.Reconciles() && world.Data.History.Any(e => e.Category == "staff-support"), "Staff support was not reconciled and logged");
+            StaffMember stable = world.Data.Staff.First(s => s.Role == "Caseworker");
+            stable.Integrity = 100; stable.Pressure = stable.Favoritism = 0; cash = world.Data.CashCents;
+            Check(!world.SupportStaff(stable.Id) && world.Data.CashCents == cash,
+                "Support charged for a fully stable staff member with no support need");
         });
         Console.WriteLine("\n" + passed + " passed, " + failed + " failed. These checks exercise the C# core; they do not run Unity.");
         Environment.ExitCode = failed == 0 ? 0 : 1;
