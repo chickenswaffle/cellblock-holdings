@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "editor": "6000.3.24f1",
+  "message": "Actual Unity Play mode: boot, desktop/phone UI, categorized catalog, catalog furnishing models, people/staff profiles, live individual routines, Unity JSON social-state round trip, connected wing quote, camera changes, full-height view. Manual pointer/touch feel and device performance remain separate checks.",
+  "errors": [],
+  "captures": [
+    "01-contracts-desktop.png",
+    "02-facility-desktop.png",
+    "03-construction-review.png",
+    "04-architecture-detail.png",
+    "05-full-height.png",
+    "06-facility-phone.png",
+    "07-construction-phone.png",
+    "08-contracts-phone.png",
+    "09-build-catalog.png",
+    "10-resident-profile.png",
+    "11-staff-profile.png",
+    "12-individual-routines.png",
+    "13-people-phone.png",
+    "14-catalog-phone.png",
+    "15-relationships.png",
+    "16-furnishing-models.png"
+  ]
+}

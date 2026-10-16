@@ -36,3 +36,5 @@ The permanent decorative site fence is not a complete breach/climbing simulation
 
 - Current core suite: 84 passed, 0 failed, including 72 prefab/package/rotation quotes, stable upgrade identity, save/resume, no early capability, wiring/isolation, local lighting, qualifications/fees, dogs/rest, staffing/climb, comfort, metering, perimeter placement, door preservation and exact two-crew handover clearance.
 - Actual Unity 6000.3.24f1 security review passed all nine captures with no runtime errors. It covers a connected unit quote and build, actual tower arrival/climb, dog/patrol rendering, upgrade quote/handover, Unity JSON reload, powered night illumination, isolation, phone equipment controls and repeat-placement purchase persistence. Local images/report: `Builds/SecurityReview/2026-10-16/`. The small report and core transcript are retained in `docs/reviews/`.
+
+- Final general regression also passed all sixteen captures with no runtime errors after the quote layout change. See `docs/reviews/presentation-2026-10-16.json`. Implementation checkpoint: `a6d2afc`; subsequent documentation commits publish the exact ownership handoff.

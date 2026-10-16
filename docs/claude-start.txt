@@ -5,7 +5,7 @@ Current coordination update: the user reports you are working on prisoner lives 
 Handoff ready: build richer resident lives and animation for Cellblock Holdings.
 
 Repository: https://github.com/chickenswaffle/cellblock-holdings
-Fetch base branch codex/live-operations-handoff and confirm commit9624674 is included. Your finished justice branch49aff6e is integrated and reviewed, with Codex save/presence/release fixes. Do not start from the old justice branch alone.
+Fetch codex/live-operations-handoff and confirm security checkpoint a6d2afc and integration commit9624674 are included. Your finished justice branch49aff6e is integrated and reviewed, with Codex save/presence/release fixes. Do not start from the old justice branch alone.
 
 Read AGENTS.md, CLAUDE.md, COORDINATION.md, docs/claude-lives-handoff.md and docs/implementation-status.md. Preserve all existing work. In your separate clone, create codex/claude-resident-lives from the updated shared base. Claim resident-lives and acknowledge your plan in your own coordination log.
 

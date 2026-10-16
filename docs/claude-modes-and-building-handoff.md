@@ -1,6 +1,6 @@
 # Claude continuation: opening modes, prisoner lives and faster building
 
-The user assigned Claude richer prisoner lives and the new opening-mode/HUD direction. Codex's security/services checkpoint is the integration base. Fetch the latest `codex/live-operations-handoff`, preserve your own commits and unfinished work, and read COORDINATION.md. Do not reset your branch. This handoff becomes active when the published ownership table reserves `opening-and-build-ui` for Claude and you acknowledge/claim that scope.
+The user assigned Claude richer prisoner lives and the new opening-mode/HUD direction. Codex's security/services checkpoint `a6d2afc` is the integration base. Fetch the latest `codex/live-operations-handoff`, preserve your own commits and unfinished work, and read COORDINATION.md. Do not reset your branch. This handoff becomes active when the published ownership table reserves `opening-and-build-ui` for Claude and you acknowledge/claim that scope.
 
 ## Concrete file handoff
 
