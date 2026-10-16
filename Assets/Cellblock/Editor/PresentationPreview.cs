@@ -15,7 +15,7 @@ namespace Cellblock.Editor
     public static partial class PresentationPreview
     {
         const string Request = "Temp/CellblockPresentation.request";
-        static string Output { get { string mode = SessionState.GetString(ModeKey, ""); return mode == "operations" ? "Temp/CellblockOperations" : mode == "justice" ? "Temp/CellblockJustice" : "Temp/CellblockPresentation"; } }
+        static string Output { get { string mode = SessionState.GetString(ModeKey, ""); return mode == "operations" ? "Temp/CellblockOperations" : mode == "security" ? "Temp/CellblockSecurity" : mode == "justice" ? "Temp/CellblockJustice" : "Temp/CellblockPresentation"; } }
         const string ModeKey = "Cellblock.Presentation.Mode", StageKey = "Cellblock.Presentation.Stage";
         const string WaitKey = "Cellblock.Presentation.Wait", StartKey = "Cellblock.Presentation.Start", ErrorKey = "Cellblock.Presentation.Errors";
         const string PendingKey = "Cellblock.Presentation.Pending", WidthKey = "Cellblock.Presentation.Width", HeightKey = "Cellblock.Presentation.Height";
@@ -32,7 +32,7 @@ namespace Cellblock.Editor
         static void RequestRun(string mode) { Directory.CreateDirectory("Temp"); File.WriteAllText(Request, mode); }
         static void Log(string condition, string stack, LogType type)
         {
-            if ((SessionState.GetString(ModeKey, "") != "capture" && SessionState.GetString(ModeKey, "") != "operations" && SessionState.GetString(ModeKey, "") != "justice") || !EditorApplication.isPlaying) return;
+            if ((SessionState.GetString(ModeKey, "") != "capture" && SessionState.GetString(ModeKey, "") != "operations" && SessionState.GetString(ModeKey, "") != "justice" && SessionState.GetString(ModeKey, "") != "security") || !EditorApplication.isPlaying) return;
             if (type != LogType.Error && type != LogType.Exception && type != LogType.Assert) return;
             string errors = SessionState.GetString(ErrorKey, "");
             string message = condition.Replace('\n', ' ');
@@ -53,12 +53,12 @@ namespace Cellblock.Editor
             {
                 if (!File.Exists(Request)) return;
                 mode = File.ReadAllText(Request).Trim(); File.Delete(Request);
-                if (mode != "play" && mode != "capture" && mode != "edit" && mode != "operations" && mode != "justice") return;
+                if (mode != "play" && mode != "capture" && mode != "edit" && mode != "operations" && mode != "justice" && mode != "security") return;
                 SessionState.SetString(ModeKey, mode); SessionState.SetInt(StageKey, -1);
                 SessionState.SetString(ErrorKey, ""); SessionState.SetFloat(StartKey, (float)EditorApplication.timeSinceStartup);
                 SessionState.SetString(PendingKey, "");
                 Directory.CreateDirectory(Output);
-                if (mode == "capture" || mode == "operations" || mode == "justice")
+                if (mode == "capture" || mode == "operations" || mode == "justice" || mode == "security")
                 {
                     foreach (string file in Directory.GetFiles(Output, "*.png")) File.Delete(file);
                     if (File.Exists(Path.Combine(Output, "report.json"))) File.Delete(Path.Combine(Output, "report.json"));
@@ -73,7 +73,7 @@ namespace Cellblock.Editor
             }
             if (mode == "stopping")
             { if (!EditorApplication.isPlayingOrWillChangePlaymode) SessionState.SetString(ModeKey, ""); return; }
-            if (EditorApplication.timeSinceStartup - SessionState.GetFloat(StartKey, 0) > (mode == "operations" ? 600 : 150))
+            if (EditorApplication.timeSinceStartup - SessionState.GetFloat(StartKey, 0) > (mode == "operations" || mode == "security" ? 600 : 150))
             { Fail("Unity presentation check timed out."); return; }
             int stage = SessionState.GetInt(StageKey, -1);
             if (stage == -1)
@@ -99,10 +99,10 @@ namespace Cellblock.Editor
                 if (!EditorApplication.isPlayingOrWillChangePlaymode) Fail("Unity could not enter Play mode. Resolve the editor compilation errors before retrying.");
                 return;
             }
-            if ((mode == "capture" || mode == "operations" || mode == "justice") && !SessionState.GetBool("Cellblock.Review.RefreshHeld", false))
+            if ((mode == "capture" || mode == "operations" || mode == "justice" || mode == "security") && !SessionState.GetBool("Cellblock.Review.RefreshHeld", false))
             { AssetDatabase.DisallowAutoRefresh(); SessionState.SetBool("Cellblock.Review.RefreshHeld", true); }
             EditorApplication.isPaused = false;
-            if (mode == "capture" || mode == "operations" || mode == "justice") Application.runInBackground = true;
+            if (mode == "capture" || mode == "operations" || mode == "justice" || mode == "security") Application.runInBackground = true;
             string pending = SessionState.GetString(PendingKey, "");
             if (pending != "")
             {
@@ -117,6 +117,16 @@ namespace Cellblock.Editor
             GameController game = UnityEngine.Object.FindFirstObjectByType<GameController>();
             if (game == null) { Fail("The game controller did not initialize in Play mode."); return; }
             if (mode == "play") { SessionState.SetString(ModeKey, ""); Debug.Log("CELLBLOCK_PLAY_MODE_READY"); return; }
+            if (mode == "security")
+            {
+                try
+                {
+                    if(!RunSecurityStage(game,stage))return;
+                    SessionState.SetInt(StageKey,stage+1);SessionState.SetFloat(WaitKey,(float)EditorApplication.timeSinceStartup+1.8f);
+                }
+                catch(Exception error){Fail(error.ToString());}
+                return;
+            }
             if (mode == "justice")
             {
                 try
@@ -203,7 +213,7 @@ namespace Cellblock.Editor
             string[] errors = SessionState.GetString(ErrorKey, "").Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
             if (Directory.GetFiles(Output, "*.png").Length != 16) { Fail("The review did not produce all sixteen required captures."); return; }
             var report = new Report { passed = errors.Length == 0, editor = Application.unityVersion,
-                message = "Actual Unity Play mode: boot, desktop/phone UI, categorized catalog, all fourteen furnishing models, people/staff profiles, live individual routines, Unity JSON social-state round trip, connected wing quote, camera changes, full-height view. Manual pointer/touch feel and device performance remain separate checks.",
+                message = "Actual Unity Play mode: boot, desktop/phone UI, categorized catalog, catalog furnishing models, people/staff profiles, live individual routines, Unity JSON social-state round trip, connected wing quote, camera changes, full-height view. Manual pointer/touch feel and device performance remain separate checks.",
                 errors = errors, captures = Directory.GetFiles(Output, "*.png").Select(Path.GetFullPath).ToArray() };
             File.WriteAllText(Path.Combine(Output, "report.json"), JsonUtility.ToJson(report, true));
             Debug.Log(report.passed ? "CELLBLOCK_PRESENTATION_CHECK_PASSED" : "CELLBLOCK_PRESENTATION_CHECK_FAILED");

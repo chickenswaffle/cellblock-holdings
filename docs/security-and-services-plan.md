@@ -1,6 +1,6 @@
 # Connected units, security and building services
 
-Owner: Codex. Status: implementation plan for the next bounded milestone; this file does not claim these features already work. Claude owns the separately handed-off resident life/story slice. Read COORDINATION.md first.
+Owner: Codex. Status: first bounded implementation completed; see security-and-services-status.md for exact behavior, evidence and remaining limits. The design rules below also guide subsequent work. Claude owns the separately handed-off resident life/story slice. Read COORDINATION.md first.
 
 ## Rules the code must enforce
 

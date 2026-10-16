@@ -64,7 +64,7 @@ namespace Cellblock.Unity
         void ArmPose(Actor actor, int arm, Vector3 hand, float blend)
         {
             // Analytic two-bone arms keep the hands with the tool while elbows bend naturally.
-            Vector3 shoulder = actor.Root.InverseTransformPoint(actor.Limbs[arm].position);
+            Vector3 shoulder = actor.Model.InverseTransformPoint(actor.Limbs[arm].position);
             Vector3 delta = hand - shoulder;
             float distance = Mathf.Clamp(delta.magnitude, 0.10f, 0.53f);
             Vector3 direction = delta.normalized;
@@ -73,8 +73,8 @@ namespace Cellblock.Unity
             Vector3 bend = Vector3.ProjectOnPlane(new Vector3(arm == 0 ? -1 : 1, -0.25f, -0.2f), direction).normalized;
             Vector3 elbow = shoulder + direction * along + bend * Mathf.Sqrt(Mathf.Max(0, upper * upper - along * along));
             Vector3 grip = shoulder + direction * distance;
-            Quaternion upperRotation = actor.Root.rotation * Quaternion.FromToRotation(Vector3.down, (elbow - shoulder).normalized);
-            Quaternion lowerRotation = actor.Root.rotation * Quaternion.FromToRotation(Vector3.down, (grip - elbow).normalized);
+            Quaternion upperRotation = actor.Model.rotation * Quaternion.FromToRotation(Vector3.down, (elbow - shoulder).normalized);
+            Quaternion lowerRotation = actor.Model.rotation * Quaternion.FromToRotation(Vector3.down, (grip - elbow).normalized);
             actor.Limbs[arm].rotation = Quaternion.Slerp(actor.Limbs[arm].rotation, upperRotation, blend);
             actor.Forearms[arm].rotation = Quaternion.Slerp(actor.Forearms[arm].rotation, lowerRotation, blend);
         }

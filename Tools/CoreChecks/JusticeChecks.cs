@@ -212,12 +212,16 @@ static partial class Program
             Check(world.StageEscapeDemo(), world.Notice);
             Resident resident = world.Escapee;
             RunUntil(world, () => world.Escape.Phase == "Held at gate", 200, "Hold at the closed gate");
-            Check(world.Escape.DetectedBy == "the closed vehicle gate" && world.Escape.ResponseDueMinute - world.Escape.DetectedMinute == 20, "Unalarmed one-officer response is not 20 minutes");
-            world.SetAlarm(true); int alarm = world.Data.Minute;
+            Check(world.Escape.DetectedBy == "the closed vehicle gate" && world.Escape.ResponseDueMinute > world.Data.Minute, "A reachable officer should have a physical ETA");
+            StaffMember responder = world.Data.Staff.First(s => s.Role == "Officer" && world.IsOnShift(s));
+            Point before = responder.Position; int oldEta = world.Escape.ResponseDueMinute - world.Data.Minute;
+            world.SetAlarm(true); world.AdvanceMinutes(1);
+            Check(Geometry.Distance(before, responder.Position) > 0.01f && responder.Duty == "Responding to escape", "Officer did not physically respond");
+            Check(world.Escape.Phase == "None" || world.Escape.ResponseDueMinute - world.Data.Minute < oldEta, "Alarm did not shorten the physical ETA");
+            // A closer reachable responder must intercept by proximity, not a timer.
+            responder.Position = responder.Destination = resident.Position + new Point(1,0);
             world.AdvanceMinutes(1);
-            Check(world.Escape.Phase == "None" || world.Escape.ResponseDueMinute == alarm + 1 + 7, "The alarm did not shorten the response to 7 minutes");
-            RunUntil(world, () => world.Escape.Phase == "None", 20, "Interception");
-            Check(world.Data.Minute <= alarm + 8 && world.Data.Justice.Interceptions == 1 && Ledger(world, "custody-penalty") == 0, "The held attempt was not intercepted promptly");
+            Check(world.Escape.Phase == "None" && world.Data.Justice.Interceptions == 1 && Ledger(world, "custody-penalty") == 0, "A present officer did not intercept");
             Check(resident.Legal.Charges.Any(c => c.Offense == "Attempted escape") && resident.Legal.RestrictedUntil > world.Data.Minute, "Interception consequences missing");
             world.SetAlarm(false); world.SetLockdown(false);
             RunUntil(world, () => resident.Legal.Custody == "In facility", 300, "Escort back to housing");

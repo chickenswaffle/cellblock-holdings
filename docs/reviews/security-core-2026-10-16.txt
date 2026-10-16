@@ -1,0 +1,88 @@
+CSSM_ModuleLoad(): One or more parameters passed to a function were not valid.
+PASS three opening contracts have distinct terms and reconciled acquisition cash
+PASS starter residents have routes to meals and yard
+PASS all catalog items quote, hand over, block navigation, and survive save/load
+PASS room faces retain doors as room boundaries and triangulate their area
+PASS curved walls share a real door opening with navigation
+PASS diagonal boundaries block both travel directions
+PASS prefab attachment removes shared wall and does not charge twice
+PASS partially shared straight boundaries retain only uncovered geometry
+PASS closing an occupied cell door is rejected before payment
+PASS planned construction does not change operational geometry
+PASS additional crews accelerate parallel construction with paid labor
+PASS a finished prefab remains editable through the same wall model
+PASS pause advances neither construction nor finance
+PASS saved in-progress construction resumes without duplicate charges
+PASS reopening a save does not apply elapsed real time
+PASS earnings are receivables until the contractual payment day
+PASS residents never move through a completed wall
+PASS out-of-bounds and folded curves are rejected
+PASS save with a corrupted ledger is rejected
+PASS a partial prefab join retains its door only on the correct fragment
+PASS nested building boundaries generate non-overlapping floor area
+PASS occupied bed removal requires a replacement and a valid relocation
+PASS renovations validate the resident's actual service destination
+PASS staff stations cannot overlap furniture and legacy staff migrate around it
+PASS invalid numeric geometry cannot erase collision
+PASS malformed pending work and negative crew rates cannot load
+PASS different viable circulation layouts change verified service earnings
+PASS moving the active meal-service table also relocates its service point
+PASS unapproved plans can be saved without charging for construction
+PASS resident identity and relationships are seeded, stable, and staggered
+PASS version-1 saves hydrate missing people fields without changing money or identities
+PASS social thresholds and high-risk guard misconduct create traceable wellbeing consequences
+PASS new hires carpool only before departure and release preserves trip references
+PASS closed gate and inbound travel cannot earn construction progress
+PASS arrival and physical work resume without duplicate fees or reset progress
+PASS alarm and lockdown persist without invalidating structural routes
+PASS casework requires an arrived on-duty worker at the resident
+PASS CCTV honors handover, direction, walls and network power
+PASS prefab packages and quarter turns quote as one editable project
+PASS shift report boundary persists and cannot duplicate on reload
+PASS builders collect and carry supplies before physical work and resume mid-carry
+PASS transport reserves separate marked bays and slows before unloading
+PASS legacy operations migrate builder workflow once without changing purchases
+PASS simultaneous crew and staff hires keep headway at a closed gate
+PASS enhanced housing shared arrivals disembark after a held gate
+PASS later-project carry survives a save after geometry handover
+PASS pre-justice saves gain stable legal profiles without changing people, money or buildings
+PASS legal profiles persist exactly and a new facility has a hearing on its first full day
+PASS a regular court day dispatches at 07:15 and accounts for every docketed resident
+PASS the court van boards, leaves the site, holds hearings and returns, with residents hidden while away
+PASS a mid-trip save resumes the court run without replaying transport or fees
+PASS absent residents are excluded from CCTV coverage, and pause/load never advance the court run
+PASS a closed vehicle gate holds the court van and the missed hearing is charged once
+PASS lockdown during court boarding becomes a missed hearing
+PASS escape risk follows individual traits and facility conditions
+PASS high-risk residents are warned at least two game hours before any attempt
+PASS with the gate open and no guard or camera, an attempt succeeds once and the resident is returned later
+PASS a closed gate holds the attempt, and the alarm shortens the officers' response
+PASS only an operational camera with a clear line of sight detects an attempt
+PASS close supervision is charged once per game day, including across a reload
+PASS released residents leave the roster, free their bed, and never block construction
+PASS a late court van still boards, and a van held inside the gate is abandoned only there
+PASS re-enabling close supervision on a paid day costs nothing more
+PASS an officer detects an attempt only with a clear line of sight
+PASS legal event history is bounded and malformed justice saves are rejected
+OK social contact while away at court: no relationship change.
+PASS construction discriminators strip Unity phantom null payloads without losing work
+PASS an empty Unity inline draft does not become a blocked build plan
+PASS blocked release waits for a real exit and resumes after access is restored
+PASS staff misconduct leaves absent people unchanged
+PASS security upgrades preserve identity and stay inactive until handover
+PASS new shells need wiring while legacy rooms retain power
+PASS camera upgrades require power and night light is local
+PASS qualified security assignments use one officer and one post
+PASS dog detection requires nearby handler and dog rests without staffing
+PASS tower requires arrival, climb, shift and condition
+PASS comfort is local, powered and affects morale over game time
+PASS added utility cents reconcile across save and isolation
+PASS perimeter equipment is bounded by placement and actual coverage
+PASS draft connection preserves existing openings and quotes whole unit
+PASS all fitout kits include wired service and enhanced local cooling
+PASS two crews clear connected enhanced fitout for handover
+PASS unavailable posts reject assignments before training and saved posts validate
+PASS armed deterrence requires a real nearby qualified officer
+PASS security save validation rejects nonfinite measures
+
+84 passed, 0 failed. These checks exercise the C# core; they do not run Unity.

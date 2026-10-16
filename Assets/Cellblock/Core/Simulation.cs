@@ -9,7 +9,8 @@ namespace Cellblock.Core
         public string Id = "", Kind = "Bed";
         public Point Position;
         public float Rotation, Condition = 100;
-        public Fixture Copy() { return new Fixture { Id = Id, Kind = Kind, Position = Position, Rotation = Rotation, Condition = Condition }; }
+        public int UpgradeLevel;
+        public Fixture Copy() { return new Fixture { Id = Id, Kind = Kind, Position = Position, Rotation = Rotation, Condition = Condition, UpgradeLevel = UpgradeLevel }; }
     }
     [Serializable] public sealed partial class Resident
     {
@@ -48,7 +49,11 @@ namespace Cellblock.Core
         public bool Arrived = true;
         public string TripId = "", Duty = "On duty";
         public int NextDutyMinute, LastServiceMinute, ShiftStart = 8;
-        public long DailyCents;
+        public long DailyCents, SecurityDailyCents;
+        public float Morale = 70;
+        public string SecurityRole = "", SecurityPostId = "";
+        public bool ArmedTrained, DogTrained;
+        public int PostArrivedMinute = -1;
         public float Risk { get { return PeopleDynamics.MisconductRisk(this); } }
     }
     [Serializable] public sealed class HistoryEvent
@@ -148,6 +153,7 @@ namespace Cellblock.Core
         public List<Fixture> Fixtures = new List<Fixture>();
         public List<string> RemoveWalls = new List<string>();
         public List<string> RemoveFixtures = new List<string>();
+        public List<string> UpgradeIds = new List<string>();
         public List<HomeMove> HomeMoves = new List<HomeMove>();
         public bool RelocatesDining;
         public Point Dining;
@@ -268,17 +274,18 @@ namespace Cellblock.Core
             var occupiedStations = new Navigation(Data.Walls, Data.Fixtures);
             if (Data.Staff.Any(staff => !PeopleDynamics.ClearStaffStation(staff.Position, occupiedStations, Data.Fixtures)))
                 throw new ArgumentException("Invalid saved staff station: a staff member is inside a wall or furnishing.");
+            InitializeSecurity();
         }
         static bool FiniteRange(float value, float low, float high) { return !float.IsNaN(value) && !float.IsInfinity(value) && value >= low && value <= high; }
         static bool ValidPoint(Point p) { return FiniteRange(p.X, -Geometry.SiteX, Geometry.SiteX) && FiniteRange(p.Y, -Geometry.SiteY, Geometry.SiteY); }
-        static bool ValidFixture(Fixture f) { return f != null && ValidPoint(f.Position) && FiniteRange(f.Rotation, -36000, 36000) && FiniteRange(f.Condition, 0, 100) && FixtureCatalog.Contains(f.Kind); }
+        static bool ValidFixture(Fixture f) { return f != null && ValidPoint(f.Position) && FiniteRange(f.Rotation, -36000, 36000) && FiniteRange(f.Condition, 0, 100) && f.UpgradeLevel >= 0 && f.UpgradeLevel <= 2 && FixtureCatalog.Contains(f.Kind); }
         public static World Start(string contractId)
         {
             ContractOffer offer = Offers.First(o => o.Id == contractId);
             var state = new State { ContractId = contractId, OpeningCapitalCents = offer.CapitalCents, CashCents = offer.CapitalCents };
             var world = new World(state);
             world.Book(-offer.AcquisitionCents, "acquisition", "Land and starter facility");
-            Facility.Starter(state);
+            Facility.Starter(state); world.InitializeSecurity();
             return world;
         }
         public string Id() { return "item-" + Data.NextId++; }
@@ -398,6 +405,11 @@ namespace Cellblock.Core
             var plan = new Plan { Name = request.Name };
             plan.RemoveWalls.AddRange(request.RemoveWalls.Distinct());
             plan.RemoveFixtures.AddRange(request.RemoveFixtures.Distinct());
+            if (request.UpgradeIds == null) { result.Message = "Missing upgrade references."; return result; }
+            plan.UpgradeIds.AddRange(request.UpgradeIds.Distinct());
+            if (request.Fixtures.Where(f => f != null && plan.RemoveFixtures.Contains(f.Id)).GroupBy(f => f.Id).Any(g => g.Count() > 1) ||
+                plan.UpgradeIds.Any(id => !plan.RemoveFixtures.Contains(id) || request.Fixtures.Count(f => f != null && f.Id == id) != 1))
+            { result.Message = "An upgrade needs one existing asset and one replacement."; return result; }
             var future = FutureWalls();
             var futureFixtures = FutureFixtures();
             futureFixtures.RemoveAll(f => plan.RemoveFixtures.Contains(f.Id));
@@ -437,17 +449,22 @@ namespace Cellblock.Core
                 if (!ValidFixture(fixture) || Math.Abs(fixture.Position.X) >= Geometry.SiteX - 1 || Math.Abs(fixture.Position.Y) >= Geometry.SiteY - 1)
                 { result.Message = "Place the furnishing inside the site."; return result; }
                 plan.Fixtures.Add(fixture.Copy());
-                result.MaterialCents += FixtureCatalog.Get(fixture.Kind).PriceCents;
+                Fixture prior = Data.Fixtures.FirstOrDefault(f => f.Id == fixture.Id);
+                bool upgrade = plan.UpgradeIds.Contains(fixture.Id);
+                if (upgrade && (prior == null || prior.Kind != fixture.Kind || fixture.UpgradeLevel != prior.UpgradeLevel + 1 || fixture.Position.X != prior.Position.X || fixture.Position.Y != prior.Position.Y || fixture.Rotation != prior.Rotation || fixture.Condition != prior.Condition))
+                { result.Message = "Upgrade the installed asset one level at a time; keep its position and condition."; return result; }
+                if (fixture.Kind == "PerimeterWire" && !NearPerimeter(fixture.Position)) { result.Message = "Place perimeter wire within 3.5 m of the property boundary."; return result; }
+                result.MaterialCents += SecurityRules.Price(fixture) - (upgrade ? SecurityRules.Price(prior) : 0);
                 result.CrewMinutes += 35;
             }
             var futureRooms = Geometry.Rooms(future);
             foreach (Fixture fixture in plan.Fixtures)
             {
                 var footprint = Geometry.Footprint(fixture);
-                if (fixture.Kind != "CCTV" && !futureRooms.Any(room => footprint.All(p => Geometry.Contains(room, p))))
+                if (!SecurityRules.Outdoor(fixture.Kind) && !futureRooms.Any(room => footprint.All(p => Geometry.Contains(room, p))))
                 { result.Message = "The furnishing needs an enclosed room with space around its full footprint."; return result; }
                 if (futureFixtures.Any(other => Geometry.Overlap(footprint, Geometry.Footprint(other))))
-                { result.Message = "The furnishing overlaps another item. Move it or include that item in the renovation."; return result; }
+                { result.Message = FixtureCatalog.Get(fixture.Kind).Name + " overlaps another item. Move it or include that item in the renovation."; return result; }
                 futureFixtures.Add(fixture);
             }
             foreach (Fixture fixture in futureFixtures)
@@ -494,14 +511,14 @@ namespace Cellblock.Core
             foreach (Fixture fixture in plan.Fixtures)
             {
                 Point access = Geometry.AccessPoint(fixture);
-                if ((fixture.Kind != "CCTV" && !futureRooms.Any(room => Geometry.Contains(room, access))) || !futureRoutes.Clear(access, access))
+                if ((!SecurityRules.Outdoor(fixture.Kind) && !futureRooms.Any(room => Geometry.Contains(room, access))) || !futureRoutes.Clear(access, access))
                 { result.Message = "Leave clear access space in front of the furnishing, inside the room."; return result; }
                 bool reachable = Data.Residents.Any(resident =>
                 {
                     HomeMove move = futureMoves.LastOrDefault(m => m.Resident == resident.Name);
                     return futureRoutes.Find(move == null ? resident.Home : move.Home, access) != null;
                 });
-                if (!reachable) { result.Message = "This furnishing has no clear route from an occupied resident home."; return result; }
+                if (!reachable) { result.Message = FixtureCatalog.Get(fixture.Kind).Name + " has no clear route from an occupied resident home."; return result; }
             }
             string blocked = CheckRoutes(future, futureMoves, finalDining, futureFixtures);
             if (blocked != "") { result.Message = blocked; return result; }
@@ -527,7 +544,7 @@ namespace Cellblock.Core
             }
             foreach (Fixture fixture in plan.Fixtures)
             {
-                fixture.Id = Id();
+                if (string.IsNullOrEmpty(fixture.Id) || !plan.RemoveFixtures.Contains(fixture.Id)) fixture.Id = Id();
                 project.Work.Add(new WorkItem { TaskId = Id(), Site = fixture.Position, HasSite = true, Kind = "Fixture", Fixture = fixture, Required = 35, Remaining = 35 });
             }
             foreach (string id in plan.RemoveWalls)
@@ -593,7 +610,7 @@ namespace Cellblock.Core
                     var completedFixtures = Data.Fixtures.Where(f => !project.RemoveFixtures.Contains(f.Id)).ToList();
                     completedFixtures.AddRange(project.Work.Where(w => w.Fixture != null).Select(w => w.Fixture));
                     var handoverRoutes = new Navigation(completed, completedFixtures);
-                    if (Data.Crews.Any(c => c.Arrived && (!PeopleDynamics.ClearStaffStation(c.Position, handoverRoutes, completedFixtures) || !PeopleDynamics.ClearStaffStation(c.HelperPosition, handoverRoutes, completedFixtures))))
+                    if (!ClearHandoverCrews(project, handoverRoutes, completedFixtures))
                     { project.Status = "Handover held: builders are clearing the new geometry"; continue; }
                     string issue = CheckRoutes(completed, project.HomeMoves, project.RelocatesDining ? (Point?)project.Dining : null, completedFixtures);
                     if (issue != "") { project.Status = "Handover held: " + issue; continue; }
@@ -616,13 +633,14 @@ namespace Cellblock.Core
             {
                 Data.Minute++;
                 AdvanceOperations();
+                AdvanceSecurity();
                 AdvanceJustice();
                 AdvanceLives();
                 MoveResidents();
                 if (Data.Minute % 30 == 0) PeopleDynamics.Advance(this);
                 Data.OperatingRemainder += Contract.DailyOperatingCents / 1440.0;
                 Data.CrewRemainder += Data.Crews.Sum(c => c.DailyCents) / 1440.0;
-                Data.StaffRemainder += Data.Staff.Sum(s => s.DailyCents) / 1440.0;
+                Data.StaffRemainder += Data.Staff.Sum(s => s.DailyCents + s.SecurityDailyCents) / 1440.0;
                 Data.RevenueRemainder += Contract.DailyRevenueCents / 1440.0;
                 int hour = Data.Minute / 60 % 24;
                 bool mealtime = (hour >= 7 && hour < 9) || (hour >= 12 && hour < 14) || (hour >= 18 && hour < 20);

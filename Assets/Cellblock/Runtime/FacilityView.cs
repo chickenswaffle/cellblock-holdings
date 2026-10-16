@@ -17,7 +17,7 @@ namespace Cellblock.Unity
         Transform structures, planned, ghost, people;
         sealed class Actor
         {
-            public Transform Root, Body, Marker;
+            public Transform Root, Model, Body, Marker, SecurityProp;
             public Transform[] Limbs;
             public float Speed, Gait, TurnRate;
             public List<Point> RenderRoute;
@@ -149,7 +149,13 @@ namespace Cellblock.Unity
             float siteX = Geometry.SiteX, siteY = Geometry.SiteY;
             float roadZ = -siteY - 4.8f;
             Box(site, "Meadow", new Vector3(0, -0.30f, 0), new Vector3(200, 0.4f, 180), "grass", new Color(0.36f, 0.43f, 0.31f));
-            Box(site, "Buildable property", new Vector3(0, -0.08f, 0), new Vector3(siteX * 2, 0.12f, siteY * 2), "site-grass", new Color(0.40f, 0.47f, 0.34f));
+            // Keep local lighting local: a single property-wide renderer selects only four
+            // additional lights for the whole plot, hiding distant operational floodlights.
+            for(int row=0;row<4;row++)for(int column=0;column<5;column++)
+            {
+                Transform sector=Root("Ground lighting sector "+column+"/"+row);
+                Box(sector,"Buildable ground",new Vector3(-siteX+6+column*12,-.08f,-siteY+6+row*12),new Vector3(12,.12f,12),"site-grass",new Color(.40f,.47f,.34f));Combine(sector);
+            }
             Box(site, "Public access road · outside property", new Vector3(0, -0.055f, roadZ), new Vector3(200, 0.13f, 7.4f), "asphalt", new Color(0.26f, 0.29f, 0.30f));
             Box(site, "Driveway", new Vector3(-2, 0, (roadZ - 8.7f) / 2), new Vector3(5.8f, 0.12f, -8.7f - roadZ), "asphalt", new Color(0.29f, 0.31f, 0.32f));
             Box(site, "Entrance walk", new Vector3(-2, 0.035f, -10), new Vector3(6.8f, 0.12f, 3.5f), "paving", new Color(0.65f, 0.66f, 0.61f));
@@ -477,6 +483,7 @@ namespace Cellblock.Unity
                 Color tint = palette == "ghost" ? Teal : Ochre;
                 Box(root, "Exact proposed footprint", new Vector3(0, 0.025f, 0), new Vector3(definition.Width, 0.025f, definition.Depth), palette, tint);
             }
+            SecurityFixture(root, fixture);
             if (fixture.Kind == "CCTV")
             {
                 Cylinder(root, "Camera mast", new Vector3(0, 1.25f, 0), new Vector3(0.085f, 1.25f, 0.085f), metal, steel);
@@ -716,7 +723,8 @@ namespace Cellblock.Unity
         {
             int index = IdentitySeed(id);
             var root = new GameObject((staff ? role : "Resident") + " · " + id).transform; root.SetParent(people, false);
-            var body = new GameObject("Body").transform; body.SetParent(root, false);
+            var model = new GameObject("Articulated model").transform; model.SetParent(root, false);
+            var body = new GameObject("Body").transform; body.SetParent(model, false);
             Color skin = index % 4 == 0 ? new Color(0.43f, 0.29f, 0.21f) : index % 4 == 1 ? new Color(0.65f, 0.45f, 0.32f) : index % 4 == 2 ? new Color(0.77f, 0.60f, 0.45f) : new Color(0.55f, 0.37f, 0.28f);
             string skinName = "skin-" + index % 4;
             Color uniform = staff ? role == "Builder" ? new Color(0.91f, 0.60f, 0.12f) : role == "Officer" ? new Color(0.19f, 0.27f, 0.33f) : role == "Technician" ? new Color(0.30f, 0.39f, 0.44f) : new Color(0.39f, 0.47f, 0.43f) :
@@ -737,14 +745,14 @@ namespace Cellblock.Unity
             }
             Capsule(body, "Hips", new Vector3(0, 0.92f, 0), new Vector3(0.32f, 0.13f, 0.24f), "trousers", new Color(0.30f, 0.34f, 0.33f));
             Combine(body);
-            var torso = new GameObject("Waist / upper-body pivot").transform; torso.SetParent(root, false); torso.localPosition = Vector3.up * 0.9f;
+            var torso = new GameObject("Waist / upper-body pivot").transform; torso.SetParent(model, false); torso.localPosition = Vector3.up * 0.9f;
             body.SetParent(torso, false); body.localPosition = Vector3.down * 0.9f;
             var parts = new Transform[4];
             var forearms = new Transform[2]; var hands = new Transform[2]; var knees = new Transform[2];
             for (int i = 0; i < 4; i++)
             {
                 bool arm = i < 2; float side = i % 2 == 0 ? -1 : 1;
-                var pivot = new GameObject(arm ? "Shoulder" : "Hip").transform; pivot.SetParent(arm ? torso : root, false);
+                var pivot = new GameObject(arm ? "Shoulder" : "Hip").transform; pivot.SetParent(arm ? torso : model, false);
                 pivot.localPosition = new Vector3(side * (arm ? 0.23f : 0.09f), arm ? 0.50f : 0.90f, 0);
                 if (arm)
                 {
@@ -770,7 +778,7 @@ namespace Cellblock.Unity
             root.localScale = Vector3.one * (0.96f + index % 4 * 0.025f);
             Transform marker = Cylinder(root, "Selected person", new Vector3(0, 0.015f, 0), new Vector3(0.72f, 0.008f, 0.72f), "handle", Teal);
             marker.gameObject.SetActive(false);
-            var actor = new Actor { Root = root, Body = torso, Limbs = parts, Marker = marker, Staff = staff, Motion = new Resident(), Forearms = forearms, Hands = hands, Knees = knees, Gait = index % 97 * 0.13f, TurnRate = 7 + index % 5 };
+            var actor = new Actor { Root = root, Model = model, Body = torso, Limbs = parts, Marker = marker, Staff = staff, Motion = new Resident(), Forearms = forearms, Hands = hands, Knees = knees, Gait = index % 97 * 0.13f, TurnRate = 7 + index % 5 };
             if (role == "Builder")
             {
                 Sphere(body, "Hard hat", new Vector3(0, 1.79f, 0), new Vector3(0.28f, 0.16f, 0.29f), "hi-vis", new Color(0.96f, 0.77f, 0.14f));
@@ -791,7 +799,7 @@ namespace Cellblock.Unity
             Actor actor;
             if (id != null && actors.TryGetValue(id, out actor) && actor.Root.gameObject.activeInHierarchy)
             {
-                position = actor.Root.position; return true;
+                position = actor.Model.position; return true;
             }
             position = Vector3.zero; return false;
         }

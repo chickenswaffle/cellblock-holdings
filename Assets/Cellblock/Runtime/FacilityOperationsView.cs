@@ -115,7 +115,9 @@ namespace Cellblock.Unity
                 if (!member.Arrived) continue;
                 Actor actor; bool created = !actors.TryGetValue(member.Id, out actor);
                 if (created) actor = Person(member.Id, true, member.Role);
-                AnimateWorker(actor, member.Position, world, force || created, !member.Duty.StartsWith("Walking") && member.Duty != "Patrolling" && member.Duty != "Responding to alarm" && world.IsOnShift(member), member.Role);
+                actor.PoseArms = member.Duty == "Climbing tower";
+                AnimateWorker(actor, member.Position, world, force || created, !member.Duty.StartsWith("Walking") && member.Duty != "Patrolling" && member.Duty != "Responding to alarm" && member.Duty != "Responding to escape" && world.IsOnShift(member), member.Role);
+                AnimateSecurityOfficer(actor, member, world, force || created);
                 actor.Marker.gameObject.SetActive(member.Id == selectedResidentId);
             }
             foreach (Crew crew in world.Data.Crews.Where(c => c.Arrived))
@@ -196,7 +198,7 @@ namespace Cellblock.Unity
                 Box(gateRoot, "Warning stripe", new Vector3(0, 1.30f, -0.05f), new Vector3(5.8f, 0.16f, 0.08f), "planned", Ochre); Combine(gateRoot);
             }
             gateRoot.localPosition = Vector3.Lerp(gateRoot.localPosition, new Vector3(world.Data.Operations.GateOpen ? -8.3f : -2, 0, -24), force ? 1 : 1 - Mathf.Exp(-Time.unscaledDeltaTime * 4));
-            RefreshLighting(world, force); RefreshCoverage(world);
+            RefreshLighting(world, force); RefreshCoverage(world); RefreshSecurity(world, force);
             if (force || feedWallRevision != world.GeometryRevision || feedFullHeight != FullHeight)
             {
                 if (feedWalls == null) feedWalls = Root("CCTV full-height wall extensions · layer 30");
@@ -228,11 +230,12 @@ namespace Cellblock.Unity
                     lamp.type = LightType.Point; lamp.range = 10; lamp.intensity = 3; lamp.color = new Color(1, 0.89f, 0.70f); lamp.shadows = LightShadows.None; facilityLights.Add(lamp);
                 }
             }
-            foreach (Light lamp in facilityLights) lamp.enabled = world.Data.Operations.Lights;
+            for (int i = 0; i < facilityLights.Count; i++)
+                facilityLights[i].enabled = world.Data.Operations.Lights && world.PowerAt(new Point(facilityLights[i].transform.position.x, facilityLights[i].transform.position.z));
             Material luminaireOn = Material("ceiling-on", new Color(0.91f, 0.87f, 0.73f));
             luminaireOn.EnableKeyword("_EMISSION"); luminaireOn.SetColor("_EmissionColor", new Color(0.73f, 0.69f, 0.55f));
             Material luminaireOff = Material("ceiling-off", new Color(0.25f, 0.28f, 0.29f));
-            foreach (Renderer housing in luminaireMeshes) housing.sharedMaterial = world.Data.Operations.Lights ? luminaireOn : luminaireOff;
+            for (int i = 0; i < luminaireMeshes.Count; i++) luminaireMeshes[i].sharedMaterial = facilityLights[i].enabled ? luminaireOn : luminaireOff;
             if (alarmRoot == null)
             {
                 alarmRoot = Root("Alarm beacon"); alarmRoot.position = new Vector3(-2, 3.2f, -8);
@@ -263,7 +266,7 @@ namespace Cellblock.Unity
             {
                 float angle = (watchedCamera.Rotation - 60 + i * 6) * Mathf.Deg2Rad;
                 Point direction = new Point(Mathf.Sin(angle), Mathf.Cos(angle)); Point end = watchedCamera.Position;
-                for (float distance = 0.35f; distance <= world.CameraRange; distance += 0.35f)
+                for (float distance = 0.35f; distance <= world.CameraRangeFor(watchedCamera); distance += 0.35f)
                 { Point candidate = watchedCamera.Position + direction * distance; if (!walls.Clear(watchedCamera.Position, candidate)) break; end = candidate; }
                 points.Add(V(watchedCamera.Position, 0.18f)); points.Add(V(end, 0.18f)); points.Add(V(watchedCamera.Position, 0.18f));
             }

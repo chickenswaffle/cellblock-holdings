@@ -203,11 +203,11 @@ namespace Cellblock.Core
 
         public float CameraRange { get { return Data.Operations.Lights || Data.Minute % 1440 >= 360 && Data.Minute % 1440 < 1140 ? 15 : 8; } }
         public bool CameraOnline(Fixture camera)
-        { return camera != null && camera.Kind == "CCTV" && Data.Fixtures.Contains(camera) && Data.Operations.CamerasEnabled && camera.Condition > 15; }
+        { return camera != null && camera.Kind == "CCTV" && Data.Fixtures.Contains(camera) && Data.Operations.CamerasEnabled && camera.Condition > 15 && EquipmentOnline(camera); }
         public bool CameraSees(Fixture camera, Point target)
         {
             if (!CameraOnline(camera)) return false;
-            Point delta = target - camera.Position; float range = CameraRange;
+            Point delta = target - camera.Position; float range = CameraRangeFor(camera);
             if (delta.Length > range) return false;
             double angle = camera.Rotation * Math.PI / 180;
             Point forward = new Point((float)Math.Sin(angle), (float)Math.Cos(angle));
@@ -359,6 +359,33 @@ namespace Cellblock.Core
             if (!leader || !helper) { crew.Activity = (crew.WorkPhase == "Carrying" ? "Carrying materials to " : "Walking to ") + project.Name; project.Status = "Crew travelling to work front"; return false; }
             crew.WorkPhase = "Working"; return true;
         }
+        bool ClearHandoverCrews(Project project, Navigation completed, List<Fixture> fixtures)
+        {
+            bool clear=true;
+            foreach(Crew crew in Data.Crews.Where(c=>c.Arrived))
+            {
+                bool leader=PeopleDynamics.ClearStaffStation(crew.Position,completed,fixtures);
+                bool helper=PeopleDynamics.ClearStaffStation(crew.HelperPosition,completed,fixtures);
+                if(leader&&helper)continue;
+                clear=false;crew.Working=false;crew.WorkPhase="Walking";crew.Activity="Clearing the handover area";
+                // A spare crew can be midway through the final work front when its colleague
+                // finishes. Move it through current usable geometry before activating fitout.
+                Point Clearance(Point from)
+                {
+                    for(int ring=1;ring<=14;ring++)for(int i=0;i<16;i++)
+                    {
+                        double angle=i*Math.PI/8;Point p=from+new Point((float)Math.Cos(angle),(float)Math.Sin(angle))*(ring*.4f);
+                        if(!PeopleDynamics.ClearStaffStation(p,completed,fixtures)||!Routes.Clear(p,p))continue;
+                        if(new[]{new Point(.16f,0),new Point(-.16f,0),new Point(0,.16f),new Point(0,-.16f)}.Any(o=>!PeopleDynamics.ClearStaffStation(p+o,completed,fixtures)))continue;
+                        if(Routes.Find(from,p)!=null)return p;
+                    }
+                    return from;
+                }
+                if(!leader){Point target=Clearance(crew.Position);Walk(crew.Id,ref crew.Position,target,.38f);}
+                if(!helper){Point target=Clearance(crew.HelperPosition);Walk(crew.Id+"/helper",ref crew.HelperPosition,target,.40f);}
+            }
+            return clear;
+        }
         bool FindWorksite(Crew crew, Project project, WorkItem work, out Point target)
         {
             Point from = crew.Position;
@@ -393,14 +420,25 @@ namespace Cellblock.Core
                 if (!staff.Arrived) { staff.Duty = TripStatus(staff.TripId); continue; }
                 if (!IsOnShift(staff))
                 {
+                    staff.PostArrivedMinute = -1;
                     Walk(staff.Id, ref staff.Position, staff.Station, 0.34f); staff.Duty = "Off shift / rest"; continue;
                 }
-                if (Data.Minute >= staff.NextDutyMinute)
+                bool responding = staff.Role == "Officer" && staff.SecurityRole != "Tower" && Escape.Detected && Escape.Phase != "None";
+                Resident escapee = responding ? Data.Residents.FirstOrDefault(r => r.Id == Escape.ResidentId) : null;
+                if (escapee != null)
+                {
+                    Point goal = NearbyClear(escapee.Position, Routes);
+                    if (Routes.Find(staff.Position, goal) != null) staff.Destination = goal;
+                    staff.NextDutyMinute = Data.Minute; // refresh a moving target, including after a reload
+                }
+                else if (Data.Minute >= staff.NextDutyMinute)
                 {
                     Point goal = staff.Station;
-                    if (staff.Role == "Technician")
+                    Fixture assigned = Data.Fixtures.FirstOrDefault(f => f.Id == staff.SecurityPostId && f.Kind == "GuardTower");
+                    if (staff.SecurityRole == "Tower" && assigned != null) goal = Geometry.AccessPoint(assigned);
+                    else if (staff.Role == "Technician")
                     {
-                        Fixture camera = Data.Fixtures.Where(f => f.Kind == "CCTV").OrderBy(f => f.Condition).FirstOrDefault();
+                        Fixture camera = Data.Fixtures.Where(f => SecurityRules.Equipment(f.Kind)).OrderBy(f => f.Condition).FirstOrDefault();
                         if (camera != null) goal = Geometry.AccessPoint(camera);
                     }
                     else if (Data.Residents.Any(IsPresent))
@@ -412,13 +450,20 @@ namespace Cellblock.Core
                     staff.Destination = Routes.Find(staff.Position, goal) != null ? goal : staff.Station;
                     staff.NextDutyMinute = Data.Minute + (staff.Role == "Officer" ? 35 : 50);
                 }
-                bool at = Walk(staff.Id, ref staff.Position, staff.Destination, 0.37f);
+                bool at = Walk(staff.Id, ref staff.Position, staff.Destination, responding ? ResponseSpeed : 0.37f);
                 staff.Duty = !at ? staff.Role == "Officer" ? Data.Operations.Alarm ? "Responding to alarm" : "Patrolling" : "Walking to service" :
-                    staff.Role == "Officer" ? Data.Operations.Alarm ? "Alarm welfare check" : "Welfare check" : staff.Role == "Caseworker" ? "Casework" : Data.Fixtures.Any(f => f.Kind == "CCTV") ? "Maintaining CCTV" : "Inspecting utilities";
+                    staff.Role == "Officer" ? Data.Operations.Alarm ? "Alarm welfare check" : "Welfare check" : staff.Role == "Caseworker" ? "Casework" : Data.Fixtures.Any(f => SecurityRules.Equipment(f.Kind)) ? "Maintaining equipment" : "Inspecting utilities";
+                if (staff.SecurityRole == "Tower" && Data.Fixtures.Any(f => f.Id == staff.SecurityPostId && f.Kind == "GuardTower"))
+                {
+                    if (at && staff.PostArrivedMinute < 0) staff.PostArrivedMinute = Data.Minute;
+                    if (!at) staff.PostArrivedMinute = -1;
+                    staff.Duty = !at ? "Walking to tower" : Data.Minute - staff.PostArrivedMinute < 5 ? "Climbing tower" : "Tower watch";
+                }
+                if (responding) staff.Duty = "Responding to escape";
                 if (!at) continue;
                 if (staff.Role == "Technician")
-                    foreach (Fixture camera in Data.Fixtures.Where(f => f.Kind == "CCTV" && Geometry.Distance(Geometry.AccessPoint(f), staff.Position) < 1)) camera.Condition = Math.Min(100, camera.Condition + 0.7f);
-                if (staff.Role == "Officer" && Data.Minute - staff.LastServiceMinute >= 5)
+                    foreach (Fixture camera in Data.Fixtures.Where(f => SecurityRules.Equipment(f.Kind) && Geometry.Distance(Geometry.AccessPoint(f), staff.Position) < 1)) camera.Condition = Math.Min(100, camera.Condition + 0.7f);
+                if (staff.Role == "Officer" && staff.SecurityRole != "Tower" && Data.Minute - staff.LastServiceMinute >= 5)
                 {
                     foreach (Resident resident in Data.Residents.Where(r => IsPresent(r) && Geometry.Distance(r.Position, staff.Position) < 3 && Routes.Clear(r.Position, staff.Position)))
                     { resident.Safety = Math.Min(100, resident.Safety + staff.Integrity / 100f * 0.5f); resident.Stress = Math.Max(0, resident.Stress - 0.15f); }

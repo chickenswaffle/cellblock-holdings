@@ -60,20 +60,21 @@ static partial class Program
             {
                 World world = County();
                 var plan = new Plan { Name = "Catalog: " + definition.Name };
-                plan.Fixtures.Add(new Fixture { Kind = definition.Id, Position = new Point(-1, -1.3f) });
+                Point location = definition.Id == "PerimeterWire" ? new Point(25, 22) : definition.Id == "GuardTower" || definition.Id == "Kennel" ? new Point(17, 12) : new Point(-1, -1.3f);
+                plan.Fixtures.Add(new Fixture { Kind = definition.Id, Position = location });
                 Quote quote = world.Quote(plan);
                 Check(quote.Valid, definition.Id + " quote rejected: " + quote.Message);
                 Check(quote.MaterialCents == definition.PriceCents, definition.Id + " used the wrong material price");
                 Check(world.Approve(plan) && world.HireCrew(), definition.Id + " project could not be approved or staffed");
                 Finish(world);
-                Fixture installed = world.Data.Fixtures.Single(f => f.Kind == definition.Id && Geometry.Distance(f.Position, new Point(-1, -1.3f)) < 0.01f);
+                Fixture installed = world.Data.Fixtures.Single(f => f.Kind == definition.Id && Geometry.Distance(f.Position, location) < 0.01f);
                 List<Point> footprint = Geometry.Footprint(installed);
                 Check(footprint.Count == 4, definition.Id + " did not produce a complete footprint");
                 var routes = new Navigation(world.Data.Walls, world.Data.Fixtures);
                 Check(!routes.Clear(installed.Position + new Point(-2, 0), installed.Position + new Point(2, 0)),
                     definition.Id + " did not block navigation across its footprint");
                 World loaded = new World(RoundTrip(world.Data));
-                Fixture restored = loaded.Data.Fixtures.Single(f => f.Kind == definition.Id && Geometry.Distance(f.Position, new Point(-1, -1.3f)) < 0.01f);
+                Fixture restored = loaded.Data.Fixtures.Single(f => f.Kind == definition.Id && Geometry.Distance(f.Position, location) < 0.01f);
                 Check(Math.Abs(Geometry.Distance(restored.Position, installed.Position)) < 0.001f &&
                     Math.Abs(Geometry.Area(Geometry.Footprint(restored)) - definition.Width * definition.Depth) < 0.02f,
                     definition.Id + " geometry changed after save/load");
