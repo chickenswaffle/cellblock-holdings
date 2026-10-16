@@ -67,6 +67,10 @@ namespace Cellblock.Core
                 state.OperationsVersion = 2;
             }
             if (state.Operations == null || state.Trips == null || state.ShiftReports == null) throw new ArgumentException("Missing operations state.");
+            Plan draft = state.DraftPlan;
+            if (draft != null && draft.Walls != null && draft.Fixtures != null && draft.RemoveWalls != null && draft.RemoveFixtures != null && draft.HomeMoves != null &&
+                draft.Walls.Count == 0 && draft.Fixtures.Count == 0 && draft.RemoveWalls.Count == 0 && draft.RemoveFixtures.Count == 0 && draft.HomeMoves.Count == 0 && !draft.RelocatesDining)
+                state.DraftPlan = null; // JsonUtility can also materialize an absent draft as an empty inline Plan.
             if (state.Projects == null) return;
             foreach (Project project in state.Projects)
             {
@@ -74,6 +78,7 @@ namespace Cellblock.Core
                 for (int i = 0; i < project.Work.Count; i++)
                 {
                     WorkItem work = project.Work[i]; if (work == null) continue;
+                    NormalizeWorkPayload(work);
                     if (string.IsNullOrEmpty(work.TaskId)) work.TaskId = project.Id + "/task-" + i;
                     if (work.HasSite) continue;
                     Wall wall = work.Wall ?? (state.Walls == null ? null : state.Walls.FirstOrDefault(w => project.RemoveWalls != null && project.RemoveWalls.Contains(w.Id)));
@@ -82,6 +87,19 @@ namespace Cellblock.Core
                     work.HasSite = true;
                 }
             }
+        }
+        static void NormalizeWorkPayload(WorkItem work)
+        {
+            // Unity's inline serializer materializes null class fields as empty objects.
+            // A stable discriminator distinguishes removal work from those phantom payloads.
+            bool wall = work.Wall != null && !string.IsNullOrEmpty(work.Wall.Id);
+            bool fixture = work.Fixture != null && !string.IsNullOrEmpty(work.Fixture.Id);
+            if (string.IsNullOrEmpty(work.Kind)) work.Kind = wall ? "Wall" : fixture ? "Fixture" : "Removal";
+            if (work.Kind != "Wall" && work.Kind != "Fixture" && work.Kind != "Removal") throw new ArgumentException("Invalid construction payload kind.");
+            if ((work.Kind != "Wall" && wall) || (work.Kind != "Fixture" && fixture)) throw new ArgumentException("Conflicting construction payloads.");
+            if (work.Kind != "Wall") work.Wall = null;
+            if (work.Kind != "Fixture") work.Fixture = null;
+            if ((work.Kind == "Wall" && !wall) || (work.Kind == "Fixture" && !fixture)) throw new ArgumentException("Missing construction payload.");
         }
         void ValidateOperations()
         {
@@ -199,7 +217,7 @@ namespace Cellblock.Core
         public ShiftReport CurrentShift() { return CaptureShift(Data.Minute / 480 * 480); }
         ShiftReport CaptureShift(int start)
         {
-            return new ShiftReport { Minute = Data.Minute, Residents = Data.Residents.Count, StaffOnDuty = Data.Staff.Count(IsOnShift),
+            return new ShiftReport { Minute = Data.Minute, Residents = Data.Residents.Count(IsPresent), StaffOnDuty = Data.Staff.Count(IsOnShift),
                 ActiveProjects = Data.Projects.Count(p => !p.Completed), CompletedProjects = Data.Projects.Count(p => p.Completed && p.CompletedMinute > start && p.CompletedMinute <= Data.Minute),
                 CoveredResidents = CameraCoverage(), CashCents = Data.CashCents,
                 Incidents = Data.History.Count(e => e.Minute > start && e.Minute <= Data.Minute && (e.Category == "contraband" || e.Category == "favoritism" || e.Severity >= 3)),

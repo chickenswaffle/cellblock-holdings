@@ -124,7 +124,7 @@ namespace Cellblock.Unity
             }
             feed.image = game.CameraFeed;
             feed.style.display = game.WatchedCamera != null ? DisplayStyle.Flex : DisplayStyle.None;
-            feedStatus.text = world.Data.Fixtures.Any(f => f.Kind == "CCTV") ? world.CameraCoverage() + " / " + world.Data.Residents.Count + " residents currently observed.\n" +
+            feedStatus.text = world.Data.Fixtures.Any(f => f.Kind == "CCTV") ? world.CameraCoverage() + " / " + world.Data.Residents.Count(world.IsPresent) + " residents on site currently observed.\n" +
                 (game.WatchedCamera == null ? "Select a camera to open its live feed." : world.CameraOnline(game.WatchedCamera) ? "LIVE · selected feed / 5 updates per second" : "OFFLINE · check network and condition") :
                 "No operational cameras. Place one indoors or outdoors, approve its installation, and let a crew complete the work.";
             staffCost.text = "Additional staff wages: " + Money(world.Data.Staff.Sum(s => s.DailyCents)) + " / day. Day shift 08:00–20:00; night shift 20:00–08:00. Initial contract staff are included in operations.";

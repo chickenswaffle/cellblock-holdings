@@ -7,6 +7,9 @@ using Cellblock.Core;
 static partial class Program
 {
     static partial void RunJusticeChecks();
+    static partial void RunIntegrationChecks();
+    static partial void RunLivesChecks();
+    static partial void RunSecurityChecks();
     static int passed, failed;
     static void Check(bool condition, string message) { if (!condition) throw new Exception(message); }
     static void Test(string name, Action test)
@@ -516,7 +519,7 @@ static partial class Program
             resumed.AdvanceMinutes(1);
             Check(resumed.Data.Crews[0].WorkPhase == "Carrying" && resumed.Data.Crews[0].SupplyLoadMinutes == 3, "Loading discarded a delivered supply batch after handover");
         });
-        RunJusticeChecks();
+        RunJusticeChecks(); RunIntegrationChecks(); RunLivesChecks(); RunSecurityChecks();
         Console.WriteLine("\n" + passed + " passed, " + failed + " failed. These checks exercise the C# core; they do not run Unity.");
         Environment.ExitCode = failed == 0 ? 0 : 1;
     }

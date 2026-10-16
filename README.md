@@ -2,7 +2,7 @@
 
 A Unity reboot of a prison ownership and management simulation for iPhone, iPad, Mac, and potentially Windows/Steam. The player chooses a contract, takes over an editable starter facility, and connects building decisions to people, construction, and business results.
 
-**Current milestone: local Unity playable.** The project imports and runs in Unity 6000.3.24f1 on this Mac. The engine-independent core passes 46 executable checks. The presentation now includes detailed procedural architecture and people, a categorized furnishing catalog, individual resident/social dynamics, physical crew/staff arrivals, staged construction, prison controls, live CCTV, and packaged prefab units. Native builds and actual phone performance remain unverified; the [visual study](docs/concepts/visual-direction-study.png) remains an art direction reference.
+**Current milestone: local Unity playable.** The project imports and runs in Unity 6000.3.24f1 on this Mac. The engine-independent core passes 69 executable checks. The presentation now includes detailed procedural architecture and people, a categorized furnishing catalog, individual resident/social dynamics, physical crew/staff arrivals, staged construction, prison controls, live CCTV, and packaged prefab units. Native builds and actual phone performance remain unverified; the [visual study](docs/concepts/visual-direction-study.png) remains an art direction reference.
 
 ## Open on a Mac
 
@@ -67,7 +67,7 @@ Staff have integrity, workload pressure, favoritism, and misconduct risk. Incide
 
 The native Mac magnify plugin is included for Intel and Apple silicon. Rebuild it with `bash Tools/build-mac-gestures.sh` only if its source changes, while holding the Unity runner lock.
 
-Read [the Claude handoff](docs/claude-handoff.md) and [shared coordination](COORDINATION.md) before parallel work. Legal profiles, court transport and escape gameplay are reserved for Claude's separate slice; they are not yet included in this operations milestone.
+Read [the Claude handoff](docs/claude-handoff.md) and [shared coordination](COORDINATION.md) before parallel work. Claude's legal profiles, court transport and interactive escape gameplay are integrated. Its next reserved slice is resident animation, daily life and stories; see `docs/claude-lives-handoff.md`. Codex owns the upcoming security/services work described in `docs/security-and-services-plan.md`.
 
 ## Verify the engine-independent core
 

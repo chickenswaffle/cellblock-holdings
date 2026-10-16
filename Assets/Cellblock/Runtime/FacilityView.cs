@@ -12,6 +12,8 @@ namespace Cellblock.Unity
     {
         partial void ResidentVisibility(World world, Resident resident, ref bool visible);
         partial void RefreshJustice(World world, bool force);
+        partial void PrepareResidentPose(Actor actor, Resident resident, World world);
+        partial void AnimateResidentLife(Actor actor, Resident resident, World world);
         Transform structures, planned, ghost, people;
         sealed class Actor
         {
@@ -921,7 +923,9 @@ namespace Cellblock.Unity
                 if (created) actor = Person(id);
                 actor.Seen = true; actor.Root.gameObject.SetActive(true);
                 actor.Marker.gameObject.SetActive(id == selectedResidentId);
+                PrepareResidentPose(actor, resident, world);
                 MoveActor(actor, resident, world, force || created);
+                AnimateResidentLife(actor, resident, world);
             }
             RefreshWorkers(world, force);
             RefreshOperations(world, force);

@@ -11,6 +11,8 @@ namespace Cellblock.Unity
     public sealed partial class GameHud : MonoBehaviour
     {
         partial void BuildJustice();
+        partial void BuildLives();
+        partial void RefreshLives(World world, Resident resident);
         partial void RefreshJustice(World world, Resident resident);
         enum Workspace { Facility, Build, People, Company, Control }
         GameController game;
@@ -79,7 +81,7 @@ namespace Cellblock.Unity
             BuildNavigation();
             inspector = new ScrollView(ScrollViewMode.Vertical); inspector.name = "inspector"; inspector.AddToClassList("inspector");
             ((ScrollView)inspector).horizontalScrollerVisibility = ScrollerVisibility.Hidden; root.Add(inspector);
-            BuildInspector(); BuildCatalog(); BuildPeople(); BuildJustice(); BuildControl();
+            BuildInspector(); BuildCatalog(); BuildPeople(); BuildJustice(); BuildLives(); BuildControl();
             BuildTools();
             BuildCamera();
             status = Panel("status");
@@ -379,7 +381,7 @@ namespace Cellblock.Unity
                 personMetricValues[2].EnableInClassList("negative", staff.Risk >= 30);
                 personEffects.text = PeopleDynamics.StaffEffect(staff) + "\nStaff support adds 8 integrity, relieves 25 pressure, and reduces favoritism by 10.";
             }
-            RefreshJustice(world, selected);
+            RefreshJustice(world, selected); RefreshLives(world, selected);
             var history = world.Data.History.AsEnumerable().Reverse().Take(historyRows.Length).ToArray();
             for (int i = 0; i < historyRows.Length; i++)
             {

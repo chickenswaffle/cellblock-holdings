@@ -617,6 +617,15 @@ namespace Cellblock.Unity
             if (!CreateCompany(contract, true)) throw new InvalidOperationException("Could not preserve the active company before preview.");
             hud.CloseOverlays(); Recenter(); CameraPosition(true);
         }
+        public void ReloadPresentationPreview()
+        {
+            if (!presentationPreview) throw new InvalidOperationException("Only disposable previews can use this review helper.");
+            string residentId = SelectedResident == null ? "" : SelectedResident.Id;
+            World = new World(JsonUtility.FromJson<State>(JsonUtility.ToJson(World.Data)));
+            SelectedResident = World.Data.Residents.FirstOrDefault(r => r.Id == residentId); SelectedStaff = null;
+            SelectedWall = null; SelectedFixture = null; accumulator = 0; nextFeed = 0;
+            view.Refresh(World, true); hud.Refresh(true);
+        }
         public void PreviewConstruction()
         {
             hud.ShowBuildCatalog("Structure"); PrefabId = "wing"; PrefabPackage = 0; PlacementRotation = 0;
