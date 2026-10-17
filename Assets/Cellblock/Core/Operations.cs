@@ -182,7 +182,7 @@ namespace Cellblock.Core
             Notice = staff.Name + " is boarding transport. Duties begin on arrival and during their shift."; return true;
         }
         public bool IsOnShift(StaffMember staff)
-        { return staff.Arrived && ((Data.Minute % 1440 - staff.ShiftStart * 60 + 1440) % 1440) < 720; }
+        { return staff.Arrived && !IsSuspended(staff) && ((Data.Minute % 1440 - staff.ShiftStart * 60 + 1440) % 1440) < 720; }
         public void SetLights(bool on) { if (Data.Operations.Lights == on) return; Data.Operations.Lights = on; OperationalEvent(on ? "Facility lighting restored." : "Facility lights switched off; CCTV night visibility is reduced."); }
         public void SetGate(bool open) { if (Data.Operations.GateOpen == open) return; Data.Operations.GateOpen = open; OperationalEvent(open ? "Vehicle gate opened; waiting arrivals may proceed." : "Vehicle gate closed; inbound vehicles wait outside."); }
         public void SetAlarm(bool on)
@@ -423,7 +423,8 @@ namespace Cellblock.Core
                     staff.PostArrivedMinute = -1;
                     Walk(staff.Id, ref staff.Position, staff.Station, 0.34f); staff.Duty = "Off shift / rest"; continue;
                 }
-                bool responding = staff.Role == "Officer" && staff.SecurityRole != "Tower" && Escape.Detected && Escape.Phase != "None";
+                bool responding = staff.Role == "Officer" && !IsWarden(staff) && staff.SecurityRole != "Tower" && Escape.Detected && !Compromised(staff,Escapee) && Escape.Phase != "None";
+                Point capitalGoal=staff.Station;bool capitalEscort=!responding&&CapitalEscortTarget(staff,out capitalGoal);
                 Resident escapee = responding ? Data.Residents.FirstOrDefault(r => r.Id == Escape.ResidentId) : null;
                 if (escapee != null)
                 {
@@ -431,6 +432,7 @@ namespace Cellblock.Core
                     if (Routes.Find(staff.Position, goal) != null) staff.Destination = goal;
                     staff.NextDutyMinute = Data.Minute; // refresh a moving target, including after a reload
                 }
+                else if(capitalEscort){staff.Destination=capitalGoal;staff.NextDutyMinute=Data.Minute;}
                 else if (Data.Minute >= staff.NextDutyMinute)
                 {
                     Point goal = staff.Station;
@@ -460,6 +462,7 @@ namespace Cellblock.Core
                     staff.Duty = !at ? "Walking to tower" : Data.Minute - staff.PostArrivedMinute < 5 ? "Climbing tower" : "Tower watch";
                 }
                 if (responding) staff.Duty = "Responding to escape";
+                else if(capitalEscort)staff.Duty="Capital transfer escort";
                 if (!at) continue;
                 if (staff.Role == "Technician")
                     foreach (Fixture camera in Data.Fixtures.Where(f => SecurityRules.Equipment(f.Kind) && Geometry.Distance(Geometry.AccessPoint(f), staff.Position) < 1)) camera.Condition = Math.Min(100, camera.Condition + 0.7f);

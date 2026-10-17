@@ -31,6 +31,8 @@ namespace Cellblock.Unity
             if (sallyPort == null) BuildSallyPort();
             RefreshCourtVan(world, force);
             RefreshEscapeAlert(world);
+            RefreshPersonnelView(world);
+            RefreshFacilityEventsView(world,force);
         }
 
         void BuildSallyPort()

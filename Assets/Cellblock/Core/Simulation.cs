@@ -285,7 +285,7 @@ namespace Cellblock.Core
             var state = new State { ContractId = contractId, OpeningCapitalCents = offer.CapitalCents, CashCents = offer.CapitalCents };
             var world = new World(state);
             world.Book(-offer.AcquisitionCents, "acquisition", "Land and starter facility");
-            Facility.Starter(state); world.InitializeSecurity();
+            Facility.Starter(state); world.InitializeSecurity(); world.InitializeNewFacilityStories();
             return world;
         }
         public string Id() { return "item-" + Data.NextId++; }

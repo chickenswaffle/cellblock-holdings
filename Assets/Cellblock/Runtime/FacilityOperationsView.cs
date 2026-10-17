@@ -119,6 +119,7 @@ namespace Cellblock.Unity
                 AnimateWorker(actor, member.Position, world, force || created, !member.Duty.StartsWith("Walking") && member.Duty != "Patrolling" && member.Duty != "Responding to alarm" && member.Duty != "Responding to escape" && world.IsOnShift(member), member.Role);
                 AnimateSecurityOfficer(actor, member, world, force || created);
                 actor.Marker.gameObject.SetActive(member.Id == selectedResidentId);
+                UpdateCharacterNameTag(actor,world.StaffTitle(member)+" "+member.Name,member.Id==selectedResidentId);
             }
             foreach (Crew crew in world.Data.Crews.Where(c => c.Arrived))
             {

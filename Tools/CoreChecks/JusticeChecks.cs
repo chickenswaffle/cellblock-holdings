@@ -48,7 +48,7 @@ static partial class Program
             State old = PreJusticeSave(source.Data);
             Check(old.JusticeVersion == 0, "The emulated old save still carries a justice marker");
             World first = new World(old), second = new World(PreJusticeSave(source.Data)), normal = new World(RoundTrip(source.Data));
-            Check(first.Data.JusticeVersion == 1 && first.Data.Residents.All(r => r.Legal.Ready && r.Legal.Charges.Count > 0), "Old residents were not given legal profiles");
+            Check(first.Data.JusticeVersion == JusticeRules.Version && first.Data.Residents.All(r => r.Legal.Ready && r.Legal.Charges.Count > 0), "Old residents were not given legal profiles");
             Check(Enumerable.Range(0, first.Data.Residents.Count).All(i => LegalJson(first.Data.Residents[i]) == LegalJson(second.Data.Residents[i])), "Hydration is not deterministic");
             Check(WithoutLegal(first.Data.Residents) == WithoutLegal(normal.Data.Residents), "Hydration changed names, ids, homes, positions or needs");
             Check(first.Data.CashCents == source.Data.CashCents && first.Data.Ledger.Count == source.Data.Ledger.Count && first.Reconciles(), "Hydration charged or credited money");
@@ -69,9 +69,16 @@ static partial class Program
             List<string> docket = world.CourtDocket(1).Select(r => r.Id).ToList();
             RunUntil(world, () => world.CourtVan.Phase != "Idle", 1500, "Court van dispatch");
             Check(world.Data.Minute == 1440 + 435, "The court van left at " + JusticeRules.When(world.Data.Minute));
+            world.AdvanceMinutes(1);
+            Check(world.Data.Residents.Where(r => docket.Contains(r.Id) && r.Legal.Custody != "Escaping" && r.Legal.RestrictedUntil <= world.Data.Minute).All(r => r.Legal.Custody == "Boarding") &&
+                world.CourtVan.Phase == "Inbound", "Residents were not called to the sally port when the van was dispatched");
+            // Residents in the facility at dispatch must all make the hearing, including from the far cells.
+            var present = world.Data.Residents.Where(r => docket.Contains(r.Id) && r.Legal.Custody == "In facility").Select(r => r.Id).ToList();
             RunUntil(world, () => world.CourtVan.Phase == "Idle", 600, "Court run completion");
-            foreach (Resident resident in world.Data.Residents.Where(r => docket.Contains(r.Id)))
+            foreach (Resident resident in world.FormerResidents.Concat(world.Data.Residents).Where(r => docket.Contains(r.Id)))
                 Check(resident.Legal.Appearances + resident.Legal.MissedAppearances >= 1, resident.Name + " vanished from the court calendar");
+            foreach (Resident resident in world.FormerResidents.Concat(world.Data.Residents).Where(r => present.Contains(r.Id)))
+                Check(resident.Legal.Appearances >= 1 && resident.Legal.MissedAppearances == 0, resident.Name + " was in the facility but missed the regular court run");
             Check(world.Reconciles(), "The court run broke cash accounting");
         });
         Test("the court van boards, leaves the site, holds hearings and returns, with residents hidden while away", () => {
@@ -352,6 +359,8 @@ static partial class Program
             Rejects(s => s.Residents[0].Legal.Charges.Clear(), "A legal profile without charges loaded");
             Rejects(s => s.Justice.Van.Position = new Point(float.NaN, 0), "A non-finite van position loaded");
         });
+
+        RunPersonnelChecks();
 
         // Integration regression: absent residents must not have social contact at their parked home.
         World probe = County(); probe.StageCourtDemo();

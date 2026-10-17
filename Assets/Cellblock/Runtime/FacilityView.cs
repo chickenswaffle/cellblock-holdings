@@ -17,7 +17,8 @@ namespace Cellblock.Unity
         Transform structures, planned, ghost, people;
         sealed class Actor
         {
-            public Transform Root, Model, Body, Marker, SecurityProp;
+            public Transform Root, Model, Body, Head, Marker, SecurityProp;
+            public TextMesh NameTag;
             public Transform[] Limbs;
             public float Speed, Gait, TurnRate;
             public List<Point> RenderRoute;
@@ -141,6 +142,7 @@ namespace Cellblock.Unity
             RenderSettings.fogMode = FogMode.Linear; RenderSettings.fogStartDistance = 115; RenderSettings.fogEndDistance = 210;
             Transform site = Root("Site and landscape · presentation");
             Landscape(site);
+            PublicFrontage(site);
             Combine(site);
         }
 
@@ -729,12 +731,10 @@ namespace Cellblock.Unity
             string skinName = "skin-" + index % 4;
             Color uniform = staff ? role == "Builder" ? new Color(0.91f, 0.60f, 0.12f) : role == "Officer" ? new Color(0.19f, 0.27f, 0.33f) : role == "Technician" ? new Color(0.30f, 0.39f, 0.44f) : new Color(0.39f, 0.47f, 0.43f) :
                 index % 2 == 0 ? new Color(0.59f, 0.43f, 0.30f) : new Color(0.54f, 0.40f, 0.29f);
-            string uniformName = staff ? "uniform-staff-" + role : "uniform-" + index % 2;
+            if(role=="Visitor")uniform=new[]{new Color(.37f,.43f,.51f),new Color(.46f,.31f,.27f),new Color(.34f,.43f,.35f),new Color(.57f,.50f,.35f)}[index%4];
+            if(role=="Inspector")uniform=new Color(.30f,.34f,.39f);
+            string uniformName = staff ? "uniform-staff-" + role + (role=="Visitor"?"-"+index%4:"") : "uniform-" + index % 2;
             Capsule(body, "Neck", new Vector3(0, 1.48f, 0), new Vector3(0.115f, 0.085f, 0.115f), skinName, skin);
-            Sphere(body, "Head", new Vector3(0, 1.62f, 0), new Vector3(0.225f, 0.29f, 0.24f), skinName, skin);
-            Sphere(body, "Hair", new Vector3(0, 1.72f, -0.016f), new Vector3(0.226f, 0.13f, 0.225f), "hair-" + index % 2,
-                index % 2 == 0 ? new Color(0.18f, 0.15f, 0.12f) : new Color(0.27f, 0.23f, 0.17f));
-            Sphere(body, "Nose", new Vector3(0, 1.61f, 0.118f), new Vector3(0.048f, 0.060f, 0.063f), skinName, skin);
             Capsule(body, "Shirt", new Vector3(0, 1.20f, 0), new Vector3(0.38f, 0.29f, 0.25f), uniformName, uniform);
             Box(body, "Shirt seam", new Vector3(0.065f, 1.25f, 0.129f), new Vector3(0.007f, 0.30f, 0.012f), "seam", new Color(0.38f, 0.31f, 0.24f));
             Box(body, "Chest pocket", new Vector3(-0.09f, 1.31f, 0.126f), new Vector3(0.10f, 0.10f, 0.018f), uniformName, uniform);
@@ -744,9 +744,11 @@ namespace Cellblock.Unity
                 Box(body, "Duty belt", new Vector3(0, 0.96f, 0), new Vector3(0.34f, 0.045f, 0.25f), "rubber", new Color(0.10f, 0.12f, 0.12f));
             }
             Capsule(body, "Hips", new Vector3(0, 0.92f, 0), new Vector3(0.32f, 0.13f, 0.24f), "trousers", new Color(0.30f, 0.34f, 0.33f));
+            DressCharacter(body,index,staff,role,uniformName,uniform);
             Combine(body);
             var torso = new GameObject("Waist / upper-body pivot").transform; torso.SetParent(model, false); torso.localPosition = Vector3.up * 0.9f;
             body.SetParent(torso, false); body.localPosition = Vector3.down * 0.9f;
+            Transform head=DetailedHead(torso,index,skinName,skin,staff);
             var parts = new Transform[4];
             var forearms = new Transform[2]; var hands = new Transform[2]; var knees = new Transform[2];
             for (int i = 0; i < 4; i++)
@@ -775,10 +777,10 @@ namespace Cellblock.Unity
                 }
                 parts[i] = pivot;
             }
-            root.localScale = Vector3.one * (0.96f + index % 4 * 0.025f);
+            root.localScale = new Vector3(.94f+index%5*.025f,.96f+index%4*.025f,.94f+index%5*.025f);
             Transform marker = Cylinder(root, "Selected person", new Vector3(0, 0.015f, 0), new Vector3(0.72f, 0.008f, 0.72f), "handle", Teal);
             marker.gameObject.SetActive(false);
-            var actor = new Actor { Root = root, Model = model, Body = torso, Limbs = parts, Marker = marker, Staff = staff, Motion = new Resident(), Forearms = forearms, Hands = hands, Knees = knees, Gait = index % 97 * 0.13f, TurnRate = 7 + index % 5 };
+            var actor = new Actor { Root = root, Model = model, Body = torso, Head = head, Limbs = parts, Marker = marker, Staff = staff, Motion = new Resident(), Forearms = forearms, Hands = hands, Knees = knees, Gait = index % 97 * 0.13f, TurnRate = 7 + index % 5 };
             if (role == "Builder")
             {
                 Sphere(body, "Hard hat", new Vector3(0, 1.79f, 0), new Vector3(0.28f, 0.16f, 0.29f), "hi-vis", new Color(0.96f, 0.77f, 0.14f));
@@ -786,6 +788,7 @@ namespace Cellblock.Unity
                 Box(body, "Reflective vest band", new Vector3(0, 1.20f, 0.14f), new Vector3(0.34f, 0.06f, 0.018f), "reflective", new Color(0.94f, 0.94f, 0.80f));
                 CreateBuilderKit(actor);
             }
+            CreateCharacterNameTag(actor);
             actors.Add(id, actor); return actor;
         }
 
@@ -866,7 +869,7 @@ namespace Cellblock.Unity
                 }
                 else { actor.RenderRoute = null; actor.RouteIndex = 0; }
                 float baseSpeed = 1.6f * Mathf.Max(1, world.Data.Speed) * resident.WalkSpeed;
-                float desiredSpeed = Mathf.Min(baseSpeed * 1.35f, baseSpeed + gap * 2.2f);
+                float desiredSpeed = Mathf.Min(baseSpeed * 1.20f, gap / (0.16f / Mathf.Sqrt(Mathf.Max(1,world.Data.Speed))));
                 actor.Speed = Mathf.MoveTowards(actor.Speed, desiredSpeed, dt * baseSpeed * 8);
                 Vector3 candidate = Vector3.MoveTowards(previous, waypoint, actor.Speed * dt);
                 if (world.Routes.Clear(from, new Point(candidate.x, candidate.z))) actor.Root.position = candidate;
@@ -881,6 +884,7 @@ namespace Cellblock.Unity
                 actor.Root.rotation = Quaternion.Slerp(actor.Root.rotation, rotation, 1 - Mathf.Exp(-actor.TurnRate * dt));
                 actor.Gait += movement.magnitude * (7.0f + resident.WalkSpeed * 0.6f);
             }
+            AnimateCharacterDetail(actor,resident,world,walking,dt);
             float stride = walking ? Mathf.Clamp01(speed / 1.3f) : 0;
             float swing = Mathf.Sin(actor.Gait) * 21 * stride;
             for (int leg = 0; leg < 2; leg++) actor.Knees[leg].localRotation = Quaternion.Slerp(actor.Knees[leg].localRotation,
@@ -931,6 +935,7 @@ namespace Cellblock.Unity
                 if (created) actor = Person(id);
                 actor.Seen = true; actor.Root.gameObject.SetActive(true);
                 actor.Marker.gameObject.SetActive(id == selectedResidentId);
+                UpdateCharacterNameTag(actor,resident.Name,id==selectedResidentId);
                 PrepareResidentPose(actor, resident, world);
                 MoveActor(actor, resident, world, force || created);
                 AnimateResidentLife(actor, resident, world);

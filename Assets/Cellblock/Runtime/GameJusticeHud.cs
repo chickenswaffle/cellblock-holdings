@@ -89,6 +89,7 @@ namespace Cellblock.Unity
             legalDetails.Add(Text("Charges, court calendars and outcomes are fictional game rules, not a model of real legal procedure.", "muted"));
             legalCard.Add(legalDetails);
             personCard.Insert(personCard.IndexOf(personEffects) + 1, legalCard);
+            BuildPersonnel(); BuildFacilityEvents();
         }
 
         partial void RefreshJustice(World world, Resident resident)
@@ -97,6 +98,7 @@ namespace Cellblock.Unity
             world.EnsureLegalProfiles();
             RefreshCustodyPanel(world);
             RefreshRosterTags(world);
+            RefreshPersonnel(world, resident); RefreshFacilityEvents(world,resident);
             legalCard.style.display = resident != null && resident.Legal.Ready ? DisplayStyle.Flex : DisplayStyle.None;
             if (resident == null || !resident.Legal.Ready) return;
             LegalProfile legal = resident.Legal;
@@ -139,7 +141,7 @@ namespace Cellblock.Unity
             List<Resident> docket = world.CourtDocket(today), next = world.CourtDocket(today + 1);
             custodyDocket.text = "Hearings today: " + (docket.Count == 0 ? "none" : string.Join(", ", docket.Select(r => r.Name))) +
                 "\nTomorrow: " + (next.Count == 0 ? "none" : string.Join(", ", next.Select(r => r.Name))) +
-                (world.FormerResidents.Count == 0 ? "" : "\nRecently released: " + string.Join(", ", world.FormerResidents.Reverse().Take(3).Select(r => r.Name + " (" + JusticeRules.When(r.Legal.ReleaseMinute) + ")")));
+                (world.FormerResidents.Count == 0 ? "" : "\nRecently released: " + string.Join(", ", world.FormerResidents.Where(r=>r.Legal.Custody=="Released").Reverse().Take(3).Select(r => r.Name + " (" + JusticeRules.When(r.Legal.ReleaseMinute) + ")")));
             var ranked = world.Data.Residents.Where(r => r.Legal.Ready && world.InCustody(r)).Select(r => new { Resident = r, Risk = world.EscapeRisk(r) })
                 .OrderByDescending(x => x.Risk).ToList();
             int high = ranked.Count(x => x.Risk >= JusticeRules.HighRisk), elevated = ranked.Count(x => x.Risk >= JusticeRules.ElevatedRisk && x.Risk < JusticeRules.HighRisk);

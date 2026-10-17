@@ -46,7 +46,7 @@ namespace Cellblock.Unity
         bool inspectorOpen = true, cameraOpen, compact, layoutReady, guideOpen, hadDraft;
         object previousSelection;
         float nextRefresh;
-        public bool BlocksWorldInput { get { return guideOpen || (menu != null && menu.style.display.value != DisplayStyle.None); } }
+        public bool BlocksWorldInput { get { return InteractionModalOpen || guideOpen || (menu != null && menu.style.display.value != DisplayStyle.None); } }
         public Vector2 WorldViewCenter { get; private set; } = new Vector2(0.5f, 0.5f);
         public static string Money(long cents) { return "$" + (cents / 100d).ToString("N0", CultureInfo.InvariantCulture); }
 
@@ -721,6 +721,7 @@ namespace Cellblock.Unity
         }
         public void CloseOverlays()
         {
+            CloseInteractionSheets();
             if (guideOpen) { CloseGuide(); return; }
             if (game.World != null && menu != null) menu.style.display = DisplayStyle.None;
             cameraOpen = false; Layout();

@@ -1,0 +1,19 @@
+{
+    "passed": true,
+    "editor": "6000.3.24f1",
+    "message": "Actual Play: detailed people, personnel files and modal guards, hiring/phone layout, routed inspector, facility goals, public protest, capital review/real escorted van/offsite disposition, Unity JSON round trips. Preview only; no company slot overwritten. Device touch/performance remain unmeasured.",
+    "errors": [],
+    "captures": [
+        "01-resident-detail.png",
+        "02-officer-detail.png",
+        "03-personnel-file.png",
+        "04-phone-hiring-board.png",
+        "05-inspector-at-work.png",
+        "06-goals-and-incidents.png",
+        "07-public-demonstration.png",
+        "08-phone-facility-journal.png",
+        "09-capital-case-review.png",
+        "10-authority-transfer.png",
+        "11-case-outcome.png"
+    ]
+}
