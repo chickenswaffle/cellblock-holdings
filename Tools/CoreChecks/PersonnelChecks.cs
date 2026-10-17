@@ -114,7 +114,8 @@ static partial class Program
             Check(Math.Abs(world.EscapeRisk(resident) - Math.Max(0, before - 18)) < 0.01f, "An integrity-80 watch did not cut risk by 18");
             world.AdvanceMinutes(300);
             PersonnelFile file = FileOf(world, officer);
-            Check(file.WatchMinutes > 250 && file.WatchCloseMinutes / (float)file.WatchMinutes > 0.6f, "The watch officer did not stay close: " + file.WatchCloseMinutes + "/" + file.WatchMinutes);
+            Check(file.WatchMinutes > 250 && file.WatchCloseMinutes / (float)file.WatchMinutes > 0.85f, "The watch officer did not stay close: " + file.WatchCloseMinutes + "/" + file.WatchMinutes);
+            Check(!world.Personnel.WriteUps.Any(w => w.SubjectId == officer.Id && w.Category == "Neglect of duty"), "A watch officer keeping pace was written up for neglect");
             officer.FavoredGang = resident.Gang; officer.Favoritism = 40;
             Check(world.WatchReliability(officer, resident) == 0, "A watch officer who favors the resident's gang still counted");
         });
@@ -135,6 +136,15 @@ static partial class Program
             string honest = Outcome(false);
             Check(honest == "Escorted" || honest == "In facility", "An honest watch officer did not stop the attempt: " + honest);
             Check(Outcome(true) == "At large", "A compromised watch officer still stopped the attempt");
+        });
+        Test("without the gate post duty, the same held-far officer does not stop the attempt", () => {
+            World world = County(); HoldOfficersFar(world);
+            StaffMember guard = OnShiftOfficer(world);
+            world.AdvanceMinutes(30);
+            Check(Geometry.Distance(guard.Position, PersonnelRules.GatePost) > 10, "Control setup: the guard walked to the gate without a duty");
+            Check(world.StageEscapeDemo(), world.Notice); Resident resident = world.Escapee;
+            RunUntil(world, () => world.Escape.Phase == "None", 200, "Attempt resolution");
+            Check(FileOf(world, guard).Interceptions == 0, "The control officer intercepted without the gate post");
         });
         Test("a gate post stops an attempt at an open gate", () => {
             World world = County(); HoldOfficersFar(world);
@@ -309,6 +319,99 @@ static partial class Program
             Rejects(s => s.Residents[0].Health = float.NaN, "A non-finite health value loaded");
             Rejects(s => s.Personnel.Files[0].Duty = "Juggling", "An unknown duty loaded");
             Rejects(s => s.Personnel.WriteUps.Add(new WriteUp { Id = "bad", SubjectId = "x", Severity = 9, Text = "x" }), "A write-up with severity 9 loaded");
+        });
+        Test("rest between shifts recovers pressure; a default county company keeps its opening staff for two weeks", () => {
+            World world = County(); var opening = world.Data.Staff.Select(s => s.Id).ToList();
+            for (int day = 0; day < 14; day++) world.AdvanceMinutes(1440);
+            Check(opening.All(id => world.Data.Staff.Any(s => s.Id == id)), "An opening staff member quit with no player action within 14 days");
+            Check(world.Data.Staff.All(s => s.Pressure < 80), "Pressure kept climbing: " + string.Join(",", world.Data.Staff.Select(s => (int)s.Pressure)));
+            World rest = County(); StaffMember off = rest.Data.Staff.First(s => s.Role == "Officer" && !rest.IsOnShift(s));
+            off.Pressure = 60; rest.AdvanceMinutes(120);
+            Check(Math.Abs(off.Pressure - (60 - 2 * PersonnelRules.RestRecoveryPerHour)) < 0.05f, "Two off-shift hours did not recover exactly one pressure point: " + off.Pressure);
+        });
+        Test("a burnout warning reaches the owner once a day before anyone resigns", () => {
+            World world = County(); StaffMember officer = OnShiftOfficer(world); officer.Pressure = 82;
+            world.AdvanceMinutes(2);
+            int warnings() => world.Data.History.Count(e => e.SubjectId == officer.Id && e.Description.StartsWith("Burnout warning"));
+            Check(warnings() == 1, "Expected exactly one burnout warning at pressure 82, saw " + warnings());
+            world.AdvanceMinutes(600); Check(warnings() == 1, "The burnout warning repeated within a day");
+        });
+        Test("minor injuries heal within a day without a nurse; serious ones barely improve", () => {
+            World world = County(); world.EnsureLegalProfiles();
+            Resident minor = world.Data.Residents[0], serious = world.Data.Residents[1];
+            minor.Health = 60; serious.Health = 30; minor.Food = serious.Food = 90;
+            world.AdvanceMinutes(1200);
+            Check(minor.Health >= 72, "A minor injury did not heal on its own: " + minor.Health);
+            Check(serious.Health < 36, "A serious injury healed without a nurse: " + serious.Health);
+        });
+        Test("a commendation counts once every three game days", () => {
+            World world = County(); StaffMember officer = OnShiftOfficer(world); officer.Integrity = 44;
+            Check(world.DisciplineStaff(officer.Id, "Commendation", "Good work") && Math.Abs(officer.Integrity - 46) < 0.01f, "The first commendation did not add 2 integrity");
+            for (int i = 0; i < 27; i++) world.DisciplineStaff(officer.Id, "Commendation", "Again");
+            Check(officer.Integrity < 47, "Repeated commendations still raised integrity: " + officer.Integrity);
+            world.AdvanceMinutes(3 * 1440);
+            float before = officer.Integrity;
+            Check(world.DisciplineStaff(officer.Id, "Commendation", "Later"), "A commendation three days later was refused: " + world.Notice);
+            Check(officer.Integrity > before, "The later commendation had no effect");
+        });
+        Test("a paid background check survives the listing refresh", () => {
+            World world = County(); Candidate pick = world.Personnel.Candidates.First(c => c.Kind == "Officer");
+            Check(world.OrderBackgroundCheck(pick.Id), world.Notice);
+            world.AdvanceMinutes(1440); Check(pick.Checked, "The check did not return");
+            Check(world.PostListing(), world.Notice);
+            Check(world.Personnel.Candidates.Contains(pick) && world.Personnel.Candidates.Count <= PersonnelRules.CandidateLimit, "The checked applicant was dropped on refresh");
+            Check(world.Personnel.Candidates.Any(c => c.Kind == "Warden"), "The refreshed board lost its warden applicant");
+            Candidate unpaid = world.Personnel.Candidates.First(c => c != pick && !c.Checked && c.CheckReadyMinute < 0);
+            world.PostListing(); Check(!world.Personnel.Candidates.Contains(unpaid), "An unpaid applicant survived the refresh");
+            world.AdvanceMinutes(6 * 1440); world.PostListing();
+            Check(!world.Personnel.Candidates.Contains(pick), "A checked applicant stayed beyond six days");
+            new World(RoundTrip(world.Data));
+        });
+        Test("a demotion takes back exactly the latest raise", () => {
+            World world = County(); StaffMember officer = OnShiftOfficer(world); PersonnelFile file = FileOf(world, officer);
+            file.HiredMinute = 0; world.AdvanceMinutes(2900); officer.Pressure = 20;
+            Check(world.Promote(officer.Id) && officer.DailyCents == 6000, "Promotion raise wrong: " + officer.DailyCents);
+            Check(world.Demote(officer.Id) && officer.DailyCents == 0, "Demotion left part of the raise: " + officer.DailyCents);
+            officer.DailyCents = 52000; world.AdvanceMinutes(3 * 1440); officer.Pressure = 20;
+            Check(world.Promote(officer.Id) && officer.DailyCents == 59800, "Second raise wrong: " + officer.DailyCents);
+            State saved = RoundTrip(world.Data); World loaded = new World(saved);
+            StaffMember again = loaded.Data.Staff.First(s => s.Id == officer.Id);
+            Check(loaded.Demote(again.Id) && again.DailyCents == 52000, "The recorded raise was lost across save/load: " + again.DailyCents);
+        });
+        Test("a court referral at the charge limit is refused without a fee", () => {
+            World world = WithWarden(85);
+            Resident resident = world.Data.Residents.First(r => r.Legal.Custody == "In facility");
+            while (resident.Legal.Charges.Count < JusticeRules.ChargeLimit) resident.Legal.Charges.Add(new LegalCharge { Id = resident.Id + "/fill-" + resident.Legal.Charges.Count, Offense = "Filler", Outcome = "Dismissed" });
+            world.Data.Personnel.WriteUps.Add(new WriteUp { Id = "cap-1", SubjectId = resident.Id, Category = "Fighting", Severity = 2, Text = "Cap", Minute = world.Data.Minute });
+            long cash = world.Data.CashCents;
+            Check(!world.ReviewWriteUp("cap-1", "Refer") && world.Data.CashCents == cash && world.Personnel.WriteUps.First(w => w.Id == "cap-1").Status == "Open", "A capped referral charged or closed the write-up");
+            Check(world.ReviewWriteUp("cap-1", "Sanction"), "The capped write-up could not be sanctioned instead");
+        });
+        Test("without a warden, minor write-ups lapse after three days and serious ones wait; overflow drops the least serious", () => {
+            World world = County(); world.EnsureLegalProfiles();
+            string subject = world.Data.Residents[0].Id;
+            world.Data.Personnel.WriteUps.Add(new WriteUp { Id = "minor", SubjectId = subject, Category = "Rule violation", Severity = 1, Text = "Minor", Minute = world.Data.Minute });
+            world.Data.Personnel.WriteUps.Add(new WriteUp { Id = "serious", SubjectId = subject, Category = "Fighting", Severity = 3, Text = "Serious", Minute = world.Data.Minute });
+            world.AdvanceMinutes(3 * 1440 + 61);
+            Check(world.Personnel.WriteUps.First(w => w.Id == "minor").Status == "Closed" && world.Personnel.LapsedWriteUps >= 1, "A minor write-up did not lapse");
+            Check(world.Personnel.WriteUps.First(w => w.Id == "serious").Status == "Open", "A serious write-up lapsed");
+            World flood = County(); flood.EnsureLegalProfiles();
+            for (int i = 0; i < PersonnelRules.WriteUpLimit; i++)
+                flood.Data.Personnel.WriteUps.Add(new WriteUp { Id = "f" + i, SubjectId = subject, Category = "Fighting", Severity = i == 7 ? 1 : 3, Text = "x", Minute = flood.Data.Minute });
+            flood.Data.Personnel.WriteUps.Add(new WriteUp { Id = "newest", SubjectId = subject, Category = "Fighting", Severity = 3, Text = "x", Minute = flood.Data.Minute });
+            int lapsed = flood.Personnel.LapsedWriteUps;
+            flood.StageFightDemo();
+            Check(flood.Personnel.WriteUps.Count <= PersonnelRules.WriteUpLimit && !flood.Personnel.WriteUps.Any(w => w.Id == "f7") && flood.Personnel.WriteUps.Any(w => w.Id == "f0"), "Overflow did not drop the least serious write-up first");
+            Check(flood.Personnel.LapsedWriteUps > lapsed, "Dropped open write-ups were not counted as lapsed");
+        });
+        Test("security posts and escape responses own their officer's destination", () => {
+            World world = County(); StaffMember officer = OnShiftOfficer(world);
+            officer.SecurityRole = "Armed";
+            Check(!world.SetDuty(officer.Id, "Gate post") && !world.AssignWatch(officer.Id, world.Data.Residents[0].Id), "A posted officer took a personnel duty");
+            officer.SecurityRole = "";
+            Check(world.SetDuty(officer.Id, "Gate post"), world.Notice);
+            officer.SecurityRole = "K9"; Point before = officer.Destination; world.AdvanceMinutes(3);
+            Check(Geometry.Distance(officer.Destination, PersonnelRules.GatePost) > 1 || Geometry.Distance(before, PersonnelRules.GatePost) < 1, "The personnel tick replaced a security post's destination");
         });
     }
 }
