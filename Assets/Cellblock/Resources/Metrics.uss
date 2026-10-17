@@ -1,0 +1,39 @@
+/* Additive, scoped metric presentation. Claude's workspace and build theme remain independent. */
+.stat-grid { flex-direction: row; flex-wrap: wrap; margin-left: -3px; margin-right: -3px; margin-top: 6px; margin-bottom: 8px; }
+.stat-grid > .metric-note { width: 100%; }
+.stat-grid > .stat-meter { width: 45%; flex-grow: 1; margin-left: 3px; margin-right: 3px; }
+.stat-meter { margin-top: 4px; margin-bottom: 5px; flex-shrink: 0; min-width: 0; }
+.stat-meter-head { flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 4px; min-height: 16px; }
+.stat-meter-title { color: rgb(218, 228, 222); font-size: 11px; -unity-font-style: bold; flex-shrink: 1; white-space: normal; margin: 0; padding: 0; }
+.stat-meter-direction { color: rgb(151, 175, 173); font-size: 8px; margin: 0 0 0 5px; padding: 0; flex-shrink: 0; }
+.stat-grid .stat-meter-direction { display: none; }
+.stat-meter-track { height: 27px; background-color: rgb(15, 25, 29); border-width: 1px; border-color: rgb(66, 85, 86); border-radius: 5px; overflow: hidden; align-items: center; justify-content: center; }
+.stat-meter-fill { position: absolute; top: 0; bottom: 0; left: 0; width: 0; transition-property: width, left; transition-duration: 0.22s; transition-timing-function: ease-out; }
+.stat-meter-zero { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background-color: rgba(235, 242, 231, 0.55); }
+.stat-meter-number { color: rgb(247, 249, 239); font-size: 12px; -unity-font-style: bold; -unity-text-align: middle-center; margin: 0; padding: 1px 7px; background-color: rgba(10, 20, 23, 0.68); border-radius: 3px; }
+.metric-note { color: rgb(154, 175, 174); font-size: 10px; white-space: normal; margin-top: 5px; margin-bottom: 7px; }
+.metric-risk-card { margin-top: 6px; margin-bottom: 4px; padding: 8px; border-width: 1px; border-color: rgb(71, 91, 91); border-radius: 6px; background-color: rgb(23, 33, 37); }
+.metric-risk-card > .stat-meter { margin-top: 0; margin-bottom: 0; }
+.metric-risk-card .stat-meter-track { height: 33px; }
+.metric-risk-card .stat-meter-number { font-size: 14px; }
+.metric-factor-list { margin-bottom: 5px; }
+.metric-factor-list .stat-meter { margin-bottom: 8px; }
+.metric-factor-list .stat-meter-track { height: 25px; }
+.metric-factor-list .stat-meter-title { font-size: 10px; }
+.metric-factor-list .stat-meter-direction { font-size: 8px; }
+.metric-context { color: rgb(204, 191, 152); font-size: 10px; -unity-font-style: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 1px 4px 4px 4px; padding: 0; min-height: 13px; }
+.metric-section-tabs { flex-direction: row; flex-shrink: 0; }
+.stat-meter.metric-critical .stat-meter-track { border-color: rgb(160, 77, 66); }
+.stat-meter.metric-critical .stat-meter-number { background-color: rgba(65, 24, 22, 0.72); }
+.metric-section-nav { flex-direction: column; flex-shrink: 0; min-height: 51px; padding: 3px 4px; border-bottom-width: 1px; border-bottom-color: rgb(76, 96, 96); background-color: rgb(21, 31, 35); }
+.metric-section-tabs > Button.metric-jump { flex-grow: 1; flex-shrink: 1; flex-basis: 0; min-width: 44px; min-height: 44px; height: 44px; margin: 0 2px; padding: 0 2px; font-size: 11px; border-radius: 5px; background-color: rgb(31, 44, 48); border-color: rgb(57, 77, 80); color: rgb(183, 204, 199); }
+.metric-section-tabs > Button.metric-jump:hover { background-color: rgb(49, 68, 69); color: rgb(250, 243, 222); border-color: rgb(139, 143, 114); }
+.metric-section-tabs > Button.metric-jump.selected { background-color: rgb(59, 72, 65); border-color: rgb(174, 159, 111); color: rgb(250, 234, 190); border-bottom-width: 3px; }
+.metric-section-tabs > Button.metric-jump:focus { border-color: rgb(231, 207, 141); }
+.metric-section-tabs > Button.metric-jump:disabled { opacity: 0.4; }
+Button.metric-factor-toggle { min-height: 44px; font-size: 11px; margin-bottom: 6px; }
+.compact .stat-meter-track { height: 25px; }
+.compact .stat-meter-title { font-size: 10px; }
+.compact .stat-meter-number { font-size: 11px; }
+.compact .metric-risk-card .stat-meter-track { height: 30px; }
+.compact .metric-section-nav { min-height: 49px; padding-top: 2px; padding-bottom: 2px; }

@@ -61,7 +61,7 @@ namespace Cellblock.Unity
             lockdownControl = Action("Lockdown", () => { game.World.SetLockdown(!game.World.Data.Operations.Lockdown); Refresh(true); });
             switches.Add(lightsControl); switches.Add(alarmControl); switches.Add(gateControl); switches.Add(lockdownControl);
             controlPane.Add(Text("Alarm dispatches officers, holds construction, closes the vehicle gate and starts lockdown. Clear each restriction deliberately after the response.", "muted"));
-            controlPane.Add(Text("CCTV / LIVE SURVEILLANCE", "section-label"));
+            controlCamerasAnchor = Text("CCTV / LIVE SURVEILLANCE", "section-label"); controlPane.Add(controlCamerasAnchor);
             var cameras = Element("wrap-row");
             cctvControl = Action("CCTV enabled", () => { game.World.SetCameras(!game.World.Data.Operations.CamerasEnabled); Refresh(true); }); cameras.Add(cctvControl);
             cameras.Add(Action("Place camera", () => { ShowBuildCatalog("Security"); ChooseFixture("CCTV"); }, "primary")); controlPane.Add(cameras);
@@ -69,7 +69,7 @@ namespace Cellblock.Unity
             feedStatus = Text("", "body"); controlPane.Add(feedStatus);
             cctvRoster = Element("cctv-roster"); controlPane.Add(cctvRoster);
             controlPane.Add(Text("Aim with rotation before placing. A camera covers a 120° cone; walls block its view. Upgrades improve range and night vision. Power and local lighting affect availability. A technician maintains camera condition.", "muted"));
-            controlPane.Add(Text("HIRING / SHIFTS", "section-label"));
+            controlStaffAnchor = Text("HIRING / SHIFTS", "section-label"); controlPane.Add(controlStaffAnchor);
             foreach (string role in new[] { "Officer", "Caseworker", "Technician" })
             {
                 string selected = role;
@@ -82,14 +82,14 @@ namespace Cellblock.Unity
             arrivalStatus = Text("", "body"); controlPane.Add(arrivalStatus);
             crewRoster = Element("crew-roster"); controlPane.Add(crewRoster);
             controlPane.Add(Text("Two builders per crew. Two crews can share a waiting pickup; staff share shuttles. Late hires get a new trip. Arrival, unloading and walking take game time. Seven marked bays are reserved per trip; staff shuttles leave after dropoff. A closed gate holds arrivals. View a crew to watch its current task.", "muted"));
-            controlPane.Add(Text("SHIFT REPORTS / EVERY 8 HOURS", "section-label"));
+            controlReportsAnchor = Text("SHIFT REPORTS / EVERY 8 HOURS", "section-label"); controlPane.Add(controlReportsAnchor);
             reportStatus = Text("", "body"); reportStatus.AddToClassList("shift-report-output"); controlPane.Add(reportStatus);
         }
         public void ShowFacility()
         { workspace = Workspace.Facility; inspectorOpen = true; cameraOpen = false; ((ScrollView)inspector).scrollOffset = Vector2.zero; Refresh(true); }
         public void ShowControl()
         {
-            workspace = Workspace.Control; inspectorOpen = true; cameraOpen = false;
+            workspace = Workspace.Control; inspectorOpen = true; cameraOpen = false; ResetMetricNavigation();
             ((ScrollView)inspector).scrollOffset = Vector2.zero;
             if (game.Tool != BuildTool.Inspect && game.Draft == null) game.SetTool(BuildTool.Inspect);
             Refresh(true);
@@ -124,7 +124,8 @@ namespace Cellblock.Unity
             }
             feed.image = game.CameraFeed;
             feed.style.display = game.WatchedCamera != null ? DisplayStyle.Flex : DisplayStyle.None;
-            feedStatus.text = world.Data.Fixtures.Any(f => f.Kind == "CCTV") ? world.CameraCoverage() + " / " + world.Data.Residents.Count(world.IsPresent) + " residents on site currently observed.\n" +
+            observedResidents = world.CameraCoverage(); onSiteResidents = world.Data.Residents.Count(world.IsPresent);
+            feedStatus.text = world.Data.Fixtures.Any(f => f.Kind == "CCTV") ? observedResidents + " / " + onSiteResidents + " residents on site currently observed.\n" +
                 (game.WatchedCamera == null ? "Select a camera to open its live feed." : world.CameraOnline(game.WatchedCamera) ? "LIVE · selected feed / 5 updates per second" : "OFFLINE · check network and condition") :
                 "No operational cameras. Place one indoors or outdoors, approve its installation, and let a crew complete the work.";
             staffCost.text = "Additional staff wages: " + Money(world.Data.Staff.Sum(s => s.DailyCents + s.SecurityDailyCents)) + " / day. Day shift 08:00–20:00; night shift 20:00–08:00. Initial contract staff are included in operations.";

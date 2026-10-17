@@ -21,7 +21,7 @@ namespace Cellblock.Unity
                 var officers=game.World.Data.Staff.Where(s=>s.Role=="Officer").ToList();
                 if(officers.Count==0){game.Message("Hire an officer in Control first.");return;}
                 int index=officers.FindIndex(s=>s.Id==securityOfficerId);securityOfficerId=officers[(index+1)%officers.Count].Id;Refresh(true);
-            });fixturePane.Add(chooseOfficer);
+            });chooseOfficer.style.whiteSpace=WhiteSpace.Normal;chooseOfficer.style.height=64;fixturePane.Add(chooseOfficer);
             assignPost=Action("Assign",()=>{
                 Fixture f=game.SelectedFixture;if(f==null)return;
                 string role=f.Kind=="GuardTower"?"Tower":f.Kind=="Kennel"?"K9":"Armed";
@@ -33,10 +33,11 @@ namespace Cellblock.Unity
                 Refresh(true);
             },"quiet");fixturePane.Add(clearPost);
             BuildSearchlightControls();
-            controlPane.Add(Text("POWER / COMFORT / SECURITY","section-label"));
+            controlPowerAnchor=Text("POWER / COMFORT / SECURITY","section-label");controlPane.Add(controlPowerAnchor);
             powerInfo=Text("","body");controlPane.Add(powerInfo);
             gridSwitch=Action("Grid",()=>{game.World.Data.Security.GridEnabled=!game.World.Data.Security.GridEnabled;Refresh(true);});controlPane.Add(gridSwitch);
             controlPane.Add(Text("New units need a distribution panel for room power. Cooling raises local comfort over time. K9 and armed duty add wages; each new qualification costs $750 once. Staffed towers and nearby dog teams detect through real sightlines. Select equipment in the world for upgrades and assignments.","muted"));
+            BuildSecurityMeters();
         }
         void RefreshSecurity(World world)
         {
@@ -45,6 +46,7 @@ namespace Cellblock.Unity
                 "Added equipment: $0.18/kWh · "+world.Data.Staff.Count(world.IsOnShift)+" on shift\nStaff morale "+(world.Data.Staff.Count==0?"—":world.Data.Staff.Average(s=>s.Morale).ToString("0"))+" / 100 · "+world.Data.Security.Dogs.Count+" dogs\n"+(world.DispatchOnline?"Staffed dispatch console online":"Dispatch console unstaffed or offline")+"\nEffective perimeter reinforcement "+(world.PerimeterIntegrity*100).ToString("0.0")+"%\n"+world.Data.Fixtures.Count(world.SearchlightOnline)+" active searchlights · "+world.SearchlightSleepers+" sleeping residents exposed";
             gridSwitch.text=world.Data.Security.GridEnabled?"Isolate electricity":"Restore electricity";
             Fixture f=game.SelectedFixture;
+            RefreshSecurityMeters(world,f);
             RefreshSearchlightControls(world,f);
             if(f==null)return;
             securityInfo.text=SecurityRules.LevelName(f.UpgradeLevel)+" · condition "+f.Condition.ToString("0")+"%\n"+SecurityRules.Features(f.Kind,f.UpgradeLevel)+"\n"+world.EquipmentStatus(f)+"\nDemand "+SecurityRules.Demand(f).ToString("0.00")+" kW · local comfort "+world.ComfortAt(f.Position).ToString("0")+"/100";
@@ -60,7 +62,7 @@ namespace Cellblock.Unity
                 bool trained=f.Kind=="Kennel"?officer.DogTrained:f.Kind=="Armory"?officer.ArmedTrained:true;
                 securityInfo.text+="\n"+(trained?"Qualification ready":"Qualification: $750 once before assignment")+(f.Kind=="Kennel"?" · duty +$80/day":f.Kind=="Armory"?" · duty +$100/day":" · standard officer wage");
             }
-            chooseOfficer.text=officer==null?"Hire an officer in Control":"Officer: "+officer.Name+" · tap to cycle";
+            chooseOfficer.text=officer==null?"Hire an officer in Control":"Choose: "+officer.Name+"\nTap to cycle candidates";
             var assigned=world.Data.Staff.FirstOrDefault(s=>s.SecurityPostId==f.Id);
             assignPost.text=assigned!=null?"Assigned: "+assigned.Name:f.Kind=="Kennel"?"Assign K9 handler · +$80/day":f.Kind=="Armory"?"Assign armed duty · +$100/day":"Assign tower lookout";
             assignPost.SetEnabled(officer!=null&&assigned==null&&(f.Kind!="Armory"||f.UpgradeLevel>0));clearPost.SetEnabled(assigned!=null);

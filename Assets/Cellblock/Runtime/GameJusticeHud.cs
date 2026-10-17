@@ -11,7 +11,7 @@ namespace Cellblock.Unity
     public sealed partial class GameHud
     {
         VisualElement legalCard, legalDetails, custodyPanel, custodyAlert;
-        Label legalStatusChip, legalRiskChip, legalCustody, legalCourt, legalCharges, legalTimeline, legalFactors;
+        Label legalStatusChip, legalRiskChip, legalCustody, legalCourt, legalCharges, legalTimeline;
         Label custodyVan, custodyDocket, custodyRisk, custodyAlertText, custodyAtLarge;
         Button legalToggle, supervisionButton, legalFocus, alarmAction, gateAction, lockdownAction, escapeFocusAction, reviewRiskAction;
         readonly Label[] legalHistoryRows = new Label[4];
@@ -68,7 +68,6 @@ namespace Cellblock.Unity
             legalDetails = Element("legal-details");
             legalDetails.Add(Text("CHARGES", "legal-label")); legalCharges = Text("", "legal-line"); legalDetails.Add(legalCharges);
             legalDetails.Add(Text("TIMELINE", "legal-label")); legalTimeline = Text("", "legal-line"); legalDetails.Add(legalTimeline);
-            legalDetails.Add(Text("ESCAPE RISK FACTORS", "legal-label")); legalFactors = Text("", "legal-line"); legalDetails.Add(legalFactors);
             var controls = Element("wrap-row");
             supervisionButton = Action("Close supervision · $150/day", () =>
             {
@@ -89,7 +88,7 @@ namespace Cellblock.Unity
             legalDetails.Add(Text("Charges, court calendars and outcomes are fictional game rules, not a model of real legal procedure.", "muted"));
             legalCard.Add(legalDetails);
             personCard.Insert(personCard.IndexOf(personEffects) + 1, legalCard);
-            BuildPersonnel(); BuildFacilityEvents();
+            BuildPersonnel(); BuildFacilityEvents(); BuildProfileMeters();
         }
 
         partial void RefreshJustice(World world, Resident resident)
@@ -99,14 +98,16 @@ namespace Cellblock.Unity
             RefreshCustodyPanel(world);
             RefreshRosterTags(world);
             RefreshPersonnel(world, resident); RefreshFacilityEvents(world,resident);
+            RefreshProfileMeters(world, resident, game.SelectedStaff);
             legalCard.style.display = resident != null && resident.Legal.Ready ? DisplayStyle.Flex : DisplayStyle.None;
             if (resident == null || !resident.Legal.Ready) return;
             LegalProfile legal = resident.Legal;
             float risk = world.EscapeRisk(resident, riskFactors);
             string band = JusticeRules.RiskBand(risk);
             bool inCustody = world.InCustody(resident);
+            RefreshRiskMeters(risk, inCustody);
             legalStatusChip.text = legal.Status.ToUpperInvariant() + (JusticeRules.HasPending(legal) ? " · " + legal.Charges.Count(c => c.Outcome == "Alleged") + " ALLEGED" : "");
-            legalRiskChip.text = inCustody ? "ESCAPE RISK " + Mathf.RoundToInt(risk) + " · " + band.ToUpperInvariant() : "NOT IN CUSTODY";
+            legalRiskChip.text = inCustody ? "ESCAPE RISK " + RiskNumber(risk) + " · " + band.ToUpperInvariant() : "NOT IN CUSTODY";
             legalRiskChip.EnableInClassList("risk-high", inCustody && band == "High");
             legalRiskChip.EnableInClassList("risk-elevated", inCustody && band == "Elevated");
             legalCustody.text = world.CustodyStatus(resident) + (legal.CloseSupervision ? " · close supervision" : "");
@@ -121,8 +122,6 @@ namespace Cellblock.Unity
             if (legal.Status == "Sentenced") timeline.Add("Sentence " + legal.SentenceDays + " days · release " + JusticeRules.When(legal.ReleaseMinute));
             if (legal.Attempts > 0) timeline.Add("Escape attempts on record: " + legal.Attempts);
             legalTimeline.text = string.Join("\n", timeline);
-            legalFactors.text = !inCustody ? "Not in custody." : riskFactors.Count == 0 ? "No significant factors." :
-                string.Join("\n", riskFactors.Take(5).Select(f => (f.Points > 0 ? "+" : "−") + Mathf.RoundToInt(Mathf.Abs(f.Points)) + "  " + f.Label));
             supervisionButton.text = legal.CloseSupervision ? "End close supervision" : "Close supervision · $150/day";
             supervisionButton.SetEnabled(inCustody && (legal.CloseSupervision || world.Data.CashCents >= JusticeRules.SupervisionDailyCents));
             legalFocus.SetEnabled(world.IsPresent(resident) || (legal.Custody == "Aboard" && world.CourtVanOnRoad));

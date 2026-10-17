@@ -2,9 +2,23 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
-## October 17 checkpoint
+## October 17 numbered HUD and navigation
 
-The combined core passes **202 checks**. Claude overload snapshot `b470a10` is integrated: population transfers, coach/intake, crowding, contraband, disturbances, audits, upgrade programs, resident poses and watch-only ride-along. Codex reviewed it with an independent critic, preserved physical custody/mode/accounting integration, replaced the audit capsule with an articulated visitor and refined the coach and resident presentation.
+[Numbered meters](hud-metrics.md) now show resident needs/personality, staff condition, final escape risk and signed contributing factors, power, morale, perimeter, CCTV observations, equipment condition and construction progress. People has fixed Profile / Risk / Record / Roster shortcuts with a retained name; Control has Switches / CCTV / Team / Power / Reports. Highlights follow manual scrolling. Subject changes, reopening Control and resizing preserve a usable section start. Risk colors use the actual 35/55 thresholds; a displayed number cannot round across its classification boundary. Protective factors appear alongside danger factors, and all factors use a shared centered scale.
+
+Implementation `2f54ce4` preserves Claude's reserved main HUD/build/theme and lives/personnel/pressure source. The independent critic reviewed the source and actual desktop/phone images. A phone resize/heading failure was fixed before the final passing run. The latest **215/215 core checks and 36 actual Unity captures passed, no runtime errors**: 20 focused meter/navigation frames and 16 existing general regression frames. The review asserts 44px targets, readable numbers, section jumps, stale-selection reset, resize handling, manual scroll highlights and world-input blocking at 1600, 900 and 640 widths. Full frames: `Builds/MetricsReview/2026-10-17/final/` and `Builds/PresentationReview/2026-10-17/metrics-regression/`; committed evidence: `docs/reviews/2026-10-17-metrics-*`. Actual device touch/performance remains unmeasured.
+
+## October 17 night-watch continuation
+
+The current core passes **215 checks / 0 failures**. Claude's published `650e3ce` and balance note `db6ad58` are integrated. They preserve nearest-free dining places, last-shift meal grace and trays, stranded-resident load repair, contract advances/net solvency and night-shift fixes. The critic found no confirmed regression in that published snapshot. Claude retains its active lives/personnel/pressure/HUD work; the economy design is preserved separately.
+
+Codex added [directed night searchlights](night-watch.md): saved Sweep/Hold/Off and aim, shared wall/door-aware illumination/detection, staffed/powered/climbed operating gates, bounded sleeping-resident stress and exposure feedback. Towers have rotating detailed heads, articulated binocular watch and a corrected access-side ladder/clear deck stand. Cooler moonlight, softer shafts/pools and correctly switched lens emission improve night readability. Saved route endpoints are checked, and permanently removed resident/staff meshes and appearance bindings retire without discarding temporary court actors.
+
+Final corrected source passed **50 actual Unity Game-view captures**, with no runtime errors: security/construction/night watch 17, door/polish/pressure 12, and stories/personnel/modes/menu 21. This includes Unity API/shader compilation, project validation, Unity JSON, narrow-wall shadow, light through a door, outage, phone button bounds and paused same-count roster replacement. Core transcript and reports are `docs/reviews/*night-watch*2026-10-17*`; full frames are in the `night-watch-final` / `night-watch-regression` folders under the October 17 Builds review directories. Native stripped players, actual device touch/performance and production character art remain unverified.
+
+## Earlier October 17 checkpoint
+
+At the earlier checkpoint the combined core passed **202 checks**. Claude overload snapshot `b470a10` is integrated: population transfers, coach/intake, crowding, contraband, disturbances, audits, upgrade programs, resident poses and watch-only ride-along. Codex reviewed it with an independent critic, preserved physical custody/mode/accounting integration, replaced the audit capsule with an articulated visitor and refined the coach and resident presentation.
 
 Doors now use direct clicks on proposed or installed walls, live opening previews, retained earlier doors, curved splits, quote updates and undo. Drafts survive Unity JSON; loading/changing companies clears runtime history. [Door controls](direct-doors.md) and [presentation changes](presentation-polish.md) describe the behavior and limits.
 
@@ -52,8 +66,8 @@ The actual Unity security/services review passed nine Game-view captures with no
 | Installed Unity | 6000.3.24f1, Intel macOS | Actual local installation, not a cloud editor claim |
 | Editor import/API compilation | Successful | URP 17.3 bundled packages resolved by the installed editor; generated scene, retained material/shader, UI theme, and render assets |
 | Project setup | `CELLBLOCK_PROJECT_VALIDATION_PASSED` | Actual editor validation; fixed the clean untitled startup-scene failure that previously aborted batch mode |
-| .NET core checks | 202 passed, 0 failed | Geometry/construction/accounting, people/migration/conduct, arrivals/carpools, gate/work travel, carrying/resume, bay reservation, alarm, CCTV, reports, and 72 prefab/package/rotation quotes |
-| Security/services Play review | Passed; nine actual captures, no runtime errors | Connected door, enhanced unit, two-crew handover, staffed tower, dog, wiring/upgrade/save, night/outage and repeat placement; `Builds/SecurityReview/2026-10-16/` |
+| .NET core checks | 215 passed, 0 failed | Geometry/construction/accounting, people/migration/conduct, arrivals/carpools, gate/work travel, carrying/resume, bay reservation, alarm, CCTV, reports, and 72 prefab/package/rotation quotes |
+| Security/services Play review | Passed; 17 final actual captures, no runtime errors | Connected building, physical staffing, directed searchlights, narrow walls/openings, Unity JSON, power loss, phone controls and actor lifetimes; `Builds/SecurityReview/2026-10-17/night-watch-final/` |
 | Unity Play review | Passed; 16 actual Game-view captures; no runtime errors | Desktop/900×420 layout, contracts, catalog, profiles and named ties, live routines, connected wing quote, camera/full-height views, all furnishing models, and Unity JSON social-state round trip |
 | Operations Play review | Passed; 12 actual captures; no runtime errors | Native magnify initialization/direction, shared arrival queues and marked-bay parking, physical supply carry, articulated saw/hammer/drill, staged housing and capacity handover, CCTV, night alarm/lights, reports, and phone Control |
 | Combined justice Play review | Passed; eight captures; no runtime errors | Legal desktop/phone layout, court boarding/absence/return, mid-court Unity JSON reload, furnishing install/move/removal saves, detected escape, alarm interception and ledger. A subsequent deterministic capture-timing pass is running. |
