@@ -321,7 +321,8 @@ static partial class Program
             Rejects(s => s.Personnel.WriteUps.Add(new WriteUp { Id = "bad", SubjectId = "x", Severity = 9, Text = "x" }), "A write-up with severity 9 loaded");
         });
         Test("rest between shifts recovers pressure; a default county company keeps its opening staff for two weeks", () => {
-            World world = County(); var opening = world.Data.Staff.Select(s => s.Id).ToList();
+            // Transfers are held to the beds on hand: this isolates the rest mechanics from population growth.
+            World world = County(); world.SetTransferPolicy("Accept to capacity"); var opening = world.Data.Staff.Select(s => s.Id).ToList();
             for (int day = 0; day < 14; day++) world.AdvanceMinutes(1440);
             Check(opening.All(id => world.Data.Staff.Any(s => s.Id == id)), "An opening staff member quit with no player action within 14 days");
             Check(world.Data.Staff.All(s => s.Pressure < 80), "Pressure kept climbing: " + string.Join(",", world.Data.Staff.Select(s => (int)s.Pressure)));

@@ -75,13 +75,13 @@ namespace Cellblock.Core
     {
         public const int Version = 1, FileLimit = 80, WriteUpLimit = 150, DisciplineLimit = 30, RemarkLimit = 12, CandidateLimit = 8;
         public const long BackgroundCheckCents = 25000, ListingCents = 30000, FilingCents = 20000, ExpediteCents = 15000, WelfarePenaltyCents = 200000;
-        // Off-shift rest recovers this much pressure per game hour; a 12-hour break offsets about five residents per officer.
-        public const float RestRecoveryPerHour = 0.5f;
+        // Off-shift rest recovers this much pressure per game hour; a 12-hour break offsets about ten residents per on-shift officer.
+        public const float RestRecoveryPerHour = 0.75f;
         public const int CommendationDays = 3, WriteUpLapseDays = 3;
         public static readonly string[] Kinds = { "Officer", "Caseworker", "Technician", "Nurse", "Warden" };
         public static readonly string[] Regimes = { "Rehabilitative", "Balanced", "Strict" };
-        public static readonly string[] OfficerDuties = { "", "Watch", "Gate post", "Court escort", "CCTV monitoring", "Perimeter patrol", "Cell checks", "Mentoring" };
-        public static readonly string[] CaseworkerDuties = { "", "Counseling", "Reentry planning" };
+        public static readonly string[] OfficerDuties = { "", "Watch", "Gate post", "Court escort", "CCTV monitoring", "Perimeter patrol", "Cell checks", "Mentoring", "Intake" };
+        public static readonly string[] CaseworkerDuties = { "", "Counseling", "Reentry planning", "Intake" };
         static readonly string[] OfficerRanks = { "Officer", "Senior Officer", "Sergeant", "Lieutenant", "Captain" };
         static readonly string[] CaseworkerRanks = { "Caseworker", "Senior Caseworker", "Case Manager" };
         static readonly string[] TechnicianRanks = { "Technician", "Senior Technician" };
@@ -893,6 +893,10 @@ namespace Cellblock.Core
                 // One owner per destination: security posts (tower, K9, armed) and a detected-escape response
                 // belong to the security and justice systems; personnel duties resume when they end.
                 if (staff.SecurityRole != "" || (staff.Role == "Officer" && Escape.Detected && Escape.Phase != "None")) continue;
+                // A disturbance pulls every line officer; then intake lanes and detected contraband drops.
+                if (staff.Role == "Officer" && file.Post == "" && RiotActive) { Direct(staff, Population.Riot.Center + new Point(file.RankLevel % 2 == 0 ? 1.6f : -1.6f, 1.2f), "Riot response"); continue; }
+                if (file.Post != "Warden" && DirectIntakeStaff(staff)) continue;
+                if (file.Post == "" && DirectContrabandStaff(staff)) continue;
                 // Supervision: officers drift toward the integrity of the most senior officer on their shift.
                 if (lead != null && lead != staff && staff.Role == "Officer" && !IsWarden(staff) && (IsWarden(lead) ? 9 : FileFor(lead).RankLevel) > file.RankLevel)
                 {
@@ -917,6 +921,7 @@ namespace Cellblock.Core
                         break;
                     }
                     case "Gate post": Direct(staff, PersonnelRules.GatePost, "Gate post"); break;
+                    case "Intake": Direct(staff, IntakeStations()[0] + new Point(0.9f, -0.4f), "Intake desk"); break;
                     case "Court escort":
                         if (CourtVan.Phase == "Boarding" || CourtVan.Phase == "Unloading") Direct(staff, CourtVan.Board + new Point(1.2f, 0.4f), "Court escort");
                         break;
@@ -933,7 +938,7 @@ namespace Cellblock.Core
                         if (residents.Count == 0) break;
                         Resident next = residents[0];
                         Direct(staff, next.Home, "Cell checks");
-                        if (Geometry.Distance(staff.Position, next.Home) < 1.4f) { next.CellCheckedMinute = Data.Minute; next.Stress = Math.Min(100, next.Stress + 1.5f); }
+                        if (Geometry.Distance(staff.Position, next.Home) < 1.4f) { next.CellCheckedMinute = Data.Minute; next.Stress = Math.Min(100, next.Stress + 1.5f); SearchCell(next, staff); }
                         break;
                     }
                     case "Mentoring":
@@ -1000,9 +1005,10 @@ namespace Cellblock.Core
                     if (resident.NeglectSince < 0) resident.NeglectSince = Data.Minute;
                     else if (Data.Minute - resident.NeglectSince >= 720)
                     {
-                        Book(-Scaled(PersonnelRules.WelfarePenaltyCents), "welfare-penalty", "Untreated injury / " + resident.Name);
-                        Personnel.WelfareViolations++; resident.NeglectSince = Data.Minute;
-                        string text = "Welfare violation: " + resident.Name + " went 12 hours with a serious untreated injury. The contract charged " + JusticeRules.Dollars(Scaled(PersonnelRules.WelfarePenaltyCents)) + ". A nurse prevents this.";
+                        // After 12 untreated hours the person is taken to an outside hospital: one penalty, and they return stabilized.
+                        if (PenaltiesApply) Book(-Scaled(PersonnelRules.WelfarePenaltyCents), "welfare-penalty", "Untreated injury / " + resident.Name);
+                        Personnel.WelfareViolations++; resident.NeglectSince = -1; resident.Health = Math.Max(resident.Health, 60);
+                        string text = "Welfare violation: " + resident.Name + " went 12 hours with a serious untreated injury and was taken to an outside hospital. The contract charged " + JusticeRules.Dollars(Scaled(PersonnelRules.WelfarePenaltyCents)) + ". A nurse prevents this.";
                         PeopleDynamics.Record(Data, "welfare", resident.Id, text, 4); Notice = text;
                     }
                 }
@@ -1033,7 +1039,7 @@ namespace Cellblock.Core
         // Residents with serious tension who meet can fight. A nearby officer usually defuses it first.
         void CheckFights()
         {
-            var present = Data.Residents.Where(r => IsPresent(r) && r.Legal.Ready && r.Legal.Custody == "In facility" && r.Legal.RestrictedUntil <= Data.Minute).ToList();
+            var present = Data.Residents.Where(r => IsPresent(r) && !InIntake(r) && r.SeparatedUntil <= Data.Minute && r.Legal.Ready && r.Legal.Custody == "In facility" && r.Legal.RestrictedUntil <= Data.Minute).ToList();
             for (int i = 0; i < present.Count; i++)
             for (int j = i + 1; j < present.Count; j++)
             {
@@ -1043,6 +1049,8 @@ namespace Cellblock.Core
                 if (link == null || link.Tension < 58 || Geometry.Distance(a.Position, b.Position) > 2.6f || !SightLines.Clear(a.Position, b.Position)) continue;
                 float chance = (link.Tension >= 82 ? 0.16f : 0.05f) * ((a.Impulsivity + b.Impulsivity) / 120f) * ((a.Stress + b.Stress) / 2 + 20) / 60f;
                 chance *= (Personnel.Regime == "Strict" ? 0.7f : Personnel.Regime == "Rehabilitative" ? 1.1f : 1f) * FacilityMode.FightScale;
+                if (a.DrunkUntil > Data.Minute || b.DrunkUntil > Data.Minute) chance *= 1.6f;
+                if ((a.Dependency > 30 && a.HighUntil <= Data.Minute) || (b.Dependency > 30 && b.HighUntil <= Data.Minute)) chance *= 1.25f;
                 if (JusticeRules.Unit(Data.Seed, a.Id + b.Id, "fight", Data.Minute / 30) >= chance) continue;
                 Confront(a, b, link, present);
             }
@@ -1082,6 +1090,10 @@ namespace Cellblock.Core
                     return;
                 }
                 float hurtA = 8 + JusticeRules.Unit(Data.Seed, a.Id, "injury", Data.Minute) * 14, hurtB = 8 + JusticeRules.Unit(Data.Seed, b.Id, "injury", Data.Minute) * 14;
+                // A weapon turns a fight into an assault: the other person takes a serious injury.
+                ContrabandItem blade = ItemsOf(a).FirstOrDefault(x => x.Kind == "Weapon") ?? ItemsOf(b).FirstOrDefault(x => x.Kind == "Weapon");
+                Resident armed = blade == null ? null : blade.HolderId == a.Id ? a : b;
+                if (armed != null) { if (armed == a) hurtB *= 2.2f; else hurtA *= 2.2f; Population.Assaults++; }
                 a.Health = Math.Max(0, a.Health - hurtA); b.Health = Math.Max(0, b.Health - hurtB);
                 a.Stress = Math.Min(100, a.Stress + 10); b.Stress = Math.Min(100, b.Stress + 10);
                 a.Safety = Math.Max(0, a.Safety - 8); b.Safety = Math.Max(0, b.Safety - 8);
@@ -1089,11 +1101,35 @@ namespace Cellblock.Core
                 link.Tension = Math.Min(100, link.Tension + 6);
                 Relationship reverse = b.Relationships.FirstOrDefault(r => r.OtherId == a.Id); if (reverse != null) reverse.Tension = link.Tension;
                 Personnel.Fights++;
-                string text = "FIGHT · " + a.Name + " and " + b.Name + " fought with no officer nearby. Both were hurt" + (Nurse == null ? " and there is no nurse on staff." : "; the nurse is on the way.");
+                string text = armed != null ? "ASSAULT · " + armed.Name + " attacked " + (armed == a ? b.Name : a.Name) + " with an improvised weapon. The victim is seriously hurt" + (Nurse == null ? " and there is no nurse on staff." : "; the nurse is on the way.") :
+                    "FIGHT · " + a.Name + " and " + b.Name + " fought with no officer nearby. Both were hurt" + (Nurse == null ? " and there is no nurse on staff." : "; the nurse is on the way.");
                 StaffMember reporter = NearestOfficer(middle, 30);
-                FileWriteUp(a.Id, "Resident", "Fighting", 2, text, reporter); FileWriteUp(b.Id, "Resident", "Fighting", 2, text, reporter);
+                if (armed != null)
+                {
+                    Resident victim = armed == a ? b : a;
+                    FileWriteUp(armed.Id, "Resident", "Assault with a weapon", 3, text, reporter); FileWriteUp(victim.Id, "Resident", "Fighting", 1, text, reporter);
+                    if (reporter != null && Geometry.Distance(reporter.Position, middle) < 12) Seize(blade, reporter, "recovered the weapon after the assault");
+                }
+                else { FileWriteUp(a.Id, "Resident", "Fighting", 2, text, reporter); FileWriteUp(b.Id, "Resident", "Fighting", 2, text, reporter); }
+                SeparateAfterFight(a, b);
                 PeopleDynamics.Record(Data, "fight", a.Id, text, 3); Notice = text;
             }
+        }
+        // Officers on shift separate the two afterwards: six hours in housing, a keep-separate order, and a move
+        // to another room when a bed is free there.
+        void SeparateAfterFight(Resident a, Resident b)
+        {
+            if (ResponseOfficers().Count == 0) return;
+            a.SeparatedUntil = b.SeparatedUntil = Data.Minute + 360;
+            if (!a.Intake.KeepSeparate.Contains(b.Id) && a.Intake.KeepSeparate.Count < 8) a.Intake.KeepSeparate.Add(b.Id);
+            if (!b.Intake.KeepSeparate.Contains(a.Id) && b.Intake.KeepSeparate.Count < 8) b.Intake.KeepSeparate.Add(a.Id);
+            List<Point> room = RoomOf(a.Home);
+            if (room == null || !Geometry.Contains(room, b.Home)) return;
+            Resident mover = a.Impulsivity >= b.Impulsivity ? a : b;
+            Fixture bed = HousingBeds().Where(f => !BedTaken(f) && !Geometry.Contains(room, f.Position)).OrderBy(f => Geometry.Distance(f.Position, mover.Home)).FirstOrDefault();
+            if (bed == null) return;
+            mover.Home = Geometry.AccessPoint(bed); mover.FloorBed = false; paths.Remove(mover); destinations.Remove(mover);
+            PeopleDynamics.Record(Data, "housing", mover.Id, mover.Name + " was moved to another housing room after the fight.", 1);
         }
         void MinorInfraction()
         {

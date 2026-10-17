@@ -43,15 +43,16 @@ static partial class Program
             var mealSlots = new HashSet<Point>(); var yardSlots = new HashSet<Point>();
             for (int i = 0; i < world.Data.Residents.Count; i++)
             {
+                // Residents who share a meal place eat in different shifts; no two share a place in the same shift.
                 Resident r = world.Data.Residents[i]; Point meal = world.ServiceDestination(i, true), yard = world.ServiceDestination(i, false);
-                Check(mealSlots.Add(meal) && yardSlots.Add(yard), "Residents share a meal or yard destination");
+                Check(mealSlots.Add(new Point(meal.X + 1000 * world.MealShift(i), meal.Y)) && yardSlots.Add(yard), "Residents share a meal place in the same shift or a yard destination");
                 Check(world.Routes.Clear(meal, meal) && world.Routes.Clear(yard, yard), "A service destination overlaps an obstacle");
                 Check(world.Routes.Find(r.Home, meal) != null, r.Name + " cannot reach meals: home=" + r.Home + ", destination=" + meal + ", homeClear=" + world.Routes.Clear(r.Home,r.Home) + ", destinationClear=" + world.Routes.Clear(meal,meal));
                 Check(world.Routes.Find(r.Home, yard) != null, r.Name + " cannot reach the yard");
             }
             Check(mealSlots.Count == world.Data.Residents.Count && yardSlots.Count == world.Data.Residents.Count,
                 "Not every resident has a distinct service slot");
-            Check(Enumerable.Range(0, 24).Select(i => world.ServiceDestination(i, true)).Distinct().Count() == 24 &&
+            Check(Enumerable.Range(0, 24).Select(i => new Point(world.ServiceDestination(i, true).X + 1000 * world.MealShift(i), world.ServiceDestination(i, true).Y)).Distinct().Count() == 24 &&
                 Enumerable.Range(0, 24).Select(i => world.ServiceDestination(i, false)).Distinct().Count() == 24,
                 "Service destinations recycle when a roster exceeds the current contract size");
         });
@@ -278,7 +279,8 @@ static partial class Program
             altered.Walls[4].Door = 0.75f;
             World different = new World(altered);
             Check(different.Routes.Find(different.Data.Residents[0].Home, different.ServiceDestination(0, true)) != null, "Alternative layout is not viable");
-            original.AdvanceMinutes(180); different.AdvanceMinutes(180);
+            // Through lunch, so every meal shift crosses the changed doorway at least once.
+            original.AdvanceMinutes(330); different.AdvanceMinutes(330);
             Check(original.Data.ReceivableCents != different.Data.ReceivableCents, "Circulation had no service-payment consequence");
             Check(original.Reconciles() && different.Reconciles(), "Service earnings broke cash accounting");
         });
@@ -324,7 +326,8 @@ static partial class Program
             first.AdvanceMinutes(3);
             int moved = first.Data.Residents.Count(r => Geometry.Distance(r.Position, startingPositions[r.Id]) > 0.02f);
             Check(moved > 0 && moved < first.Data.Residents.Count, "Initial routine departures were not staggered");
-            first.AdvanceMinutes(35);
+            // Residents whose breakfast shift has passed wait for the yard at 10:00 (with their routine offset).
+            first.AdvanceMinutes(180);
             Check(first.Data.Residents.All(r => Geometry.Distance(r.Position, startingPositions[r.Id]) > 0.02f),
                 "Residents did not eventually leave their initial positions");
         });

@@ -179,8 +179,10 @@ static partial class Program
             int Fights(World world)
             {
                 HoldOfficersFar(world);
-                foreach (Resident r in world.Data.Residents) foreach (Relationship rel in r.Relationships) rel.Tension = 90;
-                world.AdvanceMinutes(3 * 1440); return world.Personnel.Fights;
+                // Beef-level tension keeps fights below the cooldown and separation limits, so the type's scale shows.
+                foreach (Resident r in world.Data.Residents) foreach (Relationship rel in r.Relationships) rel.Tension = 62;
+                world.SetTransferPolicy("Accept to capacity");
+                world.AdvanceMinutes(5 * 1440); return world.Personnel.Fights;
             }
             int calm = Fights(Swap(baseWorld, "county-intake")), rough = Fights(Swap(baseWorld, "county-maximum"));
             Check(rough > calm, "County maximum (fights ×" + GameModes.Type("county-maximum").FightScale + ") did not see more fights: " + calm + " vs " + rough);
