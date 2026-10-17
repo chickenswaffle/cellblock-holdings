@@ -90,6 +90,10 @@ Claude: your completed justice branch is under Codex integration. Your next rese
 - **Queued (user requests):** money-making prisoner programs (farm, kitchen, manufacturing, clerical, education) through the Lives activity hook; resident intake requests after building beds (per-diem); special response team (staffing); the resident-lives handoff. **Spotlight/searchlight is security equipment for Codex:** a powered night beam that detects residents in its cone, can be staffed or motorized, and causes sleep stress if aimed at housing.
 - Checks: 97 passed, 0 failed; Unity typecheck passes for editor/macOS and iOS. Not yet: a critic pass on game modes, mutation tests for modes, `docs/game-modes.md`.
 
+### 2026-10-16 — personnel critic findings (fixed 1, 4; rest open for Claude's next session)
+
+Fixed: (1) a departed nurse's file failed validation and made saves unloadable; (4) the 81st personnel file broke loading because trimming only ran on removal. Still open, from the critic run (24 seeds × 15,000 min): (2) a default game unravels with no player action: pressure saturates, both opening officers quit by day 8, and fights and welfare penalties run away; needs pressure relief/headcount tuning or a softer burnout; (3) duty movement re-plans every minute, so staff on moving targets barely walk, which also causes false neglect write-ups; (5) commendations are free and unlimited (28 clicks takes integrity 44→100); (6) a paid background check is lost when the listing refreshes; (7) demoting an opening staff member leaves part of the raise; (8) a referral at the 12-charge cap charges $200 and does nothing; (9) without a warden, write-ups flood and the oldest open ones are evicted. Weak checks: gate post passes without the duty, and the watch check hides finding 3.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:

@@ -264,6 +264,12 @@ namespace Cellblock.Core
                 file.Hometown = hometown; file.PriorEmployer = employer; file.Backstory = story; file.Resume = resume; file.References = references; file.BackgroundNote = background;
                 state.Personnel.Files.Add(file);
             }
+            // Keep the archive bounded on every path that adds a file, dropping the oldest departed files first.
+            while (state.Personnel.Files.Count > FileLimit)
+            {
+                PersonnelFile oldest = state.Personnel.Files.Where(f => f.DepartedMinute >= 0).OrderBy(f => f.DepartedMinute).FirstOrDefault();
+                if (oldest == null) break; state.Personnel.Files.Remove(oldest);
+            }
         }
         public static int NextReview(int minute, int index) { return (minute / 1440 + 3) * 1440 + 1020 + index % 4 * 15; }
 
@@ -310,7 +316,7 @@ namespace Cellblock.Core
                 string role = staff != null ? staff.Role : "Officer";
                 if (string.IsNullOrEmpty(f.StaffId) || f.Face == null || f.Caseload == null || f.Resume == null || f.References == null || f.Discipline == null || f.Remarks == null ||
                     f.Name == null || f.Post == null || f.Duty == null || f.WatchId == null || f.MenteeId == null ||
-                    (f.Post != "" && f.Post != "Warden" && f.Post != "Nurse") || (f.Post == "Warden" && role != "Officer") || (f.Post == "Nurse" && role != "Caseworker") ||
+                    (f.Post != "" && f.Post != "Warden" && f.Post != "Nurse") || (staff != null && ((f.Post == "Warden" && role != "Officer") || (f.Post == "Nurse" && role != "Caseworker"))) ||
                     f.RankLevel < 0 || f.RankLevel >= Ladder(role, f.Post).Length || (staff != null && Array.IndexOf(DutiesFor(role, f), f.Duty) < 0) ||
                     f.Caseload.Count > 3 || f.Discipline.Count > DisciplineLimit || f.Remarks.Count > RemarkLimit || f.Resume.Count > 12 ||
                     f.Discipline.Any(d => d == null || d.Minute < 0 || d.Minute > state.Minute || string.IsNullOrEmpty(d.Level)) ||
@@ -430,6 +436,7 @@ namespace Cellblock.Core
             file.Hometown = c.Hometown; file.PriorEmployer = c.PriorEmployer; file.Backstory = c.Backstory; file.Resume = c.Resume; file.References = c.References;
             file.BackgroundNote = c.Checked ? c.BackgroundNote : ""; file.HiredMinute = Data.Minute; file.NextReviewMinute = PersonnelRules.NextReview(Data.Minute, Personnel.Files.Count);
             file.RankLevel = c.Kind != "Warden" && c.Experience >= 8 ? 1 : 0;
+            PersonnelRules.EnsureFiles(Data);
             file.Credibility = c.Kind == "Warden" ? Math.Max(20, Math.Min(95, c.Integrity + c.Experience)) : 60;
             Personnel.Candidates.Remove(c);
             string text = c.Name + " hired as " + PersonnelRules.Title(staff.Role, file) + " and is on the staff shuttle. Their file and resume are in People.";
