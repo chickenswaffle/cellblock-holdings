@@ -129,14 +129,15 @@ static partial class Program
             Transfer(world, 6); FinishIntake(world);
             Hold(world);
             int extra = world.ExtraResidents; Check(extra > 0, "No extra residents for the per-diem check");
+            // One quiet afternoon hour: no meals (no service bonus) and no payment day, with the roster fixed.
+            int target = (world.Data.Minute / 1440 + 1) * 1440 + 14 * 60;
+            if (world.Data.Minute < target - 1440) target -= 1440;
+            world.AdvanceMinutes(target - world.Data.Minute);
+            extra = world.ExtraResidents;
             long receivable = world.Data.ReceivableCents, costs = Ledger(world, "resident-costs");
-            int population = world.Data.Residents.Count;
-            world.AdvanceMinutes(1440);
-            if (world.Data.Residents.Count == population && world.Data.Minute % (1440 * 7) > 1440)
-            {
-                long gained = world.Data.ReceivableCents - receivable, perDiem = (long)extra * world.PerDiemCents;
-                Check(Math.Abs(gained - world.Contract.DailyRevenueCents - perDiem) <= world.Contract.DailyServiceBonusCents + 2, "Per-diem did not accrue: gained " + gained + ", expected about " + (world.Contract.DailyRevenueCents + perDiem));
-            }
+            world.AdvanceMinutes(60);
+            long gained = world.Data.ReceivableCents - receivable, expected = (world.Contract.DailyRevenueCents + (long)extra * world.PerDiemCents) / 24;
+            Check(world.ExtraResidents == extra && Math.Abs(gained - expected) <= 2, "Per-diem did not accrue: gained " + gained + " in an hour, expected " + expected + " with " + extra + " extra");
             Check(Ledger(world, "resident-costs") < costs && world.Reconciles(), "Resident costs were not booked or accounting broke");
         });
         Test("meals run in shifts when places are short, and a fifth shift's worth of people go without", () => {
@@ -150,7 +151,11 @@ static partial class Program
             World crowded = County();
             for (int i = 0; i < 20; i++) { var r = new Resident { Id = "extra-" + i, Name = "Extra " + i, Home = crowded.Data.Residents[0].Home, Position = crowded.Data.Residents[0].Home }; crowded.Data.Residents.Add(r); }
             Check(crowded.MealShift(31) >= World.MaxMealShifts && crowded.MealCapacity == 24, "Residents beyond four shifts still have a seat");
-            Check(!crowded.MealDue(31, crowded.Data.Residents[31]), "A resident with no place was sent to a meal");
+            for (int minute = 0; minute < 1440; minute += 5)
+            {
+                crowded.Data.Minute = 1440 + minute;
+                Check(!crowded.MealDue(31, crowded.Data.Residents[31]), "A resident with no place was sent to a meal at " + JusticeRules.When(crowded.Data.Minute));
+            }
         });
         Test("unrest rises with crowding, missed meals and contraband, and falls with officer coverage", () => {
             World world = County(); world.EnsureLegalProfiles();
@@ -169,6 +174,17 @@ static partial class Program
             float none = world.UnrestTarget();
             Check(none > calm + 10 && none - calm > officers, "Losing every officer did not raise unrest: " + calm + " → " + none);
         });
+        Test("a bed, meals and safety let stress settle; a floor mattress wears people down", () => {
+            World world = County(); Hold(world); world.EnsureLegalProfiles();
+            Resident settled = world.Data.Residents[0], floor = world.Data.Residents[1];
+            // Someone else takes the floor sleeper's bed, so housing has no bed to give back.
+            world.Data.Residents.Add(new Resident { Id = "bed-taker", Name = "Bed Taker", Home = floor.Home, Position = floor.Home });
+            floor.FloorBed = true; floor.Home = floor.Position = world.Data.Yard;
+            settled.Stress = floor.Stress = 60; settled.Food = floor.Food = 90; settled.Safety = floor.Safety = 90;
+            world.AdvanceMinutes(180);
+            Check(settled.Stress < 60 - 1.5f, "Stress did not settle for a fed, safe, bedded resident: " + settled.Stress);
+            Check(floor.Stress > settled.Stress + 3, "A floor mattress did not raise stress against a bed: " + floor.Stress + " vs " + settled.Stress);
+        });
         Test("a disturbance is contained by enough officers; otherwise it becomes a riot with damage, penalty and an audit", () => {
             World held = County(); Hold(held); held.EnsureLegalProfiles();
             Check(held.StageRiotDemo() && held.Population.Riot.Phase == "Disturbance", "The riot demo did not start a disturbance");
@@ -180,6 +196,7 @@ static partial class Program
             Check(held.Population.Riots == 0 && Ledger(held, "contract-penalty") == 0 && !held.Data.Operations.Lockdown && held.Data.Operations.GateOpen, "A contained disturbance became a riot or left the facility locked down");
             World open = County(); Hold(open); open.EnsureLegalProfiles(); HoldOfficersFar(open);
             Check(open.StageRiotDemo(), open.Notice);
+            open.SetAlarm(false); open.SetLockdown(false); open.SetGate(true);
             Fixture near = open.Data.Fixtures.OrderBy(f => Geometry.Distance(f.Position, open.Population.Riot.Center)).First();
             RunUntil(open, () => open.Population.Riot.Phase == "Riot", 40, "Escalation to a riot");
             Check(open.Data.Operations.Lockdown && Ledger(open, "contract-penalty") == -1500000 && open.Population.Audit.Phase == "Announced", "Riot lockdown, penalty or audit trigger wrong");
@@ -214,7 +231,7 @@ static partial class Program
             Check(report.Score == Math.Max(0, Math.Min(100, 100 + report.Findings.Sum(f => f.Points))), "The score does not equal 100 plus findings");
             Check((report.Result == "Exemplary") == (report.Score >= 85) && (report.Result == "Fail") == (report.Score < 50), "Result thresholds wrong");
         });
-        Test("a federal facility below its required intake program fails the intake standard", () => {
+        Test("federal facilities run the federal program; state monitors fail standard intake until it is enhanced", () => {
             World world = Chartered("federal-camp", "halvern");
             Check(world.IntakeLevel == "Federal" && world.IncludedLevel("intake-program") == 3, "A federal facility does not run the federal program by default");
             AuditReport ok = world.Inspect(false);
@@ -223,6 +240,10 @@ static partial class Program
             Check(!basic.Findings.Any(f => f.Category == "Intake" && f.Points < 0), "Basic intake flagged at a county jail");
             World state = Chartered("state-medium", "northbridge");
             Check(state.IntakeLevel == "Standard", "A state facility does not start with standard intake");
+            AuditFinding below = state.Inspect(false).Findings.FirstOrDefault(f => f.Category == "Intake" && f.Text.Contains("below"));
+            Check(below != null && below.Points == -20, "Standard intake at a state facility was not marked below the enhanced standard");
+            state.Data.CashCents += 5000000; Check(state.BuyUpgrade("intake-program") && state.IntakeLevel == "Enhanced", state.Notice);
+            Check(!state.Inspect(false).Findings.Any(f => f.Category == "Intake" && f.Text.Contains("below")), "Enhanced intake still failed the state standard");
         });
         Test("three failed audits within 30 days terminate the contract: revenue, transfers and fines stop", () => {
             World world = County();
@@ -345,17 +366,91 @@ static partial class Program
                 }
         });
         Test("people in intake are held out of routines, fights and escape attempts until housed", () => {
-            World world = County(); Hold(world);
-            var arrivals = Transfer(world, 3);
-            Resident person = arrivals.First(r => world.InIntake(r));
-            Check(person.Legal.CooldownUntil > world.Data.Minute, "An intake case could start an escape attempt");
-            Resident other = world.Data.Residents.First(r => !world.InIntake(r));
-            person.Relationships.First(x => x.OtherId == other.Id).Tension = 95; other.Relationships.First(x => x.OtherId == person.Id).Tension = 95;
-            other.Position = person.Position; int fights = world.Personnel.Fights;
-            world.AdvanceMinutes(31);
-            Check(world.Personnel.Fights == fights || !world.InIntake(person), "Someone in intake fought a resident");
-            FinishIntake(world);
-            Check(!world.InIntake(person) && person.Intake.Processed && person.Legal.CooldownUntil <= world.Data.Minute, "Intake did not release the person to routines");
+            int Fights(bool inIntake)
+            {
+                World world = County(); Hold(world); world.EnsureLegalProfiles(); HoldOfficersFar(world);
+                var arrivals = Transfer(world, 2);
+                Resident person = arrivals[0], other = world.Data.Residents.First(r => !world.InIntake(r));
+                if (!inIntake) { FinishIntake(world); }
+                else Check(world.InIntake(person) && person.Legal.CooldownUntil > world.Data.Minute, "The arrival is not held in intake");
+                person.Relationships.First(x => x.OtherId == other.Id).Tension = 95; other.Relationships.First(x => x.OtherId == person.Id).Tension = 95;
+                person.Impulsivity = other.Impulsivity = 95; person.Stress = other.Stress = 90;
+                int fights = world.Personnel.Fights;
+                for (int m = 0; m < 240 && (!inIntake || world.InIntake(person)); m++) { other.Position = person.Position + new Point(0.4f, 0); world.AdvanceMinutes(1); }
+                return world.Personnel.Fights - fights;
+            }
+            Check(Fights(false) > 0, "Control: the two residents never fought outside intake");
+            Check(Fights(true) == 0, "Someone in intake fought a resident");
+            World flow = County(); Hold(flow);
+            Resident newcomer = Transfer(flow, 1)[0];
+            FinishIntake(flow);
+            Check(!flow.InIntake(newcomer) && newcomer.Intake.Processed && newcomer.Legal.CooldownUntil <= flow.Data.Minute, "Intake did not release the person to routines");
+        });
+        Test("a screened crisis risk goes on a three-day watch and never becomes a crisis", () => {
+            World world = County(); Hold(world); world.Data.CashCents += 10000000;
+            world.BuyUpgrade("intake-program"); world.BuyUpgrade("intake-program");
+            HireNow(world, "Nurse"); HireNow(world, "Caseworker");
+            Resident person = Transfer(world, 1)[0];
+            person.Intake.Condition = "Crisis risk";
+            FinishIntake(world, 3000);
+            Check(person.Intake.MentalScreened && person.Intake.WatchUntil > world.Data.Minute && person.Intake.ConditionManaged, "The screened crisis risk was not put on watch");
+            for (int d = 0; d < 3; d++) world.AdvanceMinutes(1440);
+            Check(world.Data.Intake.Crises == 0, "A screened crisis risk still became a crisis");
+        });
+        Test("one officer working two lanes never causes a skipped step; a missed search brings the item inside", () => {
+            // Three lanes, standard intake's four officer steps, one officer on shift: lanes wait well over an hour for him.
+            World world = County(); Hold(world); world.EnsureLegalProfiles(); world.Data.CashCents += 2000000; world.BuyUpgrade("intake-program");
+            world.Data.Fixtures.Add(new Fixture { Id = "desk-lane", Kind = "Desk", Position = new Point(0.4f, -6.6f) });
+            world.Data.Fixtures.Add(new Fixture { Id = "desk-lane-2", Kind = "Desk", Position = new Point(-2.6f, -6.6f) }); world.Data.GeometryGeneration++;
+            Check(world.IntakeStations().Count == 3, "Setup: three intake lanes");
+            Transfer(world, 6); FinishIntake(world, 3000);
+            int officerSkips = world.Data.History.Count(e => e.Category == "intake" && e.Description.Contains("no officer on shift"));
+            Check(officerSkips == 0, "A busy officer caused " + officerSkips + " skipped officer steps");
+            World corrupt = County(); Hold(corrupt); corrupt.EnsureLegalProfiles();
+            Resident carrier = Transfer(corrupt, 1)[0];
+            IntakeCase c = corrupt.IntakeCaseFor(carrier); c.Carrying = true; c.CarryKind = "Phone";
+            carrier.Gang = "Harbor Union";
+            foreach (StaffMember officer in corrupt.Data.Staff.Where(x => x.Role == "Officer")) { officer.Integrity = 30; officer.FavoredGang = "Harbor Union"; officer.Favoritism = 50; }
+            FinishIntake(corrupt);
+            Check(corrupt.Data.Intake.MissedAtIntake == 1 && corrupt.Data.Contraband.Items.Any(i => i.Source == "Intake" && i.HolderId == carrier.Id && i.Kind == "Phone"), "A search by an officer favoring the carrier's gang did not let the phone in");
+        });
+        Test("housing keeps a classified arrival out of a room with a known enemy when another bed is free", () => {
+            World world = County(); Hold(world); world.EnsureLegalProfiles();
+            Resident enemy = world.Data.Residents[0];
+            var enemyRoom = world.Rooms.First(r => Geometry.Contains(r, enemy.Home));
+            Resident leaveSame = world.Data.Residents.First(r => r != enemy && Geometry.Contains(enemyRoom, r.Home));
+            Resident leaveOther = world.Data.Residents.First(r => !Geometry.Contains(enemyRoom, r.Home));
+            foreach (Resident gone in new[] { leaveSame, leaveOther }) { world.Data.Residents.Remove(gone); foreach (Resident r in world.Data.Residents) r.Relationships.RemoveAll(x => x.OtherId == gone.Id); }
+            var arrival = new Resident { Id = "person-check", Name = "Check Arrival", Home = enemy.Home, Position = enemy.Home };
+            arrival.Intake = new IntakeRecord { Classified = true, KnownGang = "Unaffiliated", SecurityLevel = "Medium" };
+            arrival.Intake.KeepSeparate.Add(enemy.Id);
+            world.Data.Residents.Add(arrival);
+            world.HouseResident(arrival);
+            Check(!arrival.FloorBed && !Geometry.Contains(enemyRoom, arrival.Home), "The arrival was housed with a known enemy");
+            arrival.Intake.KeepSeparate.Clear(); arrival.Intake.Classified = false;
+        });
+        Test("after a fight, officers on shift separate the pair for six hours with a keep-separate order", () => {
+            World world = County(); Hold(world); world.EnsureLegalProfiles(); HoldOfficersFar(world);
+            Resident a = world.Data.Residents[0], b = world.Data.Residents[1];
+            a.Relationships.First(x => x.OtherId == b.Id).Tension = 95; b.Relationships.First(x => x.OtherId == a.Id).Tension = 95;
+            a.Impulsivity = b.Impulsivity = 95; a.Stress = b.Stress = 90;
+            RunUntil(world, () => { b.Position = a.Position + new Point(0.5f, 0); return world.Personnel.Fights > 0; }, 600, "The first fight");
+            Check(a.SeparatedUntil >= world.Data.Minute + 350 && b.SeparatedUntil >= world.Data.Minute + 350 && world.KeepSeparate(a, b), "The pair was not separated after the fight");
+            // Separated residents go to their housing even when meals or yard would call them elsewhere.
+            RunUntil(world, () => Geometry.Distance(a.Position, a.Home) < 0.5f && Geometry.Distance(b.Position, b.Home) < 0.5f, 240, "Both separated residents reaching housing");
+        });
+        Test("a resident watched by an officer does not collect a dropped package", () => {
+            World world = County(); Hold(world); world.EnsureLegalProfiles();
+            StaffMember officer = OnShiftOfficer(world);
+            Resident r = world.Data.Residents[0];
+            Point spot = r.Position;
+            officer.Position = officer.Station = officer.Destination = world.Routes.Clear(spot + new Point(2.5f, 0), spot + new Point(2.5f, 0)) ? spot + new Point(2.5f, 0) : spot + new Point(0, 2.5f);
+            officer.NextDutyMinute = int.MaxValue / 2;
+            Check(Geometry.Distance(officer.Position, spot) > 1.6f && world.SightLines.Clear(officer.Position, spot), "Setup: the officer must see the package from a distance");
+            world.Data.Contraband.Items.Add(new ContrabandItem { Id = "watched", Kind = "Drugs", Source = "Throw-over", Place = "Dropped", Position = spot, AssignedStaffId = "" });
+            for (int m = 0; m < 30; m++) { r.Position = spot; officer.Position = officer.Destination; world.AdvanceMinutes(1); }
+            ContrabandItem item = world.Data.Contraband.Items.FirstOrDefault(i => i.Id == "watched");
+            Check(item == null || item.Place == "Dropped", "A resident collected a package in plain sight of an officer");
         });
     }
 
@@ -427,9 +522,10 @@ static partial class Program
             world.Data.Contraband.Items.Add(new ContrabandItem { Id = "drug-1", Kind = "Drugs", Source = "Mail", HolderId = r.Id, Place = "Held", Position = r.Home, Uses = 2 });
             RunUntil(world, () => r.HighUntil > world.Data.Minute, 40, "Using the narcotics");
             Check(r.Dependency >= 6 && r.Stress < 70 - 6, "Use did not relieve stress and build dependency: dependency " + r.Dependency + ", stress " + r.Stress);
-            r.Dependency = 60; r.HighUntil = -1; world.Data.Contraband.Items.Clear(); float before = r.Stress;
-            world.AdvanceMinutes(60);
-            Check(r.Stress > before, "Withdrawal did not raise stress");
+            Resident control = world.Data.Residents[1];
+            r.Dependency = 60; r.HighUntil = -1; world.Data.Contraband.Items.Clear(); r.Stress = control.Stress = 50; control.Dependency = 0;
+            world.AdvanceMinutes(120);
+            Check(r.Stress > control.Stress + 2, "Withdrawal did not raise stress: " + r.Stress + " vs control " + control.Stress);
             World saved = County(); saved.Data.CashCents += 1000000; saved.BuyUpgrade("naloxone"); saved.EnsureLegalProfiles();
             Resident victim = saved.Data.Residents[0]; StaffMember officer = OnShiftOfficer(saved); officer.Position = victim.Position;
             victim.Health = 90;

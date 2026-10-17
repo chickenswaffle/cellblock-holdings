@@ -188,8 +188,8 @@ namespace Cellblock.Core
             float carry = Standard.CarryShare * (resident.Gang != "Unaffiliated" ? 1.4f : 1) * (record.Condition == "Withdrawal" ? 1.5f : 1);
             if (JusticeRules.Unit(seed, key, "carry", 0) < carry) { c.Carrying = true; c.CarryKind = ArrivalContraband(resident); }
             s.Cases.Add(c);
+            // AdvanceIntake holds the escape cooldown open every minute the case is active (Justice reads it the next minute).
             resident.Home = HoldingSpot(s.Cases.Count - 1);
-            resident.Legal.CooldownUntil = Math.Max(resident.Legal.CooldownUntil, Data.Minute + 1440);
         }
 
         bool IntakeStaffAvailable(StaffMember s, string role)

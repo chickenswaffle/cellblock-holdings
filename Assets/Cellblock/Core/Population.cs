@@ -113,7 +113,8 @@ namespace Cellblock.Core
             switch (tier == null ? "county" : tier.Id)
             {
                 case "city": return new PressureStandard { Oversight = "City inspector", MinimumIntake = "Basic", TransfersPerResident = 0.22f, Growth = 0.04f, MaxCrowding = 1.25f, CarryShare = 0.18f, AuditDays = 10, ResidentsPerOfficer = 14 };
-                case "state": return new PressureStandard { Oversight = "State corrections monitor", MinimumIntake = "Standard", TransfersPerResident = 0.08f, Growth = 0.05f, MaxCrowding = 1.10f, CarryShare = 0.12f, AuditDays = 5, ResidentsPerOfficer = 10 };
+                // State monitors expect more than the standard program a state contract includes: upgrading is the way to pass.
+                case "state": return new PressureStandard { Oversight = "State corrections monitor", MinimumIntake = "Enhanced", TransfersPerResident = 0.08f, Growth = 0.05f, MaxCrowding = 1.10f, CarryShare = 0.12f, AuditDays = 5, ResidentsPerOfficer = 10 };
                 case "federal": return new PressureStandard { Oversight = "Federal compliance review team", MinimumIntake = "Federal", TransfersPerResident = 0.06f, Growth = 0.05f, MaxCrowding = 1.00f, CarryShare = 0.08f, AuditDays = 4, ResidentsPerOfficer = 8 };
                 default: return new PressureStandard { Oversight = "County jail auditor", MinimumIntake = "Basic", TransfersPerResident = 0.12f, Growth = 0.04f, MaxCrowding = 1.15f, CarryShare = 0.15f, AuditDays = 7, ResidentsPerOfficer = 12 };
             }
