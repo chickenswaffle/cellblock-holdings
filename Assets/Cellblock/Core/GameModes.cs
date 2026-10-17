@@ -303,7 +303,7 @@ namespace Cellblock.Core
             Data.Operations.GateOpen = !type.GateClosedAtStart;
             PersonnelRules.PostListing(Data);
             Data.Mode.Applied = true; Data.Mode.AppliedMinute = Data.Minute;
-            paths.Clear(); destinations.Clear();
+            ClearResidentPaths();
             string text = type.Name + " in " + location.Name + ". " + type.SignatureRule;
             PeopleDynamics.Record(Data, "operations", "mode", "Charter: " + text, 1); Notice = text;
             return true;

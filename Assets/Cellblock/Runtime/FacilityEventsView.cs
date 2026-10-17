@@ -34,6 +34,7 @@ namespace Cellblock.Unity
                 }
                 if(incident.Kind=="Protest")for(int i=0;i<8;i++)RefreshCampaigner(world,incident,i,force);
             }
+            RefreshPressureAuditor(world,force);
             retiredEventActors.Clear();
             foreach(string id in eventActorIds)
             {
@@ -51,6 +52,25 @@ namespace Cellblock.Unity
                 Vector3 delta=van.Root.position-before;if(delta.sqrMagnitude>.001f)van.Root.rotation=Quaternion.Slerp(van.Root.rotation,Quaternion.LookRotation(delta),1-Mathf.Exp(-Time.unscaledDeltaTime*10));
                 foreach(Transform wheel in van.Wheels)wheel.Rotate(0,delta.magnitude*180,0,Space.Self);
             }
+        }
+        void RefreshPressureAuditor(World world,bool force)
+        {
+            if(world.Population.Audit.Phase!="In progress")return;
+            const string id="population-auditor";Actor inspector;bool created=!actors.TryGetValue(id,out inspector);
+            if(created){inspector=Person(id,true,"Inspector");eventActorIds.Add(id);}
+            inspector.Seen=true;inspector.Root.gameObject.SetActive(true);inspector.Motion.Position=world.Population.Audit.Inspector;inspector.Motion.WalkSpeed=.95f;
+            inspector.PoseArms=inspector.Speed<.06f;MoveActor(inspector,inspector.Motion,world,force||created);
+            if(inspector.PoseArms)
+            {
+                inspector.Limbs[0].localRotation=Quaternion.Euler(-35,0,-8);inspector.Forearms[0].localRotation=Quaternion.Euler(-65,0,0);
+                inspector.Limbs[1].localRotation=Quaternion.Euler(-25,0,8);inspector.Forearms[1].localRotation=Quaternion.Euler(-70,0,0);
+            }
+            if(!visitorProps.ContainsKey(id))
+            {
+                Transform board=Box(inspector.Hands[0],"Audit clipboard",new Vector3(0,0,.08f),new Vector3(.25f,.025f,.34f),"clipboard",new Color(.31f,.23f,.16f));
+                Box(board,"Audit notes",new Vector3(0,.014f,0),new Vector3(.21f,.005f,.29f),"paper",new Color(.91f,.89f,.80f));visitorProps[id]=board;
+            }
+            UpdateCharacterNameTag(inspector,world.Standard.Oversight,true);
         }
         void RefreshCampaigner(World world,FacilityIncident incident,int index,bool force)
         {

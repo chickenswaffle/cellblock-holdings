@@ -29,7 +29,7 @@ namespace Cellblock.Core
                     Point lane=loser.Position+offset;
                     if(Data.Residents.Any(other=>other!=loser&&IsPresent(other)&&Geometry.Distance(lane,other.Position)<.48f)||Geometry.Distance(lane,winner.Position)<.5f||!PeopleDynamics.ClearStaffStation(lane,Routes,Data.Fixtures)||!Routes.Clear(loser.Position,lane))continue;
                     var onward=Routes.Find(lane,destination);if(onward==null)continue;
-                    var route=new Queue<Point>();route.Enqueue(lane);foreach(Point p in onward)route.Enqueue(p);paths[loser]=route;diverted=true;loser.TrafficWaitMinutes=0;break;
+                    var route=new List<Point>{lane};route.AddRange(onward);SetResidentPath(loser,route,destination);diverted=true;loser.TrafficWaitMinutes=0;break;
                 }
                 if(!diverted)yieldingResidents.Add(loser.Id);
             }

@@ -89,9 +89,14 @@ static partial class Program
             }
             float city = Integrity("city-holding", "east-tolland"), federal = Integrity("federal-camp", "cedar-falls");
             Check(federal > city + 12, "Federal vetting did not raise applicant integrity: city " + city + ", federal " + federal);
-            World cheap = Chartered("city-holding", "east-tolland"), dear = Chartered("federal-camp", "halvern");
-            Check(dear.Personnel.Candidates.Where(c => c.Kind == "Officer").Average(c => c.AskingCents) > cheap.Personnel.Candidates.Where(c => c.Kind == "Officer").Average(c => c.AskingCents) * 1.4,
-                "Federal wages are not markedly higher");
+            // Same location, so only the tier's wage scale (×0.85 vs ×1.35) and its vetting separate the offers.
+            World cheap = Chartered("city-holding", "halvern"), dear = Chartered("federal-camp", "halvern");
+            double ratio = dear.Personnel.Candidates.Where(c => c.Kind == "Officer").Average(c => c.AskingCents) / cheap.Personnel.Candidates.Where(c => c.Kind == "Officer").Average(c => c.AskingCents);
+            Check(ratio > 1.45, "Federal wages are not markedly higher at the same location: ×" + ratio.ToString("F2"));
+            // Same tier and seed: each applicant's integrity differs by exactly the locations' labor quality (+4 vs −6).
+            World good = Chartered("county-intake", "lakewood"), poor = Chartered("county-intake", "east-tolland");
+            var pairs = good.Personnel.Candidates.Zip(poor.Personnel.Candidates, (a, b) => a.Integrity - b.Integrity).ToList();
+            Check(pairs.Count(d => d == 10) >= pairs.Count - 1, "Location labor quality did not shift applicant integrity by 10: " + string.Join(",", pairs));
         });
         Test("a remote location's court drive moves the van's schedule earlier", () => {
             World world = Chartered("county-intake", "cedar-falls"); world.EnsureLegalProfiles();
@@ -122,6 +127,70 @@ static partial class Program
                 Check(loaded.FacilityMode.Id == type.Id && loaded.Data.Residents.Count == world.Data.Residents.Count, type.Id + " did not reload");
             }
         });
+        Test("charges and pretrial share follow the facility type", () => {
+            World city = Chartered("city-holding", "northbridge"), supermax = Chartered("federal-supermax", "mason-ridge"), release = Chartered("city-work-release", "northbridge");
+            var cityCharges = city.Data.Residents.SelectMany(r => r.Legal.Charges).ToList();
+            Check(cityCharges.All(c => c.Severity < 4) && cityCharges.Average(c => c.Severity) <= 1.8, "City charges are not mostly minor: mean " + cityCharges.Average(c => c.Severity));
+            Check(supermax.Data.Residents.SelectMany(r => r.Legal.Charges).Average(c => c.Severity) >= 3, "Supermax charges are not serious");
+            Check(city.Data.Residents.Count(r => r.Legal.Status == "Pretrial") >= 8, "A city holding center is not mostly pretrial");
+            Check(release.Data.Residents.Count(r => r.Legal.Status == "Pretrial") <= 2, "A work-release campus holds pretrial residents");
+        });
+        Test("gang presence follows the facility type across seeds", () => {
+            int Members(string typeId, string locationId)
+            {
+                int total = 0;
+                for (int seed = 1; seed <= 6; seed++)
+                {
+                    World world = County(); world.Data.Seed = 7000 + seed;
+                    Check(world.ApplyMode(typeId, locationId), world.Notice);
+                    total += world.Data.Residents.Count(r => r.Gang != "Unaffiliated");
+                }
+                return total;
+            }
+            int heavy = Members("state-medium", "northbridge"), light = Members("city-work-release", "northbridge");
+            Check(heavy >= 3 * Math.Max(1, light) && heavy >= 25, "Gang share does not follow the type: state medium " + heavy + ", work release " + light);
+        });
+        Test("land prices follow the location and the escape-risk offset follows the population", () => {
+            FacilityType county = GameModes.Type("county-intake");
+            Check(GameModes.AcquisitionCents(county, GameModes.Location("briar-county")) == 20500000 && GameModes.AcquisitionCents(county, GameModes.Location("lakewood")) == 25323500,
+                "Land prices do not follow the location's land index");
+            World supermax = Chartered("federal-supermax", "mason-ridge"); var factors = new List<RiskFactor>();
+            supermax.EscapeRisk(supermax.Data.Residents[0], factors);
+            Check(factors.Any(f => f.Label.EndsWith(" population") && f.Points == 14), "The supermax population's +14 escape offset is missing");
+        });
+        Test("good-time credit, release at court and fights scale with the facility type on an identical population", () => {
+            // The same company under two facility types of one tier and location; only the type's rules differ.
+            World Swap(World source, string typeId) { State copy = RoundTrip(source.Data); copy.Mode.TypeId = typeId; return new World(copy); }
+            World baseWorld = WithWarden(85); State shaped = RoundTrip(baseWorld.Data); shaped.Mode.LocationId = "lakewood"; baseWorld = new World(shaped);
+            int Credit(World world, string id)
+            {
+                Resident r = world.Data.Residents.First(x => x.Id == id); r.ReentryMinutes = 200;
+                long before = r.Legal.ReleaseMinute;
+                Check(world.RecommendGoodTime(r.Id), world.Notice);
+                RunUntil(world, () => r.Legal.PendingReview == "", 4320, "The good-time hearing");
+                return (int)((before - r.Legal.ReleaseMinute) / 1440);
+            }
+            baseWorld.AdvanceMinutes(6 * 1440); State settled = RoundTrip(baseWorld.Data); baseWorld = new World(settled);
+            // The grant roll is seeded per resident, so find one the court grants, then compare the same person under both types.
+            string granted = baseWorld.GoodTimeEligible().Select(r => r.Id).FirstOrDefault(id => Credit(Swap(baseWorld, "county-intake"), id) > 0);
+            Check(granted != null, "No eligible resident was granted good-time");
+            int a = Credit(Swap(baseWorld, "county-intake"), granted), b = Credit(Swap(baseWorld, "county-reentry"), granted);
+            Check(b == (int)(a * 1.2f) && b > 0, "Reentry good-time credit is not ×1.2: " + a + " vs " + b);
+            int Fights(World world)
+            {
+                HoldOfficersFar(world);
+                // Beef-level tension keeps fights below the cooldown and separation limits, so the type's scale shows.
+                foreach (Resident r in world.Data.Residents) foreach (Relationship rel in r.Relationships) rel.Tension = 62;
+                world.SetTransferPolicy("Accept to capacity");
+                world.AdvanceMinutes(5 * 1440); return world.Personnel.Fights;
+            }
+            int calm = Fights(Swap(baseWorld, "county-intake")), rough = Fights(Swap(baseWorld, "county-maximum"));
+            Check(rough > calm, "County maximum (fights ×" + GameModes.Type("county-maximum").FightScale + ") did not see more fights: " + calm + " vs " + rough);
+            int Releases(World world) { world.AdvanceMinutes(4 * 1440); world.AdvanceMinutes(4 * 1440); return world.Data.Justice.Releases; }
+            World holding = Chartered("city-holding", "northbridge"); State copy2 = RoundTrip(holding.Data); copy2.Mode.TypeId = "city-downtown";
+            int quick = Releases(holding), slow = Releases(new World(copy2));
+            Check(quick > slow, "City holding (release bias +0.25) did not release more at court: " + quick + " vs " + slow);
+        });
         Test("malformed mode saves are rejected", () => {
             World world = Chartered("federal-camp", "halvern");
             void Rejects(Action<State> corrupt, string message)
@@ -133,6 +202,7 @@ static partial class Program
             Rejects(s => s.Mode.TypeId = "moon-base", "An unknown facility type loaded");
             Rejects(s => s.Mode.LocationId = "atlantis", "An unknown location loaded");
             Rejects(s => s.Mode.Version = 4, "A future mode version loaded");
+            Rejects(s => { s.Mode.TypeId = "city-holding"; s.Mode.LocationId = "mason-ridge"; }, "A city facility loaded at a location outside the city tier");
         });
     }
 }

@@ -14,7 +14,10 @@ namespace Cellblock.Unity
         partial void BuildLives();
         partial void RefreshLives(World world, Resident resident);
         partial void RefreshJustice(World world, Resident resident);
-        enum Workspace { Facility, Build, People, Company, Control }
+        partial void BuildPressure();
+        partial void RefreshPressure(World world);
+        partial void LayoutPressure(float left, float right, float top, bool menuOpen);
+        enum Workspace { Facility, Build, People, Company, Control, Pressure }
         GameController game;
         PanelSettings panelSettings;
         int displayWidth, displayHeight;
@@ -41,7 +44,7 @@ namespace Cellblock.Unity
         World rosterWorld;
         Button residentsToggle, staffToggle, staffSupport, buildRotate, catalogToggle;
         readonly Dictionary<int, Button> speedButtons = new Dictionary<int, Button>();
-        Button approve, repeatPlacement, draftConnection, hire, release, facilityTab, buildTab, peopleTab, companyTab, cameraToggle, snap, height, planView, perspectiveView;
+        Button approve, repeatPlacement, draftConnection, undoDoor, hire, release, facilityTab, buildTab, peopleTab, companyTab, cameraToggle, snap, height, planView, perspectiveView;
         Workspace workspace;
         bool inspectorOpen = true, cameraOpen, compact, layoutReady, guideOpen, hadDraft;
         object previousSelection;
@@ -81,7 +84,7 @@ namespace Cellblock.Unity
             BuildNavigation();
             inspector = new ScrollView(ScrollViewMode.Vertical); inspector.name = "inspector"; inspector.AddToClassList("inspector");
             ((ScrollView)inspector).horizontalScrollerVisibility = ScrollerVisibility.Hidden; root.Add(inspector);
-            BuildInspector(); BuildCatalog(); BuildPeople(); BuildJustice(); BuildLives(); BuildControl(); BuildSecurity();
+            BuildInspector(); BuildCatalog(); BuildPeople(); BuildJustice(); BuildLives(); BuildControl(); BuildSecurity(); BuildPressure();
             BuildTools();
             BuildCamera();
             status = Panel("status");
@@ -141,7 +144,8 @@ namespace Cellblock.Unity
             buildTab = Action("Build", () => SwitchWorkspace(Workspace.Build));
             peopleTab = Action("People", () => SwitchWorkspace(Workspace.People));
             companyTab = Action("Company", () => SwitchWorkspace(Workspace.Company));
-            tabs.Add(facilityTab); tabs.Add(buildTab); tabs.Add(peopleTab); tabs.Add(companyTab); controlTab = Action("Control", () => SwitchWorkspace(Workspace.Control)); tabs.Add(controlTab); navigation.Add(tabs);
+            tabs.Add(facilityTab); tabs.Add(buildTab); tabs.Add(peopleTab); tabs.Add(companyTab); controlTab = Action("Control", () => SwitchWorkspace(Workspace.Control)); tabs.Add(controlTab);
+            pressureTab = Action("Pressure", () => SwitchWorkspace(Workspace.Pressure)); pressureTab.tooltip = "Transfers, intake, contraband, unrest, audits and upgrades"; tabs.Add(pressureTab); navigation.Add(tabs);
             var utilities = Element("navigation-utilities");
             cameraToggle = Action("Camera", () => { cameraOpen = !cameraOpen; if (compact && cameraOpen) inspectorOpen = false; Layout(); }, "quiet");
             utilities.Add(cameraToggle); utilities.Add(Action("Controls", () => ShowGuide(false), "quiet")); navigation.Add(utilities);
@@ -460,16 +464,32 @@ namespace Cellblock.Unity
             }
         }
 
+        Label directDoorHint;
+#if UNITY_EDITOR
+        public string PreviewDoorLayout {get{return "Quote "+quote.worldBound+" / approve "+approve.worldBound+" / viewport "+root.worldBound;}}
+        public bool PreviewDoorControlsFit()
+        {
+            Rect viewport=root.worldBound,card=quote.worldBound;var actions=quote.Q<VisualElement>(className:"quote-actions");
+            foreach(Button button in actions.Query<Button>().ToList())
+            {
+                Rect b=button.worldBound;
+                if(b.width<44||b.height<43.5f||b.xMin<viewport.xMin+8||b.xMax>viewport.xMax-8||b.yMin<card.yMin||b.yMax>card.yMax-4||b.yMax>viewport.yMax-8)return false;
+            }
+            return true;
+        }
+#endif
         void BuildQuote()
         {
             quote = Panel("quote");
-            var content = new ScrollView(ScrollViewMode.Vertical); content.horizontalScrollerVisibility = ScrollerVisibility.Hidden; quote.Add(content);
+            directDoorHint=Text("Click a wall for a door · Command/Ctrl+Z to undo", "muted");directDoorHint.style.marginLeft=16;directDoorHint.style.marginTop=10;directDoorHint.style.marginRight=16;directDoorHint.style.flexShrink=0;quote.Add(directDoorHint);
+            var content = new ScrollView(ScrollViewMode.Vertical); content.horizontalScrollerVisibility = ScrollerVisibility.Hidden; content.style.minHeight=0;content.style.flexGrow=1;content.style.flexShrink=1;quote.Add(content);
             content.Add(Text("CAPITAL PROJECT / REVIEW", "eyebrow"));
             quoteTitle = Text("", "card-title"); quoteCost = Text("", "quote-cost"); quoteText = Text("", "body");
             content.Add(quoteTitle); content.Add(quoteCost); content.Add(quoteText);
-            draftConnection=Action("Add connecting door", () => game.BeginDraftConnection(), "quiet");content.Add(draftConnection);
+            draftConnection=Action("Click a wall to add a door", () => game.BeginDraftConnection(), "quiet");content.Add(draftConnection);
+            undoDoor=Action("Undo last door",()=>game.UndoDoor(),"quiet");content.Add(undoDoor);
             content.Add(Text("Materials are charged on approval. Crew wages accrue as time runs. New space opens at handover.", "muted"));
-            var actions = Element("quote-actions");
+            var actions = Element("quote-actions");actions.style.flexShrink=0;actions.style.minHeight=52;
             approve = Action("Approve project", () => { game.Confirm(); Refresh(true); }, "primary");
             repeatPlacement=Action("Approve & place another",()=>{game.ConfirmAndRepeat();Refresh(true);},"quiet");content.Add(repeatPlacement);
             actions.Add(approve); actions.Add(Action("Discard", () => { game.Cancel(); Refresh(true); }, "quiet")); quote.Add(actions);
@@ -529,15 +549,15 @@ namespace Cellblock.Unity
             header.style.display = menuOpen ? DisplayStyle.None : DisplayStyle.Flex;
             navigation.style.display = menuOpen ? DisplayStyle.None : DisplayStyle.Flex;
             bool building = workspace == Workspace.Build;
-            bool reviewing = game.Draft != null && !game.PlacingConnection;
+            bool reviewing = game.Draft != null;
             float dockOffset = reviewing ? 0 : compact ? 76 : 98;
             if (reviewing) { inspectorOpen = false; cameraOpen = false; }
             cameraToggle.SetEnabled(!reviewing);
-            facilityTab.SetEnabled(!reviewing); buildTab.SetEnabled(!reviewing); peopleTab.SetEnabled(!reviewing); companyTab.SetEnabled(!reviewing); controlTab.SetEnabled(!reviewing);
+            facilityTab.SetEnabled(!reviewing); buildTab.SetEnabled(!reviewing); peopleTab.SetEnabled(!reviewing); companyTab.SetEnabled(!reviewing); controlTab.SetEnabled(!reviewing); pressureTab.SetEnabled(!reviewing);
             tools.style.display = building && !menuOpen && !reviewing ? DisplayStyle.Flex : DisplayStyle.None;
             tools.style.left = left; tools.style.right = StyleKeyword.Auto; tools.style.bottom = bottom;
             inspector.style.display = inspectorOpen && !menuOpen ? DisplayStyle.Flex : DisplayStyle.None;
-            float panelWidth = compact ? (root.resolvedStyle.width < 700 ? 280 : 300) : workspace == Workspace.Control ? 360 : workspace == Workspace.People ? 350 : workspace == Workspace.Build ? 344 : 314;
+            float panelWidth = compact ? (root.resolvedStyle.width < 700 ? 280 : 300) : workspace == Workspace.Control || workspace == Workspace.Pressure ? 360 : workspace == Workspace.People ? 350 : workspace == Workspace.Build ? 344 : 314;
             float utilityWidth = Mathf.Max(0, root.resolvedStyle.width - left - right - (compact && inspectorOpen ? panelWidth + 16 : 0));
             tools.style.width = Mathf.Min(480, utilityWidth);
             if (compact && inspectorOpen && utilityWidth < 260) tools.style.display = DisplayStyle.None;
@@ -558,7 +578,7 @@ namespace Cellblock.Unity
             WorldViewCenter = new Vector2((worldLeft + Mathf.Max(0, worldRight - worldLeft) * 0.5f) / root.resolvedStyle.width,
                 (worldBottom + Mathf.Max(0, root.resolvedStyle.height - worldTop - worldBottom) * 0.5f) / root.resolvedStyle.height);
             status.style.display = !menuOpen && game.World != null && game.Draft == null ? DisplayStyle.Flex : DisplayStyle.None;
-            quote.style.display = !menuOpen && game.Draft != null && !game.PlacingConnection ? DisplayStyle.Flex : DisplayStyle.None;
+            quote.style.display = !menuOpen && game.Draft != null ? DisplayStyle.Flex : DisplayStyle.None;
             status.style.left = left; status.style.right = right + contextWidth;
             status.style.bottom = bottom + (building ? dockOffset : 0);
             status.style.maxWidth = compact ? 610 : 720;
@@ -569,6 +589,7 @@ namespace Cellblock.Unity
             menu.style.paddingTop = top + (compact ? 8 : 16); menu.style.paddingBottom = bottom;
             guide.style.paddingLeft = left; guide.style.paddingRight = right; guide.style.paddingTop = top; guide.style.paddingBottom = bottom;
             cameraToggle.EnableInClassList("selected", cameraOpen);
+            LayoutPressure(left, right, navTop + 54, menuOpen);
         }
 
         public bool IsOverUI(Vector2 screen)
@@ -734,11 +755,12 @@ namespace Cellblock.Unity
             foreach (var pair in speedButtons) pair.Value.EnableInClassList("selected", pair.Key == world.Data.Speed);
             foreach (var pair in toolButtons) pair.Value.EnableInClassList("selected", pair.Key == game.Tool);
             foreach (var pair in fixtureButtons) pair.Value.EnableInClassList("selected", game.Tool == BuildTool.Furnishing && pair.Key == game.PlacementFixtureKind);
-            RefreshCatalog(); RefreshPeople(world); RefreshControl(world); RefreshPrefabSelector();
+            RefreshCatalog(); RefreshPeople(world); RefreshControl(world); RefreshPrefabSelector(); RefreshPressure(world);
             facilityTab.EnableInClassList("selected", workspace == Workspace.Facility);
             buildTab.EnableInClassList("selected", workspace == Workspace.Build);
             companyTab.EnableInClassList("selected", workspace == Workspace.Company);
             peopleTab.EnableInClassList("selected", workspace == Workspace.People); controlTab.EnableInClassList("selected", workspace == Workspace.Control);
+            pressureTab.EnableInClassList("selected", workspace == Workspace.Pressure);
             FixtureDefinition activeFixture = FixtureCatalog.Get(game.PlacementFixtureKind);
             bool furnishingTool = game.Tool == BuildTool.Furnishing || game.Tool == BuildTool.Bed || game.Tool == BuildTool.Table;
             buildRotate.style.display = furnishingTool || game.Tool == BuildTool.Wing ? DisplayStyle.Flex : DisplayStyle.None;
@@ -754,9 +776,9 @@ namespace Cellblock.Unity
             placement.text = game.PlacementSummary; placement.style.display = string.IsNullOrEmpty(game.PlacementSummary) ? DisplayStyle.None : DisplayStyle.Flex;
             notice.text = world.Notice; notice.style.display = string.IsNullOrEmpty(world.Notice) ? DisplayStyle.None : DisplayStyle.Flex;
             bool company = workspace == Workspace.Company;
-            sectionTitle.text = workspace == Workspace.Control ? "CONTROL / LIVE OPERATIONS" : company ? "COMPANY / ACCOUNTS" : workspace == Workspace.Build ? "BUILD / CATALOG" : workspace == Workspace.People ? "PEOPLE / CULTURE" : "FACILITY / OPERATIONS";
+            sectionTitle.text = workspace == Workspace.Pressure ? "PRESSURE / OVERLOAD" : workspace == Workspace.Control ? "CONTROL / LIVE OPERATIONS" : company ? "COMPANY / ACCOUNTS" : workspace == Workspace.Build ? "BUILD / CATALOG" : workspace == Workspace.People ? "PEOPLE / CULTURE" : "FACILITY / OPERATIONS";
             FixtureDefinition selectedFixture = game.SelectedFixture != null ? FixtureCatalog.Get(game.SelectedFixture.Kind) : null;
-            facilityTitle.text = workspace == Workspace.Control ? "Prison control" : company ? "The business" : workspace == Workspace.Build ? "Construction catalog" : workspace == Workspace.People ? "People & culture" : game.SelectedWall != null ? "Wall details" : game.SelectedFixture != null ? (selectedFixture != null ? selectedFixture.Name : game.SelectedFixture.Kind) : world.Contract.Name;
+            facilityTitle.text = workspace == Workspace.Pressure ? "Population pressure" : workspace == Workspace.Control ? "Prison control" : company ? "The business" : workspace == Workspace.Build ? "Construction catalog" : workspace == Workspace.People ? "People & culture" : game.SelectedWall != null ? "Wall details" : game.SelectedFixture != null ? (selectedFixture != null ? selectedFixture.Name : game.SelectedFixture.Kind) : world.Contract.Name;
             overview.text = world.Data.Residents.Count + " residents  /  " + world.Capacity + " beds  /  " + world.Rooms.Count + " enclosed spaces";
             companyPane.style.display = company ? DisplayStyle.Flex : DisplayStyle.None;
             facilityPane.style.display = workspace == Workspace.Facility ? DisplayStyle.Flex : DisplayStyle.None;
@@ -805,18 +827,21 @@ namespace Cellblock.Unity
                 }
             }
             cameraTitle.text = game.CameraModeLabel; height.text = game.HeightLabel;
-            quote.style.display = game.Draft != null && !game.PlacingConnection ? DisplayStyle.Flex : DisplayStyle.None;
-            status.style.display = game.Draft != null && !game.PlacingConnection ? DisplayStyle.None : DisplayStyle.Flex;
+            quote.style.display = game.Draft != null ? DisplayStyle.Flex : DisplayStyle.None;
+            directDoorHint.style.display=game.Draft!=null&&game.Draft.Walls.Count>0?DisplayStyle.Flex:DisplayStyle.None;
+            status.style.display = game.Draft != null ? DisplayStyle.None : DisplayStyle.Flex;
             if (game.Draft != null)
             {
                 Quote q = game.CurrentQuote;
-                draftConnection.style.display=game.Draft.Walls.Count>=3?DisplayStyle.Flex:DisplayStyle.None;
+                undoDoor.style.display=game.CanUndoDoor?DisplayStyle.Flex:DisplayStyle.None;
+                draftConnection.style.display=game.Draft.Walls.Count>0?DisplayStyle.Flex:DisplayStyle.None;
                 repeatPlacement.style.display=game.CanRepeatPlacement?DisplayStyle.Flex:DisplayStyle.None;
                 repeatPlacement.SetEnabled(q!=null&&q.Valid);
                 quoteTitle.text = game.Draft.Name; quoteCost.text = q != null && q.Valid ? Money(q.MaterialCents) + "  upfront" : "Plan needs attention";
                 quoteText.text = q == null ? "Reviewing plan…" : q.Valid
                     ? "Estimated work: " + q.CrewMinutes.ToString("0") + " crew-minutes\n" + q.Message + (world.Data.Crews.Count == 0 ? "\nHire a crew in Facility before work can begin." : "")
                     : q.Message;
+                if(game.Draft.Walls.Count>0)quoteText.text+="\n\nClick any wall in the 3D plan to add a door. Drag or use arrows to move; pinch/scroll to zoom. Undo restores your previous plan.";
                 quoteCost.EnableInClassList("negative", q != null && !q.Valid); approve.SetEnabled(q != null && q.Valid);
             }
             RefreshSecurity(world);

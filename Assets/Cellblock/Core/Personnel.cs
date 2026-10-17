@@ -32,6 +32,9 @@ namespace Cellblock.Core
         public int Age = 35, Experience, RankLevel, HiredMinute, SuspendedUntil = -1, ResignMinute = -1, DepartedMinute = -1, NextReviewMinute, Credibility = 60;
         public int ShiftMinutes, WatchMinutes, WatchCloseMinutes, WatchAwayMinutes, Interceptions, Detections, Incidents, FightsStopped, Treated, WriteUpsFiled;
         public int LastShift, LastWatch, LastWatchClose, LastInterceptions, LastIncidents, LastFightsStopped, LastTreated;
+        // Each promotion's raise in cents, so a demotion takes back exactly the latest one.
+        public List<long> RaiseCents = new List<long>();
+        public int BurnoutWarnedMinute = -100000;
     }
     [Serializable] public sealed class Candidate
     {
@@ -54,6 +57,8 @@ namespace Cellblock.Core
         public List<WriteUp> WriteUps = new List<WriteUp>();
         public string Regime = "Balanced";
         public int NextId = 1, NextListingMinute, LastScannedMinute = -1, RegimeChangedMinute = -100000, Fights, FightsPrevented, WelfareViolations;
+        // Write-ups that expired unreviewed because no warden was on staff. Auditors count them.
+        public int LapsedWriteUps;
     }
     public sealed partial class State
     {
@@ -70,10 +75,13 @@ namespace Cellblock.Core
     {
         public const int Version = 1, FileLimit = 80, WriteUpLimit = 150, DisciplineLimit = 30, RemarkLimit = 12, CandidateLimit = 8;
         public const long BackgroundCheckCents = 25000, ListingCents = 30000, FilingCents = 20000, ExpediteCents = 15000, WelfarePenaltyCents = 200000;
+        // Off-shift rest recovers this much pressure per game hour; a 12-hour break offsets about ten residents per on-shift officer.
+        public const float RestRecoveryPerHour = 0.75f;
+        public const int CommendationDays = 3, WriteUpLapseDays = 3;
         public static readonly string[] Kinds = { "Officer", "Caseworker", "Technician", "Nurse", "Warden" };
         public static readonly string[] Regimes = { "Rehabilitative", "Balanced", "Strict" };
-        public static readonly string[] OfficerDuties = { "", "Watch", "Gate post", "Court escort", "CCTV monitoring", "Perimeter patrol", "Cell checks", "Mentoring" };
-        public static readonly string[] CaseworkerDuties = { "", "Counseling", "Reentry planning" };
+        public static readonly string[] OfficerDuties = { "", "Watch", "Gate post", "Court escort", "CCTV monitoring", "Perimeter patrol", "Cell checks", "Mentoring", "Intake" };
+        public static readonly string[] CaseworkerDuties = { "", "Counseling", "Reentry planning", "Intake" };
         static readonly string[] OfficerRanks = { "Officer", "Senior Officer", "Sergeant", "Lieutenant", "Captain" };
         static readonly string[] CaseworkerRanks = { "Caseworker", "Senior Caseworker", "Case Manager" };
         static readonly string[] TechnicianRanks = { "Technician", "Senior Technician" };
@@ -239,6 +247,7 @@ namespace Cellblock.Core
                 state.PersonnelVersion = Version;
             }
             if (state.Personnel == null) throw new ArgumentException("Invalid personnel state: the personnel record is missing.");
+            if (state.Personnel.Files != null) foreach (PersonnelFile f in state.Personnel.Files) if (f != null && f.RaiseCents == null) f.RaiseCents = new List<long>();
             EnsureFiles(state);
             Normalize(state);
             if (state.Personnel.Candidates != null && state.Personnel.Candidates.Count == 0 && state.Personnel.NextListingMinute == 0) PostListing(state);
@@ -276,11 +285,14 @@ namespace Cellblock.Core
         public static void PostListing(State state)
         {
             PersonnelState personnel = state.Personnel;
-            personnel.Candidates.Clear();
-            bool needWarden = !state.Staff.Any(s => s != null && FileFor(state, s.Id) != null && FileFor(state, s.Id).Post == "Warden");
+            // An applicant whose background check was paid for stays on the board for six game days.
+            personnel.Candidates.RemoveAll(c => !(c.Checked || c.CheckReadyMinute >= 0) || state.Minute - c.PostedMinute >= 6 * 1440);
+            bool needWarden = !state.Staff.Any(s => s != null && FileFor(state, s.Id) != null && FileFor(state, s.Id).Post == "Warden") && !personnel.Candidates.Any(c => c.Kind == "Warden");
             var kinds = new List<string> { "Officer", "Officer", "Officer", "Caseworker", "Nurse", "Technician" };
             if (needWarden) kinds[2] = "Warden";
-            foreach (string kind in kinds) personnel.Candidates.Add(MakeCandidate(state, kind, personnel.NextId++));
+            int room = CandidateLimit - personnel.Candidates.Count;
+            if (needWarden && room < kinds.Count) { kinds.Remove("Warden"); kinds.Insert(0, "Warden"); }
+            foreach (string kind in kinds.Take(Math.Max(0, room))) personnel.Candidates.Add(MakeCandidate(state, kind, personnel.NextId++));
             personnel.NextListingMinute = (state.Minute / 1440 + 3) * 1440 + 480;
         }
 
@@ -304,7 +316,7 @@ namespace Cellblock.Core
             PersonnelState p = state.Personnel;
             if (p.Files == null || p.Candidates == null || p.WriteUps == null || Array.IndexOf(Regimes, p.Regime) < 0 || p.NextId < 1 || p.LastScannedMinute > state.Minute)
                 throw Invalid("missing lists or an unknown regime");
-            if (p.Files.Count > FileLimit || p.WriteUps.Count > WriteUpLimit || p.Candidates.Count > CandidateLimit) throw Invalid("records exceed their bounds");
+            if (p.Files.Count > FileLimit || p.WriteUps.Count > WriteUpLimit || p.Candidates.Count > CandidateLimit || p.LapsedWriteUps < 0) throw Invalid("records exceed their bounds");
             var staffIds = new HashSet<string>(state.Staff.Where(s => s != null).Select(s => s.Id));
             var active = p.Files.Where(f => f != null && f.DepartedMinute < 0).ToList();
             if (p.Files.Any(f => f == null) || active.Select(f => f.StaffId).Distinct().Count() != active.Count || active.Any(f => !staffIds.Contains(f.StaffId)) ||
@@ -323,6 +335,7 @@ namespace Cellblock.Core
                     f.Remarks.Any(r => r == null || r.Minute < 0 || r.Minute > state.Minute || r.Rating < 1 || r.Rating > 5) ||
                     f.HiredMinute < 0 || f.HiredMinute > state.Minute || f.DepartedMinute > state.Minute || f.SuspendedUntil < -1 || f.ResignMinute < -1 || f.Credibility < 0 || f.Credibility > 100 ||
                     f.Age < 18 || f.Age > 80 || f.Experience < 0 || f.Experience > 60 ||
+                    f.RaiseCents == null || f.RaiseCents.Count > f.RankLevel || f.RaiseCents.Any(c => c < 0 || c > 1000000) || f.BurnoutWarnedMinute > state.Minute ||
                     new[] { f.ShiftMinutes, f.WatchMinutes, f.WatchCloseMinutes, f.WatchAwayMinutes, f.Interceptions, f.Detections, f.Incidents, f.FightsStopped, f.Treated, f.WriteUpsFiled,
                         f.LastShift, f.LastWatch, f.LastWatchClose, f.LastInterceptions, f.LastIncidents, f.LastFightsStopped, f.LastTreated }.Any(n => n < 0))
                     throw Invalid("staff file for " + f.Name);
@@ -481,7 +494,8 @@ namespace Cellblock.Core
             string blocker = PromotionBlocker(staff);
             if (blocker != "") { Notice = blocker; return false; }
             PersonnelFile file = FileFor(staff);
-            file.RankLevel++; staff.DailyCents += Raise(staff);
+            long raise = Raise(staff);
+            file.RankLevel++; staff.DailyCents += raise; file.RaiseCents.Add(raise);
             staff.Integrity = Math.Min(100, staff.Integrity + 3); staff.Pressure = Math.Max(0, staff.Pressure - 8);
             string title = PersonnelRules.Title(staff.Role, file);
             AddDiscipline(file, "Promotion", "Promoted to " + title, ActingAuthority);
@@ -494,7 +508,10 @@ namespace Cellblock.Core
             StaffMember staff = Data.Staff.FirstOrDefault(s => s.Id == staffId);
             PersonnelFile file = FileFor(staff);
             if (staff == null || file == null || file.Post == "Warden" || file.RankLevel == 0) { Notice = "There is no lower rank."; return false; }
-            file.RankLevel--; staff.DailyCents = Math.Max(0, staff.DailyCents - Raise(staff) * 100 / 115);
+            long raise;
+            if (file.RaiseCents.Count > 0) { raise = file.RaiseCents[file.RaiseCents.Count - 1]; file.RaiseCents.RemoveAt(file.RaiseCents.Count - 1); }
+            else raise = Raise(staff) * 100 / 115; // ranks granted before raises were recorded
+            file.RankLevel--; staff.DailyCents = Math.Max(0, staff.DailyCents - raise);
             staff.Pressure = Math.Min(100, staff.Pressure + 12); staff.Integrity = Math.Max(0, staff.Integrity - 3);
             if (staff.Integrity < 50) staff.Favoritism = Math.Min(100, staff.Favoritism + 4);
             string title = PersonnelRules.Title(staff.Role, file);
@@ -532,6 +549,9 @@ namespace Cellblock.Core
             PersonnelFile file = FileFor(staff);
             if (staff == null || file == null || Array.IndexOf(PersonnelRules.DisciplineLevels, level) < 0) return false;
             if ((level == "Suspension" || level == "Final warning") && (!WardenPresent || IsWarden(staff))) { Notice = level + " needs the warden's office (and cannot apply to the warden)."; return false; }
+            DisciplineEntry lastPraise = file.Discipline.LastOrDefault(d => d.Level == "Commendation");
+            if (level == "Commendation" && lastPraise != null && Data.Minute - lastPraise.Minute < PersonnelRules.CommendationDays * 1440)
+            { Notice = staff.Name + " was commended " + JusticeRules.When(lastPraise.Minute) + ". Another commendation counts after " + JusticeRules.When(lastPraise.Minute + PersonnelRules.CommendationDays * 1440) + "."; return false; }
             bool corrective = staff.Integrity >= 50;
             switch (level)
             {
@@ -569,7 +589,7 @@ namespace Cellblock.Core
         void RemoveStaff(StaffMember staff, string reason)
         {
             PersonnelFile file = FileFor(staff);
-            RemovePassenger(staff.Id); Data.Staff.Remove(staff); workerPaths.Remove(staff.Id);
+            RemovePassenger(staff.Id); Data.Staff.Remove(staff); RemoveWorkerPath(staff.Id);
             if (file != null) { file.DepartedMinute = Data.Minute; file.Duty = ""; file.WatchId = ""; file.MenteeId = ""; file.Caseload.Clear(); AddDiscipline(file, "Departure", reason, ActingAuthority); }
             foreach (PersonnelFile other in Personnel.Files.Where(f => f.DepartedMinute < 0 && f.MenteeId == staff.Id)) { other.MenteeId = ""; if (other.Duty == "Mentoring") other.Duty = ""; }
             // Keep the archive bounded, dropping the oldest departed files first.
@@ -587,6 +607,7 @@ namespace Cellblock.Core
             Resident resident = Data.Residents.FirstOrDefault(r => r.Id == residentId);
             PersonnelFile file = FileFor(staff);
             if (staff == null || resident == null || file == null || staff.Role != "Officer" || file.Post != "") { Notice = "Only a line officer can be assigned to watch a resident."; return false; }
+            if (staff.SecurityRole != "") { Notice = staff.Name + " holds a " + staff.SecurityRole.ToLowerInvariant() + " post. Release the post in Security first."; return false; }
             StaffMember existing = WatcherOf(resident);
             if (existing != null && existing != staff) { PersonnelFile other = FileFor(existing); other.Duty = ""; other.WatchId = ""; }
             ClearSecurityAssignment(staff.Id);
@@ -600,7 +621,8 @@ namespace Cellblock.Core
             PersonnelFile file = FileFor(staff);
             if (staff == null || file == null || Array.IndexOf(PersonnelRules.DutiesFor(staff.Role, file), duty) < 0 || duty == "Watch" || duty == "Mentoring")
             { Notice = "That duty is not available for this role."; return false; }
-            ClearSecurityAssignment(staff.Id);
+            if(duty!=""&&staff.SecurityRole!=""){Notice=staff.Name+" holds a security post. Release it in Security first.";return false;}
+
             file.Duty = duty; file.WatchId = ""; file.MenteeId = "";
             Notice = staff.Name + (duty == "" ? " returns to regular duties." : " assigned to " + duty.ToLowerInvariant() + ".");
             return true;
@@ -645,7 +667,13 @@ namespace Cellblock.Core
             PersonnelFile file = FileFor(author); if (file != null) file.WriteUpsFiled++;
             while (Personnel.WriteUps.Count > PersonnelRules.WriteUpLimit)
             {
-                WriteUp old = Personnel.WriteUps.FirstOrDefault(x => x.Status != "Open") ?? Personnel.WriteUps[0];
+                WriteUp old = Personnel.WriteUps.FirstOrDefault(x => x.Status != "Open");
+                if (old == null)
+                {
+                    // Every record is still open: the least serious, oldest one lapses rather than vanishing silently.
+                    old = Personnel.WriteUps.OrderBy(x => x.Severity).ThenBy(x => x.Minute).First();
+                    Personnel.LapsedWriteUps++;
+                }
                 Personnel.WriteUps.Remove(old);
             }
             return w;
@@ -671,6 +699,7 @@ namespace Cellblock.Core
                 else if (decision == "Refer")
                 {
                     if (!JusticeRules.InCustody(resident.Legal)) { Notice = "The resident is not in custody."; return false; }
+                    if (resident.Legal.Charges.Count >= JusticeRules.ChargeLimit) { Notice = resident.Name + "'s court record is full (" + JusticeRules.ChargeLimit + " charges). Sanction or dismiss instead."; return false; }
                     if (Data.CashCents < PersonnelRules.FilingCents) { Notice = "A court referral filing costs $200."; return false; }
                     Book(-PersonnelRules.FilingCents, "legal-filings", "Court referral / " + resident.Name);
                     AddCharge(resident, "Institutional misconduct · " + w.Category.ToLowerInvariant(), w.Severity, warden.Id, office.Credibility);
@@ -742,6 +771,8 @@ namespace Cellblock.Core
             foreach (Candidate c in Personnel.Candidates.Where(c => c.CheckReadyMinute >= 0 && !c.Checked && Data.Minute >= c.CheckReadyMinute))
             { c.Checked = true; Notice = "Background check returned for " + c.Name + "."; }
             AdvanceCareers();
+            RestStaff();
+            if (Data.Minute % 60 == 30) LapseWriteUps();
             DirectStaff();
             AdvanceHealth();
             ScanIncidents();
@@ -762,6 +793,29 @@ namespace Cellblock.Core
                 }
                 if (staff.Arrived && Data.Minute >= file.NextReviewMinute) WriteReview(staff, file);
             }
+        }
+        // Rest between shifts recovers pressure; a burnout warning reaches the owner once a day before notices follow.
+        void RestStaff()
+        {
+            foreach (StaffMember staff in Data.Staff)
+            {
+                if (!staff.Arrived) continue;
+                if (!IsOnShift(staff)) staff.Pressure = Math.Max(0, staff.Pressure - PersonnelRules.RestRecoveryPerHour / 60f);
+                PersonnelFile file = FileFor(staff);
+                if (file != null && staff.Pressure >= 80 && file.ResignMinute < 0 && Data.Minute - file.BurnoutWarnedMinute >= 1440)
+                {
+                    file.BurnoutWarnedMinute = Data.Minute;
+                    string text = "Burnout warning: " + staff.Name + " is at " + (int)staff.Pressure + " pressure. Hire another " + staff.Role.ToLowerInvariant() + " for their shift, commend them or pay for support before they resign.";
+                    PeopleDynamics.Record(Data, "staff-career", staff.Id, text, 2); Notice = text;
+                }
+            }
+        }
+        // Without a warden, minor write-ups lapse after a few days instead of piling up. Serious ones wait.
+        void LapseWriteUps()
+        {
+            if (WardenPresent) return;
+            foreach (WriteUp w in Personnel.WriteUps.Where(x => x.Status == "Open" && x.Severity == 1 && Data.Minute - x.Minute >= PersonnelRules.WriteUpLapseDays * 1440))
+            { w.Status = "Closed"; w.Outcome = "Lapsed without review: no warden on staff."; w.ClosedMinute = Data.Minute; Personnel.LapsedWriteUps++; }
         }
         StaffMember SupervisorFor(StaffMember staff)
         {
@@ -819,6 +873,10 @@ namespace Cellblock.Core
         }
         void Direct(StaffMember staff, Point target, string label)
         {
+            // Keep the current route while the target drifts a little; re-planning every minute restarts the path
+            // at the nearest grid node and leaves staff following a moving person barely walking.
+            float drift = Geometry.Distance(staff.Destination, target), tolerance = Math.Max(0.6f, 0.35f * Geometry.Distance(staff.Position, target));
+            if (drift <= tolerance) { staff.NextDutyMinute = Data.Minute + 5; staff.Duty = Geometry.Distance(staff.Position, staff.Destination) < 0.6f ? label : "Walking to " + label.ToLowerInvariant(); return; }
             target = NearbyClear(target, Routes);
             if (Geometry.Distance(staff.Destination, target) > 0.3f && Routes.Find(staff.Position, target) == null) return;
             staff.Destination = target; staff.NextDutyMinute = Data.Minute + 5;
@@ -836,6 +894,13 @@ namespace Cellblock.Core
                 PersonnelFile file = FileFor(staff); if (file == null) continue;
                 file.ShiftMinutes++;
                 if (IsSuspended(staff)) { Direct(staff, staff.Station, "Suspended"); staff.Duty = "Suspended"; continue; }
+                // One owner per destination: security posts (tower, K9, armed) and a detected-escape response
+                // belong to the security and justice systems; personnel duties resume when they end.
+                if (staff.SecurityRole != "" || (staff.Role == "Officer" && Escape.Detected && Escape.Phase != "None")) continue;
+                // A disturbance pulls every line officer; then intake lanes and detected contraband drops.
+                if (staff.Role == "Officer" && file.Post == "" && RiotActive) { Direct(staff, Population.Riot.Center + new Point(file.RankLevel % 2 == 0 ? 1.6f : -1.6f, 1.2f), "Riot response"); continue; }
+                if (file.Post != "Warden" && DirectIntakeStaff(staff)) continue;
+                if (file.Post == "" && DirectContrabandStaff(staff)) continue;
                 // Supervision: officers drift toward the integrity of the most senior officer on their shift.
                 if (lead != null && lead != staff && staff.Role == "Officer" && !IsWarden(staff) && (IsWarden(lead) ? 9 : FileFor(lead).RankLevel) > file.RankLevel)
                 {
@@ -862,6 +927,7 @@ namespace Cellblock.Core
                         break;
                     }
                     case "Gate post": Direct(staff, PersonnelRules.GatePost, "Gate post"); break;
+                    case "Intake": Direct(staff, IntakeStations()[0] + new Point(0.9f, -0.4f), "Intake desk"); break;
                     case "Court escort":
                         if (CourtVan.Phase == "Inbound" || CourtVan.Phase == "At gate" || CourtVan.Phase == "Boarding" || CourtVan.Phase == "Unloading") Direct(staff, CourtVan.Board + new Point(1.2f, 0.4f), "Court escort");
                         break;
@@ -878,7 +944,7 @@ namespace Cellblock.Core
                         if (residents.Count == 0) break;
                         Resident next = residents[0];
                         Direct(staff, next.Home, "Cell checks");
-                        if (Geometry.Distance(staff.Position, next.Home) < 1.4f) { next.CellCheckedMinute = Data.Minute; next.Stress = Math.Min(100, next.Stress + 1.5f); }
+                        if (Geometry.Distance(staff.Position, next.Home) < 1.4f) { next.CellCheckedMinute = Data.Minute; next.Stress = Math.Min(100, next.Stress + 1.5f); SearchCell(next, staff); }
                         break;
                     }
                     case "Mentoring":
@@ -935,7 +1001,8 @@ namespace Cellblock.Core
             {
                 if (!IsPresent(resident)) continue;
                 if (resident.Food < 20) resident.Health = Math.Max(0, resident.Health - 0.02f);
-                else if (resident.Health < 92 && resident.Food > 50) resident.Health = Math.Min(92, resident.Health + 0.004f);
+                // Bruises and minor cuts heal on their own within a day or two; a serious injury (under 50) needs the nurse.
+                else if (resident.Health < 92 && resident.Food > 50) resident.Health = Math.Min(92, resident.Health + (resident.Health >= 50 ? 0.012f : 0.004f));
                 if (resident.Health < 50) resident.Stress = Math.Min(100, resident.Stress + 0.02f);
                 if (Personnel.Regime == "Rehabilitative") resident.Stress = Math.Max(0, resident.Stress - 0.004f);
                 else if (Personnel.Regime == "Strict") resident.Stress = Math.Min(100, resident.Stress + 0.006f);
@@ -944,9 +1011,10 @@ namespace Cellblock.Core
                     if (resident.NeglectSince < 0) resident.NeglectSince = Data.Minute;
                     else if (Data.Minute - resident.NeglectSince >= 720)
                     {
-                        Book(-Scaled(PersonnelRules.WelfarePenaltyCents), "welfare-penalty", "Untreated injury / " + resident.Name);
-                        Personnel.WelfareViolations++; resident.NeglectSince = Data.Minute;
-                        string text = "Welfare violation: " + resident.Name + " went 12 hours with a serious untreated injury. The contract charged " + JusticeRules.Dollars(Scaled(PersonnelRules.WelfarePenaltyCents)) + ". A nurse prevents this.";
+                        // After 12 untreated hours the person is taken to an outside hospital: one penalty, and they return stabilized.
+                        if (PenaltiesApply) Book(-Scaled(PersonnelRules.WelfarePenaltyCents), "welfare-penalty", "Untreated injury / " + resident.Name);
+                        Personnel.WelfareViolations++; resident.NeglectSince = -1; resident.Health = Math.Max(resident.Health, 60);
+                        string text = "Welfare violation: " + resident.Name + " went 12 hours with a serious untreated injury and was taken to an outside hospital. The contract charged " + JusticeRules.Dollars(Scaled(PersonnelRules.WelfarePenaltyCents)) + ". A nurse prevents this.";
                         PeopleDynamics.Record(Data, "welfare", resident.Id, text, 4); Notice = text;
                     }
                 }
@@ -977,7 +1045,7 @@ namespace Cellblock.Core
         // Residents with serious tension who meet can fight. A nearby officer usually defuses it first.
         void CheckFights()
         {
-            var present = Data.Residents.Where(r => IsPresent(r) && r.Legal.Ready && r.Legal.Custody == "In facility" && r.Legal.RestrictedUntil <= Data.Minute).ToList();
+            var present = Data.Residents.Where(r => IsPresent(r) && !InIntake(r) && r.SeparatedUntil <= Data.Minute && r.Legal.Ready && r.Legal.Custody == "In facility" && r.Legal.RestrictedUntil <= Data.Minute).ToList();
             for (int i = 0; i < present.Count; i++)
             for (int j = i + 1; j < present.Count; j++)
             {
@@ -987,6 +1055,8 @@ namespace Cellblock.Core
                 if (link == null || link.Tension < 58 || Geometry.Distance(a.Position, b.Position) > 2.6f || !SightLines.Clear(a.Position, b.Position)) continue;
                 float chance = (link.Tension >= 82 ? 0.16f : 0.05f) * ((a.Impulsivity + b.Impulsivity) / 120f) * ((a.Stress + b.Stress) / 2 + 20) / 60f;
                 chance *= (Personnel.Regime == "Strict" ? 0.7f : Personnel.Regime == "Rehabilitative" ? 1.1f : 1f) * FacilityMode.FightScale;
+                if (a.DrunkUntil > Data.Minute || b.DrunkUntil > Data.Minute) chance *= 1.6f;
+                if ((a.Dependency > 30 && a.HighUntil <= Data.Minute) || (b.Dependency > 30 && b.HighUntil <= Data.Minute)) chance *= 1.25f;
                 if (JusticeRules.Unit(Data.Seed, a.Id + b.Id, "fight", Data.Minute / 30) >= chance) continue;
                 Confront(a, b, link, present);
             }
@@ -1026,6 +1096,10 @@ namespace Cellblock.Core
                     return;
                 }
                 float hurtA = 8 + JusticeRules.Unit(Data.Seed, a.Id, "injury", Data.Minute) * 14, hurtB = 8 + JusticeRules.Unit(Data.Seed, b.Id, "injury", Data.Minute) * 14;
+                // A weapon turns a fight into an assault: the other person takes a serious injury.
+                ContrabandItem blade = ItemsOf(a).FirstOrDefault(x => x.Kind == "Weapon") ?? ItemsOf(b).FirstOrDefault(x => x.Kind == "Weapon");
+                Resident armed = blade == null ? null : blade.HolderId == a.Id ? a : b;
+                if (armed != null) { if (armed == a) hurtB *= 2.2f; else hurtA *= 2.2f; Population.Assaults++; }
                 a.Health = Math.Max(0, a.Health - hurtA); b.Health = Math.Max(0, b.Health - hurtB);
                 a.Stress = Math.Min(100, a.Stress + 10); b.Stress = Math.Min(100, b.Stress + 10);
                 a.Safety = Math.Max(0, a.Safety - 8); b.Safety = Math.Max(0, b.Safety - 8);
@@ -1033,11 +1107,35 @@ namespace Cellblock.Core
                 link.Tension = Math.Min(100, link.Tension + 6);
                 Relationship reverse = b.Relationships.FirstOrDefault(r => r.OtherId == a.Id); if (reverse != null) reverse.Tension = link.Tension;
                 Personnel.Fights++;
-                string text = "FIGHT · " + a.Name + " and " + b.Name + " fought with no officer nearby. Both were hurt" + (Nurse == null ? " and there is no nurse on staff." : "; the nurse is on the way.");
+                string text = armed != null ? "ASSAULT · " + armed.Name + " attacked " + (armed == a ? b.Name : a.Name) + " with an improvised weapon. The victim is seriously hurt" + (Nurse == null ? " and there is no nurse on staff." : "; the nurse is on the way.") :
+                    "FIGHT · " + a.Name + " and " + b.Name + " fought with no officer nearby. Both were hurt" + (Nurse == null ? " and there is no nurse on staff." : "; the nurse is on the way.");
                 StaffMember reporter = NearestOfficer(middle, 30);
-                FileWriteUp(a.Id, "Resident", "Fighting", 2, text, reporter); FileWriteUp(b.Id, "Resident", "Fighting", 2, text, reporter);
+                if (armed != null)
+                {
+                    Resident victim = armed == a ? b : a;
+                    FileWriteUp(armed.Id, "Resident", "Assault with a weapon", 3, text, reporter); FileWriteUp(victim.Id, "Resident", "Fighting", 1, text, reporter);
+                    if (reporter != null && Geometry.Distance(reporter.Position, middle) < 12) Seize(blade, reporter, "recovered the weapon after the assault");
+                }
+                else { FileWriteUp(a.Id, "Resident", "Fighting", 2, text, reporter); FileWriteUp(b.Id, "Resident", "Fighting", 2, text, reporter); }
+                SeparateAfterFight(a, b);
                 PeopleDynamics.Record(Data, "fight", a.Id, text, 3); Notice = text;
             }
+        }
+        // Officers on shift separate the two afterwards: six hours in housing, a keep-separate order, and a move
+        // to another room when a bed is free there.
+        void SeparateAfterFight(Resident a, Resident b)
+        {
+            if (ResponseOfficers().Count == 0) return;
+            a.SeparatedUntil = b.SeparatedUntil = Data.Minute + 360;
+            if (!a.Intake.KeepSeparate.Contains(b.Id) && a.Intake.KeepSeparate.Count < 8) a.Intake.KeepSeparate.Add(b.Id);
+            if (!b.Intake.KeepSeparate.Contains(a.Id) && b.Intake.KeepSeparate.Count < 8) b.Intake.KeepSeparate.Add(a.Id);
+            List<Point> room = RoomOf(a.Home);
+            if (room == null || !Geometry.Contains(room, b.Home)) return;
+            Resident mover = a.Impulsivity >= b.Impulsivity ? a : b;
+            Fixture bed = HousingBeds().Where(f => !BedTaken(f) && !Geometry.Contains(room, f.Position)).OrderBy(f => Geometry.Distance(f.Position, mover.Home)).FirstOrDefault();
+            if (bed == null) return;
+            mover.Home = Geometry.AccessPoint(bed); mover.FloorBed = false; RemoveResidentPath(mover);
+            PeopleDynamics.Record(Data, "housing", mover.Id, mover.Name + " was moved to another housing room after the fight.", 1);
         }
         void MinorInfraction()
         {

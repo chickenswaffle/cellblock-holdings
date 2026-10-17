@@ -16,6 +16,7 @@ namespace Cellblock.Unity
             Tonemapping tone = owner.profile.Add<Tonemapping>(true); tone.mode.Override(TonemappingMode.ACES);
             ColorAdjustments color = owner.profile.Add<ColorAdjustments>(true);
             color.postExposure.Override(0.1f); color.contrast.Override(8); color.saturation.Override(-5);
+            Bloom bloom=owner.profile.Add<Bloom>(true);bloom.threshold.Override(1.2f);bloom.intensity.Override(.07f);bloom.scatter.Override(.4f);
             WhiteBalance balance = owner.profile.Add<WhiteBalance>(true); balance.temperature.Override(3);
             Vignette vignette = owner.profile.Add<Vignette>(true); vignette.intensity.Override(0.1f); vignette.smoothness.Override(0.55f);
             camera.GetUniversalAdditionalCameraData().renderPostProcessing = true;

@@ -507,7 +507,7 @@ namespace Cellblock.Core
         }
         void ResumeRoutine(Resident resident)
         {
-            paths.Remove(resident); destinations.Remove(resident); resident.NextDecisionMinute = Data.Minute;
+            RemoveResidentPath(resident); resident.NextDecisionMinute = Data.Minute;
         }
         Point SallyPortPoint() { return NearbyClear(JusticeRules.SallyPort, Routes); }
         void ChargeSupervision()
@@ -602,7 +602,7 @@ namespace Cellblock.Core
             if (!Data.Residents.Any(r => r.Name == resident.Name))
                 foreach (Project project in Data.Projects) project.HomeMoves.RemoveAll(m => m.Resident == resident.Name);
             resident.Relationships.Clear(); CourtVan.Aboard.Remove(resident.Id); CourtVan.Scheduled.Remove(resident.Id);
-            paths.Remove(resident); destinations.Remove(resident); custodyStill.Remove(resident.Id);
+            RemoveResidentPath(resident); custodyStill.Remove(resident.Id);
             Data.Justice.Former.Add(resident); Data.Justice.Releases++;
             if (Data.Justice.Former.Count > JusticeRules.FormerLimit) Data.Justice.Former.RemoveAt(0);
         }
@@ -968,7 +968,7 @@ namespace Cellblock.Core
             if (Routes.Find(resident.Position, exit) == null) return false;
             Data.Justice.Attempt = new EscapeAttempt { ResidentId = resident.Id, Phase = "Moving", StartMinute = Data.Minute, Exit = exit, LastPosition = resident.Position };
             resident.Legal.Custody = "Escaping"; resident.Legal.Attempts++;
-            workerPaths.Remove("justice/escape/" + resident.Id); ResumeRoutine(resident);
+            RemoveWorkerPath("justice/escape/" + resident.Id); ResumeRoutine(resident);
             return true;
         }
         StaffMember OfficerWithSight(List<StaffMember> officers, Point target, float range)
@@ -1003,6 +1003,8 @@ namespace Cellblock.Core
             {
                 bool night = Data.Minute % 1440 < 360 || Data.Minute % 1440 >= 1140;
                 float sight = night && !IsIlluminated(resident.Position) ? 5 : 8;
+                // Cameras record continuously, but someone on CCTV monitoring duty catches it at once.
+
                 Fixture camera = Data.Fixtures.FirstOrDefault(f => f.Kind == "CCTV" && CameraSees(f, resident.Position));
                 if (camera != null && !CctvMonitored && JusticeRules.Unit(Data.Seed, resident.Id, "cctv", Data.Minute) >= 0.35f) camera = null;
                 StaffMember seen = OfficerWithSight(officers, resident.Position, sight);
@@ -1045,7 +1047,7 @@ namespace Cellblock.Core
         void EndAttempt(Resident resident, string outcome, string text, StaffMember officer = null)
         {
             EscapeAttempt attempt = Escape; LegalProfile legal = resident.Legal; bool detected = attempt.Detected;
-            workerPaths.Remove("justice/escape/" + resident.Id);
+            RemoveWorkerPath("justice/escape/" + resident.Id);
             Data.Justice.Attempt = new EscapeAttempt();
             if (outcome == "escaped")
             {

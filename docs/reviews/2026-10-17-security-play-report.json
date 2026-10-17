@@ -1,0 +1,17 @@
+{
+    "passed": true,
+    "editor": "6000.3.24f1",
+    "message": "Connected unit, construction, security teams, upgrade, Unity JSON, night, outage and phone controls.",
+    "errors": [],
+    "captures": [
+        "01-connected-unit-quote.png",
+        "02-services-under-construction.png",
+        "03-tower-dog-and-patrol.png",
+        "04-upgrade-quote.png",
+        "05-night-security-lighting.png",
+        "06-power-isolation.png",
+        "07-handler-upgrades-phone.png",
+        "08-wired-comfort-unit.png",
+        "09-repeat-placement.png"
+    ]
+}

@@ -49,16 +49,20 @@ namespace Cellblock.Unity
         {
             Material value;
             if (materials.TryGetValue(name, out value)) return value;
-            Material template = Resources.Load<Material>("BuildingMaterial");
+            string surface = Surface(name);
+            bool emission=name=="ghost"||name=="planned"||name=="handle"||name=="lamp"||name=="ceiling-on"||name=="alarm"||name=="door-outline";
+            bool detailed=surface!=null&&surface!="grass";
+            Material template = Resources.Load<Material>(emission?"LuminaireMaterial":detailed?"DetailedBuildingMaterial":"BuildingMaterial");
             if (template == null || template.shader == null)
                 throw new System.InvalidOperationException("BuildingMaterial is missing. Run Cellblock > Prepare project before Play or building a player.");
             value = new Material(template) { name = name, color = color, enableInstancing = true };
             bool metal = name.Contains("steel") || name.Contains("metal") || name == "cap";
             bool glass = name == "glass" || name == "screen";
-            if (value.HasProperty("_Smoothness")) value.SetFloat("_Smoothness", glass ? 0.74f : metal ? 0.4f : 0.16f);
+            if (value.HasProperty("_Smoothness")) value.SetFloat("_Smoothness", glass ? 0.74f : metal ? 0.48f : name.StartsWith("skin") ? .28f : surface=="fabric" ? .12f : .22f);
             if (value.HasProperty("_SpecColor")) value.SetColor("_SpecColor", metal ? new Color(0.3f, 0.33f, 0.34f) : new Color(0.08f, 0.08f, 0.08f));
-            string surface = Surface(name);
+            if(value.HasProperty("_Metallic"))value.SetFloat("_Metallic",metal?.50f:0);
             if (surface != null) value.mainTexture = Texture(surface);
+            if(detailed){value.SetTexture("_BumpMap",SurfaceNormal(surface));value.SetFloat("_BumpScale",.65f);}
             if (name == "grass" || name == "site-grass")
             {
                 Texture2D meadow = Resources.Load<Texture2D>("Textures/GroundMeadow");
@@ -68,7 +72,7 @@ namespace Cellblock.Unity
                     value.color = name == "site-grass" ? new Color(0.88f, 0.94f, 0.85f) : new Color(0.74f, 0.83f, 0.72f);
                 }
             }
-            if (name == "ghost" || name == "planned" || name == "handle" || name == "lamp")
+            if (emission)
             {
                 value.EnableKeyword("_EMISSION");
                 value.SetColor("_EmissionColor", color * (name == "lamp" ? 0.8f : 0.18f));
@@ -133,7 +137,7 @@ namespace Cellblock.Unity
             sun.transform.SetParent(transform, false); sun.type = LightType.Directional;
             sun.transform.rotation = Quaternion.Euler(43, -32, 0); sun.intensity = 1.5f;
             sun.color = new Color(1f, 0.93f, 0.83f); sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.68f; sun.shadowBias = 0.035f; sun.shadowNormalBias = 0.25f;
+            sun.shadowStrength = 0.82f; sun.shadowBias = 0.02f; sun.shadowNormalBias = 0.14f;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.69f, 0.76f, 0.80f);
             RenderSettings.ambientEquatorColor = new Color(0.46f, 0.51f, 0.52f);
@@ -298,7 +302,7 @@ namespace Cellblock.Unity
             Destroy(item.GetComponent<Collider>()); return item.transform;
         }
         Transform Box(Transform parent, string name, Vector3 position, Vector3 scale, string material, Color color)
-        { return Shape(PrimitiveType.Cube, parent, name, position, scale, material, color); }
+        { return SoftEdge(name,material,scale)?SoftBox(parent,name,position,scale,material,color):Shape(PrimitiveType.Cube, parent, name, position, scale, material, color); }
         Transform Sphere(Transform parent, string name, Vector3 position, Vector3 scale, string material, Color color)
         { return Shape(PrimitiveType.Sphere, parent, name, position, scale, material, color); }
         Transform Cylinder(Transform parent, string name, Vector3 position, Vector3 scale, string material, Color color)
@@ -334,7 +338,7 @@ namespace Cellblock.Unity
                         Vector3 p = vertices[i], n = normals[i];
                         uv[i] = Mathf.Abs(n.y) > 0.65f ? new Vector2(p.x, p.z) : Mathf.Abs(n.z) > Mathf.Abs(n.x) ? new Vector2(p.x, p.y) : new Vector2(p.z, p.y);
                     }
-                    mesh.uv = uv;
+                    mesh.uv = uv; mesh.RecalculateTangents();
                 }
                 combined.Add(mesh);
             }
@@ -733,7 +737,7 @@ namespace Cellblock.Unity
             Color skin = index % 4 == 0 ? new Color(0.43f, 0.29f, 0.21f) : index % 4 == 1 ? new Color(0.65f, 0.45f, 0.32f) : index % 4 == 2 ? new Color(0.77f, 0.60f, 0.45f) : new Color(0.55f, 0.37f, 0.28f);
             string skinName = "skin-" + index % 4;
             Color uniform = staff ? role == "Builder" ? new Color(0.91f, 0.60f, 0.12f) : role == "Officer" ? new Color(0.19f, 0.27f, 0.33f) : role == "Technician" ? new Color(0.30f, 0.39f, 0.44f) : new Color(0.39f, 0.47f, 0.43f) :
-                index % 2 == 0 ? new Color(0.59f, 0.43f, 0.30f) : new Color(0.54f, 0.40f, 0.29f);
+                index % 2 == 0 ? new Color(0.38f, 0.48f, 0.51f) : new Color(0.44f, 0.52f, 0.53f);
             if(role=="Visitor")uniform=new[]{new Color(.37f,.43f,.51f),new Color(.46f,.31f,.27f),new Color(.34f,.43f,.35f),new Color(.57f,.50f,.35f)}[index%4];
             if(role=="Inspector")uniform=new Color(.30f,.34f,.39f);
             string uniformName = staff ? "uniform-staff-" + role + (role=="Visitor"?"-"+index%4:"") : "uniform-" + index % 2;
@@ -776,6 +780,9 @@ namespace Cellblock.Unity
                     Transform knee = new GameObject("Knee").transform; knee.SetParent(pivot, false); knee.localPosition = new Vector3(0, -0.40f, 0);
                     Capsule(knee, "Lower trouser leg", new Vector3(0, -0.19f, 0), new Vector3(0.135f, 0.20f, 0.15f), "trousers", new Color(0.30f, 0.34f, 0.33f));
                     Sphere(knee, "Work shoe", new Vector3(0, -0.41f, 0.052f), new Vector3(0.16f, 0.14f, 0.29f), "rubber", new Color(0.10f, 0.12f, 0.12f));
+                    Box(knee,"Shoe sole",new Vector3(0,-.46f,.052f),new Vector3(.162f,.035f,.28f),"rubber",new Color(.08f,.09f,.09f));
+                    for(int lace=0;lace<3;lace++)Box(knee,"Boot lace",new Vector3(0,-.355f,.04f+lace*.035f),new Vector3(.075f,.009f,.008f),"shoe-lace",new Color(.23f,.24f,.22f));
+                    Box(knee,"Trouser side seam",new Vector3(side*.067f,-.19f,0),new Vector3(.008f,.32f,.014f),"trouser-seam",new Color(.24f,.28f,.28f));
                     Combine(knee); knees[i - 2] = knee;
                 }
                 parts[i] = pivot;
@@ -912,7 +919,7 @@ namespace Cellblock.Unity
             if (!object.ReferenceEquals(presentedWorld, world))
             {
                 foreach (Actor oldActor in actors.Values) { Clear(oldActor.Root); Destroy(oldActor.Root.gameObject); }
-                actors.Clear();
+                actors.Clear(); looks.Clear();
                 foreach (ProjectView oldProject in constructionViews.Values) { Clear(oldProject.Root); Destroy(oldProject.Root.gameObject); }
                 constructionViews.Clear();
                 if (transportRoot != null) Clear(transportRoot); trucks.Clear();
@@ -987,7 +994,7 @@ namespace Cellblock.Unity
             previewHash = hash; Clear(ghost);
             if (plan != null)
             {
-                foreach (Wall wall in plan.Walls) WallView(ghost, wall, "ghost");
+                foreach (Wall wall in plan.Walls){WallView(ghost, wall, "ghost");if(wall.Door>=0)DoorPlanFrame(ghost,wall);}
                 foreach (Fixture fixture in plan.Fixtures) FixtureView(ghost, fixture, "ghost");
             }
             if (selected != null)
@@ -1045,6 +1052,7 @@ namespace Cellblock.Unity
                 if (filter.sharedMesh != null && filter.sharedMesh.name.StartsWith("Generated ")) Destroy(filter.sharedMesh);
             foreach (Material material in materials.Values) Destroy(material);
             foreach (Texture2D texture in textures.Values) Destroy(texture);
+            foreach(Mesh mesh in bevels.Values)Destroy(mesh);
         }
     }
 }

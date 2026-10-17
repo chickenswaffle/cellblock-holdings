@@ -24,3 +24,6 @@
 /Tools/**/obj/
 /.local-tools/
 /.collaboration/
+
+/Assets/Cellblock/Resources/DetailedBuildingMaterial.mat*
+/Assets/Cellblock/Resources/LuminaireMaterial.mat*

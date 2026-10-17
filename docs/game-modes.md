@@ -27,3 +27,5 @@ The broader catalog dragging/placement/HUD redesign and new Lives files remain y
 Core checks enumerate every supported mode/location pairing, assert housing capacity, resident/service routes, chosen finances and save/load terms, and check actual nearby escorts and moving-target progress. Unity Play evidence covers all charter steps, desktop/phone layout, camp/supermax starts and Unity JSON. Native phone/tablet touch, sustained performance, advanced room zoning and long-run balance remain separate work. Review the final transcript/report rather than treating catalog descriptions as proof of every later feature.
 
 For Lives integration: `ChooseResidentActivity` must be a pure target query. The secure-escort planner also calls it to assign officers before routine movement. Book programs, update memories and advance work only in `AdvanceLives`, once per explicit game minute and only after actual arrival/presence checks.
+
+Claude’s catalog design and roadmap notes from b470a10 are preserved in [the design appendix](claude-game-modes-design.md). Current integration status above takes precedence over earlier wiring requests.

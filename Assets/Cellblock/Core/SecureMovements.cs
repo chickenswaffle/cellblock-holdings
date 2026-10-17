@@ -11,8 +11,8 @@ namespace Cellblock.Core
         {
             if(secureEscortMinute==Data.Minute)return;secureEscortMinute=Data.Minute;secureEscorts.Clear();if(!SecureMovementMode)return;
             var waiting=Data.Residents.Where(r=>IsPresent(r)&&new[]{"In facility","Boarding","Escorted","Release processing"}.Contains(r.Legal.Custody)&&r.Legal.RestrictedUntil<=Data.Minute&&(!Data.Operations.Lockdown||r.Legal.Custody!="In facility")).Where(r=>{
-                int i=Data.Residents.IndexOf(r);bool meal=PeopleDynamics.IsMealWindow(Data.Minute+r.RoutineOffset),yard=PeopleDynamics.IsYardWindow(Data.Minute+r.RoutineOffset);
-                Point target=r.Legal.Custody=="Boarding"||r.Legal.Custody=="Release processing"?SallyPortPoint():r.Legal.Custody=="Escorted"?r.Home:meal||yard?ServiceDestination(i,meal):r.Home;if(r.Legal.Custody=="In facility")ChooseResidentActivity(r,ref target);return Geometry.Distance(r.Position,target)>.7f;
+                int i=Data.Residents.IndexOf(r);bool meal=MealTravelDue(i,r),yard=PeopleDynamics.IsYardWindow(Data.Minute+r.RoutineOffset);
+                Point target=r.Legal.Custody=="Boarding"||r.Legal.Custody=="Release processing"?SallyPortPoint():r.Legal.Custody=="Escorted"?r.Home:meal||yard?ServiceDestination(i,meal):r.Home;if(r.Legal.Custody=="In facility"){ChooseResidentActivity(r,ref target);PressureTarget(r,ref target);}return Geometry.Distance(r.Position,target)>.7f;
             }).OrderBy(r=>r.Id,System.StringComparer.Ordinal).ToList();
             foreach(StaffMember staff in Data.Staff.Where(s=>s.Role=="Officer"&&s.SecurityRole==""&&IsOnShift(s)&&!IsWarden(s)&&FileFor(s).Duty=="").OrderBy(s=>s.Id,System.StringComparer.Ordinal))
             {

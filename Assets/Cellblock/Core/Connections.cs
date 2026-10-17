@@ -13,9 +13,7 @@ namespace Cellblock.Core
             if (source == null || draft == null) { Notice = "Choose an existing wall beside the planned unit."; return null; }
             if (draft.RemoveWalls.Contains(wallId)) { Notice = "This wall is already changing in the draft. Review it before adding another connection."; return null; }
             float door = Geometry.NearestFraction(source, opening), length = Geometry.Length(source);
-            var boundary = draft.Walls.SelectMany(w => Geometry.Segments(w,false)).ToList();
-            // Test both door edges: a crossing or a nearby unrelated wall is not a shared boundary.
-            if (new[] { door*length-0.9f, door*length, door*length+0.9f }.Any(d => !boundary.Any(edge => Geometry.DistanceToSegment(Geometry.OnLength(source,d/length),edge.A,edge.B)<0.12f)))
+            if (!SharedDoorBoundary(draft,source,door))
             { Notice = "Choose the wall shared with the new unit. The full doorway must border its draft boundary."; return null; }
             var replacement = source.Copy(); replacement.Id = ""; replacement.Door = door; replacement.DoorWidth = 1.6f;
             string error = Geometry.Validate(replacement);

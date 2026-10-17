@@ -2,7 +2,7 @@
 
 A Unity reboot of a prison ownership and management simulation for iPhone, iPad, Mac, and potentially Windows/Steam. The player chooses a contract, takes over an editable starter facility, and connects building decisions to people, construction, and business results.
 
-**Current milestone: local Unity playable.** The project imports and runs in Unity 6000.3.24f1 on this Mac. The engine-independent core passes 133 executable checks. The new-holding flow offers City/County/State/Federal jurisdictions, twelve institution profiles and selected or random eligible locations with matching finances, populations and editable layouts. Play includes detailed people, personnel files/recruitment, live inspections, goals, protests, gang pressure, fictional capital-case proceedings, physical arrivals/building/security and packaged prefab units. See [mode integration](docs/game-modes.md) and [facility stories](docs/facility-stories.md). Native builds and actual phone performance remain unverified; the [visual study](docs/concepts/visual-direction-study.png) remains an art direction reference.
+**Current milestone: local Unity playable.** The project imports and runs in Unity 6000.3.24f1 on this Mac. The engine-independent core passes 202 executable checks. The new-holding flow offers City/County/State/Federal jurisdictions, twelve institution profiles and selected or random eligible locations with matching finances, populations and editable layouts. Play includes detailed people, personnel files/recruitment, transfer coaches and staged intake, contraband and disturbances, live inspections, goals, protests, fictional capital-case proceedings, physical arrivals/building/security and packaged prefab units. See [mode integration](docs/game-modes.md) and [facility stories](docs/facility-stories.md). The final local review passed 42 actual Unity Game-view captures with no runtime errors. Native builds and actual phone performance remain unverified; the [visual study](docs/concepts/visual-direction-study.png) remains an art direction reference.
 
 ## Open on a Mac
 
@@ -45,9 +45,9 @@ That command is an editor preparation check, not a gameplay or device test. The 
 7. Use **Build → Dining → Meal service** on an installed table to change the destination. Routes and service attendance affect verified meal-service earnings. **Company** shows cash, unpaid earnings, costs, and the cash ledger.
 8. Save and resume from the contract menu. Separate company saves remain selectable. Approved jobs and unapproved complete plans persist; an unfinished first/second drawing tap is not a complete plan and is not saved.
 
-Desktop: **left drag in Select / Inspect** or **middle drag** to pan; **arrows / WASD** also pan. **Right drag / Alt + drag** or **Q / E** orbit. **R / F** tilt, Mac trackpad pinch and the wheel zoom toward the pointer, **Home** centers, **Space** pauses, and **Escape** discards an unapproved plan. Click inside Unity's Game view to give it keyboard focus.
+Desktop: **left drag in Select / Inspect or while reviewing a plan** or **middle drag** to pan; **arrows / WASD** also pan. **Right drag / Alt + drag** or **Q / E** orbit. **R / F** tilt, Mac trackpad pinch and the wheel zoom toward the pointer, **Home** centers, **Space** pauses, and **Escape** discards an unapproved plan. Click inside Unity's Game view to give it keyboard focus.
 
-Touch: tap to select/place, one-finger drag in Select / Inspect to pan, and two fingers to pan/pinch/twist in any tool. **Camera** includes pan arrows, tilt, orbit, zoom, 3D / plan, and cutaway controls. **Controls** reopens the guide. See [the controls and first-improvement guide](docs/controls.md).
+Touch: tap to select/place, one-finger drag in Select / Inspect or while reviewing a plan to pan, and two fingers to pan/pinch/twist in any tool. **Camera** includes pan arrows, tilt, orbit, zoom, 3D / plan, and cutaway controls. **Controls** reopens the guide. See [the controls and first-improvement guide](docs/controls.md).
 
 The game clock is player controlled. Closing, suspending, or unfocusing the game stops progression. Resume does not apply elapsed wall-clock time. Resumed saves start paused.
 
@@ -57,7 +57,7 @@ The game clock is player controlled. Closing, suspending, or unfocusing the game
 
 **People** lists residents and staff. Select a person in the scene or roster to see a persistent name, temperament, traits, needs, gang/clique affiliation, relationships, and recent events. Residents use individual speeds, staggered decisions, and distinct service destinations. Nearby social contact can change trust/tension and create friendships, beefs, and nemeses. Fictional gangs and cliques affect those interactions.
 
-Staff have integrity, workload pressure, favoritism, and misconduct risk. Incidents affect resident wellbeing and enter the history. A funded **Staff support** action reduces pressure/favoritism and improves integrity. New staff arrive by shared transport and walk to duty. Officers patrol and perform nearby welfare checks, caseworkers provide nearby consultations on shift, and technicians maintain operational equipment. Investigations, contraband inventory, and a full gang/security simulation remain future work.
+Staff have integrity, workload pressure, favoritism, and misconduct risk. Incidents affect resident wellbeing and enter the history. A funded **Staff support** action reduces pressure/favoritism and improves integrity. New staff arrive by shared transport and walk to duty. Officers patrol and perform nearby welfare checks, caseworkers provide nearby consultations on shift, and technicians maintain operational equipment. Contraband intake, stashes, drone drops, searches and disturbance pressure are integrated. Full misconduct investigations and gang territorial control remain future work.
 
 ## Live operations and construction
 
@@ -69,11 +69,17 @@ Staff have integrity, workload pressure, favoritism, and misconduct risk. Incide
 
 Select installed equipment to inspect condition, power, comfort, staff assignments and **Upgrade**. Improvements use the same crew/quote/handover process and retain the asset's identity. Build → Security adds exterior lighting, perimeter barriers, dog teams, towers and an armory. Build → Services adds room wiring, cooling and control terminals. Staff specializations retain each Officer's identity, shift and actual route. Power loss and maintenance affect availability; comfort changes morale and stress over game time. See [mechanics and boundaries](docs/security-and-services-status.md).
 
-In a prefab quote, **Add connecting door** lets you tap the shared existing wall and quote the connection with the unit. Existing straight-wall openings are retained. Essential kits include wiring; Enhanced kits include cooling. For repeated furnishings, use **Approve & place another** and **Z** to rotate.
+In a prefab quote, **click directly on any proposed or existing wall where you want a door**. The project quote updates; **Undo last door** or **Command/Ctrl+Z** restores the previous plan. Drag or use arrows while reviewing; pinch/scroll zooms. Existing straight and curved openings are retained. See [door controls](docs/direct-doors.md). Essential kits include wiring; Enhanced kits include cooling. For repeated furnishings, use **Approve & place another** and **Z** to rotate.
 
 The native Mac magnify plugin is included for Intel and Apple silicon. Rebuild it with `bash Tools/build-mac-gestures.sh` only if its source changes, while holding the Unity runner lock.
 
 Read [the Claude handoff](docs/claude-handoff.md) and [shared coordination](COORDINATION.md) before parallel work. Claude's legal profiles, court transport and interactive escape gameplay are integrated. Its next reserved slice is resident animation, daily life and stories; see `docs/claude-lives-handoff.md`. Codex owns connected doors, security equipment and building services; see `docs/security-and-services-status.md` and `docs/claude-coordination-update.md`. Claude has also received the new opening-mode/HUD direction.
+
+## Population pressure and presentation
+
+**Pressure** shows transfers, intake lanes, crowding, contraband, unrest, audits and upgrade programs. Choose a transfer policy, staff actual intake stations, improve beds/meal capacity and respond to disturbances. Contract pressure and cent-based costs persist in saves. **People → Ride along** follows a present resident or staff member with an optional body-camera inset; Escape returns to the build camera. This is a watch camera.
+
+The presentation pass adds beveled furniture, fabric/tile/wood/concrete relief, distinct clothing, articulated everyday poses, detailed audit visitors and transfer coach, and revised shadows/contact shading. See [presentation notes and limits](docs/presentation-polish.md).
 
 ## Verify the engine-independent core
 
