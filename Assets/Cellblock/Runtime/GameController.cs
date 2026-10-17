@@ -277,7 +277,17 @@ namespace Cellblock.Unity
             }
             point = default(Point); return false;
         }
-        Point Snap(Point point) { return Geometry.Snap(point, World.Data.Walls, Snapping); }
+        Point Snap(Point point) { return FurnishingTool ? FitFurniture(point) : Geometry.Snap(point, World.Data.Walls, Snapping); }
+        bool FurnishingTool { get { return Tool == BuildTool.Bed || Tool == BuildTool.Table || Tool == BuildTool.Furnishing || (Tool == BuildTool.MoveFixture && SelectedFixture != null); } }
+        // Furniture snaps to the half-metre grid, then settles at the nearest spot that fits: flush against a wall, never in it.
+        Point FitFurniture(Point raw)
+        {
+            Point p = Snapping ? new Point(Mathf.Round(raw.X * 2) / 2, Mathf.Round(raw.Y * 2) / 2) : raw;
+            bool moving = Tool == BuildTool.MoveFixture && SelectedFixture != null;
+            string kind = moving ? SelectedFixture.Kind : PlacementFixtureKind;
+            float rotation = moving ? SelectedFixture.Rotation : PlacementRotation;
+            return World.FitFurnishing(kind, rotation, p, moving ? SelectedFixture.Id : null);
+        }
         void Pan(Vector2 previous, Vector2 current)
         {
             Point a, b;

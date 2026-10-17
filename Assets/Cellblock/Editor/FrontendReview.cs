@@ -12,6 +12,12 @@ namespace Cellblock.Editor
     {
         static string saveA, saveB, backupText, saveScratch;
         static int bMinute;
+        static void ClickFurnishingReview(GameController game, Point point)
+        {
+            Vector3 screen = Camera.main.WorldToScreenPoint(new Vector3(point.X, 0, point.Y));
+            typeof(GameController).GetMethod("Tap", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(game, new object[] { new Vector2(screen.x, screen.y) });
+            Require(game.CurrentQuote != null && game.CurrentQuote.Valid, "Projected furnishing click failed: " + game.CurrentQuote?.Message);
+        }
         static void InstallReviewCounter(GameController game)
         {
             World w = game.World; if (w.Data.Fixtures.Any(f => f.Kind == "ServingCounter")) return;
@@ -121,11 +127,24 @@ namespace Cellblock.Editor
                     hud.PreviewCharterMode(); hud.CloseOverlays(); hud.ShowFacility();
                     Require(game.World != null && game.World.FacilityMode.Id == "county-intake" && game.World.Data.Speed == 0 && game.SavedCompanies().Count() == 1 && game.ContinueSave() != null, "Home charter failed to create one resumable holding."); break;
                 case 48: Shot(game, "23-new-holding-ready.png"); break;
+                case 49:
+                    Require(game.PreviewHasSaveSandbox, "Placement review must stay in its isolated save sandbox.");
+                    SetGameSize(1600, 900); hud.PreviewHomeNewHolding(); hud.PreviewModeStep(2, "county-maximum", GameModes.Tier("county").Locations[0]); hud.PreviewCharterMode();
+                    game.SetFixtureTool("Floodlight"); ClickFurnishingReview(game, new Point(-20, 14)); break;
+                case 50: Shot(game, "24-secure-start-exterior-light.png"); break;
+                case 51:
+                    game.Cancel(); Fixture bed = game.World.Data.Fixtures.First(f => f.Kind == "Bed" && Mathf.Abs(f.Position.X + 11) < .01f);
+                    game.World.Data.Minute = 22 * 60; foreach (Resident person in game.World.Data.Residents) person.Position = person.Home;
+                    game.PreviewInspectFixture(bed.Id); game.SetTool(BuildTool.MoveFixture);
+                    Wall wall = game.World.Data.Walls.OrderBy(x => Geometry.Distance(Geometry.OnLength(x, Geometry.NearestFraction(x, bed.Position)), bed.Position)).First();
+                    Point dropped = Geometry.OnLength(wall, Geometry.NearestFraction(wall, bed.Position)); ClickFurnishingReview(game, dropped);
+                    Require(Geometry.Distance(game.Draft.Fixtures[0].Position, dropped) > .1f, "The bed stayed centered on the wall."); break;
+                case 52: Shot(game, "25-wall-fitted-bed-quote.png"); break;
                 default:
                     game.PreviewEndSaveSandbox(); string errors = SessionState.GetString(ErrorKey, "");
-                    Require(Directory.GetFiles(Output, "*.png").Length == 23, "Missing frontend captures.");
+                    Require(Directory.GetFiles(Output, "*.png").Length == 25, "Missing frontend captures.");
                     var report = new Report { passed = errors == "", editor = Application.unityVersion,
-                        message = "Actual Unity Play: cinematic home, Continue/library/settings, command HUD, phone/narrow/large-interface fit; real atomic files in an isolated Temp sandbox; stale/missing/malformed pointer fallback, newest ordering, pause on load, correct chosen slot, autosave, backup recovery and damaged-original preservation, failure/retry status, persisted applied audio/display/control settings; published Claude economy/intel/counsel/kitchen demos + Unity JSON, role switch release, one-level Back, empty first-use Home, actual charter acquisition creating one resumable slot, charter styling. Actual devices and sustained performance remain unmeasured.",
+                        message = "Actual Unity Play: cinematic home, Continue/library/settings, command HUD, phone/narrow/large-interface fit; real atomic files in an isolated Temp sandbox; stale/missing/malformed pointer fallback, newest ordering, pause on load, correct chosen slot, autosave, backup recovery and damaged-original preservation, failure/retry status, persisted applied audio/display/control settings; published Claude economy/intel/counsel/kitchen demos + Unity JSON, role switch release, one-level Back, empty first-use Home, actual charter acquisition creating one resumable slot, charter styling; projected pointer path for secure-start exterior light and occupied bed fitted beside a wall. Actual devices and sustained performance remain unmeasured.",
                         errors = errors.Split('\n').Where(e => e != "").ToArray(), captures = Directory.GetFiles(Output, "*.png").Select(Path.GetFileName).ToArray() };
                     File.WriteAllText(Path.Combine(Output, "report.json"), JsonUtility.ToJson(report, true)); Debug.Log(report.passed ? "CELLBLOCK_FRONTEND_REVIEW_PASSED" : "CELLBLOCK_FRONTEND_REVIEW_FAILED");
                     ReleaseRefresh(); SessionState.SetString(ModeKey, "stopping"); EditorApplication.isPlaying = false; return false;

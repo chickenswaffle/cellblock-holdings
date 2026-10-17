@@ -1071,7 +1071,7 @@ namespace Cellblock.Core
                 .OrderBy(s => Geometry.Distance(s.Position, point)).FirstOrDefault();
         }
         // Residents with serious tension who meet can fight. A nearby officer usually defuses it first.
-        void CheckFights()
+        internal void CheckFights()
         {
             var present = Data.Residents.Where(r => IsPresent(r) && !InIntake(r) && !r.ProtectiveCustody && r.SeparatedUntil <= Data.Minute && r.Legal.Ready && r.Legal.Custody == "In facility" && r.Legal.RestrictedUntil <= Data.Minute).ToList();
             for (int i = 0; i < present.Count; i++)

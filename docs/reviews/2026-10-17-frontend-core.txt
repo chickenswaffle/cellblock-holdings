@@ -199,6 +199,8 @@ PASS rumors, leaks and court papers label people; secure records stop paperwork 
 PASS corroboration confirms a true tip seen on camera and drops a false one
 PASS tip policies: held tips wait, protected sources corroborate first, act at once does not wait
 PASS investigating a staff tip finds a corrupt officer and insults an honest one
+PASS exposure is 12 divided by the square root of how many knew, scaled by the action
+PASS protective custody keeps a person out of fights even next to a nemesis
 PASS trust in staff moves unrest both ways
 PASS intelligence work is deterministic, survives a reload mid-tip and rejects malformed saves
 PASS saves from before the kitchen keep catering and record diets for about one in eight
@@ -230,6 +232,12 @@ PASS a prisoner can drop a note, confront a known snitch or ask for protection
 PASS an officer is offered bribes and decides how hard to search on a tip
 PASS playing the warden: the owner makes demands, and refusing costs confidence
 PASS pending cards survive a reload, the role does not, and malformed cards are rejected
+PASS an existing item touching a wall does not block unrelated construction (secure-cell starts)
+PASS plans still cannot put furniture through a wall or a new wall through furniture
+PASS moving a bed works while its owner sleeps beside it, and nobody is left inside furniture
+PASS handover clears a resident from a fixture interior, not only its edges
+PASS furniture dropped against a wall settles flush beside it and the plan is accepted
+PASS someone walking past does not block a plan, but nothing is installed on top of a person
 PASS searchlight is a directed cone with real installation and operating gates
 PASS tower aim is independent of footprint and deterministic across paused reload
 PASS searchlight stops at walls and respects actual door openings
@@ -286,4 +294,4 @@ PASS legacy route hydration preserves overdue decisions and invalidates old geom
 PASS malformed movement caches are rejected without trusting waypoint data
 PASS cached route with a false destination is discarded and replanned
 
-286 passed, 0 failed. These checks exercise the C# core; they do not run Unity.
+294 passed, 0 failed. These checks exercise the C# core; they do not run Unity.

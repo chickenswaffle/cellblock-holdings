@@ -100,6 +100,10 @@ static partial class Program
             World w = KitchenWorld(1, true); RunTo(w, 600);
             Check(w.PlanHolidayMeal(), w.Notice);
             Check(!w.PlanHolidayMeal() && w.HolidayBlocker.Contains("two weeks"), "Two holiday meals in one fortnight");
+            World later = new World(RoundTrip(w.Data)); later.Data.Minute += 3 * 1440;
+            Check(!later.PlanHolidayMeal() && later.HolidayBlocker.Contains("two weeks"), "A second holiday dinner three days later");
+            later.Data.Minute = (later.Kitchen.HolidayMinute / 1440 + 15) * 1440 + 600;
+            Check(later.HolidayBlocker == "", "Still blocked two weeks later: " + later.HolidayBlocker);
             RunTo(w, 1075); long spend = Booked(w, "food-purchases");
             RunTo(w, 1205);
             int covers = w.Data.Residents.Count(r => w.IsPresent(r) && !w.InIntake(r)), diets = w.Data.Residents.Count(r => w.IsPresent(r) && !w.InIntake(r) && r.Diet != "");

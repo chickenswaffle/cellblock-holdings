@@ -474,8 +474,10 @@ namespace Cellblock.Core
             RemoveResidentPath(actor); actor.NextDecisionMinute = Data.Minute;
             if (t.Truth)
             {
+                // Exposure first: it needs to know who knew about the plan.
+                Exposure(t, 0.6f);
                 IntelWork.Intel.RemoveAll(i => i.Kind == "Hit" && i.ActorId == actor.Id && i.SubjectId == target.Id);
-                Personnel.FightsPrevented++; Exposure(t, 0.6f);
+                Personnel.FightsPrevented++;
                 Finish(t, true, actor.Name + " was kept in housing and a keep-separate order issued. The attack on " + target.Name + " did not happen.");
             }
             else { actor.Stress = Math.Min(100, actor.Stress + 8); IntelWork.Trust = Math.Max(0, IntelWork.Trust - 1); Finish(t, false, actor.Name + " was kept in housing on a tip that turned out to be false."); }

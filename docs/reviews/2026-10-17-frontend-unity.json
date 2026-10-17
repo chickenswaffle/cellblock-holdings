@@ -1,7 +1,7 @@
 {
     "passed": true,
     "editor": "6000.3.24f1",
-    "message": "Actual Unity Play: cinematic home, Continue/library/settings, command HUD, phone/narrow/large-interface fit; real atomic files in an isolated Temp sandbox; stale/missing/malformed pointer fallback, newest ordering, pause on load, correct chosen slot, autosave, backup recovery and damaged-original preservation, failure/retry status, persisted applied audio/display/control settings; published Claude economy/intel/counsel/kitchen demos + Unity JSON, role switch release, one-level Back, empty first-use Home, actual charter acquisition creating one resumable slot, charter styling. Actual devices and sustained performance remain unmeasured.",
+    "message": "Actual Unity Play: cinematic home, Continue/library/settings, command HUD, phone/narrow/large-interface fit; real atomic files in an isolated Temp sandbox; stale/missing/malformed pointer fallback, newest ordering, pause on load, correct chosen slot, autosave, backup recovery and damaged-original preservation, failure/retry status, persisted applied audio/display/control settings; published Claude economy/intel/counsel/kitchen demos + Unity JSON, role switch release, one-level Back, empty first-use Home, actual charter acquisition creating one resumable slot, charter styling; projected pointer path for secure-start exterior light and occupied bed fitted beside a wall. Actual devices and sustained performance remain unmeasured.",
     "errors": [],
     "captures": [
         "01-home-continue-desktop.png",
@@ -26,6 +26,8 @@
         "20-integrated-economy-phone.png",
         "21-charter-theme-phone.png",
         "22-first-use-home.png",
-        "23-new-holding-ready.png"
+        "23-new-holding-ready.png",
+        "24-secure-start-exterior-light.png",
+        "25-wall-fitted-bed-quote.png"
     ]
 }

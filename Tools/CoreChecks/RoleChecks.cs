@@ -81,7 +81,7 @@ static partial class Program
             RoleCard bribe = CardOf(w, "bribe");
             Check(bribe != null, "No bribe offer in 30 shifts");
             float integrity = me.Integrity;
-            Check(w.ChooseCard(bribe.Id, 2) && w.Personnel.WriteUps.Any(x => x.Category == "Attempted bribery") && me.Integrity > integrity, "Reporting the bribe failed");
+            Check(w.ChooseCard(bribe.Id, 2) && w.Personnel.WriteUps.Any(x => x.Category == "Attempted bribery" && x.SubjectId == bribe.OtherId) && !w.Personnel.WriteUps.Any(x => x.Category == "Attempted bribery" && x.SubjectId == me.Id) && me.Integrity > integrity, "Reporting the bribe failed");
             World v = IntelWorld(); v.SetIntelPolicy("Hold for review"); StaffMember officer = v.Data.Staff.First(s => s.Role == "Officer" && !v.IsWarden(s) && v.IsOnShift(s));
             foreach (StaffMember s in v.Data.Staff.Where(s => s != officer && s.Role == "Officer")) s.ShiftStart = (officer.ShiftStart + 12) % 24;
             Resident holder = v.Data.Residents[0]; ContrabandItem item = v.Introduce("Drugs", "Throw-over", holder);

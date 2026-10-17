@@ -239,6 +239,32 @@ static partial class Program
             Check(t1.Status == "Confirmed" && w.Personnel.WriteUps.Any(x => x.SubjectId == crooked.Id && x.Category == "Contraband smuggling"), "The corrupt officer was not caught");
             Check(t2.Status == "False" && honest.Pressure >= pressure + 9.9f, "The honest officer was not affected");
         });
+        Test("exposure is 12 divided by the square root of how many knew, scaled by the action", () => {
+            World w = IntelWorld(); w.SetIntelPolicy("Hold for review");
+            Resident actor = w.Data.Residents[0], target = w.Data.Residents[1];
+            var circle = w.Data.Residents.Skip(2).Take(4).ToList();
+            Intel hit = w.NoteHit(actor, target, 3);
+            hit.Knowers.Clear(); hit.Knowers.Add(actor.Id); hit.Knowers.AddRange(circle.Select(r => r.Id));
+            foreach (Resident r in circle) r.Suspicion = 0;
+            Tip tip = w.AddTip("", "Note", "Hit", target.Id, actor.Id, target.Home, true, hit.Id, w.Data.Minute + 1440, "check");
+            Check(w.ActOnTip(tip.Id, "Separate them") && tip.Status == "Confirmed", w.Notice);
+            Check(circle.All(r => Math.Abs(r.Suspicion - 12f / 2f * 0.6f) < 0.001f), "Exposure per knower: " + string.Join(", ", circle.Select(r => r.Suspicion)));
+        });
+        Test("protective custody keeps a person out of fights even next to a nemesis", () => {
+            int Fights(bool protect)
+            {
+                World w = IntelWorld(); Resident a = w.Data.Residents[0], b = Cellmate(w, a);
+                foreach (Resident r in new[] { a, b }) { r.Impulsivity = 100; r.Stress = 100; }
+                Pair(a, b, 95, 0);
+                foreach (StaffMember s in w.Data.Staff) { s.Position = s.Station = s.Destination = new Point(24, 20); s.NextDutyMinute = int.MaxValue / 2; }
+                if (protect) Check(w.SetProtectiveCustody(b.Id, true, "check"), w.Notice);
+                int before = w.Personnel.Fights + w.Personnel.FightsPrevented;
+                for (int m = 0; m < 600; m++) { b.Position = a.Position + new Point(0.5f, 0); w.CheckFights(); w.Data.Minute++; }
+                return w.Personnel.Fights + w.Personnel.FightsPrevented - before;
+            }
+            Check(Fights(false) > 0, "Setup: nemeses side by side never fought");
+            Check(Fights(true) == 0, "A resident in protective custody was drawn into a fight");
+        });
         Test("trust in staff moves unrest both ways", () => {
             World w = IntelWorld(); var factors = new List<RiskFactor>();
             w.IntelWork.Trust = 30; w.UnrestTarget(factors);

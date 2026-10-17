@@ -42,6 +42,8 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 - Final critic corrections: disable vSync when applying the selected desktop frame cap; treat every overcrowded ratio and custody with zero valid beds as red, full capacity as amber and an empty facility as green. Shared capacity policy has explicit Play semantic probes. The previous 23-frame run passed; final corrected-source frontend and existing metrics/door regressions are now running. No more feature scope is planned before publication.
 - Actual-image review caught the phone New Holding CTA clipped by the ScrollView despite fitting root bounds. Tightened compact title spacing, retained 44px actions and changed the assertion to the actual content viewport. All earlier frontend captures are superseded by the final corrected-source run; they are not added to final totals.
 - Final corrected frontend source passed all **23 actual Unity captures, errors empty**, including the strengthened phone viewport checks, first-use/charter, real isolated save recovery/retry, applied preferences and Claude economy/role integration. The independent critic approved the regenerated phone/narrow images and final source. Evidence: Builds/FrontendReview/2026-10-17/final and docs/reviews/2026-10-17-frontend-{unity.json,core.txt}. Existing metrics and polish/door regressions follow the source checkpoint.
+- A final fetch found newly published Claude placement/mutation fixes ccd16c4 and 1a9aa5b; merge is clean and preserves all frontend hooks. Scope exception for integration: correct only StepAside’s resident footprint-interior predicate in Simulation.cs and add a focused PlacementChecks regression, as confirmed by the read-only critic. NearbyClear already checks fixture containment for candidates. Extend the owned frontend review with actual projected furniture/light clicks in the secure-cell start, then rerun combined core and the final matrix on merged source. Earlier 23+20 frame passes remain prior-source evidence, not final combined totals.
+- Combined snapshot through Claude1a9aa5b passed **294/294 core checks** and **25 actual Unity frontend/placement captures**, errors empty. This includes the added fixture-interior handover regression and real projected-pointer path for a secure-cell exterior light and wall-fitted bed quote. Evidence updated in docs/reviews/2026-10-17-frontend-*; full frames Builds/FrontendReview/2026-10-17/combined-final. Home source3fc7417 remains intact. The user now requests a second bounded milestone: visible fight/escape scenes, physical pursuit and guard radio-before-lockdown. That follows the menu/save checkpoint.
 
 ### 2026-10-17 — validated readable metrics and inspector navigation
 
@@ -269,6 +271,29 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
   - `StaffEffect` text for the Cook post (it currently shows the technician description);
   - an escape-plan hook for escape intel;
   - optional note and meeting props.
+
+### 2026-10-17 — placement fix: furniture and exterior lights refused ("plan needs attention")
+
+- **User report:** exterior lights refused everywhere outside, and a bed moved inside its room refused as if it hit a wall. Reproduced in core with a probe across all 12 start layouts at four times of day. Three causes, all fixed in Claude's files:
+  1. **`Quote` re-checked every existing furnishing against every wall.** In the secure-cells layout (county-maximum, state-modernization) the second bed of each cell sits flush on the cell wall (0.00 m, under the 0.11 m clearance), so every plan failed with "A wall intersects furnishing": 0 of 80 light spots, every bed move. Now only conflicts the plan creates are checked: its furnishings against all walls, its walls against all furnishings.
+  2. **`CheckRoutes` treated anyone standing in a planned furnishing's clearance as trapped.** This caught the bed owner asleep beside the bed being moved, and staff walking past a light; about 25% of small bed moves failed. Now only walls trap people. Fixed staff posts (`Station`) still block, and Codex's direct-overlap rule is kept: no furnishing on top of a staff member. After handover, anyone a new item lands on steps aside (`StepAside`).
+  3. **Furniture placement used the wall-drawing snap.** `Geometry.Snap` pulls points onto walls within 0.65 m, so a bed or light dropped near a wall landed on it. Furniture tools now snap to the 0.5 m grid, then `World.FitFurnishing` settles the item at the nearest spot the quote accepts: flush against the wall with 0.13 m clearance, walkable access in front, inside a room unless outdoor, no overlap. Walls and wings keep the wall snap.
+- **Probe after the fix:** ordinary layouts 24/24 bed moves; secure-cells layouts 78/81 light spots. The rest are lights genuinely on a wall or an item.
+- **Checks:** 293/293 (5 new placement checks: unrelated construction in secure-cell starts, still refusing furniture through walls and walls through furniture, moving an occupied bed through handover with nobody left inside furniture, flush fitting against interior and exterior walls, walking past versus standing on). Unity typecheck passes for editor/macOS and iOS.
+- **For Codex (`ModeStarts.cs` `ModeLayout`, secure cells):** `Item("Bed",-9.5f,y+.9f,0)` puts the bed's edge exactly on the cell wall at `y`. y+1.05 would clear it. Construction no longer depends on it, but the bed visually touches the wall.
+- **Unity check request:**
+  - In county-maximum, place an exterior light anywhere in the yard: the quote is valid.
+  - Move a bed by dragging it against a wall: the preview settles flush, green, beside the wall.
+  - Move an occupied bed at night: the plan is accepted, and after handover the owner sleeps at the new bed.
+
+### 2026-10-17 — mutation results for the economy scope; handoff
+
+- **Mutation testing:** 50 deliberate bugs across Economy, Informants, Kitchen, Counsel and Roles.
+  - The first pass caught 45; the 5 survivors got new or pinned checks and are now caught: 50/50.
+  - The survivors were the √ in exposure, protective custody out of fights, the holiday interval, the bribe write-up target and the defender delay.
+  - The exposure check exposed a real bug: a prevented attack removed its intel before exposure ran, so nobody who knew was ever exposed. Fixed.
+- **Final:** 293/293 core checks. Unity typecheck passes for editor/macOS and iOS. Builder balance on final code: 9/9 at 21 days, 9/9 at 35 days (federal rerun included).
+- **Handoff:** local locks released in Claude's clone. Rows stay Claude until you integrate `codex/claude-overload`.
 
 ## Codex handoff request (personnel + placement)
 
