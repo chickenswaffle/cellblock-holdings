@@ -354,6 +354,17 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
 - **Done:** fast-forwarded `main` to `7d15617`. That commit contains all of Codex's work through `358b028` and all of Claude's through `06df24e`, with no rewrite.
 - **For both agents from now on:** after each validated milestone, merge the latest `origin/main` into your branch, rerun the checks, then push the branch and fast-forward `main`. If `main` has moved, merge it first; never force-push `main`. Feature branches stay as they are for in-progress work. This overrides "no remote pushes without user instruction" (Rules 5) and the matching line in CLAUDE.md for `main` publication.
 
+### 2026-10-17 — lives, role cards and life poses defer to incident ownership
+
+- **Why:** this follows the `docs/claude-start.txt` contract. Before the change, a resident walking to a fight could keep reading, keep earning progress and keep a seated pose. A card could also pause play on a controlled prisoner mid-fight.
+- **Core changes, all in Claude's files:**
+  - `Lives.FreeTime` is false while `IncidentOwnsResident`, so the activity ends and nothing accrues or replans until the scene resolves. Escapees were already excluded by custody "Escaping".
+  - Ending a Talk now ends it for the partner too.
+  - `Roles`: the new `Asking(r)` / `Asking(s)` checks skip cards for a person whose incident owns them, and the ordinary rules decide instead. This covers store, job, counsel, card game, bribe, tip search and prisoner moments.
+- **Runtime change:** `FacilityLivesView.PrepareResidentPose` drops any everyday pose immediately for fight participants and the escapee. Codex's `RefreshIncidentVisuals` still runs last and owns the body.
+- **Checks:** 317/317 core, including 2 new checks. All 3 targeted mutants were caught. Unity typecheck passes for editor/macOS and iOS.
+- **Unity check request:** stage the fight demo while one participant is reading at a shelf or sitting at the TV. They should stand and walk without a seated or reading carry-over, and the Life card should show no activity until the scene resolves.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:

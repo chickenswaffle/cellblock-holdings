@@ -128,6 +128,8 @@ namespace Cellblock.Core
             int minute = Data.Minute % 1440;
             if (minute < 6 * 60 || minute >= 22 * 60 || Data.Operations.Lockdown || Data.Mode == null || !Data.Mode.Applied) return false;
             if (!IsPresent(r) || InIntake(r) || !r.Legal.Ready || r.Legal.Custody != "In facility" || r.SeparatedUntil > Data.Minute || r.ProtectiveCustody) return false;
+            // A confrontation owns both people from the first step toward it until it resolves.
+            if (IncidentOwnsResident(r)) return false;
             if (Population.Riot.Phase != "None" && Population.Riot.Rioters.Contains(r.Id)) return false;
             int index = Data.Residents.IndexOf(r);
             if (index >= 0 && (MealTravelDue(index, r) || MealDue(index, r))) return false;
@@ -152,9 +154,12 @@ namespace Cellblock.Core
         }
         void EndActivity(Resident r)
         {
+            // A conversation ends for both people: nobody is left waiting at the meeting spot.
+            Resident partner = r.Activity == "Talk" ? Find(r.ActivityPartner) : null;
             r.Activity = ""; r.ActivityFixture = ""; r.ActivityPartner = ""; r.ActivityUntil = -1;
             // Staggered: each person reconsiders on their own clock, never the whole room at once.
             r.NextPlanMinute = Data.Minute + 10 + (int)(JusticeRules.Hash(r.Id + ":replan", unchecked((uint)Data.Seed)) % 20u);
+            if (partner != null && partner.Activity == "Talk" && partner.ActivityPartner == r.Id) EndActivity(partner);
         }
         Dictionary<string, bool> reachCache = new Dictionary<string, bool>(); int reachRevision = -1;
         bool Reachable(Resident r, Point target)
