@@ -47,6 +47,8 @@ namespace Cellblock.Unity
         float distance = 33, yaw = 36, pitch = 52, displayedDistance, displayedYaw, displayedPitch;
         float accumulator, autosave, previewTime;
         bool appPaused, unfocused, dragging, gesture, hasStart, hasEnd, pointerOwnedByUI, pointerOrbit, pointerActive;
+        // Drag-to-move: pressing on the selected furnishing and dragging moves it instead of panning the camera.
+        bool fixtureGrab, fixtureDragging;
         bool planView, presentationPreview;
         Point start, end;
         Vector2 pointerDown, lastPointer;
@@ -141,7 +143,7 @@ namespace Cellblock.Unity
                 case BuildTool.MoveStart: case BuildTool.MoveEnd: Instruction = "WALL EDIT · Tap the new endpoint position."; break;
                 case BuildTool.Bend: Instruction = "WALL EDIT · Tap the bend position. Straight walls can become curves."; break;
                 case BuildTool.MoveFixture: Instruction = "MOVE FURNISHING · Tap its new position."; break;
-                default: Instruction = "Drag to move · Arrows / WASD to pan · Right-drag to orbit · Scroll to zoom · Tap a component to edit"; break;
+                default: Instruction = "Drag to pan · Drag a selected item to move it · Right-drag to orbit · Scroll to zoom · Tap a component to edit"; break;
             }
             PlacementSummary = "";
             if (guides != null) { if (SelectedFixture != null) guides.ShowFixture(SelectedFixture); else guides.Show(SelectedWall); }
@@ -354,20 +356,24 @@ namespace Cellblock.Unity
                     pointerDown = lastPointer = touch.position; dragging = false; pointerActive = true;
                     pointerOwnedByUI = hud.IsOverUI(touch.position);
                     if (pointerOwnedByUI) gesture = true;
+                    fixtureGrab = !pointerOwnedByUI && GrabbingSelectedFixture(touch.position); fixtureDragging = false;
                 }
                 if (touch.phase == TouchPhase.Moved && !gesture)
                 {
                     if (Vector2.Distance(pointerDown, touch.position) > Mathf.Max(10, Screen.dpi > 0 ? Screen.dpi * 0.04f : 15)) dragging = true;
+                    if (dragging && fixtureGrab && !fixtureDragging) BeginFixtureDrag();
                     if (dragging && (Tool == BuildTool.Inspect || Draft!=null)) Pan(lastPointer, touch.position);
                     lastPointer = touch.position;
                     if (!hud.IsOverUI(touch.position)) PreviewAt(touch.position);
                 }
                 if (touch.phase == TouchPhase.Ended)
                 {
-                    if (pointerActive && !pointerOwnedByUI && !gesture && !dragging && !hud.IsOverUI(touch.position)) Tap(touch.position);
+                    if (fixtureDragging) EndFixtureDrag(touch.position);
+                    else if (pointerActive && !pointerOwnedByUI && !gesture && !dragging && !hud.IsOverUI(touch.position)) Tap(touch.position);
+                    fixtureGrab = false;
                     gesture = false; pointerActive = false; pointerOwnedByUI = false;
                 }
-                if (touch.phase == TouchPhase.Canceled) { gesture = false; pointerActive = false; pointerOwnedByUI = false; dragging = false; }
+                if (touch.phase == TouchPhase.Canceled) { gesture = false; pointerActive = false; pointerOwnedByUI = false; dragging = false; if (fixtureDragging) { fixtureDragging = false; SetTool(BuildTool.Inspect); } fixtureGrab = false; }
                 return;
             }
             if (gesture) { gesture = false; pointerActive = false; pointerOwnedByUI = false; }
@@ -379,16 +385,21 @@ namespace Cellblock.Unity
             {
                 pointerDown = lastPointer = cursor; dragging = false; pointerActive = true; pointerOwnedByUI = hud.IsOverUI(cursor);
                 pointerOrbit = Input.GetMouseButton(1) || (Input.GetMouseButton(0) && (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)));
+                fixtureGrab = Input.GetMouseButtonDown(0) && !pointerOrbit && !pointerOwnedByUI && GrabbingSelectedFixture(cursor); fixtureDragging = false;
             }
             bool holding = Input.GetMouseButton(0) || Input.GetMouseButton(1) || Input.GetMouseButton(2);
             if (pointerActive && holding && Vector2.Distance(pointerDown, cursor) > 6) dragging = true;
+            if (dragging && fixtureGrab && !fixtureDragging && Input.GetMouseButton(0)) BeginFixtureDrag();
+            if (fixtureDragging && holding) PreviewAt(cursor);
             if (pointerActive && holding && dragging && !pointerOwnedByUI)
             {
                 Vector2 delta = cursor - lastPointer;
                 if (pointerOrbit) Orbit(delta.x * 0.22f, -delta.y * 0.16f);
                 else if (Input.GetMouseButton(2) || (Input.GetMouseButton(0) && (Tool == BuildTool.Inspect || Draft!=null))) Pan(lastPointer, cursor);
             }
-            if (Input.GetMouseButtonUp(0) && pointerActive && !pointerOwnedByUI && !pointerOrbit && !dragging && !hud.IsOverUI(cursor)) Tap(cursor);
+            if (Input.GetMouseButtonUp(0) && fixtureDragging) EndFixtureDrag(cursor);
+            else if (Input.GetMouseButtonUp(0) && pointerActive && !pointerOwnedByUI && !pointerOrbit && !dragging && !hud.IsOverUI(cursor)) Tap(cursor);
+            if (Input.GetMouseButtonUp(0)) fixtureGrab = false;
             if (!holding) pointerActive = false;
             if (!hud.IsOverUI(cursor))
             {
@@ -409,6 +420,29 @@ namespace Cellblock.Unity
             float orbit = (Input.GetKey(KeyCode.E) ? 1 : 0) - (Input.GetKey(KeyCode.Q) ? 1 : 0);
             float tilt = (Input.GetKey(KeyCode.R) ? 1 : 0) - (Input.GetKey(KeyCode.F) ? 1 : 0);
             Orbit(orbit * Time.unscaledDeltaTime * 55, tilt * Time.unscaledDeltaTime * 35);
+        }
+        // Pressing on the furnishing that is already selected, in Inspect with no open plan.
+        bool GrabbingSelectedFixture(Vector2 screen)
+        {
+            if (Tool != BuildTool.Inspect || Draft != null || SelectedFixture == null || World == null || RideAlongActive) return false;
+            FixtureDefinition definition = FixtureCatalog.Get(SelectedFixture.Kind); if (definition == null) return false;
+            Vector3 size = new Vector3(definition.Width, definition.Height, definition.Depth); float hit;
+            return HitBox(cameraRig.ScreenPointToRay(screen), FacilityView.V(SelectedFixture.Position, size.y * 0.5f + 0.13f), Quaternion.Euler(0, SelectedFixture.Rotation, 0), size, out hit);
+        }
+        void BeginFixtureDrag()
+        {
+            fixtureDragging = true; SetTool(BuildTool.MoveFixture);
+            if (Tool != BuildTool.MoveFixture) { fixtureDragging = false; return; }
+            Instruction = "MOVE FURNISHING · Drag to the new position and let go to review the move.";
+            previewTime = 0; hud.Refresh(true);
+        }
+        // Letting go over the floor proposes the move with its quote; letting go over the interface cancels it.
+        void EndFixtureDrag(Vector2 screen)
+        {
+            fixtureDragging = false; fixtureGrab = false;
+            if (hud.IsOverUI(screen)) { SetTool(BuildTool.Inspect); return; }
+            Tap(screen);
+            if (Draft == null && Tool == BuildTool.MoveFixture) SetTool(BuildTool.Inspect);
         }
         void PreviewAt(Vector2 screen)
         {

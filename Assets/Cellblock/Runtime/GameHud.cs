@@ -773,9 +773,9 @@ namespace Cellblock.Unity
                 : game.Tool == BuildTool.Inspect ? "SELECT / INSPECT" : game.Tool == BuildTool.Meals ? "MEAL SERVICE / choose an installed dining table" : "STRUCTURE / " + game.Tool;
             snap.text = game.Snapping ? "Snap on" : "Snap off"; snap.EnableInClassList("selected", game.Snapping);
             instruction.text = game.Tool == BuildTool.Inspect
-                ? "Drag to move  ·  Arrows / WASD  ·  Right drag to orbit  ·  Pinch / scroll to zoom"
+                ? "Drag to pan  ·  Drag a selected item to move it  ·  Arrows / WASD  ·  Right drag to orbit  ·  Pinch / scroll to zoom"
                 : game.Instruction;
-            if (Application.isMobilePlatform && game.Tool == BuildTool.Inspect) instruction.text = "Drag to move  ·  Pinch to zoom  ·  Twist to orbit  ·  Tap to inspect";
+            if (Application.isMobilePlatform && game.Tool == BuildTool.Inspect) instruction.text = "Drag to pan  ·  Drag a selected item to move it  ·  Pinch to zoom  ·  Twist to orbit";
             placement.text = game.PlacementSummary; placement.style.display = string.IsNullOrEmpty(game.PlacementSummary) ? DisplayStyle.None : DisplayStyle.Flex;
             notice.text = world.Notice; notice.style.display = string.IsNullOrEmpty(world.Notice) ? DisplayStyle.None : DisplayStyle.Flex;
             bool company = workspace == Workspace.Company;

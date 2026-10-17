@@ -73,13 +73,19 @@ static partial class Program
         });
         Test("reading finishes books and study earns a certificate that counts at sentencing", () => {
             World w = LivesWorld(); Resident r = w.Data.Residents[0];
+            FreeHour(w);
             r.Activity = "Reading"; r.ActivityFixture = "life-shelf"; r.ActivityTarget = r.Position; r.ActivityUntil = int.MaxValue / 2;
-            r.ReadingMinutes = LifeRules.BookMinutes - 1; FreeHour(w);
-            r.Activity = "Reading"; r.ActivityTarget = r.Position; r.ActivityUntil = int.MaxValue / 2;
+            r.ReadingMinutes = 199; r.BooksRead = 0;
             w.AdvanceMinutes(1);
-            Check(r.BooksRead == 1 && r.Memories.Any(m => m.Kind == "book"), "No book finished at " + r.ReadingMinutes);
+            Check(r.BooksRead == 0 && r.ReadingMinutes == 200, "A book finished after 200 minutes: minutes " + r.ReadingMinutes + " books " + r.BooksRead);
+            r.ReadingMinutes = 239; r.Activity = "Reading"; r.ActivityTarget = r.Position; r.ActivityUntil = int.MaxValue / 2;
+            w.AdvanceMinutes(1);
+            Check(r.BooksRead == 1 && r.ReadingMinutes == 240 && r.Memories.Any(m => m.Kind == "book"), "No book finished at 240 minutes: " + r.ReadingMinutes);
             Resident s = w.Data.Residents[1];
-            s.StudyMinutes = LifeRules.CertificateMinutes - 1; s.Activity = "Study"; s.ActivityTarget = s.Position; s.ActivityUntil = int.MaxValue / 2;
+            s.StudyMinutes = 799; s.Activity = "Study"; s.ActivityTarget = s.Position; s.ActivityUntil = int.MaxValue / 2;
+            w.AdvanceMinutes(1);
+            Check(s.Certificates == 0, "A certificate after 800 minutes of study");
+            s.StudyMinutes = 899; s.Activity = "Study"; s.ActivityTarget = s.Position; s.ActivityUntil = int.MaxValue / 2;
             w.AdvanceMinutes(1);
             Check(s.Certificates == 1 && s.Memories.Any(m => m.Kind == "certificate") && w.Lives.Certificates == 1, "No certificate at " + s.StudyMinutes);
             World c = CourtWorld(); Resident p = c.Data.Residents[0]; p.Certificates = 1;
@@ -98,6 +104,17 @@ static partial class Program
             for (int i = 0; i < 90 && a.TalkMinutes < 20; i++) w.AdvanceMinutes(1);
             Check(a.TalkMinutes >= 20 && Link(a, b).Trust > trust, "No conversation happened: " + a.TalkMinutes);
             Check(b.MentorId == a.Id && a.MentorId == "" && b.Impulsivity < impulse && w.Lives.Mentorships == 1 && b.Memories.Any(m => m.Kind == "mentored"), "No mentoring, or it ran both ways");
+            // Near-equals both clear the thresholds, but neither is clearly steadier: nobody mentors.
+            World v = LivesWorld(); Resident c = v.Data.Residents[0], d = v.Data.Residents[1];
+            c.Discipline = 85; c.Impulsivity = 62; d.Discipline = 72; d.Impulsivity = 80; Pair(c, d, 5, 85);
+            foreach (Resident x in new[] { c, d }) { x.Activity = "Talk"; x.ActivityPartner = x == c ? d.Id : c.Id; x.ActivityTarget = x.Position; x.ActivityUntil = int.MaxValue / 2; }
+            d.Position = c.Position + new Point(0.8f, 0); d.ActivityTarget = d.Position;
+            v.LiveActivity(c); v.LiveActivity(d);
+            Check(c.MentorId == "" && d.MentorId == "" && v.Lives.Mentorships == 0, "Near-equals started mentoring");
+            // A conversation's own effect, one minute: +0.04 trust and -0.03 tension.
+            float t0 = Link(c, d).Trust, k0 = Link(c, d).Tension;
+            v.LiveActivity(c);
+            Check(Math.Abs(Link(c, d).Trust - t0 - 0.04f) < 0.0001f && Math.Abs(k0 - Link(c, d).Tension - 0.03f) < 0.0001f, "Talk effect: trust " + (Link(c, d).Trust - t0) + ", tension " + (k0 - Link(c, d).Tension));
         });
         Test("new friendships and feuds, fights, jobs, visits and arrivals become memories", () => {
             World w = LivesWorld(); Resident a = w.Data.Residents[0], b = w.Data.Residents[1];
@@ -115,7 +132,7 @@ static partial class Program
             w.Remember(r, "visit", "Had a visit from family."); w.Remember(r, "visit", "Had a visit from family.");
             Check(r.Memories.Count(m => m.Kind == "visit") == 1, "A duplicate memory on one day");
             for (int i = 0; i < 30; i++) w.Remember(r, "k" + i, "memory " + i);
-            Check(r.Memories.Count == LifeRules.MemoryLimit && r.Memories.Last().Text == "memory 29", "Memory bound");
+            Check(r.Memories.Count == 12 && r.Memories.Last().Text == "memory 29" && r.Memories.First().Text == "memory 18", "Memory bound: " + r.Memories.Count);
         });
         Test("story chapters follow what is happening to the person", () => {
             World w = LivesWorld(); Resident r = w.Data.Residents[0];

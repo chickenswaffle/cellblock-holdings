@@ -27,11 +27,11 @@ Scope (from `docs/claude-lives-handoff.md`):
 
 ## Activities
 
-| Activity | Where | Capacity | Effect per minute there | Milestone |
+| Activity | Where | Places (the only limit) | Effect per minute there | Milestone |
 | --- | --- | --- | --- | --- |
 | Reading | Bookshelf (2 places) | 2 | −0.010 stress | A book every 240 min (a named book; memory) |
 | Exercise | Exercise bench | 1 | −0.02 stress, +0.005 health (up to 95) | Every 600 min (memory) |
-| Television | Television; seats on benches and chairs within 5 m, else standing places in front | 5 | −0.012 stress. With another viewer: +trust and belonging, or with a rival (tension 58+) +tension and an argument memory | — |
+| Television | Television; seats on benches and chairs within 5 m first, then standing places in front | 5 | −0.012 stress. With another viewer: +trust and belonging, or with a rival (tension 58+) +tension and an argument memory | — |
 | Study | Table places (6), not the dining table within an hour of a meal | 6 | −0.006 stress, +0.002 discipline (up to 90); ×2 progress with a library clerk at work or a caseworker on shift | A certificate every 900 study min (first: equivalency) |
 | Talk | A common-room bench or table near both friends (trust 60+, tension below 35), or halfway | — | +0.04 trust, −0.03 tension, +belonging, −stress | Mentoring (below) |
 | Quiet | Their bunk (a daytime lie-down) | — | −0.008 stress | — |
@@ -40,7 +40,7 @@ Scope (from `docs/claude-lives-handoff.md`):
 
 - Each activity is scored by traits and needs: discipline favors reading and study, stress and impatience favor exercise, sociability and impulsiveness favor television, low belonging favors talking, high stress and low sociability favor quiet time.
 - Each score gets deterministic noise of up to 0.5 per half hour, and loses points for distance.
-- Only furnishings that are installed, not scheduled for removal, inside a room, under capacity and reachable from the person's home count.
+- Only furnishings that are installed, not scheduled for removal and inside a room count, and only places that are free and reachable from the person's home. Places are the only capacity: one at an exercise bench, two at a shelf, six at a table, five at a television.
 - A plan lasts 40–80 minutes. Each person replans 10–30 minutes after their last plan ends, so the room never switches all at once.
 
 **Mentoring:** while two friends talk, a resident with Discipline 70+ who is at least 15 steadier than a friend with Impulsivity 60+ (and at least 15 more impulsive) mentors them. The mentee gets −0.002 impulsivity and +0.002 discipline per minute. It runs one way only, and both people remember it.
@@ -102,6 +102,8 @@ The resident card › Life block shows:
 In editor and debug builds, "Demo · free time" (`StageLivesDemo`) works between 09:00–10:00 or 20:00–21:40.
 
 ## Evidence
+
+- **Mutation testing:** 15 deliberate bugs. 8 were caught at first. 2 changed a redundant capacity table, now removed, so places are the single limit. The other 5 led to pinned literals and exact-effect checks: 240-minute books, 900-minute certificates, a 12-memory bound, one-way mentoring between near-equals, and a conversation's exact +0.04 trust and −0.03 tension. All 13 valid mutants are now caught.
 
 - **Core checks:** 303/303, including 10 lives checks:
   - migration;

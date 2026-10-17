@@ -44,7 +44,6 @@ namespace Cellblock.Core
         static readonly string[] Books = { "a battered copy of The Count of Monte Cristo", "a paperback western", "a book on small-engine repair", "a thick fantasy novel",
             "a biography of a boxer", "a GED math workbook", "a book of poems someone underlined", "a mystery with the last page missing", "a cookbook nobody can use here", "a history of the city" };
         public static string BookFor(int seed, string residentId, int n) { return Books[(int)(JusticeRules.Hash(residentId + ":book:" + n, unchecked((uint)seed)) % (uint)Books.Length)]; }
-        public static int Capacity(string activity) { return activity == "Reading" ? 2 : activity == "Exercise" ? 1 : activity == "Television" ? 5 : activity == "Study" ? 6 : 0; }
         public static string FixtureFor(string activity) { return activity == "Reading" ? "Bookshelf" : activity == "Exercise" ? "ExerciseBench" : activity == "Television" ? "Television" : activity == "Study" ? "Table" : ""; }
         public static string Describe(string activity)
         {
@@ -157,7 +156,6 @@ namespace Cellblock.Core
             // Staggered: each person reconsiders on their own clock, never the whole room at once.
             r.NextPlanMinute = Data.Minute + 10 + (int)(JusticeRules.Hash(r.Id + ":replan", unchecked((uint)Data.Seed)) % 20u);
         }
-        int UsedAt(string fixtureId, string activity) { int n = 0; foreach (Resident o in Data.Residents) if (o.Activity == activity && o.ActivityFixture == fixtureId && o.ActivityUntil > Data.Minute) n++; return n; }
         Dictionary<string, bool> reachCache = new Dictionary<string, bool>(); int reachRevision = -1;
         bool Reachable(Resident r, Point target)
         {
@@ -185,6 +183,8 @@ namespace Cellblock.Core
                     places.Add(Geometry.AccessPoint(seat));
                 Point away = access - f.Position; float len = Math.Max(0.01f, away.Length); Point dir = away * (1f / len), side = new Point(-dir.Y, dir.X);
                 for (int i = -2; i <= 2; i++) places.Add(access + dir * 1.4f + side * (i * 0.7f));
+                // Five watchers at most, seated first.
+                if (places.Count > 5) places.RemoveRange(5, places.Count - 5);
             }
             else if (activity == "Reading") { places.Add(access); Point side = new Point(0.6f, 0); places.Add(access + side); }
             else places.Add(access);
@@ -206,7 +206,6 @@ namespace Cellblock.Core
                 foreach (Fixture f in Data.Fixtures.Where(x => x.Kind == LifeRules.FixtureFor(activity) && !pending.Contains(x.Id) && Rooms.Any(room => Geometry.Contains(room, x.Position))).OrderBy(x => Geometry.Distance(x.Position, r.Home)).Take(3))
                 {
                     if (activity == "Study" && Geometry.Distance(f.Position, Data.Dining) < 0.1f && PeopleDynamics.IsMealWindow(Data.Minute + 60)) continue;
-                    if (UsedAt(f.Id, activity) >= LifeRules.Capacity(activity)) continue;
                     bool found = false; Point place = default(Point);
                     foreach (Point p in ActivityPlaces(f, activity))
                         if (Reachable(r, p) && !Data.Residents.Any(o => o != r && o.Activity != "" && o.ActivityUntil > Data.Minute && Geometry.Distance(o.ActivityTarget, p) < 0.4f)) { place = p; found = true; break; }
@@ -249,7 +248,7 @@ namespace Cellblock.Core
         }
         bool AtActivity(Resident r) { return Geometry.Distance(r.Position, r.Activity == "Quiet" ? r.Home : r.ActivityTarget) < 1.0f; }
         public bool DoingActivity(Resident r) { return r.Activity != "" && r.ActivityUntil > Data.Minute && AtActivity(r); }
-        void LiveActivity(Resident r)
+        internal void LiveActivity(Resident r)
         {
             if (!AtActivity(r)) return;
             LivesState l = Lives;

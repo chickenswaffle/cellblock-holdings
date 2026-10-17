@@ -302,6 +302,21 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
   - Fuzz with the lives demo plus Unity-style reloads: 529,920 minutes, 3,931 round trips, 0 failures.
 - **Unity check request:** `docs/lives-notes.md` § Unity check request (five items: activity poses at real furnishings, meal and night priority, Life block fit, head release after reading, reload mid-activity). The disposable demo is the "Demo · free time" button on a resident card (09:00–10:00 or 20:00–21:40).
 
+### 2026-10-17 — build flow: drag a selected furnishing to move it; lives mutation results
+
+- **Drag-to-move** (`GameController.cs`, Claude's): in Inspect, pressing on the already-selected furnishing and dragging moves it instead of panning, for both mouse and touch.
+  - It previews through the new `FitFurnishing` (it settles flush, red or green).
+  - Letting go over the floor opens the move plan with its quote; letting go over the interface cancels.
+  - Dragging anywhere else still pans. Alt-drag and right-drag still orbit. The two-finger gesture is unchanged.
+  - The Inspect hints now mention it.
+- **Lives mutation:** 15 bugs, all 13 valid ones caught. 2 were redundant capacity code, now removed: places are the only limit. Checks now pin literal minutes, the memory bound, one-way mentoring between near-equals, and a conversation's exact per-minute effect.
+- **Checks:** 303/303. Unity typecheck passes for editor/macOS and iOS.
+- **Unity check request:**
+  - Select a bed, then drag it across the room: the preview follows and settles flush against walls.
+  - Let go: the move quote appears.
+  - Drag a bed onto the side panel: the move is cancelled and the selection kept.
+  - On touch, a one-finger drag that starts on the selected item moves it; one that starts elsewhere pans.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:
