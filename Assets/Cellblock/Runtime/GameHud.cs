@@ -625,6 +625,13 @@ namespace Cellblock.Unity
             body.Add(Text("Build the institution. Run the company.", "menu-subtitle"));
             body.Add(Text("Acquire an editable facility. Keep cash in reserve for operations, crews, and improvements.", "menu-intro"));
             var cards = Element("cards"); int index = 0;
+            // The full new-game flow: jurisdiction, institution and location, each with its own terms.
+            var charter = Element("contract-card"); charter.AddToClassList("charter-card");
+            var charterTop = Element("contract-topline"); charterTop.Add(Text("NEW / CHARTER", "eyebrow")); charterTop.Add(Text("12 INSTITUTIONS", "contract-tag")); charter.Add(charterTop);
+            charter.Add(Text("CITY · COUNTY · STATE · FEDERAL", "contract-city")); charter.Add(Text("Charter a facility", "contract-title"));
+            charter.Add(Text("Choose the jurisdiction for the difficulty, an institution for its core problem, and the place to build it. Each comes with its own capital, land price, population, staff, rules, transfer pressure and inspections.", "contract-description"));
+            charter.Add(Action("Choose a charter  →", () => ShowModePicker((type, location) => AcquireCharter(type, location)), "primary acquire-button"));
+            cards.Add(charter);
             foreach (ContractOffer offer in World.Offers)
             {
                 ContractOffer selected = offer;
@@ -659,6 +666,14 @@ namespace Cellblock.Unity
         void AcquireCompany(ContractOffer offer)
         {
             if (!game.StartCompany(offer.Id)) return;
+            menu.style.display = DisplayStyle.None; workspace = Workspace.Facility;
+            inspectorOpen = !compact; cameraOpen = false; previousSelection = null; Refresh(true); Layout();
+            if (!PlayerPrefs.HasKey("cellblock-controls-v2")) ShowGuide(true);
+        }
+
+        void AcquireCharter(string typeId, string locationId)
+        {
+            if (!game.StartCharter(typeId, locationId)) return;
             menu.style.display = DisplayStyle.None; workspace = Workspace.Facility;
             inspectorOpen = !compact; cameraOpen = false; previousSelection = null; Refresh(true); Layout();
             if (!PlayerPrefs.HasKey("cellblock-controls-v2")) ShowGuide(true);

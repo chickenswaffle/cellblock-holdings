@@ -762,7 +762,7 @@ namespace Cellblock.Core
             int fights = Personnel.Fights - a.Fights, assaults = Population.Assaults - a.Assaults, riots = Population.Riots - a.Riots;
             // Violence is judged per ten residents, so a larger facility is not punished for its size alone.
             float per10 = 10f / Math.Max(10, present);
-            if (fights > 0) Find("Violence", Math.Min(20, (int)Math.Ceiling(fights * 2 * per10)), fights + " fight" + (fights == 1 ? "" : "s") + " with injuries since the last inspection (" + (fights * per10).ToString("0.#") + " per ten residents).");
+            if (fights > 0) Find("Violence", Math.Min(15, (int)Math.Ceiling(fights * 1.2f * per10)), fights + " fight" + (fights == 1 ? "" : "s") + " with injuries since the last inspection (" + (fights * per10).ToString("0.#") + " per ten residents).");
             if (assaults > 0) Find("Violence", Math.Min(16, (int)Math.Ceiling(assaults * 4 * per10)), assaults + " assault" + (assaults == 1 ? "" : "s") + " with a weapon.");
             if (riots > 0) Find("Violence", Math.Min(50, riots * 25), riots + " riot" + (riots == 1 ? "" : "s") + ".");
             int welfare = Personnel.WelfareViolations - a.Welfare, crises = Data.Intake.Crises - a.Crises, overdoses = Data.Contraband.Overdoses - a.Overdoses;
@@ -826,13 +826,31 @@ namespace Cellblock.Core
         public long PerDiemCents { get { FacilityType type = FacilityMode; return Math.Max(0, type.DailyRevenueCents / Math.Max(1, type.Residents) * 85 / 100); } }
         public int ExtraResidents { get { return Math.Max(0, Data.Residents.Count(InCustody) - FacilityMode.Residents); } }
         public long InsolvencyCents { get { return -Math.Max(5000000, Data.OpeningCapitalCents / 4); } }
+        // A company is insolvent on its net position: cash plus what the government already owes it.
+        public long NetPositionCents { get { return Data.CashCents + Data.ReceivableCents; } }
+        public const long AdvanceFeePercent = 3;
+        // Bridge financing against earned revenue: half of the receivable now, less a 3% fee; the rest arrives on payment day.
+        public bool RequestAdvance()
+        {
+            long receivable = Data.ReceivableCents;
+            if (ContractTerminated) { Notice = "There is no contract to advance against."; return false; }
+            long advance = receivable / 2 / 100 * 100;
+            if (advance < 100000) { Notice = "An advance needs at least $2,000 of earned, unpaid contract revenue."; return false; }
+            long fee = advance * AdvanceFeePercent / 100;
+            Data.ReceivableCents -= advance;
+            Book(advance, "contract-advance", "Advance on earned contract revenue");
+            Book(-fee, "finance-fees", "Advance fee (" + AdvanceFeePercent + "%)");
+            Notice = "Advanced " + JusticeRules.Dollars(advance) + " of earned revenue for a " + JusticeRules.Dollars(fee) + " fee. The rest arrives on payment day.";
+            PeopleDynamics.Record(Data, "finance", "company", Notice, 1);
+            return true;
+        }
         void AccruePopulationCosts()
         {
             PopulationState p = Population;
-            if (!p.Terminated && Data.CashCents < InsolvencyCents && Data.Minute % 60 == 0)
+            if (!p.Terminated && NetPositionCents < InsolvencyCents && Data.Minute % 60 == 0)
             {
                 p.Terminated = true; p.Backlog = 0;
-                string text = "INSOLVENT · Cash fell below " + JusticeRules.Dollars(-InsolvencyCents) + " of debt. The government has terminated the contract; you can keep operating or start a new company.";
+                string text = "INSOLVENT · Cash plus money owed fell below " + JusticeRules.Dollars(-InsolvencyCents) + " of debt. The government has terminated the contract; you can keep operating or start a new company.";
                 PeopleDynamics.Record(Data, "audit", "population", text, 5); Notice = text;
             }
             int extra = ExtraResidents;

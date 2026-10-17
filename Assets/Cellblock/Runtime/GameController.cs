@@ -104,6 +104,18 @@ namespace Cellblock.Unity
             SetTool(BuildTool.Inspect); CameraPosition(true); hud.ShowMenu();
         }
         public bool StartCompany(string contract) { return CreateCompany(contract, false); }
+        // A company chartered from the jurisdiction / institution / location screen.
+        public bool StartCharter(string typeId, string locationId)
+        {
+            if (World != null && !Save()) return false;
+            presentationPreview = false;
+            EndRideAlongSilently();
+            World = Cellblock.Core.World.StartCharter(typeId, locationId); saveId = Guid.NewGuid().ToString("N");
+            World.Data.Speed = 0; watchedCameraId = ""; nextFeed = 0; nativeInputWasBlocked = true;
+            Draft = null; SelectedWall = null; SelectedFixture = null; SelectedResident = null; SelectedStaff = null; hasStart = hasEnd = false;
+            accumulator = 0; view.Refresh(World, true); view.Preview(null); SetTool(BuildTool.Inspect); Recenter(); Save();
+            return true;
+        }
         bool CreateCompany(string contract, bool preview)
         {
             if (World != null && !Save()) return false;

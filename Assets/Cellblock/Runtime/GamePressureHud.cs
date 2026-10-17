@@ -11,7 +11,7 @@ namespace Cellblock.Unity
     // classes, enabled state and display, so touch targets stay stable.
     public sealed partial class GameHud
     {
-        Button pressureTab, acceptAll, acceptCapacity, moratorium, shakedown, searchYard, searchReturns, searchVisits;
+        Button pressureTab, acceptAll, acceptCapacity, moratorium, advance, shakedown, searchYard, searchReturns, searchVisits;
         VisualElement pressurePane, unrestFill, riotCard, upgradeList, pressureAlert, ridePanel, rideFeed, riderRow;
         Label pressureStatus, unrestLabel, unrestFactors, transferInfo, intakeInfo, intakeProgram, contrabandInfo, riotInfo, auditInfo, auditFindings, alertText, rideTitle, rideInfo;
         Button rideBodyCam, rideButton;
@@ -40,6 +40,7 @@ namespace Cellblock.Unity
             acceptAll = Action("Accept all", () => { game.World.SetTransferPolicy("Accept all"); Refresh(true); }, "quiet"); policy.Add(acceptAll);
             acceptCapacity = Action("Only free beds", () => { game.World.SetTransferPolicy("Accept to capacity"); Refresh(true); }, "quiet"); policy.Add(acceptCapacity);
             moratorium = Action("Moratorium · 2 days", () => { game.World.RequestMoratorium(); Refresh(true); }, "quiet"); policy.Add(moratorium);
+            advance = Action("Advance on revenue", () => { game.World.RequestAdvance(); Refresh(true); }, "quiet"); policy.Add(advance);
             pressurePane.Add(policy);
 
             pressurePane.Add(Text("INTAKE", "section-label"));
@@ -150,10 +151,13 @@ namespace Cellblock.Unity
             transferInfo.text = "The " + world.ModeTier.Name.ToLowerInvariant() + " system is sending about " + world.TransferDemand.ToString("0.0") + " a day" + (world.MoratoriumActive ? " (moratorium until " + JusticeRules.When(p.MoratoriumUntil) + ")" : "") + ".\n" +
                 busLine + " Waiting in the system: " + Mathf.FloorToInt(p.Backlog) + ".\n" +
                 "Per-diem " + Money(world.PerDiemCents) + " a day for each person over " + world.FacilityMode.Residents + "." +
-                (p.LastSurge != "" ? "\nLast surge: " + p.LastSurge + "." : "") + (p.Refused > 0 ? "\nRefused so far: " + p.Refused + "." : "");
+                (p.LastSurge != "" ? "\nLast surge: " + p.LastSurge + "." : "") + (p.Refused > 0 ? "\nRefused so far: " + p.Refused + "." : "") +
+                "\nCash " + Money(world.Data.CashCents) + " + owed " + Money(world.Data.ReceivableCents) + " · insolvent below " + Money(world.InsolvencyCents) + ".";
             acceptAll.EnableInClassList("selected", p.Policy == "Accept all");
             acceptCapacity.EnableInClassList("selected", p.Policy == "Accept to capacity");
             moratorium.SetEnabled(!world.MoratoriumActive && !p.Terminated && world.Data.Minute - p.LastMoratoriumMinute >= 7 * 1440);
+            advance.SetEnabled(!p.Terminated && world.Data.ReceivableCents >= 200000);
+            advance.tooltip = "Draw half of " + Money(world.Data.ReceivableCents) + " earned and unpaid, less a " + World.AdvanceFeePercent + "% fee";
 
             IntakeState intake = world.Data.Intake;
             int lanes = world.IntakeStations().Count;

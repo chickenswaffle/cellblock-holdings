@@ -309,6 +309,27 @@ namespace Cellblock.Core
             Facility.Starter(state); world.InitializeSecurity();
             return world;
         }
+        // A new company chartered from a facility type and location: that type's capital, the location's land price,
+        // a seed of its own, the starter building (with a booking desk near the sally port for state and federal
+        // institutions) and the type's population, staff and rules.
+        public static World StartCharter(string typeId, string locationId)
+        {
+            FacilityType type = GameModes.Type(typeId); ModeLocation location = GameModes.Location(locationId);
+            if (type == null || location == null || !GameModes.Tier(type.TierId).Locations.Contains(location.Id)) throw new ArgumentException("Unknown facility type or location.");
+            ContractOffer offer = GameModes.Offer(type, location);
+            string contract = type.ContractId != "" ? type.ContractId : type.TierId == "state" || type.TierId == "federal" ? "modernize" : "county";
+            var state = new State { ContractId = contract, OpeningCapitalCents = offer.CapitalCents, CashCents = offer.CapitalCents, Seed = PeopleDynamics.ContractSeed(type.Id + "@" + location.Id) };
+            state.Mode = new ModeState { Version = GameModes.Version, TypeId = type.Id, LocationId = location.Id };
+            var world = new World(state);
+            world.Book(-offer.AcquisitionCents, "acquisition", "Land and starter facility · " + type.Name);
+            Facility.Starter(state);
+            if (type.TierId == "state" || type.TierId == "federal")
+                state.Fixtures.Add(new Fixture { Id = "booking-desk-" + state.NextId++, Kind = "Desk", Position = new Point(0.4f, -6.6f) });
+            world.InitializeSecurity();
+            if (!world.ApplyMode(type.Id, location.Id)) throw new ArgumentException(world.Notice);
+            world.Notice = "Chartered " + type.Name + " in " + location.Name + ". " + type.SignatureRule;
+            return world;
+        }
         public string Id() { return "item-" + Data.NextId++; }
         public bool Reconciles() { return Data.OpeningCapitalCents + Data.Ledger.Sum(e => e.Cents) == Data.CashCents; }
         void Book(long cents, string category, string description)

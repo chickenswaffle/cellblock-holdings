@@ -191,6 +191,24 @@ static partial class Program
             int quick = Releases(holding), slow = Releases(new World(copy2));
             Check(quick > slow, "City holding (release bias +0.25) did not release more at court: " + quick + " vs " + slow);
         });
+        Test("a chartered company books its own type's capital and land, and every type starts and reloads", () => {
+            foreach (FacilityType type in GameModes.Types)
+                foreach (string locationId in GameModes.Tier(type.TierId).Locations.Take(2))
+                {
+                    World world = World.StartCharter(type.Id, locationId);
+                    ContractOffer offer = GameModes.Offer(type, GameModes.Location(locationId));
+                    Check(world.Data.OpeningCapitalCents == offer.CapitalCents && world.Data.CashCents == offer.CapitalCents - offer.AcquisitionCents && world.Reconciles(),
+                        type.Id + " at " + locationId + " did not book its own capital and land");
+                    Check(world.FacilityMode.Id == type.Id && world.ModeLocation.Id == locationId && world.Data.Mode.Applied && world.Contract.DailyRevenueCents == type.DailyRevenueCents, type.Id + " did not take its mode and terms");
+                    bool booking = type.TierId == "state" || type.TierId == "federal";
+                    Check(world.IntakeStations().Count == (booking ? 2 : 1), type.Id + " intake lanes wrong: " + world.IntakeStations().Count);
+                    world.AdvanceMinutes(120);
+                    new World(RoundTrip(world.Data));
+                }
+            Check(World.StartCharter("city-holding", "northbridge").Data.Seed != World.StartCharter("city-holding", "lakewood").Data.Seed, "Two locations share a population seed");
+            bool rejected = false; try { World.StartCharter("city-holding", "mason-ridge"); } catch (ArgumentException) { rejected = true; }
+            Check(rejected, "A charter outside the tier's locations was accepted");
+        });
         Test("malformed mode saves are rejected", () => {
             World world = Chartered("federal-camp", "halvern");
             void Rejects(Action<State> corrupt, string message)

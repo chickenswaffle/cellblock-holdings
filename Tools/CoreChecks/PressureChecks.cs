@@ -274,6 +274,18 @@ static partial class Program
             Check(world.Data.ReceivableCents <= receivable && world.Population.Backlog == 0 && !world.PenaltiesApply, "Revenue or transfers continued after termination");
             Check(Ledger(world, "contract-penalty") + Ledger(world, "welfare-penalty") == fines && world.Population.Reports.Count == 1, "Audits or fines continued after termination");
         });
+        Test("an advance on earned revenue pays half now for a 3% fee; money owed keeps a company solvent", () => {
+            World world = County(); Hold(world); world.AdvanceMinutes(3 * 1440);
+            long receivable = world.Data.ReceivableCents, cash = world.Data.CashCents;
+            Check(receivable >= 200000 && world.RequestAdvance(), "No advance against " + receivable + ": " + world.Notice);
+            long advance = receivable / 2 / 100 * 100;
+            Check(world.Data.CashCents == cash + advance - advance * 3 / 100 && world.Data.ReceivableCents == receivable - advance && world.Reconciles(), "Advance amounts or ledger wrong");
+            World owed = County(); Hold(owed);
+            owed.Data.CashCents = owed.InsolvencyCents - 100; owed.Data.ReceivableCents = -owed.InsolvencyCents;
+            owed.Data.OpeningCapitalCents = owed.Data.CashCents - owed.Data.Ledger.Sum(e => e.Cents);
+            owed.AdvanceMinutes(120);
+            Check(!owed.ContractTerminated, "A company owed enough to cover its overdraft was declared insolvent");
+        });
         Test("deep debt makes the company insolvent and ends the contract", () => {
             World world = County(); world.Data.CashCents = world.InsolvencyCents - 100;
             world.Data.OpeningCapitalCents = world.Data.CashCents - world.Data.Ledger.Sum(e => e.Cents);
