@@ -249,6 +249,10 @@ namespace Cellblock.Unity
             test.SetScore("Safety", 90, MeterMeaning.HigherIsBetter); if (test.Tint != StatMeter.Green) return false;
             test.SetScore("Escape", 55, MeterMeaning.HigherIsWorse, cautionAt: .35f, dangerAt: .55f); if (test.Tint != StatMeter.Red) return false;
             test.SetScore("Escape", 35, MeterMeaning.HigherIsWorse, cautionAt: .35f, dangerAt: .55f); if (test.Tint != StatMeter.Amber) return false;
+            test.SetScore("Capacity", 100, MeterMeaning.HigherIsWorse, dangerAt: 1.000001f, cautionAt: .85f); if (test.Tint != StatMeter.Amber) return false;
+            test.SetScore("Capacity", 100.5f, MeterMeaning.HigherIsWorse, dangerAt: 1.000001f, cautionAt: .85f); if (test.Tint != StatMeter.Red) return false;
+            test.SetScore("Capacity", CapacityScore(1, 0), MeterMeaning.HigherIsWorse, dangerAt: 1.000001f, cautionAt: .85f); if (test.Tint != StatMeter.Red) return false;
+            test.SetScore("Capacity", CapacityScore(0, 0), MeterMeaning.HigherIsWorse, dangerAt: 1.000001f, cautionAt: .85f); if (test.Tint != StatMeter.Green) return false;
             if (RiskNumber(54.999f) != "54.9" || RiskNumber(34.999f) != "34.9") return false;
             return true;
         }

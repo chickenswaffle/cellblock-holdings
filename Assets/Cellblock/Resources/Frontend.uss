@@ -1,0 +1,107 @@
+/* One ink / brass / cool jade theme for home, settings and the live command surface. */
+.home-screen { background-color: rgb(7, 14, 22); }
+.home-art { position: absolute; left: 0; right: 0; top: 0; bottom: 0; }
+.home-shade { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background-color: rgba(2, 9, 15, 0.17); }
+.home-content { flex-grow: 1; min-height: 0; }
+.home-mast { flex-direction: row; justify-content: space-between; align-items: center; min-height: 58px; flex-shrink: 0; }
+.home-wordmark { font-size: 12px; letter-spacing: 2px; color: rgb(229, 209, 163); -unity-font-style: bold; flex-shrink: 1; white-space: normal; }
+.home-links { flex-direction: row; }
+Button.home-link { background-color: rgba(12, 23, 31, .85); border-color: rgb(67, 85, 91); color: rgb(217, 226, 224); min-width: 95px; margin-left: 8px; padding: 0 16px; height: 44px; }
+.home-scroll { flex-grow: 1; flex-shrink: 1; min-height: 0; }
+.home-column { width: 510px; max-width: 100%; margin-top: 68px; margin-bottom: 18px; }
+.home-eyebrow { font-size: 11px; letter-spacing: 4px; color: rgb(202, 179, 126); margin-bottom: 18px; }
+.home-title { font-size: 65px; -unity-font-style: bold; letter-spacing: 4px; color: rgb(248, 241, 224); margin: 0 0 15px 0; white-space: normal; }
+.home-tagline { font-size: 21px; color: rgb(199, 215, 214); margin-bottom: 30px; white-space: normal; }
+Button.home-continue { padding: 18px 22px; height: auto; min-height: 124px; align-items: stretch; border-radius: 7px; border-color: rgb(194, 166, 108); border-left-width: 4px; background-color: rgba(17, 33, 40, .96); -unity-text-align: upper-left; margin: 0 0 12px 0; }
+Button.home-continue:hover { background-color: rgb(35, 56, 59); border-color: rgb(245, 213, 146); }
+.home-action-kicker { font-size: 10px; letter-spacing: 2px; color: rgb(217, 186, 124); margin: 0 0 7px 0; }
+.home-save-title { font-size: 23px; -unity-font-style: bold; color: rgb(250, 245, 230); white-space: normal; margin-bottom: 6px; }
+.home-save-detail { font-size: 13px; color: rgb(191, 212, 209); white-space: normal; margin-bottom: 11px; }
+.home-save-stamp { font-size: 10px; letter-spacing: 1px; color: rgb(125, 199, 169); white-space: normal; }
+Button.home-new { min-height: 54px; height: 54px; background-color: rgb(206, 179, 123); color: rgb(18, 29, 35); border-color: rgb(238, 213, 159); -unity-font-style: bold; font-size: 13px; letter-spacing: 2px; margin: 0; }
+Button.home-new:hover { background-color: rgb(237, 213, 162); }
+.home-assurance { color: rgb(154, 180, 178); font-size: 10px; letter-spacing: .8px; white-space: normal; margin-top: 16px; }
+.home-foot { flex-shrink: 0; flex-direction: row; justify-content: space-between; margin-top: 8px; }
+.home-foot-line, .home-art-credit { color: rgb(160, 178, 183); font-size: 9px; letter-spacing: 1.3px; }
+.home-error, .recovery-note { color: rgb(241, 183, 138); white-space: normal; font-size: 12px; margin: 10px 0; }
+.library-title { font-size: 32px; color: rgb(243, 231, 205); -unity-font-style: bold; margin: 25px 0 8px 0; white-space: normal; }
+.library-intro { color: rgb(186, 205, 204); font-size: 13px; margin-bottom: 18px; white-space: normal; }
+.library-card { max-width: 790px; margin-bottom: 14px; padding: 19px 22px; background-color: rgba(12, 26, 34, .96); border-width: 1px; border-color: rgb(67, 89, 95); border-radius: 7px; }
+.library-name { font-size: 22px; color: rgb(242, 233, 211); -unity-font-style: bold; white-space: normal; margin-bottom: 7px; }
+.library-details { font-size: 13px; color: rgb(183, 205, 204); white-space: normal; margin-bottom: 10px; }
+.library-load { max-width: 290px; }
+.library-id { color: rgb(115, 142, 147); font-size: 9px; margin-top: 6px; }
+.home-empty { color: rgb(209, 224, 218); font-size: 16px; white-space: normal; padding: 24px; background-color: rgba(12, 26, 34, .94); }
+.settings-overlay { position: absolute; left: 0; top: 0; right: 0; bottom: 0; align-items: center; justify-content: center; background-color: rgba(3, 10, 17, .94); }
+.settings-card { width: 760px; max-width: 100%; height: 88%; min-height: 190px; padding: 22px; border-width: 1px; border-color: rgb(81, 101, 106); border-top-color: rgb(196, 167, 111); border-top-width: 3px; border-radius: 8px; background-color: rgb(16, 29, 37); }
+.settings-head { flex-direction: row; justify-content: space-between; align-items: center; flex-shrink: 0; margin-bottom: 12px; }
+.settings-title { font-size: 25px; letter-spacing: 3px; color: rgb(238, 226, 199); -unity-font-style: bold; }
+.settings-tabs, .setting-options { flex-direction: row; flex-shrink: 0; }
+Button.settings-tab { flex-grow: 1; flex-basis: 0; min-width: 44px; margin-right: 5px; }
+.settings-content { flex-grow: 1; flex-shrink: 1; min-height: 0; margin-top: 12px; }
+.settings-page-title { color: rgb(219, 230, 221); font-size: 19px; margin-bottom: 15px; white-space: normal; }
+.setting-row { padding: 15px 0; border-bottom-width: 1px; border-bottom-color: rgb(45, 65, 73); flex-shrink: 0; }
+.setting-title { font-size: 14px; -unity-font-style: bold; color: rgb(231, 236, 224); margin-bottom: 5px; }
+.setting-help { color: rgb(151, 180, 183); font-size: 12px; white-space: normal; margin-bottom: 10px; }
+Button.setting-choice { flex-grow: 1; flex-basis: 0; min-width: 44px; margin-right: 6px; white-space: normal; }
+.settings-feedback { flex-shrink: 0; color: rgb(132, 198, 167); font-size: 11px; white-space: normal; margin-top: 13px; }
+.settings-slider { min-height: 44px; color: rgb(225, 231, 218); padding: 10px; }
+.controls-reference { color: rgb(188, 209, 204); font-size: 12px; white-space: normal; padding: 16px; background-color: rgb(21, 40, 47); margin-top: 15px; margin-bottom: 12px; }
+.frontend-theme Button { border-radius: 5px; }
+.frontend-theme .header { background-color: rgba(10, 22, 30, .98); border-color: rgb(60, 83, 93); border-bottom-color: rgb(152, 133, 94); border-radius: 7px; }
+.frontend-theme .brand-mark { border-color: rgb(189, 160, 105); background-color: rgb(24, 39, 46); color: rgb(229, 200, 140); }
+.frontend-theme .inspector { background-color: rgba(13, 28, 36, .98); border-color: rgb(61, 86, 95); border-top-color: rgb(170, 146, 101); border-radius: 7px; }
+.frontend-theme .card-title, .frontend-theme .person-name { color: rgb(238, 229, 205); }
+.frontend-theme .selection-card, .frontend-theme .person-card, .frontend-theme .project-card { background-color: rgb(21, 39, 47); border-color: rgb(54, 79, 88); }
+.frontend-theme .status { background-color: rgba(12, 27, 35, .88); border-color: rgb(58, 82, 91); border-radius: 6px; padding: 8px 12px; }
+.frontend-theme .instruction { font-size: 10px; color: rgb(158, 182, 184); }
+.frontend-theme .navigation.command-navigation { background-color: rgb(11, 25, 33); border-color: rgb(64, 91, 102); border-top-color: rgb(158, 137, 94); border-radius: 8px; padding: 3px 6px; align-items: center; }
+.frontend-theme .command-navigation .workspace-tabs { flex-grow: 1; flex-shrink: 1; }
+.frontend-theme Button.command-tab { height: 58px; min-height: 58px; min-width: 48px; flex-grow: 1; flex-basis: 0; margin: 0 3px; padding: 3px 6px; align-items: center; justify-content: center; border-color: rgba(69, 95, 102, .3); background-color: rgb(16, 34, 43); }
+.command-icon { width: 30px; height: 26px; margin-bottom: 3px; }
+.command-icon-part { background-color: rgb(112, 152, 160); border-radius: 1px; }
+.command-tab-label { color: rgb(181, 207, 205); font-size: 11px; margin: 0; padding: 0; }
+.frontend-theme Button.command-tab.selected { background-color: rgb(46, 61, 57); border-color: rgb(199, 172, 113); border-bottom-width: 3px; }
+.command-tab.selected .command-icon-part { background-color: rgb(225, 194, 132); }
+.command-tab.selected .command-tab-label { color: rgb(246, 224, 179); -unity-font-style: bold; }
+Button.command-utility { height: 44px; min-width: 55px; margin-left: 5px; font-size: 11px; }
+.command-save-stamp { font-size: 9px; color: rgb(126, 193, 162); -unity-text-align: middle-right; white-space: normal; max-width: 91px; margin-right: 8px; }
+.command-save-stamp.save-warning { color: rgb(247, 163, 134); }
+.command-overview { position: absolute; flex-direction: row; background-color: rgba(12, 27, 35, .94); border-width: 1px; border-color: rgb(56, 84, 94); border-radius: 6px; padding: 5px 8px; }
+.command-overview > .stat-meter { flex-grow: 1; flex-basis: 0; min-width: 0; margin: 1px 4px; }
+.command-overview .stat-meter-title { font-size: 9px; color: rgb(164, 191, 191); }
+.command-overview .stat-meter-direction { display: none; }
+.command-overview .stat-meter-track { height: 21px; }
+.command-overview .stat-meter-number { font-size: 11px; padding: 0 3px; }
+.frontend-alert { position: absolute; top: 94px; left: 20px; right: 20px; max-width: 650px; padding: 15px; background-color: rgb(72, 31, 29); border-width: 1px; border-color: rgb(201, 111, 82); border-radius: 6px; }
+.frontend-alert-text { color: rgb(254, 217, 188); white-space: normal; }
+.frontend-theme .mode-sheet, .frontend-theme .personnel-sheet, .frontend-theme .event-overlay, .frontend-theme .guide-overlay { background-color: rgba(4, 13, 21, .95); }
+.frontend-theme .mode-card, .frontend-theme .personnel-card, .frontend-theme .event-sheet, .frontend-theme .guide-sheet { background-color: rgb(16, 29, 37); border-color: rgb(85, 105, 109); border-top-color: rgb(198, 169, 111); border-top-width: 3px; border-radius: 7px; }
+.frontend-theme Button.primary, .frontend-theme Button.selected { background-color: rgb(201, 177, 126); color: rgb(19, 31, 35); border-color: rgb(226, 200, 147); }
+.home-compact .home-column { width: 450px; margin-top: 8px; }
+.home-compact .home-title { font-size: 34px; letter-spacing: 3px; margin-bottom: 7px; }
+.home-compact .home-eyebrow { display: none; }
+.home-compact .home-tagline { font-size: 14px; margin-bottom: 14px; }
+.home-compact Button.home-continue { min-height: 100px; padding: 12px 16px; margin-bottom: 9px; }
+.home-compact .home-save-title { font-size: 18px; }
+.home-compact .home-save-detail { font-size: 11px; margin-bottom: 6px; }
+.home-compact .home-save-stamp { font-size: 9px; }
+.home-compact Button.home-new { height: 46px; min-height: 46px; }
+.home-compact .home-assurance { margin-top: 9px; font-size: 9px; }
+.home-compact .home-art-credit { display: none; }
+.home-compact .settings-card { height: 100%; padding: 10px 14px; }
+.home-compact .settings-head { margin-bottom: 5px; }
+.home-compact .settings-title { font-size: 20px; }
+.home-compact .settings-page-title { font-size: 16px; margin-bottom: 7px; }
+.home-compact .setting-row { padding: 10px 0; }
+.home-compact .settings-feedback { margin-top: 7px; }
+.compact .command-save-stamp { display: none; }
+.home-narrow .home-column { width: 390px; margin-top: 7px; }
+.home-narrow .home-title { font-size: 32px; }
+.home-narrow .home-mast { min-height: 48px; }
+.home-narrow .home-wordmark { font-size: 9px; max-width: 170px; }
+.home-narrow Button.home-link { min-width: 77px; padding: 0 9px; margin-left: 4px; font-size: 11px; }
+.home-narrow .home-foot-line { font-size: 8px; }
+.home-narrow .command-tab-label { font-size: 9px; }
+.home-narrow .command-icon { height: 24px; }
+.reduced-motion .stat-meter-fill { transition-duration: 0s; }

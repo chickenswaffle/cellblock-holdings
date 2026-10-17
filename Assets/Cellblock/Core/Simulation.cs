@@ -807,7 +807,7 @@ namespace Cellblock.Core
         {
             var nav = Routes;
             foreach (Resident r in Data.Residents)
-                if (IsPresent(r) && !nav.Clear(r.Position, r.Position)) { r.Position = NearbyClear(r.Position, nav); RemoveResidentPath(r); r.NextDecisionMinute = Data.Minute; }
+                if (IsPresent(r) && !PeopleDynamics.ClearStaffStation(r.Position, nav, Data.Fixtures)) { r.Position = NearbyClear(r.Position, nav); RemoveResidentPath(r); r.NextDecisionMinute = Data.Minute; }
             foreach (StaffMember s in Data.Staff)
                 if (s.Arrived && !PeopleDynamics.ClearStaffStation(s.Position, nav, Data.Fixtures)) s.Position = NearbyClear(s.Position, nav);
         }

@@ -96,6 +96,8 @@ namespace Cellblock.Unity
             BuildQuote();
             menu = Panel("menu"); menu.style.display = DisplayStyle.None;
             guide = Panel("guide-overlay"); guide.style.display = DisplayStyle.None;
+            BuildFrontend();
+            facilityPane.Add(Action("Goals & facility journal", ShowFacilityEvents, "primary"));
             root.RegisterCallback<GeometryChangedEvent>(e => Layout()); Layout();
         }
 
@@ -106,9 +108,11 @@ namespace Cellblock.Unity
             panelSettings.scale = Application.isMobilePlatform
                 ? Mathf.Clamp(displayDpi > 0 ? displayDpi / 160f : 2.5f, 1.5f, 3f)
                 : Mathf.Max(1, displayWidth / 1700f);
+            panelSettings.scale *= game.Preferences.InterfaceScale;
         }
         void Update()
         {
+            if (game.World == null && Input.GetKeyDown(KeyCode.Escape)) { if (settingsOpen) CloseSettings(); else if (modePickerOpen) HideModePicker(); }
             if (displayWidth == Screen.width && displayHeight == Screen.height && Mathf.Approximately(displayDpi, Screen.dpi)) return;
             UpdatePanelScale(); Layout();
         }
@@ -141,17 +145,7 @@ namespace Cellblock.Unity
 
         void BuildNavigation()
         {
-            navigation = Panel("navigation");
-            var tabs = Element("workspace-tabs");
-            facilityTab = Action("Facility", () => SwitchWorkspace(Workspace.Facility));
-            buildTab = Action("Build", () => SwitchWorkspace(Workspace.Build));
-            peopleTab = Action("People", () => SwitchWorkspace(Workspace.People));
-            companyTab = Action("Company", () => SwitchWorkspace(Workspace.Company));
-            tabs.Add(facilityTab); tabs.Add(buildTab); tabs.Add(peopleTab); tabs.Add(companyTab); controlTab = Action("Control", () => SwitchWorkspace(Workspace.Control)); tabs.Add(controlTab);
-            pressureTab = Action("Pressure", () => SwitchWorkspace(Workspace.Pressure)); pressureTab.tooltip = "Transfers, intake, contraband, unrest, audits and upgrades"; tabs.Add(pressureTab); navigation.Add(tabs);
-            var utilities = Element("navigation-utilities");
-            cameraToggle = Action("Camera", () => { cameraOpen = !cameraOpen; if (compact && cameraOpen) inspectorOpen = false; Layout(); }, "quiet");
-            utilities.Add(cameraToggle); utilities.Add(Action("Controls", () => ShowGuide(false), "quiet")); navigation.Add(utilities);
+            BuildCommandNavigation();
         }
 
         void BuildTools()
@@ -593,6 +587,7 @@ namespace Cellblock.Unity
             guide.style.paddingLeft = left; guide.style.paddingRight = right; guide.style.paddingTop = top; guide.style.paddingBottom = bottom;
             cameraToggle.EnableInClassList("selected", cameraOpen);
             LayoutPressure(left, right, navTop + 54, menuOpen);
+            LayoutFrontend(left, right, top, bottom, menuOpen);
         }
 
         public bool IsOverUI(Vector2 screen)
@@ -606,50 +601,7 @@ namespace Cellblock.Unity
 
         public void ShowMenu()
         {
-            CloseGuide();
-            if (game.World != null) game.World.Data.Speed = 0;
-            menu.Clear(); menu.style.display = DisplayStyle.Flex; menu.style.backgroundColor = new Color(0.067f, 0.094f, 0.11f, 1);
-            var body = new ScrollView(ScrollViewMode.Vertical); body.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
-            body.style.flexGrow = 1; menu.Add(body);
-            CompanySave[] saves = game.SavedCompanies().ToArray();
-            var saved = Element("saved-holdings"); saved.style.display = DisplayStyle.None;
-            var masthead = Element("menu-masthead");
-            masthead.Add(Text("CH  /  CELLBLOCK HOLDINGS", "menu-brand"));
-            var mastheadActions = Element("masthead-actions");
-            if (game.World != null) mastheadActions.Add(Action("Return to facility", () => { menu.style.display = DisplayStyle.None; Refresh(true); }, "quiet"));
-            if (game.HasSave) mastheadActions.Add(Action("Resume latest holding  →", () => ResumeCompany(), "quiet"));
-            else if (saves.Length > 0)
-            {
-                string firstSave = saves[0].FileName;
-                mastheadActions.Add(Action("Resume saved holding  →", () => ResumeCompany(firstSave), "quiet"));
-            }
-            if (saves.Length > 0)
-            {
-                Button allSaves = null;
-                allSaves = Action("All saves (" + saves.Length + ")  +", () =>
-                {
-                    bool open = saved.style.display.value == DisplayStyle.None;
-                    saved.style.display = open ? DisplayStyle.Flex : DisplayStyle.None;
-                    allSaves.text = "All saves (" + saves.Length + ")  " + (open ? "−" : "+");
-                }, "quiet");
-                mastheadActions.Add(allSaves);
-                foreach (CompanySave companySave in saves)
-                {
-                    string file = companySave.FileName;
-                    saved.Add(Action("Resume  /  " + companySave.Title + "  →", () => ResumeCompany(file), "save-row"));
-                }
-            }
-            masthead.Add(mastheadActions); body.Add(masthead); body.Add(saved);
-            body.Add(Text("Your next holding.", "menu-title"));
-            body.Add(Text("Build the institution. Run the company.", "menu-subtitle"));
-            body.Add(Text("Acquire an editable facility. Keep cash in reserve for operations, crews, and improvements.", "menu-intro"));
-            var charter=Element("opening-charter");
-            charter.Add(Text("01 / CHARTER A NEW FACILITY","eyebrow"));
-            charter.Add(Text("Choose your jurisdiction.","contract-title"));
-            charter.Add(Text("City · County · State · Federal. Choose the institution and location, review its operating reserve and rules, then start with a matching editable facility.","contract-description"));
-            charter.Add(Action("Choose facility & difficulty  →",()=>ShowModePicker(AcquireModeCompany),"primary"));body.Add(charter);
-
-            body.Add(Text("Separate saves for every holding. Game time advances only while you play.", "menu-footer")); Layout();
+            ShowHomeMenu();
         }
 
         void AcquireModeCompany(string type,string location)
@@ -726,6 +678,7 @@ namespace Cellblock.Unity
             if (person) showStaff = game.SelectedStaff != null;
             Refresh(true);
         }
+        public void NavigateBack() { if (settingsOpen) CloseSettings(); else if (modePickerOpen) HideModePicker(); else CloseOverlays(); }
         public void CloseOverlays()
         {
             CloseInteractionSheets();
@@ -733,7 +686,7 @@ namespace Cellblock.Unity
             if (game.World != null && menu != null) menu.style.display = DisplayStyle.None;
             cameraOpen = false; Layout();
         }
-        public void ShowMenuError(string message) { var error = Text(message, "error-message"); menu.Add(error); }
+        public void ShowMenuError(string message) { ShowSaveProblem(message); }
 
         public void Refresh(bool force = false)
         {
@@ -847,7 +800,7 @@ namespace Cellblock.Unity
                 if(game.Draft.Walls.Count>0)quoteText.text+="\n\nClick any wall in the 3D plan to add a door. Drag or use arrows to move; pinch/scroll to zoom. Undo restores your previous plan.";
                 quoteCost.EnableInClassList("negative", q != null && !q.Valid); approve.SetEnabled(q != null && q.Valid);
             }
-            RefreshSecurity(world);
+            RefreshSecurity(world); RefreshCommandHud(world);
             Layout();
         }
 

@@ -11,6 +11,8 @@
 
 ## Integration contract for Claude
 
+The later [Home/save/settings/command-shell pass](home-save-and-settings.md) adds the visible main dock, header controls and capacity/stress/risk indicators. Its exact existing-file ownership exception is in COORDINATION.md; the historical file-preservation statement below describes the earlier numbered-meter milestone. Keep these meter hooks in the new shell.
+
 This is additive to the reserved main HUD/catalog work. `GameHud.cs`, `Cellblock.uss`, the personnel/lives/pressure files and save schema are not edited by this pass.
 
 - `Runtime/StatMeter.cs`: reusable `VisualElement`, engine presentation only. `SetScore` receives meaning, actual readout/unit, optional help and threshold overrides. `SetFactor` receives signed points and the shared scale. Number badges are readable even when the fill is narrow or zero. Gradient fills use four UI vertices and retain no textures/material instances.

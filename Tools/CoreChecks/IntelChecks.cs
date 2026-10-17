@@ -259,7 +259,7 @@ static partial class Program
                 foreach (StaffMember s in w.Data.Staff) { s.Position = s.Station = s.Destination = new Point(24, 20); s.NextDutyMinute = int.MaxValue / 2; }
                 if (protect) Check(w.SetProtectiveCustody(b.Id, true, "check"), w.Notice);
                 int before = w.Personnel.Fights + w.Personnel.FightsPrevented;
-                for (int m = 0; m < 600; m++) { b.Position = a.Position + new Point(0.5f, 0); w.CheckFights(); w.Data.Minute++; }
+                for (int m = 0; m < 600; m++) { b.Position = a.Position + new Point(0.5f, 0); w.CheckFights(); w.AdvanceIncidentScenes(); w.Data.Minute++; }
                 return w.Personnel.Fights + w.Personnel.FightsPrevented - before;
             }
             Check(Fights(false) > 0, "Setup: nemeses side by side never fought");

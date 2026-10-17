@@ -309,13 +309,14 @@ namespace Cellblock.Core
     {
         readonly Dictionary<string, int> custodyStill = new Dictionary<string, int>();
 
-        static partial void HydrateJustice(State state) { GameModes.Hydrate(state); JusticeRules.Hydrate(state); PersonnelRules.Hydrate(state); HydrateFacilityStories(state); }
+        static partial void HydrateJustice(State state) { GameModes.Hydrate(state); JusticeRules.Hydrate(state); PersonnelRules.Hydrate(state); HydrateFacilityStories(state); HydrateIncidents(state); }
         partial void ResidentPresence(Resident resident, ref bool present)
         {
             if (resident != null && resident.Legal != null && resident.Legal.Ready && !JusticeRules.Present(resident.Legal)) present = false;
         }
         partial void UpdateResidentCustody(Resident resident, ref bool skip)
         {
+            if (IncidentOwnsResident(resident)) { skip = true; return; }
             LegalProfile legal = resident.Legal;
             if (legal == null || !legal.Ready) return;
             // Justice code moves boarding, escorted, releasing and escaping residents itself. Absent
@@ -335,6 +336,7 @@ namespace Cellblock.Core
             AdvanceCourtVan();
             AdvanceCustodyMovement();
             AdvanceEscape();
+            AdvanceIncidentScenes();
             AdvanceFacilityStories();
             PlanResidentTraffic();
         }
@@ -490,7 +492,7 @@ namespace Cellblock.Core
         public bool StageEscapeDemo()
         {
             JusticeRules.EnsureProfiles(Data);
-            if (Escape.Phase != "None" || Data.Operations.Lockdown) { Notice = "An escape demo needs no active attempt and no lockdown."; return false; }
+            if (Escape.Phase != "None" || IncidentReport.Phase == "Radioing control" || Data.Operations.Lockdown) { Notice = "Finish the active attempt and radio call, then clear alarm and lockdown in Control before running an escape scene."; return false; }
             Resident resident = Data.Residents.Where(r => r.Legal.Ready && r.Legal.Custody == "In facility" && r.Legal.RestrictedUntil <= Data.Minute)
                 .OrderByDescending(r => EscapeRisk(r)).ThenBy(r => r.Id, StringComparer.Ordinal).FirstOrDefault();
             if (resident == null) { Notice = "No resident is available for the escape demo."; return false; }
@@ -965,8 +967,9 @@ namespace Cellblock.Core
         bool StartAttempt(Resident resident)
         {
             Point exit = NearbyClear(JusticeRules.GateInside, Routes);
-            if (Routes.Find(resident.Position, exit) == null) return false;
+            if (Routes.Find(resident.Position, exit) == null) { Notice = resident.Name + " has no clear route to the gate. Restore the route before staging an escape."; return false; }
             Data.Justice.Attempt = new EscapeAttempt { ResidentId = resident.Id, Phase = "Moving", StartMinute = Data.Minute, Exit = exit, LastPosition = resident.Position };
+            Data.Incidents.Report = new EscapeReport { Resident = resident.Id };
             resident.Legal.Custody = "Escaping"; resident.Legal.Attempts++;
             RemoveWorkerPath("justice/escape/" + resident.Id); ResumeRoutine(resident);
             return true;
@@ -981,7 +984,8 @@ namespace Cellblock.Core
             if (resident == null) { Data.Justice.Attempt = new EscapeAttempt(); return; }
             // A watch officer who favors the resident's gang looks the other way.
             List<StaffMember> officers = ResponseOfficers().Where(s => !Compromised(s, resident)).ToList();
-            StaffMember close = OfficerWithSight(officers, resident.Position, 1.8f);
+            StaffMember close = attempt.Detected && Data.Minute - attempt.DetectedMinute >= 5
+                ? OfficerWithSight(officers.Where(CanInterceptEscape).ToList(), resident.Position, 1.8f) : null;
             if (close != null) { Credit(close, true); EndAttempt(resident, "intercepted", close.Name + " stopped " + resident.Name + " in person.", close); return; }
             bool held = attempt.Phase == "Held at gate";
             if (held && Data.Operations.GateOpen) { EndAttempt(resident, "escaped", ""); return; }
@@ -1035,6 +1039,7 @@ namespace Cellblock.Core
         void Detect(Resident resident, EscapeAttempt attempt, string by, int officers, bool camera)
         {
             attempt.DetectedMinute = Data.Minute; attempt.DetectedBy = camera ? "CCTV" : by;
+            NotifyEscapeSighting(resident);
             string text = "ESCAPE ATTEMPT · " + resident.Name + " was spotted by " + (camera ? "CCTV" : by) + " heading for the vehicle gate. " +
                 (officers == 0 ? "No officer is on shift to respond: close the vehicle gate." : "Raise the alarm to speed the response and close the vehicle gate to block the exit.");
             RecordLegal(resident, "escape", text, 4); Notice = text;
@@ -1049,6 +1054,7 @@ namespace Cellblock.Core
             EscapeAttempt attempt = Escape; LegalProfile legal = resident.Legal; bool detected = attempt.Detected;
             RemoveWorkerPath("justice/escape/" + resident.Id);
             Data.Justice.Attempt = new EscapeAttempt();
+            EscapeSceneOutcome(resident, outcome == "intercepted" ? "Intercepted in person" : outcome == "escaped" ? "Escaped through the vehicle gate" : "Attempt abandoned");
             if (outcome == "escaped")
             {
                 legal.Custody = "At large"; legal.CloseSupervision = false; resident.Position = resident.Home;

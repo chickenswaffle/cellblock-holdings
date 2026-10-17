@@ -12,9 +12,11 @@ static partial class Program
     static partial void RunSecurityChecks();
     static partial void RunFacilityStoryChecks();
     static int passed, failed;
+    static readonly string selectedChecks = Environment.GetEnvironmentVariable("CELLBLOCK_CHECK_FILTER") ?? "";
     static void Check(bool condition, string message) { if (!condition) throw new Exception(message); }
     static void Test(string name, Action test)
     {
+        if (selectedChecks != "" && name.IndexOf(selectedChecks, StringComparison.OrdinalIgnoreCase) < 0) return;
         try { test(); passed++; Console.WriteLine("PASS " + name); }
         catch (Exception e) { failed++; Console.Error.WriteLine("FAIL " + name + ": " + e.Message); }
     }
@@ -525,7 +527,8 @@ static partial class Program
             resumed.AdvanceMinutes(1);
             Check(resumed.Data.Crews[0].WorkPhase == "Carrying" && resumed.Data.Crews[0].SupplyLoadMinutes == 3, "Loading discarded a delivered supply batch after handover");
         });
-        RunJusticeChecks(); RunIntegrationChecks(); RunLivesChecks(); RunSecurityChecks(); RunFacilityStoryChecks(); RunModeStartChecks();RunDirectDoorChecks();RunMealFlowChecks();RunMovementMemoryChecks();
+        RunJusticeChecks(); RunIntegrationChecks(); RunLivesChecks(); RunSecurityChecks(); RunFacilityStoryChecks(); RunIncidentChecks(); RunModeStartChecks();RunDirectDoorChecks();RunMealFlowChecks();RunMovementMemoryChecks();
+        if (selectedChecks != "") Console.WriteLine("Filtered checks: " + selectedChecks);
         Console.WriteLine("\n" + passed + " passed, " + failed + " failed. These checks exercise the C# core; they do not run Unity.");
         Environment.ExitCode = failed == 0 ? 0 : 1;
     }

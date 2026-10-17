@@ -47,6 +47,22 @@ static partial class Program
             Check(w.Data.Fixtures.Any(f => f.Kind == "Bed" && Geometry.Distance(owner.Home, Geometry.AccessPoint(f)) < 0.1f) && Geometry.Distance(owner.Home, Geometry.AccessPoint(bed)) > 0.1f, "The owner did not follow their bed");
             new World(RoundTrip(w.Data));
         });
+        Test("handover clears a resident from a fixture interior, not only its edges", () => {
+            World w = World.StartMode("county-intake", GameModes.Tier("county").Locations[0]); Hold(w);
+            Check(w.HireCrew(), w.Notice);
+            Fixture bed = w.Data.Fixtures.First(f => f.Kind == "Bed");
+            Point target = w.FitFurnishing("Bed", bed.Rotation, bed.Position + new Point(0, -0.25f), bed.Id);
+            Check(w.Approve(MoveOf(bed, target)), w.Notice);
+            Resident r = w.Data.Residents[0]; Project job = w.Data.Projects.Last();
+            w.Data.Speed = 4;
+            for (int minute = 0; minute < 6000 && !job.Completed; minute++)
+            {
+                r.Position = target; r.NextDecisionMinute = int.MaxValue / 2;
+                w.AdvanceMinutes(1);
+            }
+            Check(job.Completed, "The bed move did not reach handover: " + job.Status);
+            Check(PeopleDynamics.ClearStaffStation(r.Position, w.Routes, w.Data.Fixtures), "Handover left a resident inside the new bed footprint");
+        });
         Test("furniture dropped against a wall settles flush beside it and the plan is accepted", () => {
             World w = World.StartMode("county-intake", GameModes.Tier("county").Locations[0]);
             Fixture bed = w.Data.Fixtures.First(f => f.Kind == "Bed");

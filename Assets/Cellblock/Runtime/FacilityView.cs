@@ -948,12 +948,14 @@ namespace Cellblock.Unity
                 actor.Marker.gameObject.SetActive(id == selectedResidentId);
                 UpdateCharacterNameTag(actor,resident.Name,id==selectedResidentId);
                 PrepareResidentPose(actor, resident, world);
+                if (world.IncidentOwnsResident(resident) || (world.Escape.Phase != "None" && world.Escape.ResidentId == resident.Id)) actor.PoseArms = true;
                 MoveActor(actor, resident, world, force || created);
                 AnimateResidentLife(actor, resident, world);
             }
             RefreshWorkers(world, force);
             RefreshOperations(world, force);
             RefreshJustice(world, force);
+            RefreshIncidentVisuals(world);
             foreach (Actor actor in actors.Values) if (!actor.Seen) actor.Root.gameObject.SetActive(false);
             RetireDepartedActors(world);
         }
@@ -1076,6 +1078,7 @@ namespace Cellblock.Unity
             // Include baked scenery and resident parts so leaving Play does not leak generated meshes.
             foreach (MeshFilter filter in GetComponentsInChildren<MeshFilter>(true))
                 if (filter.sharedMesh != null && filter.sharedMesh.name.StartsWith("Generated ")) Destroy(filter.sharedMesh);
+            if (radioClick != null) Destroy(radioClick);
             foreach (Material material in materials.Values) Destroy(material);
             foreach (Texture2D texture in textures.Values) Destroy(texture);
             foreach(Mesh mesh in bevels.Values)Destroy(mesh);

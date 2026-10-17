@@ -49,7 +49,7 @@ namespace Cellblock.Core
             if(staff!=null){position=staff.Position;return true;}
             Crew crew=Data.Crews.FirstOrDefault(c=>c.Id==key||c.Id+"/helper"==key);
             if(crew!=null){position=key==crew.Id?crew.Position:crew.HelperPosition;return true;}
-            foreach(string prefix in new[]{"intake/","capital/","justice/board/","justice/escort/","justice/release/","justice/escape/"})
+            foreach(string prefix in new[]{"intake/","capital/","justice/board/","justice/escort/","justice/release/","justice/escape/","incident/fight/"})
             {
                 if(!key.StartsWith(prefix,StringComparison.Ordinal))continue;
                 Resident resident=Data.Residents.FirstOrDefault(r=>r.Id==key.Substring(prefix.Length));

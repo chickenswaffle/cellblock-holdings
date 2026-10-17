@@ -50,7 +50,7 @@ namespace Cellblock.Unity
                 // Deterministic demonstration for review builds; the same state machine as normal play.
                 var demo = Element("wrap-row"); demo.AddToClassList("custody-demo");
                 demo.Add(Action("Demo · court run", () => { if (game.World != null) game.World.StageCourtDemo(); Refresh(true); }, "quiet"));
-                demo.Add(Action("Demo · escape", () => { if (game.World != null) game.World.StageEscapeDemo(); Refresh(true); }, "quiet"));
+                demo.Add(Action("Run escape scene · 1×", () => { game.RunIncidentDemo(true); Refresh(true); }, "quiet"));
                 custodyPanel.Add(demo);
             }
             peoplePane.Insert(peoplePane.IndexOf(peopleSummary) + 1, custodyPanel);

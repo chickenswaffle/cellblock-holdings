@@ -161,7 +161,7 @@ static partial class Program
         Test("good-time credit, release at court and fights scale with the facility type on an identical population", () => {
             // The same company under two facility types of one tier and location; only the type's rules differ.
             World Swap(World source, string typeId) { State copy = RoundTrip(source.Data); copy.Mode.TypeId = typeId; return new World(copy); }
-            World baseWorld = WithWarden(85); State shaped = RoundTrip(baseWorld.Data); shaped.Mode.LocationId = "lakewood"; baseWorld = new World(shaped);
+            World baseWorld = WithWarden(85); baseWorld.Data.Justice.NextAttemptMinute = int.MaxValue / 2; State shaped = RoundTrip(baseWorld.Data); shaped.Mode.LocationId = "lakewood"; baseWorld = new World(shaped);
             int Credit(World world, string id)
             {
                 Resident r = world.Data.Residents.First(x => x.Id == id); r.ReentryMinutes = 200;

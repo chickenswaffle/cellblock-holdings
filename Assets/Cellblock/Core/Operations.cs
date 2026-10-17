@@ -426,7 +426,8 @@ namespace Cellblock.Core
                     staff.PostArrivedMinute = -1;
                     Walk(staff.Id, ref staff.Position, staff.Station, 0.34f); staff.Duty = "Off shift / rest"; continue;
                 }
-                bool responding = staff.Role == "Officer" && !IsWarden(staff) && staff.SecurityRole != "Tower" && Escape.Detected && !Compromised(staff,Escapee) && Escape.Phase != "None";
+                if (TryIncidentStaffTask(staff)) continue;
+                bool responding = CanPursueEscape(staff);
                 Point capitalGoal=staff.Station;bool capitalEscort=!responding&&CapitalEscortTarget(staff,out capitalGoal);
                 Point secureGoal=staff.Station;bool secureEscort=!responding&&!capitalEscort&&SecureEscortTarget(staff,out secureGoal);
                 Resident escapee = responding ? Data.Residents.FirstOrDefault(r => r.Id == Escape.ResidentId) : null;

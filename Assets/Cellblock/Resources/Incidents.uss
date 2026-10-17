@@ -1,0 +1,13 @@
+.incident-card { position: absolute; padding: 14px 16px; background-color: rgba(12, 25, 33, .98); border-width: 1px; border-color: rgb(85, 107, 112); border-left-width: 4px; border-left-color: rgb(220, 112, 77); border-top-color: rgb(201, 174, 116); border-radius: 7px; }
+.incident-kicker { font-size: 9px; letter-spacing: 1.6px; color: rgb(230, 171, 118); white-space: normal; margin-bottom: 6px; }
+.incident-title { font-size: 19px; color: rgb(245, 230, 201); -unity-font-style: bold; white-space: normal; margin-bottom: 7px; }
+.incident-detail { font-size: 12px; color: rgb(191, 211, 208); white-space: normal; margin-bottom: 8px; }
+.incident-actions { flex-direction: row; margin-top: 8px; flex-shrink: 0; }
+.incident-actions Button { flex-grow: 1; flex-basis: 0; min-width: 44px; min-height: 44px; margin-right: 5px; font-size: 11px; white-space: normal; }
+.incident-card .stat-meter-track { height: 22px; }
+.incident-card .stat-meter-title { font-size: 10px; }
+.incident-card .stat-meter-direction { display: none; }
+.home-compact .incident-card { padding: 9px 11px; }
+.home-compact .incident-title { font-size: 16px; margin-bottom: 4px; }
+.home-compact .incident-detail { font-size: 11px; margin-bottom: 4px; }
+.home-compact .incident-actions { margin-top: 4px; }

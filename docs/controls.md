@@ -23,7 +23,7 @@ In the Unity editor, click inside the **Game** view before using keyboard contro
 - Drag with one finger in Select / Inspect to move the view.
 - Use two fingers in any tool to move, spread to zoom in, pinch closed to zoom out, and twist to orbit. A gesture starting over UI belongs to that panel.
 - Open **Camera** for tilt, pan arrows, precise zoom steps, 3D / plan, and full-height / cutaway walls.
-- Use **Controls** to reopen the guide. Time is held while the guide is open.
+- Use **Guide** beside the command dock to reopen the guide. On narrow screens use **Settings → Controls** for the camera reference. Time is held while these menus are open.
 
 The compact interface keeps side panels closed until needed. Close a panel to give the facility more space. Phone layout captures are development checks; touch feel, safe areas, and performance still need a run on the actual device.
 
@@ -36,7 +36,7 @@ The compact interface keeps side panels closed until needed. Close a panel to gi
 5. Check the dimensions and project quote, then approve or discard. Teal is an unapproved plan; ochre is approved construction. Space becomes operational at handover.
 6. Start the clock to let hired crews work. Open **Company** to follow cash, unpaid earnings, recurring costs, and the ledger.
 
-Every company uses a separate save. Closing, suspending, or unfocusing the game holds simulation time; returning does not apply elapsed real time.
+Every holding uses a separate save. Home has a prominent **Continue** card and a sorted **Save Library**. Autosave defaults to 30 seconds; change it in **Settings → General**. The header shows saved time or **Retry save**. Closing, suspending, or unfocusing the game holds simulation time; returning does not apply elapsed real time. **Settings → Display** changes interface size, frame cap, shadows and reduced motion; **Controls** changes keyboard/orbit speed and easing; **Audio** controls volume.
 
 ## Meet the residents
 
@@ -59,7 +59,7 @@ The initial social model includes a friendship, a nemesis, and an officer with e
 
 - **Z** rotates a new furnishing or prefab 90°. The visible **Rotate 90°** button remains available for touch.
 - A single furnishing quote offers **Approve & place another** to retain its type/rotation; every new location is still reviewed and charged once.
-- Quotes fold the inspector to leave more of the facility visible. **Add connecting door** temporarily returns you to the world: tap the existing shared wall and review the unit plus connection together.
+- Quotes fold the inspector to leave more of the facility visible. In a prefab quote, **click directly on a proposed or existing wall** where the door should go. The quote updates; **Undo last door** or Command/Ctrl+Z restores it. See [direct door controls](direct-doors.md).
 - **Build → Services** contains electrical panels, ventilation/AC and control terminals. **Security** adds lights, barriers, dog kennels, towers and an armory.
 - Select installed equipment for its current status and upgrade quote. For a tower/kennel/armory, cycle the officer selector and assign the post. An armory needs an upgrade before armed duty. Training and added daily wages are shown before assignment.
 - **Control** includes grid demand/capacity and electricity isolation. Equipment shows why it is unavailable. Power, staff shifts, actual presence and maintenance matter.

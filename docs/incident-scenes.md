@@ -1,0 +1,25 @@
+# Physical fight and escape scenes
+
+## Player flow
+
+In the review/debug build, People has **Run fight scene ·1×** and **Run escape scene ·1×**. These are live demonstrations in the current holding: the button explicitly starts normal speed and frames the action. They use the normal simulation. An unapproved construction plan must be finished or discarded first. The core staging API itself never advances time; a paused scene stays paused.
+
+The live incident card shows the actual phase, participants, response and control status. **Watch action / Release camera** toggles close, side-facing framing; dragging, pinch/scroll, arrows/WASD, Q/E/R/F or Home returns camera control. Clicking the incident card itself keeps the camera following. **Pause / Resume1×** is explicit. Manual **Raise alarm** is immediate; once alarm is active the button opens **Control panel** for gate/lockdown decisions. Natural incidents offer the same card without taking camera control automatically.
+
+Fight flow: **Converging → Tension → Scuffle or Separating → Resolved**. The pair physically walk to separate nearby meeting places; no demo teleport. Travel cannot consume the encounter's tension/scuffle time. They face and gesture, then exchange non-graphic defensive/punch poses when the scuffle phase actually begins. A free officer walks to a clear point with sight on the pair, visibly separates them, and completes intervention. Consequences are booked once at resolution. A pre-empted confrontation and an actual scuffle have different records. No available response has a real injury/discipline outcome; it is not shown as a successful intervention.
+
+Escape flow: **Movement → Detection → Observer’s radio call → Control broadcast → Pursuit → In-person interception, abandonment or escape**. Guard/camera detection uses real sight and coverage. A radio call lasts 12 game minutes (about 2.4 seconds at 1×), with an actual arm/handheld-radio pose and audio acknowledgement. Only its completion invokes the existing alarm/gate/lockdown controls. Detection alone never locks down. A CCTV observer must be on shift and at the monitoring desk. Fixed security and active custody escorts keep their duties; a stationary gate/CCTV officer can transmit in place. Free officers physically route to the escapee after seeing it themselves or receiving the broadcast/manual alarm. Physical distance and clear sight are required for capture, after a short response window; a timer cannot intercept anyone.
+
+A call already in progress can complete after a capture to request a headcount and containment. If no call began before the attempt ended, it cannot invent a report later. Missing actors and mismatched/stale reports cancel safely. Intercepted and at-large outcomes are distinct. Controls remain restricted until the player reviews them in Control; clearing the alarm does not automatically open the gate or lift lockdown.
+
+## Code contract
+
+`Core/IncidentScenes.cs` adds one bounded fight and one escape report to State. Fields, identity, phase timestamps, roles and route ownership persist; clock advancement is explicit. Hydration supports old holdings, rejects invalid active phases/times, cancels removed actors and validates saved radio reports. New movement keys use `incident/fight/` and the shared saved-route cursors. No simulation depends on Unity rendering or animation time.
+
+Existing integration is deliberately narrow: Justice hydrates/ticks scenes and records escape sightings/outcomes; Personnel splits encounter start from once-only resolution, guards personnel destinations, and stages the fight; Operations delegates real incident duties before ordinary work. Existing security roles, capital escorts and already-active secure escorts retain ownership. Intake-assigned people are excluded from incident selection. A fight responder’s goal must be clear, reachable and on the pair’s side of a wall. One active fight limits memory and duplicate consequences; the next scenario waits for resolution.
+
+Runtime partials own the incident card, optional camera and poses. Animation follows phase and real movement; it never determines injury, capture, routing or lockdown. Pausing freezes game-clock phases and gesture clocks. The ring is a location indicator. Radio sound obeys global volume, and generated clips/meshes are cleaned up with the view.
+
+## Review
+
+`incidents` in Temp/CellblockPresentation.request requests the sole Unity runner’s disposable 16-frame check. It covers actual buttons, framing, paused staging, converge/tension/scuffle, a physically arriving guard, Unity JSON mid-scuffle/intervention/radio/chase, visible radio before coordinated restrictions, chase/capture, phone bounds and an undefended escape. It never uses actual player holdings as fixtures. Core checks include pause/duplicates/no teleport, once-only resolution, movement/sight, radio timing, pause/reload, security ownership and malformed saves. Final counts and evidence live in implementation-status.md; no actual-device or sustained-performance claim is made.
