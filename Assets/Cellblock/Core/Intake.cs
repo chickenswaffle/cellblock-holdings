@@ -100,7 +100,19 @@ namespace Cellblock.Core
                 foreach (Resident r in state.Residents) if (r != null) r.Intake = Legacy(r);
             }
             foreach (Resident r in state.Residents) if (r != null && r.Intake == null) r.Intake = Legacy(r);
+            PruneDeparted(state);
             Validate(state);
+        }
+        // Feuds and separation orders naming people who have left are dropped, so the bounded lists keep room.
+        public static void PruneDeparted(State state)
+        {
+            var ids = new HashSet<string>(state.Residents.Where(r => r != null).Select(r => r.Id));
+            foreach (Resident r in state.Residents)
+                if (r != null && r.Intake != null)
+                {
+                    if (r.Intake.Enemies != null) r.Intake.Enemies.RemoveAll(id => !ids.Contains(id));
+                    if (r.Intake.KeepSeparate != null) r.Intake.KeepSeparate.RemoveAll(id => !ids.Contains(id));
+                }
         }
         static IntakeRecord Legacy(Resident r) { return new IntakeRecord { Level = "Basic", Processed = true, Identified = true, Searched = true, KnownGang = "Unknown", CompletedMinute = 0 }; }
         static ArgumentException Invalid(string what) { return new ArgumentException("Invalid intake state: " + what + "."); }
@@ -294,6 +306,7 @@ namespace Cellblock.Core
                 }
             }
             if (Data.Minute % 30 == 15) IntakeAftercare();
+            if (Data.Minute % 1440 == 45) IntakeRules.PruneDeparted(Data);
         }
         void NextIntakeStage(IntakeCase c, Resident resident)
         {

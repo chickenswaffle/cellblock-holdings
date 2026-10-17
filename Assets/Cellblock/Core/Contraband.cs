@@ -85,6 +85,12 @@ namespace Cellblock.Core
                 state.Contraband = new ContrabandState { Version = Version };
                 foreach (Resident r in state.Residents) if (r != null) { r.Dependency = 0; r.HighUntil = -1; r.DrunkUntil = -1; r.LastCustody = ""; }
             }
+            // Items held by someone who has since left the roster (released) leave with them.
+            if (state.Contraband.Items != null)
+            {
+                var ids = new HashSet<string>(state.Residents.Where(r => r != null).Select(r => r.Id));
+                state.Contraband.Items.RemoveAll(i => i != null && i.Place != "Dropped" && !ids.Contains(i.HolderId));
+            }
             Validate(state);
         }
         static ArgumentException Invalid(string what) { return new ArgumentException("Invalid contraband state: " + what + "."); }
@@ -150,6 +156,8 @@ namespace Cellblock.Core
         {
             if (Data.Mode == null || !Data.Mode.Applied) return;
             ContrabandState c = Contraband;
+            // Released people take what they were holding with them.
+            if (c.Items.Count > 0) c.Items.RemoveAll(i => i.Place != "Dropped" && Find(i.HolderId) == null);
             TrackCourtReturns();
             AdvanceDrones();
             PickUpDrops();

@@ -588,6 +588,21 @@ static partial class Program
             world.AdvanceMinutes(12 * 60);
             Check(world.Data.Contraband.Items.Count(i => i.Kind == "Phone") < 4, "Managed access did not locate any phone");
         });
+        Test("a released resident's contraband and feuds leave with them; older saves with orphans still load", () => {
+            World world = County(); Hold(world); world.EnsureLegalProfiles();
+            Resident leaving = world.Data.Residents[0], stays = world.Data.Residents[1];
+            world.Data.Contraband.Items.Add(new ContrabandItem { Id = "left-1", Kind = "Cash", Source = "Visit", HolderId = leaving.Id, Place = "Held", Position = leaving.Home });
+            stays.Intake.Enemies.Add(leaving.Id); stays.Intake.KeepSeparate.Add(leaving.Id);
+            State orphaned = RoundTrip(world.Data);
+            orphaned.Residents.RemoveAt(0); foreach (Resident r in orphaned.Residents) r.Relationships.RemoveAll(x => x.OtherId == leaving.Id);
+            World loaded = new World(orphaned);
+            Check(!loaded.Data.Contraband.Items.Any(i => i.Id == "left-1") && loaded.Data.Residents[0].Intake.KeepSeparate.Count == 0 && loaded.Data.Residents[0].Intake.Enemies.Count == 0,
+                "An orphaned item or separation order survived load");
+            world.Data.Residents.Remove(leaving); foreach (Resident r in world.Data.Residents) r.Relationships.RemoveAll(x => x.OtherId == leaving.Id);
+            world.AdvanceMinutes(1);
+            Check(!world.Data.Contraband.Items.Any(i => i.Id == "left-1"), "A released resident's item stayed inside");
+            new World(RoundTrip(world.Data));
+        });
         Test("contraband saves round-trip and malformed items are rejected", () => {
             World world = County(); Hold(world); world.EnsureLegalProfiles();
             world.Data.Contraband.Items.Add(new ContrabandItem { Id = "rt-1", Kind = "Cash", Source = "Visit", HolderId = world.Data.Residents[0].Id, Place = "Held", Position = world.Data.Residents[0].Home });
@@ -601,7 +616,7 @@ static partial class Program
                 Check(rejected, message);
             }
             Rejects(s => s.Contraband.Items[0].Kind = "Plutonium", "An unknown contraband kind loaded");
-            Rejects(s => s.Contraband.Items[0].HolderId = "nobody", "Contraband held by nobody loaded");
+            Rejects(s => s.Contraband.Items[0].Place = "Floating", "Contraband in an unknown place loaded");
             Rejects(s => s.Contraband.Drones[0].Phase = "Teleporting", "An unknown drone phase loaded");
             Rejects(s => s.Population.Policy = "Accept everyone forever", "An unknown transfer policy loaded");
             Rejects(s => s.Population.Bus.Phase = "Flying", "An unknown bus phase loaded");
