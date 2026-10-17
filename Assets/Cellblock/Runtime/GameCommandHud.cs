@@ -55,6 +55,7 @@ namespace Cellblock.Unity
             commandSaveStamp.tooltip = game.SaveProblem == "" ? "Autosave every " + game.Preferences.AutosaveSeconds + " seconds. Last saved " + (game.LastSavedUtc == default(System.DateTime) ? "—" : game.LastSavedUtc.ToLocalTime().ToString("HH:mm:ss")) : game.SaveProblem;
             commandSaveButton.text = game.SaveProblem != "" ? "Retry save" : "Save";
             commandSaveButton.EnableInClassList("danger", game.SaveProblem != "");
+            RefreshIncidentHud(world);
         }
         static float CapacityScore(int present, int beds) { return beds <= 0 ? present > 0 ? 101 : 0 : 100f * present / beds; }
         void LayoutCommandHud(float left, float right, float top, float bottom, bool menuOpen)
@@ -86,6 +87,7 @@ namespace Cellblock.Unity
             WorldViewCenter = new Vector2((worldLeft + Mathf.Max(0, worldRight - worldLeft) * .5f) / width,
                 (bottom + 80 + Mathf.Max(0, height - top - bottom - 168) * .5f) / height);
             LayoutPressure(left, right, top + 88, menuOpen);
+            LayoutIncidentHud(left, right, top, menuOpen || InteractionModalOpen || guideOpen);
         }
         sealed class CommandIcon : VisualElement
         {

@@ -15,7 +15,7 @@ namespace Cellblock.Unity
         void BuildFrontend()
         {
             root.styleSheets.Add(Resources.Load<StyleSheet>("Frontend")); root.AddToClassList("frontend-theme");
-            BuildSettings(); BuildCommandOverview();
+            BuildSettings(); BuildCommandOverview(); BuildIncidentHud();
             frontendAlert = Panel("frontend-alert"); frontendAlert.style.display = DisplayStyle.None;
             frontendAlertText = Text("", "frontend-alert-text"); frontendAlert.Add(frontendAlertText);
             frontendAlert.Add(Action("Dismiss", () => { frontendError = ""; frontendAlert.style.display = DisplayStyle.None; }, "quiet"));

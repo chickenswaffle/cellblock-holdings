@@ -66,7 +66,8 @@ static partial class Program
             Check(s != null && s.OtherId == snitch.Id, "No chance to confront the snitch");
             snitch.Position = p.Position + new Point(0.5f, 0); p.LastFightMinute = snitch.LastFightMinute = -100000;
             int incidents = v.Personnel.Fights + v.Personnel.FightsPrevented;
-            Check(v.ChooseCard(s.Id, 0) && v.Personnel.Fights + v.Personnel.FightsPrevented == incidents + 1, "Confronting did not start a confrontation: " + v.Notice);
+            Check(v.ChooseCard(s.Id, 0) && v.Fight.Active && v.Personnel.Fights + v.Personnel.FightsPrevented == incidents, "Confronting did not queue a scene without instant consequences: " + v.Notice);
+            Check(new[] { v.Fight.A, v.Fight.B }.Contains(p.Id) && new[] { v.Fight.A, v.Fight.B }.Contains(snitch.Id), "The confrontation selected the wrong pair");
             World x = IntelWorld(); Resident q = x.Data.Residents[0]; q.Safety = 25; x.TakeRole(q.Id);
             x.AdvanceMinutes(31);
             RoleCard prot = CardOf(x, "protection");

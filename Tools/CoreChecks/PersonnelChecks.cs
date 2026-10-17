@@ -213,12 +213,14 @@ static partial class Program
             Check(a1.Health < 92 && b1.Health < 92 && new[] { a1, b1 }.All(r => open.Personnel.WriteUps.Any(w => w.SubjectId == r.Id && w.Category == "Fighting" && w.Severity == 2)),
                 "The fight did not injure both or write both up");
             var (guarded, a2, b2) = Setup(); HoldOfficersFar(guarded); StaffMember guard2 = OnShiftOfficer(guarded);
-            Check(Run(guarded, a2, b2, () => a2.LastFightMinute >= 0, guard2), "Nothing happened with an officer present");
+            Check(Run(guarded, a2, b2, () => guarded.Personnel.FightsPrevented > 0, guard2), "Nothing happened with an officer present");
             Check(new[] { a2, b2 }.All(r => !guarded.Personnel.WriteUps.Any(w => w.SubjectId == r.Id && w.Category == "Fighting") &&
                     guarded.Personnel.WriteUps.Any(w => w.SubjectId == r.Id && w.Category == "Threatening behavior" && w.Severity == 1)) &&
                 a2.Health >= 92 - 0.01f && FileOf(guarded, guard2).FightsStopped >= 1, "An officer at arm's length did not defuse the fight");
             World demo = County(); HoldOfficersFar(demo); demo.EnsureLegalProfiles();
-            Check(demo.StageFightDemo() && demo.Personnel.Fights == 1 && demo.Personnel.WriteUps.Count(w => w.Category == "Fighting") == 2, "The fight demo did not stage one fight");
+            Check(demo.StageFightDemo() && demo.Fight.Active && demo.Personnel.Fights == 0, "The fight scene did not queue without instant consequences");
+            RunUntil(demo, () => !demo.Fight.Active, 300, "The staged fight resolving");
+            Check(demo.Personnel.Fights == 1 && demo.Personnel.WriteUps.Count(w => w.Category == "Fighting") == 2, "The staged fight did not resolve once");
         });
         Test("the warden's office reviews write-ups, refers them to court and earns or loses credibility", () => {
             World world = WithWarden(85);
@@ -402,7 +404,8 @@ static partial class Program
                 flood.Data.Personnel.WriteUps.Add(new WriteUp { Id = "f" + i, SubjectId = subject, Category = "Fighting", Severity = i == 7 ? 1 : 3, Text = "x", Minute = flood.Data.Minute });
             flood.Data.Personnel.WriteUps.Add(new WriteUp { Id = "newest", SubjectId = subject, Category = "Fighting", Severity = 3, Text = "x", Minute = flood.Data.Minute });
             int lapsed = flood.Personnel.LapsedWriteUps;
-            flood.StageFightDemo();
+            Check(flood.StageFightDemo(), flood.Notice);
+            RunUntil(flood, () => !flood.Fight.Active, 300, "The overflow confrontation resolving");
             Check(flood.Personnel.WriteUps.Count <= PersonnelRules.WriteUpLimit && !flood.Personnel.WriteUps.Any(w => w.Id == "f7") && flood.Personnel.WriteUps.Any(w => w.Id == "f0"), "Overflow did not drop the least serious write-up first");
             Check(flood.Personnel.LapsedWriteUps > lapsed, "Dropped open write-ups were not counted as lapsed");
         });

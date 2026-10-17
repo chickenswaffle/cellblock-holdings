@@ -2,6 +2,12 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
+## October 17 physical incidents and visible guard response
+
+The latest [incident scenes](incident-scenes.md) build on the Home/save/HUD milestone and Claude's published fixes through `1a9aa5b` (merge `9f55fd9`). **305 core checks pass, 0 failures.** The final focused Unity review passed **16 actual Game-view captures, errors empty**, including physically converging residents, distinct articulated scuffle poses, a real guard approach and separation, a visible12-minute radio call before alarm/gate/lockdown, pursuit, physical interception, an undefended escape and saved mid-scene states. The incident card reports the current control flags after manual stand-down. Desktop and900×420 phone-layout bounds passed. The independent critic reviewed source and actual corrected images; no blocking findings remain.
+
+Evidence: [core transcript](reviews/2026-10-17-incidents-core.txt), [incident Unity report](reviews/2026-10-17-incidents-unity.json), full local frames `Builds/IncidentReview/2026-10-17/final/`. The earlier wide-camera/stacked-actor captures are superseded and are not added to these totals. Final Home/save/placement, numbered-meter/navigation and construction/presentation regressions are running on the same source before publication. These are editor reviews; native device touch, stripped builds and sustained performance remain unmeasured.
+
 ## October 17 Home, safe Continue, settings and command HUD
 
 Source milestone **`3fc7417`** integrates Claude's published economy/informants/kitchen/counsel/role snapshot `9c88d9e` (merge `243441f`). The combined snapshot through Claude `1a9aa5b` now passes **294 checks / 0 failures**; Codex also corrected fixture-interior clearance at construction handover. The new [Home and save flow](home-save-and-settings.md) has original imported night-campus artwork, a prominent Continue card, a separate sorted save library, visible configurable autosave, backup recovery and persistent failure/retry feedback. Global settings group save frequency, interface size, frame cap, shadows, reduced motion, camera controls and audio. The bottom icon dock, header actions and always-visible capacity/stress/risk bars make the main HUD visibly different.
@@ -76,7 +82,7 @@ The actual Unity security/services review passed nine Game-view captures with no
 | Installed Unity | 6000.3.24f1, Intel macOS | Actual local installation, not a cloud editor claim |
 | Editor import/API compilation | Successful | URP 17.3 bundled packages resolved by the installed editor; generated scene, retained material/shader, UI theme, and render assets |
 | Project setup | `CELLBLOCK_PROJECT_VALIDATION_PASSED` | Actual editor validation; fixed the clean untitled startup-scene failure that previously aborted batch mode |
-| .NET core checks | 294 passed, 0 failed | Geometry/construction/accounting, people/migration/conduct, arrivals/carpools, gate/work travel, carrying/resume, bay reservation, alarm, CCTV, reports, and 72 prefab/package/rotation quotes |
+| .NET core checks | 305 passed, 0 failed | Geometry/construction/accounting, people/migration/conduct, arrivals/carpools, gate/work travel, carrying/resume, bay reservation, alarm, CCTV, reports, 72 prefab/package/rotation quotes and saved physical incident scenes |
 | Security/services Play review | Passed; 17 final actual captures, no runtime errors | Connected building, physical staffing, directed searchlights, narrow walls/openings, Unity JSON, power loss, phone controls and actor lifetimes; `Builds/SecurityReview/2026-10-17/night-watch-final/` |
 | Unity Play review | Passed; 16 actual Game-view captures; no runtime errors | Desktop/900×420 layout, contracts, catalog, profiles and named ties, live routines, connected wing quote, camera/full-height views, all furnishing models, and Unity JSON social-state round trip |
 | Operations Play review | Passed; 12 actual captures; no runtime errors | Native magnify initialization/direction, shared arrival queues and marked-bay parking, physical supply carry, articulated saw/hammer/drill, staged housing and capacity handover, CCTV, night alarm/lights, reports, and phone Control |

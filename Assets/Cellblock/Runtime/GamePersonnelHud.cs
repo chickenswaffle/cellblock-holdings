@@ -48,7 +48,7 @@ namespace Cellblock.Unity
             if (Application.isEditor || Debug.isDebugBuild)
             {
                 var demo = Element("wrap-row"); demo.AddToClassList("custody-demo");
-                demo.Add(Action("Demo · fight", () => { if (game.World != null) game.World.StageFightDemo(); Refresh(true); }, "quiet"));
+                demo.Add(Action("Run fight scene · 1×", () => { game.RunIncidentDemo(false); Refresh(true); }, "quiet"));
                 staffPanel.Add(demo);
             }
             peoplePane.Insert(peoplePane.IndexOf(custodyPanel) + 1, staffPanel);

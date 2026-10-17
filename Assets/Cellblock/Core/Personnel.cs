@@ -917,7 +917,7 @@ namespace Cellblock.Core
                 if (IsSuspended(staff)) { Direct(staff, staff.Station, "Suspended"); staff.Duty = "Suspended"; continue; }
                 // One owner per destination: security posts (tower, K9, armed) and a detected-escape response
                 // belong to the security and justice systems; personnel duties resume when they end.
-                if (staff.SecurityRole != "" || (staff.Role == "Officer" && Escape.Detected && Escape.Phase != "None")) continue;
+                if (staff.SecurityRole != "" || IncidentOwnsStaff(staff)) continue;
                 // A disturbance pulls every line officer; then intake lanes and detected contraband drops.
                 if (staff.Role == "Officer" && file.Post == "" && RiotActive) { Direct(staff, Population.Riot.Center + new Point(file.RankLevel % 2 == 0 ? 1.6f : -1.6f, 1.2f), "Riot response"); continue; }
                 if (file.Post != "Warden" && DirectIntakeStaff(staff)) continue;
@@ -930,7 +930,7 @@ namespace Cellblock.Core
                     staff.Pressure = Geometry.Clamp(staff.Pressure + (lead.Integrity >= 60 ? -0.003f : lead.Integrity < 45 ? 0.002f : 0), 0, 100);
                 }
                 Point capitalGoal;if(CapitalEscortTarget(staff,out capitalGoal)||SecureEscortTarget(staff,out capitalGoal))continue;
-                if (staff.SecurityRole != "" || (Escape.Detected && staff.Role=="Officer" && !IsWarden(staff))) continue;
+                if (staff.SecurityRole != "" || IncidentOwnsStaff(staff)) continue;
                 if (file.Post == "Warden") { Direct(staff, DeskPoint(), "Warden's office"); continue; }
                 if (file.Post == "Nurse") { SickCall(staff, file); continue; }
                 if (file.Post == "Cook") { Direct(staff, CookStation(), HasKitchen ? "Cooking" : "Waiting for a kitchen"); continue; }
@@ -1094,7 +1094,7 @@ namespace Cellblock.Core
         // Deterministic demonstration: the tensest present pair meets in the yard and the same rules decide it.
         public bool StageFightDemo()
         {
-            var present = Data.Residents.Where(r => IsPresent(r) && r.Legal.Ready && r.Legal.Custody == "In facility" && r.Legal.RestrictedUntil <= Data.Minute).ToList();
+            var present = Data.Residents.Where(r => IsPresent(r) && !InIntake(r) && !r.ProtectiveCustody && r.Legal.Ready && r.Legal.Custody == "In facility" && r.Legal.RestrictedUntil <= Data.Minute).ToList();
             Resident a = null, b = null; Relationship best = null;
             foreach (Resident x in present)
                 foreach (Relationship link in x.Relationships)
@@ -1103,18 +1103,15 @@ namespace Cellblock.Core
                     if (y != null && (best == null || link.Tension > best.Tension)) { a = x; b = y; best = link; }
                 }
             if (best == null) { Notice = "No two residents are available for the fight demo."; return false; }
-            a.Position = NearbyClear(Data.Yard + new Point(1.5f, 1.5f), Routes); b.Position = NearbyClear(a.Position + new Point(0.6f, 0), Routes);
-            ResumeRoutine(a); ResumeRoutine(b);
-            Confront(a, b, best, present);
-            return true;
+            return BeginFightScene(a, b, true);
         }
-        void Confront(Resident a, Resident b, Relationship link, List<Resident> present)
+        void ResolveConfrontation(Resident a, Resident b, Relationship link, List<Resident> present, bool wasFighting)
         {
             {
                 a.LastFightMinute = b.LastFightMinute = Data.Minute;
                 Point middle = (a.Position + b.Position) * 0.5f;
                 StaffMember officer = NearestOfficer(middle, 5);
-                if (officer != null)
+                if (officer != null && !wasFighting)
                 {
                     PersonnelFile f = FileFor(officer); if (f != null) f.FightsStopped++;
                     Personnel.FightsPrevented++;
@@ -1147,7 +1144,7 @@ namespace Cellblock.Core
                     if (reporter != null && Geometry.Distance(reporter.Position, middle) < 12) Seize(blade, reporter, "recovered the weapon after the assault");
                 }
                 else { FileWriteUp(a.Id, "Resident", "Fighting", 2, text, reporter); FileWriteUp(b.Id, "Resident", "Fighting", 2, text, reporter); }
-                SeparateAfterFight(a, b);
+                if (officer != null) { SeparateAfterFight(a, b); text += " " + officer.Name + " reached the scene and broke up the fight."; }
                 PeopleDynamics.Record(Data, "fight", a.Id, text, 3); Notice = text;
                 AfterFight(a, b);
             }

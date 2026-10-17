@@ -1,0 +1,79 @@
+using System.Linq;
+using Cellblock.Core;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace Cellblock.Unity
+{
+    public sealed partial class GameHud
+    {
+        VisualElement incidentCard;
+        Label incidentKicker, incidentTitle, incidentDetail;
+        Button incidentWatch, incidentClock, incidentAlarm;
+        StatMeter incidentProgress;
+        bool incidentVisible;
+        void BuildIncidentHud()
+        {
+            root.styleSheets.Add(Resources.Load<StyleSheet>("Incidents"));
+            incidentCard = Panel("incident-card"); incidentCard.style.display = DisplayStyle.None;
+            incidentKicker = Text("LIVE INCIDENT", "incident-kicker"); incidentTitle = Text("", "incident-title"); incidentDetail = Text("", "incident-detail");
+            incidentCard.Add(incidentKicker); incidentCard.Add(incidentTitle); incidentCard.Add(incidentDetail);
+            incidentProgress = new StatMeter("RESPONSE"); incidentCard.Add(incidentProgress);
+            var actions = Element("incident-actions"); incidentCard.Add(actions);
+            incidentWatch = Action("Watch action", () => { if (game.FollowingIncident) game.ReleaseIncidentCamera(); else { inspectorOpen = false; cameraOpen = false; game.FollowIncident(); Layout(); } }, "primary"); actions.Add(incidentWatch);
+            incidentClock = Action("Pause", () => { if (game.World != null) game.World.Data.Speed = game.World.Data.Speed == 0 ? 1 : 0; Refresh(true); }, "quiet"); actions.Add(incidentClock);
+            incidentAlarm = Action("Raise alarm", () => { if (game.World?.Data.Operations.Alarm == true) ShowControl(); else game.World?.SetAlarm(true); Refresh(true); }, "danger"); actions.Add(incidentAlarm);
+        }
+        public void ShowIncidentWorld() { CloseOverlays(); inspectorOpen = false; cameraOpen = false; menu.style.display = DisplayStyle.None; Layout(); }
+        void RefreshIncidentHud(World world)
+        {
+            if (incidentCard == null) return;
+            bool escape = world.Escape.Phase != "None" || world.IncidentReport.Phase == "Radioing control" || world.IncidentReport.Until > world.Data.Minute;
+            bool fight = world.Fight.Active || world.Fight.Until > world.Data.Minute;
+            incidentVisible = escape || fight;
+            if (!incidentVisible) { incidentCard.style.display = DisplayStyle.None; return; }
+            incidentKicker.text = (game.IncidentDemo ? "LIVE DEMONSTRATION" : "LIVE INCIDENT") + (world.Data.Speed == 0 ? " / PAUSED — RESUME TO CONTINUE" : " / " + world.Data.Speed + "×");
+            if (escape)
+            {
+                var report = world.IncidentReport; Resident resident = world.Data.Residents.FirstOrDefault(r => r.Id == (world.Escape.Phase != "None" ? world.Escape.ResidentId : report.Resident));
+                StaffMember observer = world.Data.Staff.FirstOrDefault(s => s.Id == report.Guard);
+                string controls = "Alarm " + (world.Data.Operations.Alarm ? "on" : "off") + ", gate " + (world.Data.Operations.GateOpen ? "open" : "closed") + ", lockdown " + (world.Data.Operations.Lockdown ? "active" : "clear") + ".";
+                incidentTitle.text = "ESCAPE / " + (resident == null ? "Custody response" : resident.Name);
+                incidentDetail.text = report.Phase == "Radioing control" ? (observer?.Name ?? "Officer") + " is transmitting. Lockdown follows the completed radio call." :
+                    report.Outcome != "" && world.Escape.Phase == "None" ? report.Outcome + ". " + (report.Phase == "Broadcast" ? controls + " Review restrictions in Control." : "No control broadcast was completed. Review the headcount and perimeter in Control.") :
+                    report.Phase == "Broadcast" ? "RADIO RECEIVED / " + controls + " Officers must reach the resident in person." :
+                    world.Escape.Detected ? "Detected by " + world.Escape.DetectedBy + ". Waiting for an observing guard or camera operator to report." : "The resident is moving toward the vehicle gate. Guards need sight or camera coverage to notice.";
+                float value = report.Phase == "Broadcast" ? 100 : report.Phase == "Radioing control" ? 100f * (world.Data.Minute - report.PhaseMinute) / World.RadioMinutes : 0;
+                incidentProgress.SetScore(report.Phase == "Radioing control" ? "RADIO TRANSMISSION" : "CONTROL NOTIFICATION", value, MeterMeaning.Neutral, report.Phase == "Broadcast" ? "RECEIVED" : Mathf.RoundToInt(value) + "%");
+            }
+            else
+            {
+                var scene = world.Fight; Resident a = world.Data.Residents.FirstOrDefault(r => r.Id == scene.A), b = world.Data.Residents.FirstOrDefault(r => r.Id == scene.B);
+                StaffMember guard = world.Data.Staff.FirstOrDefault(s => s.Id == scene.Responder);
+                incidentTitle.text = (a?.Name ?? "Resident") + " / " + (b?.Name ?? "Resident");
+                incidentDetail.text = scene.Phase == "Resolved" ? scene.Outcome : scene.Phase == "Converging" ? "A confrontation is building. Both residents are walking to the meeting point." :
+                    scene.Phase == "Separating" ? (guard?.Name ?? "Officer") + " reached them and is separating the pair." :
+                    scene.Phase == "Scuffle" ? "A scuffle has begun. " + (guard == null ? "No free officer has reached the scene." : guard.Name + " is approaching on foot.") :
+                    "Words are turning hostile. " + (guard == null ? "No available officer has noticed yet." : guard.Name + " is responding.");
+                float value = scene.Phase == "Converging" ? 10 : scene.Phase == "Tension" ? 30 : scene.Phase == "Scuffle" ? 55 : scene.Phase == "Separating" ? 75 : 100;
+                incidentProgress.SetScore("SCENE / " + scene.Phase.ToUpperInvariant(), value, MeterMeaning.Neutral, scene.Phase.ToUpperInvariant());
+            }
+            incidentWatch.text = game.FollowingIncident ? "Release camera" : "Watch action"; incidentClock.text = world.Data.Speed == 0 ? "Resume 1×" : "Pause";
+            incidentAlarm.text = world.Data.Operations.Alarm ? "Control panel" : "Raise alarm";
+        }
+        void LayoutIncidentHud(float left, float right, float top, bool blocked)
+        {
+            if (incidentCard == null) return;
+            incidentCard.style.display = incidentVisible && !blocked ? DisplayStyle.Flex : DisplayStyle.None;
+            incidentCard.style.left = left; incidentCard.style.top = top + 88;
+            float available = root.resolvedStyle.width - left - right - (inspectorOpen ? inspector.resolvedStyle.width + 18 : cameraOpen ? 350 : 0);
+            incidentCard.style.width = Mathf.Min(530, Mathf.Max(250, available));
+            if (incidentVisible && !blocked) { commandOverview.style.display = DisplayStyle.None; eventFeed.style.display = DisplayStyle.None; }
+        }
+#if UNITY_EDITOR
+        public string PreviewIncidentDescription { get { return incidentDetail == null ? "" : incidentDetail.text; } }
+        public bool PreviewIncidentPanelVisible { get { return incidentCard != null && incidentCard.resolvedStyle.display != DisplayStyle.None; } }
+        public bool PreviewIncidentPanelFits { get { return incidentCard.worldBound.xMax <= root.worldBound.xMax && incidentCard.worldBound.yMax <= root.worldBound.yMax - 68; } }
+#endif
+    }
+}

@@ -227,7 +227,7 @@ static partial class Program
             Check(world.Escape.Phase == "None" || world.Escape.ResponseDueMinute - world.Data.Minute < oldEta, "Alarm did not shorten the physical ETA");
             // A closer reachable responder must intercept by proximity, not a timer.
             responder.Position = responder.Destination = resident.Position + new Point(1,0);
-            world.AdvanceMinutes(1);
+            RunUntil(world, () => world.Escape.Phase == "None", 20, "Physical engagement after the radio call");
             Check(world.Escape.Phase == "None" && world.Data.Justice.Interceptions == 1 && Ledger(world, "custody-penalty") == 0, "A present officer did not intercept");
             Check(resident.Legal.Charges.Any(c => c.Offense == "Attempted escape") && resident.Legal.RestrictedUntil > world.Data.Minute, "Interception consequences missing");
             world.SetAlarm(false); world.SetLockdown(false);

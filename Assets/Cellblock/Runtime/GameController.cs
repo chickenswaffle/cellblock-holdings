@@ -97,7 +97,7 @@ namespace Cellblock.Unity
 
             World.Data.Speed = 0; watchedCameraId = ""; nextFeed = 0; nativeInputWasBlocked = true;
             Draft = null; CurrentQuote=null; SelectedWall = null; SelectedFixture = null; SelectedResident = null; SelectedStaff = null; hasStart = hasEnd = false;
-            accumulator = 0; savedJson = ""; RecoveredSave = false; SaveProblem = ""; LastSavedUtc = default(DateTime); autosave = 0; view.Refresh(World, true); view.Preview(null); SetTool(BuildTool.Inspect); Recenter(); Save();
+            ResetIncidentCamera(); accumulator = 0; savedJson = ""; RecoveredSave = false; SaveProblem = ""; LastSavedUtc = default(DateTime); autosave = 0; view.Refresh(World, true); view.Preview(null); SetTool(BuildTool.Inspect); Recenter(); Save();
             return true;
         }
         public void SetTool(BuildTool tool)
@@ -177,7 +177,7 @@ namespace Cellblock.Unity
             }
             else accumulator = 0;
             if (SelectedFixture != null) SelectedFixture = World.Data.Fixtures.FirstOrDefault(f => f.Id == SelectedFixture.Id);
-            InputUpdate(magnification); view.Refresh(World); view.SetWatchedCamera(WatchedCamera); pressureView.Refresh(World, Time.unscaledDeltaTime); UpdateRideAlong(); hud.Refresh();
+            InputUpdate(magnification); view.Refresh(World); view.SetWatchedCamera(WatchedCamera); pressureView.Refresh(World, Time.unscaledDeltaTime); UpdateRideAlong(); UpdateIncidentCamera(); hud.Refresh();
             TickAutosave();
         }
         void LateUpdate() { if (cameraRig != null) { if (RideAlongActive) RideAlongCamera(); else CameraPosition(); } RefreshCameraFeed(); RefreshBodyCam(); }
@@ -678,7 +678,7 @@ namespace Cellblock.Unity
                 }
                 WritePointer(name);
                 EndRideAlongSilently(); ResetDoorEditing(); PlacingConnection=false;
-                World = restored; RecoveredSave = recovered; savedJson = ""; SaveProblem = ""; LastSavedUtc = File.GetLastWriteTimeUtc(recovered ? path + ".bak" : path); autosave = 0; watchedCameraId = ""; nextFeed = 0; nativeInputWasBlocked = true; presentationPreview = false; World.Data.Speed = 0; accumulator = 0; saveId = name.Substring(8, 32);
+                ResetIncidentCamera(); World = restored; RecoveredSave = recovered; savedJson = ""; SaveProblem = ""; LastSavedUtc = File.GetLastWriteTimeUtc(recovered ? path + ".bak" : path); autosave = 0; watchedCameraId = ""; nextFeed = 0; nativeInputWasBlocked = true; presentationPreview = false; World.Data.Speed = 0; accumulator = 0; saveId = name.Substring(8, 32);
                 Draft = null; CurrentQuote = null; SelectedWall = null; SelectedFixture = null; SelectedResident = null; SelectedStaff = null;
                 view.Refresh(World, true); SetTool(BuildTool.Inspect); Recenter();
                 if (World.Data.DraftPlan != null)

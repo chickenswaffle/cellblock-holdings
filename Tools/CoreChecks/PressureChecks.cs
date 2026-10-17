@@ -420,7 +420,7 @@ static partial class Program
             Check(screened.Data.Intake.Crises == 0, "A welfare crisis happened despite mental health screening");
         });
         Test("classification turns known enemies into keep-separate orders and housing keeps them apart", () => {
-            World world = Chartered("state-medium", "northbridge"); Hold(world); world.Data.CashCents += 10000000;
+            World world = Chartered("state-medium", "northbridge"); Hold(world); world.Data.Justice.NextAttemptMinute = int.MaxValue / 2; world.Data.CashCents += 10000000;
             world.BuyUpgrade("intake-program");
             HireNow(world, "Nurse"); HireNow(world, "Caseworker");
             for (int bus = 0; bus < 3; bus++) { Transfer(world, 8); FinishIntake(world, 3000); }
@@ -450,7 +450,7 @@ static partial class Program
                 person.Relationships.First(x => x.OtherId == other.Id).Tension = 95; other.Relationships.First(x => x.OtherId == person.Id).Tension = 95;
                 person.Impulsivity = other.Impulsivity = 95; person.Stress = other.Stress = 90;
                 int fights = world.Personnel.Fights;
-                for (int m = 0; m < 240 && (!inIntake || world.InIntake(person)); m++) { other.Position = person.Position + new Point(0.4f, 0); world.AdvanceMinutes(1); }
+                for (int m = 0; m < 480 && (!inIntake || world.InIntake(person)); m++) { if (!world.Fight.Active) other.Position = person.Position + new Point(0.4f, 0); world.AdvanceMinutes(1); }
                 return world.Personnel.Fights - fights;
             }
             Check(Fights(false) > 0, "Control: the two residents never fought outside intake");
@@ -508,8 +508,11 @@ static partial class Program
             Resident a = world.Data.Residents[0], b = world.Data.Residents[1];
             a.Relationships.First(x => x.OtherId == b.Id).Tension = 95; b.Relationships.First(x => x.OtherId == a.Id).Tension = 95;
             a.Impulsivity = b.Impulsivity = 95; a.Stress = b.Stress = 90;
-            RunUntil(world, () => { b.Position = a.Position + new Point(0.5f, 0); return world.Personnel.Fights > 0; }, 600, "The first fight");
-            Check(a.SeparatedUntil >= world.Data.Minute + 350 && b.SeparatedUntil >= world.Data.Minute + 350 && world.KeepSeparate(a, b), "The pair was not separated after the fight");
+            RunUntil(world, () => { if (!world.Fight.Active) b.Position = a.Position + new Point(0.5f, 0); return world.Fight.Phase == "Scuffle"; }, 600, "The first scuffle");
+            a = world.Data.Residents.First(r => r.Id == world.Fight.A); b = world.Data.Residents.First(r => r.Id == world.Fight.B);
+            StaffMember responder = OnShiftOfficer(world); responder.Position = responder.Station = responder.Destination = IncidentResponderStart(world, world.Fight.Center);
+            RunUntil(world, () => !world.Fight.Active, 180, "A real officer reaching and separating the pair");
+            Check(a.SeparatedUntil >= world.Data.Minute + 350 && b.SeparatedUntil >= world.Data.Minute + 350 && world.KeepSeparate(a, b), "The pair was not separated after the fight: " + world.Fight.Outcome + " / until " + a.SeparatedUntil + "," + b.SeparatedUntil + " / now " + world.Data.Minute + " / responder " + world.Fight.Responder + " at " + responder.Position + " duty " + responder.Duty + " / center " + world.Fight.Center + " / people " + a.Position + "," + b.Position);
             // Separated residents go to their housing even when meals or yard would call them elsewhere.
             RunUntil(world, () => Geometry.Distance(a.Position, a.Home) < 0.5f && Geometry.Distance(b.Position, b.Home) < 0.5f, 240, "Both separated residents reaching housing");
         });
