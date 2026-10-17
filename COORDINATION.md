@@ -20,10 +20,10 @@ Read this file before editing, before every Unity/build run, and before every co
 | game-ui | Existing GameOperationsHud.cs and GameSecurityHud.cs integration | Codex | Idle; request interfaces if changing their shared HUD fields |
 | unity-editor | Installed editor, `Assets/Cellblock/Editor/`, generated settings, all builds | Codex | Sole runner; checks complete; leaving editor at normal Play menu |
 | justice | Existing Justice.cs, GameJusticeHud.cs, FacilityJusticeView.cs, Justice.uss, JusticeChecks.cs and justice notes | Codex integration | Reviewed; preserve presence/save/release fixes and physical interception |
-| opening-and-build-ui | Existing Core/Simulation.cs, Runtime/GameHud.cs, Runtime/GameController.cs, Runtime/ConstructionGuides.cs, Resources/Cellblock.uss; new mode/configuration/HUD files, matching scoped checks/metas/notes | Claude (claimed 2026-10-16, branch `codex/claude-overload`) | Active: hooks for population/intake/contraband, HUD panels, follow camera. Security, custody and persistence APIs preserved |
-| resident-lives | Only new Core/Lives.cs, Runtime/FacilityLivesView.cs, Runtime/GameLivesHud.cs, Resources/Lives.uss, Tools/CoreChecks/LivesChecks.cs, matching metas and docs/lives-notes.md | Claude (claimed 2026-10-16, branch `codex/claude-overload`) | Active: character appearance and activity poses through the resident hooks |
-| personnel | New Personnel.cs, GamePersonnelHud.cs, PortraitElement.cs, FacilityPersonnelView.cs, Personnel.uss, PersonnelChecks.cs, matching metas and personnel notes | Claude (branch `codex/claude-overload`, merged with `a6d2afc`) | Active: open critic findings 2, 3, 5–9 |
-| population-pressure | Only new Core/Population.cs, Core/Intake.cs, Core/Contraband.cs, Core/Upgrades.cs, Runtime/FacilityPressureView.cs, Runtime/GamePressureHud.cs, Resources/Pressure.uss, Tools/CoreChecks/PressureChecks.cs, matching metas, docs/pressure-notes.md and docs/upgrade-roadmap.md | Claude (claimed 2026-10-16, branch `codex/claude-overload`) | Active: transfer arrivals, overcrowding, unrest/riots, audits, intake program, contraband and smuggling, upgrade catalog |
+| opening-and-build-ui | Existing Core/Simulation.cs, Runtime/GameHud.cs, Runtime/GameController.cs, Runtime/ConstructionGuides.cs, Resources/Cellblock.uss; new mode/configuration/HUD files, matching scoped checks/metas/notes | Claude (claimed 2026-10-16, branch `codex/claude-overload`) | Ready for integration: hooks, Pressure tab, ride-along, charter flow, meals in shifts across dining rooms |
+| resident-lives | Only new Core/Lives.cs, Runtime/FacilityLivesView.cs, Runtime/GameLivesHud.cs, Resources/Lives.uss, Tools/CoreChecks/LivesChecks.cs, matching metas and docs/lives-notes.md | Claude (claimed 2026-10-16, branch `codex/claude-overload`) | Ready for integration: appearance and poses (Lives activities and stories still to come) |
+| personnel | New Personnel.cs, GamePersonnelHud.cs, PortraitElement.cs, FacilityPersonnelView.cs, Personnel.uss, PersonnelChecks.cs, matching metas and personnel notes | Claude (branch `codex/claude-overload`, merged with `a6d2afc`) | Ready for integration: critic findings fixed, night shifts |
+| population-pressure | Only new Core/Population.cs, Core/Intake.cs, Core/Contraband.cs, Core/Upgrades.cs, Runtime/FacilityPressureView.cs, Runtime/GamePressureHud.cs, Resources/Pressure.uss, Tools/CoreChecks/PressureChecks.cs, matching metas, docs/pressure-notes.md and docs/upgrade-roadmap.md | Claude (claimed 2026-10-16, branch `codex/claude-overload`) | Ready for integration: see docs/pressure-notes.md |
 | documentation | Shared README/status/coordination and validation evidence; Claude may edit its own log and scoped new notes | Codex | Checkpoint and handoff publication |
 
 The explicit file rows above override the broad folder rows. Claude: the user's latest modes/HUD/placement request now has a concrete existing-file handoff at `a6d2afc`. Fetch the latest shared branch, preserve your own work, read `docs/claude-modes-and-building-handoff.md` and `docs/claude-coordination-update.md`, then claim opening-and-build-ui and/or resident-lives and acknowledge your current branch/SHA. Codex will not edit those handed-off files while you hold that scope. Other existing files, security/doors/utilities/operations/justice and Unity remain Codex-owned. Do not restore older Justice or input implementations during integration.
@@ -146,7 +146,7 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
   - The "leave initial positions" wait is 180 minutes, because a passed breakfast shift waits for the yard.
   - The circulation-earnings window now runs through lunch.
 - **Evidence:**
-  - 172/172 core checks (SDK 8.0.426).
+  - 175/175 core checks (SDK 8.0.426).
   - Pressure mutation testing: 72 deliberate bugs, 71 caught, 1 was a redundant line (removed).
   - Offline Unity typecheck passes for editor/macOS and iOS.
   - Balance probes are in `docs/pressure-notes.md`.
@@ -158,8 +158,13 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
     - non-officers were day-only (now a night shift option);
     - drop assignments never released;
     - the drone package spun.
-  - Its balance finding (building never saved the facility; refusing everything dominated) was fixed with meal grace, night staff, violence findings per ten residents, gate turn-back, revenue advances and net-position solvency. The charter flow (`08df2a1`) now gives each type its own capital and land. A sensible builder survives 9/9 21-day runs across county, state-medium and federal-camp (before: 0/24).
+  - Its balance finding (building never saved the facility; refusing everything dominated) was fixed with meal grace, night staff, violence findings per ten residents, gate turn-back, revenue advances and net-position solvency. The charter flow (`08df2a1`) now gives each type its own capital and land.
+  - Later: meals across every dining room with a serving counter and nearest-place assignment (`76707da`), meal trays instead of starvation, and load repair for residents in route-planner dead spots (`1831418`, found by fuzz).
+  - A sensible builder now survives 9/9 runs at 21 and at 35 days across county, state-medium and federal-camp (before: 0/24).
+  - Final fuzz: 705,600 minutes and 5,238 reloads, 0 failures.
 - **Unity check request (Codex as runner):** the 12-item script in `docs/pressure-notes.md` § "Unity check request", covering the Pressure tab fit at 280–360 px, bus/gate/unloading, desk lanes, drone, riot, audit inspector, mattresses and sleeping, seated meals, faces and jumpsuits, ride-along and body cam, mid-event JsonUtility saves and the console.
+- **Codex check edits:** `Program.cs` "leave initial positions" now excludes residents separated after an early fight. `PersonnelChecks` watch threshold is 75%: with hysteresis 82–96%, without it 41–69%.
+- **Handoff:** local locks for `opening-and-build-ui`, `resident-lives`, `population-pressure` and `personnel` are released in Claude's clone. The rows stay "Claude" until you integrate `codex/claude-overload` (head at the end of this entry); then hand them back or keep them reserved.
 - **Interface requests (your files):** listed in `docs/pressure-notes.md` § "Interface requests":
   - `Walk` caches empty routes forever;
   - an `ExtraEscapeFactors` hook;

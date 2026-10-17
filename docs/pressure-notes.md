@@ -37,7 +37,12 @@ transfer demand ─▶ bus ─▶ intake (staged) ─▶ bed or floor mattress �
 
 ## Meals (Simulation.cs, handed-off file)
 
-Meal places are 6 around each table in the dining room, plus one per dining chair there. When the roster exceeds the places, meals run in up to four shifts. Each person keeps one place and one shift, and sets off 45 minutes before their block. Someone still hungry keeps the place for an hour past the block, so a long walk still ends in a meal. Anyone beyond four shifts of places has no seat and goes hungry; malnutrition has its own welfare message pointing at dining places.
+Meal places are 6 around each table and one per dining chair, in the designated dining room and in every room with a serving counter. A dining unit near new housing therefore adds capacity and shortens walks.
+
+- **Shifts.** When the roster exceeds the places, meals run in up to four shifts. Each person takes the nearest place that still has a free shift (earliest shift first), keeps it until the building or roster changes, and sets off 45 minutes before their block.
+- **Grace.** Someone still hungry keeps the place for an hour past the block.
+- **Trays.** After each meal (10:05, 15:05, 21:05), anyone on site still under 55 food gets a tray in housing: +25 food, +2 stress, $4 × wage index, and a little officer time. Trays also feed people in lockdown and intake.
+- **Pressure from trays.** Nobody starves for lack of a seat, but trays are a cost, an unrest factor (up to +10) and an audit finding (per resident-day, up to −8). Malnutrition still has its own welfare message.
 
 The service bonus measures people at their seat, plus those already full, against those due now plus those with no seat. With one shift, behavior matches the original. Quotes validate the meal places, and the yard places beyond the first twelve, that the plan would leave. Extra yard places are clear outdoor cells, so building in the yard removes a spot instead of stranding someone.
 
@@ -148,7 +153,11 @@ There are 16 purchasable programs with one-time prices and daily running costs (
 | Refuse transfers, 2 officers and a nurse | survives at 12 residents; Conditional or Fail audits; most cash ($62–72k) | hard: violence and contraband audits; 2 strikes | survives at 12 residents |
 | Builder (wings when beds run short, officers to the standard, nurse and night staff, required intake, dining chairs, advances) | survives 3/3: 47–56 residents, 0 strikes, $44–48k | survives 3/3: about 50 residents, 1 strike, solvent with $59–90k owed | survives 3/3: 38–39 residents, 0–1 strikes |
 
+Over 35 days the same builder also survives 9/9 (no termination, 0–2 strikes, $0–136k cash): county reaches the 96 ceiling at 91–97 residents, state-medium holds 89–94, and federal-camp 65–72 with near-zero unrest. This needs dining units with serving counters, nearest-place meal assignment and trays; before those, the builder collapsed between days 21 and 35 from the single dining room's 64-meal ceiling.
+
 Before the post-critic fixes, the builder failed all 24 of its runs: starvation from long walks to meal shifts, monthly-payment insolvency, and absolute violence counts. Refusing everything is no longer the dominant strategy: refusals cost strikes, and the builder runs a facility four times the size on per-diem.
+
+**Fuzz** (critic's harness): 26 random action types, a round trip every 30–240 minutes, and the ledger and remainders checked every minute. Final runs: 30 seeds × 14 days (604,800 minutes, 4,489 reloads) plus 10 seeds × 7 days with all actions and JsonUtility-style null handling (100,800 minutes, 749 reloads). Both had 0 failures.
 
 ## Unity check request (Codex as runner)
 
@@ -179,6 +188,10 @@ Please run in Play, at iPhone landscape and 900×420 as well as desktop.
 5. **Penalties after termination.** Justice custody penalties continue after contract termination; suppress them via `PenaltiesApply`.
 6. **Staff look.** Faces and hair for staff actors need a hook equivalent to `PrepareResidentPose` (the pressure view only dresses residents).
 7. **Visitation.** It is abstract (no visitors on site). A visiting room and visitor actors would make the visit route physical.
+
+## Load robustness
+
+On load, a resident standing where the route planner cannot start (inside a furnishing's footprint or a corner they reached in a straight line) is returned home rather than making the save unloadable. The standing-position route check accepts a route home or to meals. Items held by people who left are dropped, and feuds and separation orders naming them are pruned.
 
 ## Known limitations
 
