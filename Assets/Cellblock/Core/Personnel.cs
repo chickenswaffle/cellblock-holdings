@@ -199,12 +199,17 @@ namespace Cellblock.Core
             string name = Pick(seed, key + "first", First) + " " + Pick(seed, key + "last", Last);
             float roll = Unit(seed, key + "integrity");
             int integrity = kind == "Warden" ? 45 + (int)(roll * 50) : 25 + (int)(roll * 72);
+            ModeTier tier = GameModes.TierOf(state); ModeLocation place = GameModes.LocationOf(state); FacilityType mode = GameModes.TypeOf(state);
+            float corrupt = (mode != null && mode.Id == "federal-fci" ? 0.15f : mode != null && mode.Id == "state-medium" ? 0.10f : 0);
+            if (corrupt > 0 && Unit(seed, key + "corrupt") < corrupt) integrity = 25 + (int)(Unit(seed, key + "corrupt-level") * 24);
+            integrity = Math.Max(5, Math.Min(98, integrity + (tier != null ? tier.ApplicantIntegrityShift : 0) + (place != null ? place.LaborQuality : 0)));
             string gang = integrity < 50 && Unit(seed, key + "gang") < 0.55f ? (Unit(seed, key + "gangpick") < 0.5f ? "Harbor Union" : "Cedar Street") : "";
             int age = 23 + (int)(Unit(seed, key + "age") * 30) + (kind == "Warden" ? 12 : 0);
-            int experience = Math.Max(1, Math.Min(age - 21, (int)(Unit(seed, key + "exp") * (kind == "Warden" ? 22 : 14)) + (kind == "Warden" ? 8 : 1)));
+            int experience = Math.Max(1, Math.Min(age - 21, (int)(Unit(seed, key + "exp") * (kind == "Warden" ? 22 : 14)) + (kind == "Warden" ? 8 : 1) +
+                (tier != null ? tier.ApplicantExperienceShift : 0) + (place != null ? place.ExperienceBonus : 0)));
             long baseCents = kind == "Warden" ? 90000 : kind == "Nurse" ? 52000 : kind == "Caseworker" ? 44000 : kind == "Technician" ? 36000 : 40000;
             // Experience and a clean record cost more; the cheapest applicants carry the most risk.
-            long asking = (long)(baseCents * (0.86 + experience * 0.025 + (integrity - 60) * 0.004));
+            long asking = (long)(baseCents * (0.86 + experience * 0.025 + (integrity - 60) * 0.004) * (tier != null ? tier.WageScale : 1) * (place != null ? place.WageIndex : 1));
             var candidate = new Candidate { Id = "candidate-" + serial, Name = name, Kind = kind, FavoredGang = gang, Age = age, Experience = experience, Integrity = integrity,
                 Pressure = 18 + (int)(Unit(seed, key + "pressure") * 30), Favoritism = gang != "" ? 25 + (int)(Unit(seed, key + "fav") * 35) : 0,
                 AskingCents = Math.Max(20000, asking / 100 * 100), PostedMinute = state.Minute, Face = MakeFace(seed, key, age) };
@@ -703,6 +708,7 @@ namespace Cellblock.Core
         {
             if (Array.IndexOf(PersonnelRules.Regimes, regime) < 0 || regime == Personnel.Regime) return false;
             if (!WardenPresent) { Notice = "The facility regime is set by the warden."; return false; }
+            if (FacilityMode.RegimeLocked) { Notice = "A " + FacilityMode.Name.ToLowerInvariant() + " runs a " + FacilityMode.DefaultRegime.ToLowerInvariant() + " regime by statute."; return false; }
             if (Data.Minute - Personnel.RegimeChangedMinute < 1440) { Notice = "The regime can change once per game day."; return false; }
             Personnel.Regime = regime; Personnel.RegimeChangedMinute = Data.Minute;
             string text = "Warden " + Warden.Name + " set a " + regime.ToLowerInvariant() + " regime. " + (regime == "Strict" ? "Fewer fights and attempts, more stress and more minor write-ups." :
@@ -925,9 +931,9 @@ namespace Cellblock.Core
                     if (resident.NeglectSince < 0) resident.NeglectSince = Data.Minute;
                     else if (Data.Minute - resident.NeglectSince >= 720)
                     {
-                        Book(-PersonnelRules.WelfarePenaltyCents, "welfare-penalty", "Untreated injury / " + resident.Name);
+                        Book(-Scaled(PersonnelRules.WelfarePenaltyCents), "welfare-penalty", "Untreated injury / " + resident.Name);
                         Personnel.WelfareViolations++; resident.NeglectSince = Data.Minute;
-                        string text = "Welfare violation: " + resident.Name + " went 12 hours with a serious untreated injury. The contract charged $2,000. A nurse prevents this.";
+                        string text = "Welfare violation: " + resident.Name + " went 12 hours with a serious untreated injury. The contract charged " + JusticeRules.Dollars(Scaled(PersonnelRules.WelfarePenaltyCents)) + ". A nurse prevents this.";
                         PeopleDynamics.Record(Data, "welfare", resident.Id, text, 4); Notice = text;
                     }
                 }
@@ -967,7 +973,7 @@ namespace Cellblock.Core
                 Relationship link = a.Relationships.FirstOrDefault(r => r.OtherId == b.Id);
                 if (link == null || link.Tension < 58 || Geometry.Distance(a.Position, b.Position) > 2.6f || !SightLines.Clear(a.Position, b.Position)) continue;
                 float chance = (link.Tension >= 82 ? 0.16f : 0.05f) * ((a.Impulsivity + b.Impulsivity) / 120f) * ((a.Stress + b.Stress) / 2 + 20) / 60f;
-                chance *= Personnel.Regime == "Strict" ? 0.7f : Personnel.Regime == "Rehabilitative" ? 1.1f : 1f;
+                chance *= (Personnel.Regime == "Strict" ? 0.7f : Personnel.Regime == "Rehabilitative" ? 1.1f : 1f) * FacilityMode.FightScale;
                 if (JusticeRules.Unit(Data.Seed, a.Id + b.Id, "fight", Data.Minute / 30) >= chance) continue;
                 Confront(a, b, link, present);
             }

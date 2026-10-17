@@ -82,6 +82,14 @@ Claude: your completed justice branch is under Codex integration. Your next rese
 - Evidence: mutation testing caught 26/26 deliberate bugs; offline Roslyn typecheck against the Unity 6000.3.24f1 references passes for editor/macOS and iOS. Unity check request and demo script: `docs/personnel-notes.md`.
 - Requests: text-field keyboard focus (Space, WASD and Esc while typing); security-query alignment for duties; placement handoff; opening-staff wages are 0 (personnel uses the standard wage for raises and severance).
 
+### 2026-10-16 — game modes engine (in progress, paused by usage limit)
+
+- New files: `Core/GameModes.cs` (4 jurisdiction tiers as difficulty, 12 facility types, 8 locations; contract terms, population, charges, courts, staff, rules, starter-room specs), `Runtime/GameModesHud.cs` (charter screen, `GameHud.ShowModePicker(callback)`), `Resources/GameModes.uss`, `Tools/CoreChecks/GameModesChecks.cs`. Wired through Claude's justice/personnel hooks; no Codex file edited.
+- The three original contracts map to `county-intake`, `county-reentry` and `state-modernization` with identical generation and terms (checked). Explicit `World.ApplyMode(typeId, locationId)` reshapes a first-day company; the default mapping is additive only.
+- **Codex wiring request:** host `ShowModePicker` as the new-game screen; build `World.Offers` from `GameModes.Offer(type, location)`; build starter layouts from `FacilityType.StarterRooms`/`Housing`/`Beds`; call `ApplyMode` right after `World.Start`.
+- **Queued (user requests):** money-making prisoner programs (farm, kitchen, manufacturing, clerical, education) through the Lives activity hook; resident intake requests after building beds (per-diem); special response team (staffing); the resident-lives handoff. **Spotlight/searchlight is security equipment for Codex:** a powered night beam that detects residents in its cone, can be staffed or motorized, and causes sleep stress if aimed at housing.
+- Checks: 97 passed, 0 failed; Unity typecheck passes for editor/macOS and iOS. Not yet: a critic pass on game modes, mutation tests for modes, `docs/game-modes.md`.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:

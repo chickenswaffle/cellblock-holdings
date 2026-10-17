@@ -357,6 +357,7 @@ static partial class Program
         });
 
         RunPersonnelChecks();
+        RunGameModesChecks();
 
         // Integration regression: absent residents must not have social contact at their parked home.
         World probe = County(); probe.StageCourtDemo();

@@ -40,7 +40,9 @@ namespace Cellblock.Core
     [Serializable] public sealed class CourtRun
     {
         public string Id = "", Phase = "Idle";
-        public bool Leaving, ReturnLeg, Resolved, Demo;
+        public bool Leaving, ReturnLeg, Resolved, Demo, RoadStarted;
+        // Minutes of off-map driving still to go between the public road and the courthouse (location dependent).
+        public int RoadMinutes;
         public Point Position = new Point(48, -28.8f), Board = new Point(-2, -12.2f);
         public int Waypoint, Day = -1, PhaseMinute, StartMinute, DeadlineMinute, HearingMinute, ResolveMinute, ReturnMinute, CancelMinute;
         public List<string> Scheduled = new List<string>(), Aboard = new List<string>();
@@ -106,6 +108,7 @@ namespace Cellblock.Core
         public static bool HasPending(LegalProfile legal) { return legal.Charges.Any(c => c.Outcome == "Alleged"); }
         public static bool HasCourtMatter(LegalProfile legal) { return HasPending(legal) || legal.PendingReview != ""; }
         public static int PendingSeverity(LegalProfile legal) { return legal.Charges.Where(c => c.Outcome == "Alleged").Select(c => c.Severity).DefaultIfEmpty(0).Max(); }
+        public static string Dollars(long cents) { return "$" + (cents / 100).ToString("N0", System.Globalization.CultureInfo.InvariantCulture); }
         public static string RiskBand(float risk) { return risk >= HighRisk ? "High" : risk >= ElevatedRisk ? "Elevated" : "Low"; }
         public static string When(int minute)
         {
@@ -152,35 +155,45 @@ namespace Cellblock.Core
             return true;
         }
 
+        // Charges, status, sentences and hearing cadence follow the game mode's facility type. The three original
+        // contracts map to facility types with identical tables, so their generation is unchanged.
         static void CreateProfile(State state, Resident resident)
         {
-            int seed = state.Seed, day = state.Minute / 1440; string id = resident.Id, contract = state.ContractId ?? "county";
+            int seed = state.Seed, day = state.Minute / 1440; string id = resident.Id;
+            FacilityType mode = GameModes.TypeOf(state) ?? GameModes.Type(GameModes.DefaultTypeFor(state.ContractId));
+            ModeLocation place = GameModes.LocationOf(state);
             var legal = new LegalProfile { Ready = true, TransferMinute = day * 1440 };
             legal.PriorCustodyDays = 1 + (int)(Unit(seed, id, "prior", 0) * 45);
             int count = Unit(seed, id, "count", 0) < 0.3f ? 2 : 1;
             for (int c = 0; c < count; c++)
             {
-                float roll = Unit(seed, id, "severity", c);
-                int severity = contract == "reentry" ? (roll < 0.55f ? 1 : roll < 0.9f ? 2 : 3) :
-                    contract == "modernize" ? (roll < 0.2f ? 1 : roll < 0.5f ? 2 : roll < 0.85f ? 3 : 4) :
-                    (roll < 0.35f ? 1 : roll < 0.75f ? 2 : roll < 0.95f ? 3 : 4);
-                string[] names = Offenses[severity - 1];
-                string offense = names[(int)(Hash(id + ":offense:" + c, unchecked((uint)seed)) % (uint)names.Length)];
+                float roll = Unit(seed, id, "severity", c), cumulative = 0;
+                int severity = 4;
+                for (int level = 0; level < 4; level++) { cumulative += mode.SeverityWeights[level]; if (roll < cumulative) { severity = level + 1; break; } }
+                string offense;
+                if (mode.Offenses != null) offense = mode.Offenses[(int)(Hash(id + ":offense:" + c, unchecked((uint)seed)) % (uint)mode.Offenses.Length)];
+                else
+                {
+                    string[] names = Offenses[severity - 1];
+                    offense = names[(int)(Hash(id + ":offense:" + c, unchecked((uint)seed)) % (uint)names.Length)];
+                    // A little local color: each location has a characteristic charge.
+                    if (place != null && Unit(seed, id, "flavor", c) < 0.12f) offense = place.CrimeFlavor;
+                }
                 if (legal.Charges.Any(existing => existing.Offense == offense)) continue;
                 legal.Charges.Add(new LegalCharge { Id = id + "/charge-" + c, Offense = offense, Severity = severity });
             }
-            float pretrialShare = contract == "reentry" ? 0.25f : contract == "modernize" ? 0.4f : 0.7f;
-            if (Unit(seed, id, "status", 0) < pretrialShare)
+            if (Unit(seed, id, "status", 0) < mode.PretrialShare)
             {
                 legal.Status = "Pretrial";
-                legal.NextCourtMinute = (day + 1 + (int)(Unit(seed, id, "court", 0) * 5)) * 1440 + 570;
+                int span = Math.Max(1, mode.HearingCadenceMax - mode.HearingCadenceMin + 1);
+                legal.NextCourtMinute = (day + mode.HearingCadenceMin + (int)(Unit(seed, id, "court", 0) * span)) * 1440 + 570;
                 AddEvent(legal, state.Minute, "transfer", "Transferred to this facility while awaiting a hearing on alleged charges.");
             }
             else
             {
                 legal.Status = "Sentenced";
                 foreach (LegalCharge charge in legal.Charges) charge.Outcome = "Sentenced";
-                int remaining = contract == "reentry" ? 10 + (int)(Unit(seed, id, "term", 0) * 25) : 25 + (int)(Unit(seed, id, "term", 0) * 200);
+                int remaining = mode.SentenceMinDays + (int)(Unit(seed, id, "term", 0) * (mode.SentenceMaxDays - mode.SentenceMinDays));
                 legal.SentenceDays = legal.PriorCustodyDays + remaining;
                 legal.ReleaseMinute = (day + remaining) * 1440 + 600;
                 AddEvent(legal, state.Minute, "transfer", "Transferred to this facility to serve a sentence.");
@@ -209,7 +222,7 @@ namespace Cellblock.Core
                 legal.Events.Any(e => e == null || e.Minute < 0 || e.Minute > state.Minute || string.IsNullOrEmpty(e.Text)))
                 throw Invalid("charges or legal history" + who);
             if (legal.TransferMinute < 0 || legal.TransferMinute > state.Minute || legal.PriorCustodyDays < 0 || legal.PriorCustodyDays > 400 ||
-                legal.SentenceDays < 0 || legal.SentenceDays > 4000 || legal.SentencedMinute < -1 || legal.SentencedMinute > state.Minute ||
+                legal.SentenceDays < 0 || legal.SentenceDays > 20000 || legal.SentencedMinute < -1 || legal.SentencedMinute > state.Minute ||
                 legal.NextCourtMinute < -1 || legal.ReleaseMinute < -1 || legal.RecaptureMinute < -1 || legal.RestrictedUntil < -1 ||
                 legal.WarnedMinute < -1 || legal.WarnedMinute > state.Minute || legal.CooldownUntil < 0 || legal.SupervisionPaidDay < -1 || legal.SupervisionPaidDay > state.Minute / 1440 ||
                 legal.Appearances < 0 || legal.MissedAppearances < 0 || legal.Attempts < 0 || (legal.HasFormerHome && !OnSite(legal.FormerHome)) ||
@@ -246,7 +259,7 @@ namespace Cellblock.Core
                     throw Invalid("court van manifest" + who);
             }
             if (Array.IndexOf(VanPhases, van.Phase) < 0 || !Finite(van.Position.X) || !Finite(van.Position.Y) || Math.Abs(van.Position.X) > 50 || van.Position.Y < -35 || van.Position.Y > 25 ||
-                !OnSite(van.Board) || van.Waypoint < 0 || van.Waypoint > 4 || van.Day < -1 ||
+                !OnSite(van.Board) || van.Waypoint < 0 || van.Waypoint > 4 || van.Day < -1 || van.RoadMinutes < 0 || van.RoadMinutes > 120 ||
                 van.Scheduled.Any(id => !ids.Contains(id)) || van.Aboard.Any(id => !ids.Contains(id)) ||
                 van.Scheduled.Distinct().Count() != van.Scheduled.Count || van.Aboard.Distinct().Count() != van.Aboard.Count ||
                 (van.Phase == "Idle" && van.Aboard.Count > 0) || (van.Phase == "At court" && van.Leaving))
@@ -283,7 +296,7 @@ namespace Cellblock.Core
     {
         readonly Dictionary<string, int> custodyStill = new Dictionary<string, int>();
 
-        static partial void HydrateJustice(State state) { JusticeRules.Hydrate(state); PersonnelRules.Hydrate(state); }
+        static partial void HydrateJustice(State state) { GameModes.Hydrate(state); JusticeRules.Hydrate(state); PersonnelRules.Hydrate(state); }
         partial void ResidentPresence(Resident resident, ref bool present)
         {
             if (resident != null && resident.Legal != null && resident.Legal.Ready && !JusticeRules.Present(resident.Legal)) present = false;
@@ -298,6 +311,7 @@ namespace Cellblock.Core
         }
         partial void AdvanceJustice()
         {
+            EnsureMode();
             JusticeRules.EnsureProfiles(Data);
             AdvancePersonnel();
             ChargeSupervision();
@@ -312,7 +326,7 @@ namespace Cellblock.Core
         public EscapeAttempt Escape { get { return Data.Justice.Attempt; } }
         public Resident Escapee { get { return Escape.Phase == "None" ? null : Data.Residents.FirstOrDefault(r => r.Id == Escape.ResidentId); } }
         public bool CourtVanOnRoad { get { return CourtVan.Phase != "Idle" && CourtVan.Phase != "At court"; } }
-        public void EnsureLegalProfiles() { JusticeRules.EnsureProfiles(Data); }
+        public void EnsureLegalProfiles() { EnsureMode(); JusticeRules.EnsureProfiles(Data); }
         public IReadOnlyList<Resident> FormerResidents { get { return Data.Justice.Former; } }
         public bool InCustody(Resident resident) { return resident == null || resident.Legal == null || !resident.Legal.Ready || JusticeRules.InCustody(resident.Legal); }
         public int CustodyCount { get { return Data.Residents.Count(InCustody); } }
@@ -402,6 +416,8 @@ namespace Cellblock.Core
             if (RecentWriteUps(resident, 7) >= 2) Factor(factors, ref total, "Recent write-ups", 4);
             if (Data.Minute - resident.SanctionedMinute < 1440) Factor(factors, ref total, "Resentment after a sanction", 5);
             if (resident.Health < 40) Factor(factors, ref total, "Injured", -10);
+            if (FacilityMode.EscapeRiskOffset != 0) Factor(factors, ref total, FacilityMode.Security + " population", FacilityMode.EscapeRiskOffset);
+            if (FacilityMode.PerimeterRisk != 0) Factor(factors, ref total, FacilityMode.Housing == "Dormitory" && FacilityMode.Security == "Minimum" ? "Open perimeter" : "Low perimeter", FacilityMode.PerimeterRisk);
             if (Data.Fixtures.Any(f => f.Kind == "CCTV" && CameraSees(f, resident.Home))) Factor(factors, ref total, "CCTV covers housing", -10);
             if (legal.CloseSupervision) Factor(factors, ref total, "Close supervision", -22);
             int minute = Data.Minute % 1440;
@@ -507,7 +523,8 @@ namespace Cellblock.Core
                 }
             }
             CourtRun van = CourtVan;
-            if (van.Phase == "Idle" && van.Day != day && minute >= 435 && minute < 480)
+            int drive = ModeLocation.CourtDriveMinutes;
+            if (van.Phase == "Idle" && van.Day != day && minute >= 435 - drive && minute < 480 - drive)
             {
                 List<string> docket = CourtDocket(day).Select(r => r.Id).ToList();
                 if (docket.Count > 0) StartCourtRun(docket, false);
@@ -520,7 +537,7 @@ namespace Cellblock.Core
                     van.Id = "return-run-" + Data.Minute; van.Scheduled.Clear(); van.Aboard.Clear(); van.Aboard.AddRange(returning);
                     foreach (Resident resident in Data.Residents.Where(r => returning.Contains(r.Id))) resident.Legal.Custody = "Aboard";
                     van.Position = JusticeRules.CourtBase; van.Waypoint = 0; van.Leaving = false; van.ReturnLeg = true; van.Resolved = true; van.Demo = false;
-                    van.Phase = "Inbound"; van.PhaseMinute = Data.Minute;
+                    van.Phase = "Inbound"; van.PhaseMinute = Data.Minute; van.RoadMinutes = ModeLocation.CourtDriveMinutes; van.RoadStarted = false;
                     Notice = "The court van is returning " + returning.Count + " located resident(s) to custody.";
                 }
             }
@@ -539,8 +556,8 @@ namespace Cellblock.Core
             legal.MissedAppearances++; Data.Justice.MissedHearings++;
             int day = Data.Minute / 1440;
             legal.NextCourtMinute = (day + 2 + (int)(JusticeRules.Unit(Data.Seed, resident.Id, "reschedule", legal.MissedAppearances) * 3)) * 1440 + 570;
-            if (fee) ChargeHearingFee(resident, JusticeRules.MissedHearingCents, "Missed court appearance");
-            string text = resident.Name + " missed a hearing: " + reason + "." + (fee ? " The contract charged $750." : "") + " Rescheduled for " + JusticeRules.When(legal.NextCourtMinute) + ".";
+            if (fee) ChargeHearingFee(resident, Scaled(JusticeRules.MissedHearingCents), "Missed court appearance");
+            string text = resident.Name + " missed a hearing: " + reason + "." + (fee ? " The contract charged " + JusticeRules.Dollars(Scaled(JusticeRules.MissedHearingCents)) + "." : "") + " Rescheduled for " + JusticeRules.When(legal.NextCourtMinute) + ".";
             RecordLegal(resident, "court", text, 2); Notice = text;
         }
         void AddCharge(Resident resident, string offense, int severity, string referredBy = "", int credibility = -1)
@@ -575,13 +592,14 @@ namespace Cellblock.Core
             van.Scheduled.Clear(); van.Scheduled.AddRange(scheduled); van.Aboard.Clear();
             van.Position = JusticeRules.CourtBase; van.Waypoint = 0; van.Leaving = false; van.ReturnLeg = false; van.Resolved = false;
             van.Board = SallyPortPoint(); van.Phase = "Inbound"; van.PhaseMinute = now; van.StartMinute = now;
+            int drive = ModeLocation.CourtDriveMinutes; van.RoadMinutes = drive; van.RoadStarted = false;
             if (demo)
             {
                 van.DeadlineMinute = now + 90; van.CancelMinute = now + 110; van.HearingMinute = now + 150; van.ResolveMinute = now + 170; van.ReturnMinute = now + 185;
             }
             else
             {
-                van.DeadlineMinute = Math.Max(dayStart + 545, now + 50); van.CancelMinute = dayStart + 540; van.HearingMinute = dayStart + 570;
+                van.DeadlineMinute = Math.Max(dayStart + 545 - drive, now + 50); van.CancelMinute = dayStart + 540 - drive; van.HearingMinute = dayStart + 570;
                 van.ResolveMinute = dayStart + 630; van.ReturnMinute = dayStart + 660;
             }
             Data.Justice.CourtRuns++;
@@ -618,6 +636,7 @@ namespace Cellblock.Core
                     if (van.Leaving) goto case "Outbound";
                     if (!van.ReturnLeg && Data.Minute >= van.CancelMinute) { CancelRun(van); return; }
                     if (!van.ReturnLeg) CallOut(van);
+                    if (van.RoadMinutes > 0) { van.RoadMinutes--; return; }
                     if (!DriveVan(van)) return;
                     van.Phase = van.ReturnLeg ? "Unloading" : "Boarding"; van.PhaseMinute = Data.Minute;
                     if (!van.ReturnLeg)
@@ -631,7 +650,13 @@ namespace Cellblock.Core
                 case "Outbound":
                     if (van.Phase == "At gate" && van.Aboard.Count > 0 && !van.ReturnLeg && Data.Minute >= van.ResolveMinute) { AbortAtGate(van); return; }
                     if (!DriveVan(van)) return;
-                    if (van.Aboard.Count > 0 && !van.ReturnLeg) ArriveAtCourt(van);
+                    if (van.Aboard.Count > 0 && !van.ReturnLeg)
+                    {
+                        // The courthouse is a drive beyond the end of the public road.
+                        if (!van.RoadStarted) { van.RoadStarted = true; van.RoadMinutes = ModeLocation.CourtDriveMinutes; }
+                        if (van.RoadMinutes > 0) { van.RoadMinutes--; return; }
+                        van.RoadStarted = false; ArriveAtCourt(van);
+                    }
                     else { van.Phase = "Idle"; van.Aboard.Clear(); van.Scheduled.Clear(); van.Leaving = false; van.ReturnLeg = false; van.Waypoint = 0; van.Position = JusticeRules.CourtBase; }
                     return;
                 case "At court":
@@ -697,7 +722,7 @@ namespace Cellblock.Core
             {
                 Resident resident = Find(id); if (resident == null) continue;
                 resident.Legal.Custody = "At court";
-                if (late) { ChargeHearingFee(resident, JusticeRules.LateArrivalCents, "Late court arrival"); RecordLegal(resident, "court", "Arrived late to court; the contract charged $300."); }
+                if (late) { ChargeHearingFee(resident, Scaled(JusticeRules.LateArrivalCents), "Late court arrival"); RecordLegal(resident, "court", "Arrived late to court; the contract charged " + JusticeRules.Dollars(Scaled(JusticeRules.LateArrivalCents)) + "."); }
             }
             if (late) Notice = "The court van arrived late. Late-arrival fees were charged.";
         }
@@ -717,7 +742,7 @@ namespace Cellblock.Core
                 if (granted)
                 {
                     int remainingDays = Math.Max(0, (legal.ReleaseMinute - Data.Minute) / 1440);
-                    int credit = Math.Max(0, Math.Min(5 + (int)(JusticeRules.Unit(Data.Seed, resident.Id, "credit", legal.Appearances) * 10), remainingDays - 2));
+                    int credit = Math.Max(0, Math.Min((int)((5 + (int)(JusticeRules.Unit(Data.Seed, resident.Id, "credit", legal.Appearances) * 10)) * FacilityMode.GoodTimeScale), remainingDays - 2));
                     legal.ReleaseMinute -= credit * 1440; resident.Stress = Math.Max(0, resident.Stress - 10);
                     lines.Add("The court granted " + credit + " days of good-time credit; release moves to " + JusticeRules.When(legal.ReleaseMinute) + ".");
                 }
@@ -730,7 +755,7 @@ namespace Cellblock.Core
             if (pending.Count == 0) { legal.NextCourtMinute = -1; }
             else if (legal.Status == "Pretrial")
             {
-                float release = Math.Max(0.02f, Math.Min(0.3f, 0.26f - 0.05f * severity - 0.06f * legal.MissedAppearances - 0.12f * legal.Attempts - 0.05f * referrals.Count));
+                float release = Math.Max(0.02f, Math.Min(0.3f + FacilityMode.ReleaseBias, 0.26f + FacilityMode.ReleaseBias - 0.05f * severity - 0.06f * legal.MissedAppearances - 0.12f * legal.Attempts - 0.05f * referrals.Count));
                 float sentence = Math.Min(0.5f, 0.24f + 0.06f * severity);
                 if (roll < release)
                 {
@@ -742,7 +767,7 @@ namespace Cellblock.Core
                 }
                 if (roll < release + sentence)
                 {
-                    int term = 20 + severity * 30 + (int)(JusticeRules.Unit(Data.Seed, resident.Id, "term", legal.Appearances) * 45);
+                    int term = Math.Max(20 + severity * 30 + (int)(JusticeRules.Unit(Data.Seed, resident.Id, "term", legal.Appearances) * 45), FacilityMode.SentenceMinDays);
                     int credit = legal.PriorCustodyDays + (Data.Minute - legal.TransferMinute) / 1440;
                     int remaining = Math.Max(10, term - credit);
                     foreach (LegalCharge charge in pending) charge.Outcome = "Sentenced";
@@ -753,7 +778,8 @@ namespace Cellblock.Core
                 }
                 else
                 {
-                    legal.NextCourtMinute = (day + 3 + (int)(JusticeRules.Unit(Data.Seed, resident.Id, "next", legal.Appearances) * 5)) * 1440 + 570;
+                    int span = Math.Max(1, FacilityMode.HearingCadenceMax - FacilityMode.HearingCadenceMin + 1);
+                    legal.NextCourtMinute = (day + FacilityMode.HearingCadenceMin + 2 + (int)(JusticeRules.Unit(Data.Seed, resident.Id, "next", legal.Appearances) * span)) * 1440 + 570;
                     lines.Add(resident.Name + "'s hearing was continued to " + JusticeRules.When(legal.NextCourtMinute) + ".");
                 }
             }
@@ -787,6 +813,7 @@ namespace Cellblock.Core
             if (van.Aboard.Count == 0) { van.Phase = "Idle"; van.Scheduled.Clear(); return; }
             foreach (string id in van.Aboard) { Resident resident = Find(id); if (resident != null) resident.Legal.Custody = "Aboard"; }
             van.Position = JusticeRules.CourtBase; van.Waypoint = 0; van.Leaving = false; van.ReturnLeg = true; van.Phase = "Inbound"; van.PhaseMinute = Data.Minute;
+            van.RoadMinutes = ModeLocation.CourtDriveMinutes; van.RoadStarted = false;
         }
         void Unload(CourtRun van)
         {
@@ -1002,9 +1029,10 @@ namespace Cellblock.Core
                 legal.Custody = "At large"; legal.CloseSupervision = false; resident.Position = resident.Home;
                 legal.RecaptureMinute = Data.Minute + 600 + (int)(JusticeRules.Unit(Data.Seed, resident.Id, "recapture", legal.Attempts) * 1800);
                 legal.CooldownUntil = Data.Minute + 6 * 1440; Data.Justice.Escapes++; Data.Justice.NextAttemptMinute = Data.Minute + 2880;
-                Book(-JusticeRules.EscapePenaltyCents, "custody-penalty", "Contract penalty · escape / " + resident.Name);
+                long penalty = FacilityMode.EscapePenaltyCents > 0 ? FacilityMode.EscapePenaltyCents : Scaled(JusticeRules.EscapePenaltyCents);
+                Book(-penalty, "custody-penalty", "Contract penalty · escape / " + resident.Name);
                 text = "ESCAPE · " + resident.Name + (detected ? " got out through the open vehicle gate." : " got out through the open vehicle gate unseen and was found missing at the count.") +
-                    " The contract charged a $6,000 penalty. County officers are searching.";
+                    " The contract charged a " + JusticeRules.Dollars(penalty) + " penalty. Officers are searching.";
                 RecordLegal(resident, "escape", text, 5); Notice = text;
                 return;
             }
