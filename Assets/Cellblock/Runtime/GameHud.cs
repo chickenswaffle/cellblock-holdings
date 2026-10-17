@@ -619,38 +619,21 @@ namespace Cellblock.Unity
             body.Add(Text("Your next holding.", "menu-title"));
             body.Add(Text("Build the institution. Run the company.", "menu-subtitle"));
             body.Add(Text("Acquire an editable facility. Keep cash in reserve for operations, crews, and improvements.", "menu-intro"));
-            var cards = Element("cards"); int index = 0;
-            foreach (ContractOffer offer in World.Offers)
-            {
-                ContractOffer selected = offer;
-                var card = Element("contract-card");
-                var cardTop = Element("contract-topline"); cardTop.Add(Text("0" + (++index) + " / ACQUISITION", "eyebrow"));
-                cardTop.Add(Text(offer.PaymentDays == 7 ? "WEEKLY" : "28 DAY CYCLE", "contract-tag")); card.Add(cardTop);
-                card.Add(Text(offer.City.ToUpperInvariant(), "contract-city")); card.Add(Text(offer.Name, "contract-title"));
-                card.Add(Text(offer.Description, "contract-description"));
-                var reserve = Element("reserve-block"); reserve.Add(Text("OPERATING RESERVE", "metric-label"));
-                reserve.Add(Text(Money(offer.CapitalCents - offer.AcquisitionCents), "reserve-value")); card.Add(reserve);
-                card.Add(Action("Acquire · " + Money(offer.AcquisitionCents) + "  →", () => AcquireCompany(selected), "primary compact-acquire"));
-                var details = Element("contract-details");
-                Button detailToggle = null;
-                detailToggle = Action("Financial terms  +", () =>
-                {
-                    bool expanded = !details.ClassListContains("expanded");
-                    details.EnableInClassList("expanded", expanded); detailToggle.text = "Financial terms  " + (expanded ? "−" : "+");
-                }, "quiet contract-detail-toggle"); card.Add(detailToggle);
-                details.Add(FinanceRow("Starting capital", Money(offer.CapitalCents)));
-                details.Add(FinanceRow("Land + starter facility", "− " + Money(offer.AcquisitionCents)));
-                details.Add(FinanceRow("Base revenue / day", Money(offer.DailyRevenueCents)));
-                details.Add(FinanceRow("Operations / day", "− " + Money(offer.DailyOperatingCents)));
-                details.Add(FinanceRow("Verified service / day", "up to " + Money(offer.DailyServiceBonusCents)));
-                details.Add(Text(offer.Residents + " starting residents · editable one-floor facility", "contract-footnote")); card.Add(details);
-                Button choose = Action("Acquire facility  →", () => AcquireCompany(selected), "primary acquire-button");
-                choose.AddToClassList("primary"); choose.AddToClassList("acquire-button"); card.Add(choose); cards.Add(card);
-            }
-            body.Add(cards);
+            var charter=Element("opening-charter");
+            charter.Add(Text("01 / CHARTER A NEW FACILITY","eyebrow"));
+            charter.Add(Text("Choose your jurisdiction.","contract-title"));
+            charter.Add(Text("City · County · State · Federal. Choose the institution and location, review its operating reserve and rules, then start with a matching editable facility.","contract-description"));
+            charter.Add(Action("Choose facility & difficulty  →",()=>ShowModePicker(AcquireModeCompany),"primary"));body.Add(charter);
+
             body.Add(Text("Separate saves for every holding. Game time advances only while you play.", "menu-footer")); Layout();
         }
 
+        void AcquireModeCompany(string type,string location)
+        {
+            if(!game.StartModeCompany(type,location))return;
+            menu.style.display=DisplayStyle.None;workspace=Workspace.Facility;inspectorOpen=!compact;cameraOpen=false;previousSelection=null;Refresh(true);Layout();
+            if(!PlayerPrefs.HasKey("cellblock-controls-v2"))ShowGuide(true);
+        }
         void AcquireCompany(ContractOffer offer)
         {
             if (!game.StartCompany(offer.Id)) return;

@@ -1,0 +1,42 @@
+/* Charter screen. Loaded by GameModesHud; other stylesheets untouched. */
+.charter-row { margin-bottom: 6px; padding-bottom: 4px; border-bottom-width: 1px; border-bottom-color: rgb(55, 67, 69); }
+.mode-sheet { position: absolute; left: 0; right: 0; top: 0; bottom: 0; padding: 16px; align-items: center; justify-content: center; background-color: rgba(8, 12, 14, 0.9); }
+.mode-card { width: 100%; max-width: 1080px; max-height: 100%; flex-shrink: 1; padding: 16px 18px; border-width: 1px; border-color: rgb(80, 94, 95); border-radius: 8px; background-color: rgb(22, 29, 32); }
+.mode-titles { flex-shrink: 1; }
+.mode-title { font-size: 22px; letter-spacing: 2px; -unity-font-style: bold; color: rgb(236, 225, 196); }
+.mode-subtitle { white-space: normal; font-size: 12px; color: rgb(160, 178, 176); margin-top: 3px; }
+.mode-step { color: rgb(187, 164, 132); font-size: 11px; letter-spacing: 1.6px; margin-top: 16px; margin-bottom: 8px; }
+.mode-tiers, .mode-types { flex-direction: row; flex-wrap: wrap; margin-left: -4px; margin-right: -4px; }
+Button.tier-card, Button.type-card { flex-grow: 1; flex-basis: 220px; margin: 4px; padding: 12px; align-items: stretch; -unity-text-align: upper-left; border-radius: 6px; background-color: rgb(32, 41, 44); border-color: rgb(66, 78, 80); }
+Button.type-card { flex-basis: 300px; }
+Button.tier-card.selected, Button.type-card.selected { background-color: rgb(46, 52, 46); border-color: rgb(217, 188, 144); border-width: 2px; color: rgb(236, 234, 223); -unity-font-style: normal; }
+.tier-level, .type-level { font-size: 11px; letter-spacing: 1px; color: rgb(217, 188, 144); margin-bottom: 4px; }
+.tier-name { font-size: 20px; letter-spacing: 2px; -unity-font-style: bold; color: rgb(240, 235, 219); margin-bottom: 4px; }
+.type-name { white-space: normal; font-size: 17px; -unity-font-style: bold; color: rgb(240, 235, 219); margin-bottom: 3px; }
+.type-challenge { font-size: 10px; letter-spacing: 1.2px; color: rgb(232, 160, 120); margin-bottom: 6px; }
+.tier-tagline, .type-pitch { white-space: normal; font-size: 12px; color: rgb(214, 222, 213); margin-bottom: 6px; }
+.tier-detail, .type-stat { white-space: normal; font-size: 11px; color: rgb(160, 178, 176); margin-bottom: 3px; }
+.type-rule { white-space: normal; font-size: 11px; color: rgb(236, 196, 128); margin-bottom: 6px; }
+Button.location-chip { min-width: 96px; }
+.mode-footer { flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 8px; border-top-width: 1px; border-top-color: rgb(55, 67, 69); }
+.mode-summary { white-space: normal; flex-shrink: 1; font-size: 13px; color: rgb(236, 225, 196); margin-right: 10px; }
+.compact .mode-sheet { padding: 6px; }
+.compact .mode-card { padding: 10px; }
+.compact Button.tier-card { flex-basis: 140px; }
+.compact .tier-detail { display: none; }
+
+/* Fixed outer height keeps action buttons inside short landscape viewports. */
+.mode-card { height: 88%; }
+.mode-card > .personnel-head { flex-shrink: 0; }
+.mode-card .personnel-scroll { min-height: 0; flex-grow: 1; flex-shrink: 1; }
+.mode-footer { flex-direction: column; align-items: stretch; flex-shrink: 0; }
+.mode-summary { flex-shrink: 0; margin-bottom: 8px; }
+.mode-footer > .wrap-row { justify-content: flex-end; flex-shrink: 0; }
+.compact .mode-card { height: 100%; }
+.compact .mode-title { font-size: 19px; }
+.compact .mode-subtitle { font-size: 11px; }
+.compact .mode-step { margin-top: 9px; margin-bottom: 5px; }
+.compact .mode-summary { font-size: 12px; }
+.opening-charter { flex-shrink: 0; width: 100%; max-width: 1000px; padding: 25px; margin-top: 10px; margin-bottom: 25px; background-color: rgb(29,39,44); border-width: 1px; border-color: rgb(65,83,87); border-top-width: 3px; border-top-color: rgb(200,173,130); border-radius: 6px; }
+.opening-charter Button { margin-top: 14px; min-height: 50px; }
+.compact .opening-charter { padding: 18px; }

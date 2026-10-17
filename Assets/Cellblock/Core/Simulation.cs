@@ -198,7 +198,7 @@ namespace Cellblock.Core
         readonly Dictionary<Resident, Queue<Point>> paths = new Dictionary<Resident, Queue<Point>>();
         readonly Dictionary<Resident, Point> destinations = new Dictionary<Resident, Point>();
         List<List<Point>> rooms;
-        public ContractOffer Contract { get { return Offers.First(c => c.Id == Data.ContractId); } }
+        public ContractOffer Contract { get { return Data.Mode!=null&&Data.Mode.ExplicitTerms ? GameModes.Offer(FacilityMode,ModeLocation) : Offers.First(c => c.Id == Data.ContractId); } }
         public Navigation Routes { get { return navigation ?? (navigation = new Navigation(Data.Walls, Data.Fixtures)); } }
         public List<List<Point>> Rooms { get { return rooms ?? (rooms = Geometry.Rooms(Data.Walls)); } }
         public int Day { get { return Data.Minute / 1440 + 1; } }

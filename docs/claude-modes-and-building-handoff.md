@@ -1,3 +1,9 @@
+# Integration update — read first
+
+Claude's mode catalog through `029e5d9` has been integrated. Codex wired the opening wizard, explicit charter finances, actual starter layouts and saved-holding labels; see docs/game-modes.md. Preserve these and the 133 combined checks. Your next menu/placement work should improve interaction and catalog dragging around this completed acquisition path. Existing-file ownership below remains the interface handoff; check COORDINATION.md and acknowledge your branch/SHA before editing. Codex is publishing this handback and remains the only Unity runner.
+
+---
+
 # Claude continuation: opening modes, prisoner lives and faster building
 
 The user assigned Claude richer prisoner lives and the new opening-mode/HUD direction. Codex's security/services checkpoint `a6d2afc` is the integration base. Fetch the latest `codex/live-operations-handoff`, preserve your own commits and unfinished work, and read COORDINATION.md. Do not reset your branch. This handoff becomes active when the published ownership table reserves `opening-and-build-ui` for Claude and you acknowledge/claim that scope.

@@ -52,6 +52,7 @@ namespace Cellblock.Unity
                 staffPanel.Add(demo);
             }
             peoplePane.Insert(peoplePane.IndexOf(custodyPanel) + 1, staffPanel);
+            BuildModePicker();
 
             staffFileRow = Element("staff-file-row");
             staffFileLine = Text("", "staff-line"); staffFileRow.Add(staffFileLine);
@@ -77,6 +78,7 @@ namespace Cellblock.Unity
         void RefreshPersonnel(World world, Resident resident)
         {
             if (staffPanel == null || world == null) return;
+            RefreshCharterRow(world);
             StaffMember warden = world.Warden, nurse = world.Nurse;
             int open = world.OpenWriteUps().Count;
             staffSummary.text = "Warden · " + (warden == null ? "vacant: write-ups and court referrals wait" : warden.Name + (warden.Arrived ? "" : " (arriving)")) +

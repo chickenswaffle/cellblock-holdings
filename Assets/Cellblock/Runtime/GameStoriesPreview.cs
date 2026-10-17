@@ -4,6 +4,15 @@ namespace Cellblock.Unity
 {
     public sealed partial class GameHud
     {
+        public void PreviewModeStep(int step,string type,string location)
+        {pickType=type;pickTier=Cellblock.Core.GameModes.Type(type).TierId;pickLocation=location;pickRandomLocation=false;modeStep=step;RebuildModePicker();modeScroll.scrollOffset=UnityEngine.Vector2.zero;}
+        public bool PreviewModeControlsFit()
+        {
+            var button=modeStep==2?modeCreate:modeNext;var box=button.worldBound;var panel=modeSheet.worldBound;
+            return box.height>=40&&box.yMin>=panel.yMin&&box.yMax<=panel.yMax&&box.xMax<=panel.xMax;
+        }
+        public bool PreviewOpeningCardFits(){return menu.Q(className:"opening-charter").worldBound.height>=150;}
+        public void PreviewCharterMode(){Charter();}
         public void PreviewPersonnelFile(string id){CloseFacilityEventSheet();OpenSheet(PersonnelSheet.File,id);}
         public void PreviewHiringBoard(){CloseFacilityEventSheet();OpenSheet(PersonnelSheet.Hiring,"");}
         public void PreviewCloseJournal(){CloseInteractionSheets();}

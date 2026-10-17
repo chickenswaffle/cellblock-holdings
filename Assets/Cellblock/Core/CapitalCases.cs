@@ -10,9 +10,9 @@ namespace Cellblock.Core
         void SeedCapitalIntake()
         {
             if(!Stories.CapitalIntakePending||Data.Residents.Count==0)return;
-            Stories.CapitalIntakePending=false;
             Resident r=Data.Residents.Where(x=>x.Legal!=null&&x.Legal.Ready&&x.Legal.Charges!=null&&x.Legal.Charges.Count>0).OrderByDescending(x=>x.Legal.Status=="Sentenced").ThenByDescending(x=>x.Legal.Charges.Max(c=>c.Severity)).ThenBy(x=>x.Id,StringComparer.Ordinal).FirstOrDefault();
             if(r==null)return;
+            Stories.CapitalIntakePending=false;
             // This one intake slot is an authored pre-existing case in a brand-new high-security
             // contract. Never convert an existing company's allegations into convictions.
             r.Name="Elias Mercer";

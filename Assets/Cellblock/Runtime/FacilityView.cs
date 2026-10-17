@@ -146,6 +146,7 @@ namespace Cellblock.Unity
             Combine(site);
         }
 
+        Transform propertyBoundary;
         void Landscape(Transform site)
         {
             float siteX = Geometry.SiteX, siteY = Geometry.SiteY;
@@ -191,11 +192,13 @@ namespace Cellblock.Unity
                 Box(site, "Entry paving joint", new Vector3(-5.35f + i * 1.34f, 0.10f, -10), new Vector3(0.014f, 0.01f, 3.5f), "joint", new Color(0.47f, 0.50f, 0.46f));
             // The visible property boundary is the same rectangle used by quote validation.
             // Leave its six metre entrance open; this fence is presentation, not a route barrier.
-            Fence(site, new Point(-siteX, siteY), new Point(siteX, siteY));
-            Fence(site, new Point(-siteX, -siteY), new Point(-5, -siteY));
-            Fence(site, new Point(1, -siteY), new Point(siteX, -siteY));
-            Fence(site, new Point(-siteX, -siteY), new Point(-siteX, siteY));
-            Fence(site, new Point(siteX, -siteY), new Point(siteX, siteY));
+            if(propertyBoundary==null)propertyBoundary=Root("Property boundary");
+            Fence(propertyBoundary, new Point(-siteX, siteY), new Point(siteX, siteY));
+            Fence(propertyBoundary, new Point(-siteX, -siteY), new Point(-5, -siteY));
+            Fence(propertyBoundary, new Point(1, -siteY), new Point(siteX, -siteY));
+            Fence(propertyBoundary, new Point(-siteX, -siteY), new Point(-siteX, siteY));
+            Fence(propertyBoundary, new Point(siteX, -siteY), new Point(siteX, siteY));
+            Combine(propertyBoundary);
             for (int i = 0; i < 4; i++)
             {
                 float x = i < 2 ? -5.05f : 1.05f, z = i % 2 == 0 ? -siteY + 0.2f : -siteY + 1.8f;
@@ -924,6 +927,7 @@ namespace Cellblock.Unity
                 foreach (Fixture fixture in world.Data.Fixtures) FixtureView(structures, fixture);
                 Combine(structures);
             }
+            if(propertyBoundary!=null)propertyBoundary.gameObject.SetActive(world.FacilityMode.PerimeterRisk<=0);
             RefreshConstruction(world, force);
             foreach (Actor actor in actors.Values) actor.Seen = false;
             for (int i = 0; i < world.Data.Residents.Count; i++)

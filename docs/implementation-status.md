@@ -5,7 +5,7 @@ This records a working local development milestone, with the broader game still 
 ## Implemented
 
 - Unity project with separate engine-independent core, runtime presentation, and editor setup assemblies. The Mac launcher uses an installed editor; the current editor is **6000.3.24f1**.
-- Three contract starts with different reserves, populations, obligations, payment timing, and service bonuses; they share the editable starter building.
+- Three preserved legacy contract IDs plus a twelve-profile opening charter across City/County/State/Federal tiers and eligible selected/random locations. New holdings receive mode-specific terms, population, staffing and editable shared/dorm/secure/single-cell layouts. Existing saves preserve their terms and geometry.
 - Straight, diagonal, and quadratic curved walls; arc-length door openings; connected editable prefab wings; room/floor topology and routing derived from the building data.
 - Draft, approved construction, and operational geometry remain separate. Quotes, crews, wages, dependencies, handover, assignment-preserving bed replacements, and route checks connect building decisions to operation.
 - Twenty-three furnishing definitions in Housing, Hygiene, Dining, Recreation, Administration, Security, and Services. Each has a model, footprint, access side, material price, placement rotation, and quote/handover flow. The separate Structure category contains walls, curves, doors, and wings.
@@ -21,6 +21,14 @@ This records a working local development milestone, with the broader game still 
 - Universal native macOS AppKit magnify plugin; mobile pinch direction and ownership handling; queued Mac events drain through modals/focus changes.
 - Integrated legal profiles (allegations/charges, sentences, court dates), court van/away visibility, release records, escape risk and warnings, close supervision, CCTV/guard/gate detection and interactive alarm controls. Mobile officers physically route to detected attempts; only actual proximity and wall sightlines can intercept.
 - Integer-cent accounting and reconciled ledger. Company saves preserve identities, plans, and jobs, with atomic replacement/backup recovery and version-1 social-field hydration. New/resumed companies start paused; no closed-game catch-up.
+
+## People, events and modes continuation
+
+133 core checks pass in the latest integration. Twenty-one focused people/events/mode Play frames and nine final security/construction regression frames pass with no runtime errors. Claude's personnel and mode catalog through `029e5d9` is integrated with Codex's security, physical custody, modal input guards and new-world wiring. Personnel files, recruitment, warden/nurse posts, legal reviews, health and fights are available. The shared moving-target route fix makes watch officers advance instead of repeatedly consuming their current-position waypoint.
+
+Facility goals, actual state/federal inspection visits, public demonstrations, rival contract pressure, named gang organizers/instigators, and fictional capital-case appeals/stays/escorted transport/outcome records persist on the explicit game clock. Characters have more detailed faces, clothing and equipment; public frontage has street furniture and planting. Close traffic yields or uses valid sidesteps. Supermax authorized movement requires actual nearby assigned mobile officers.
+
+The broader resident-lives/programs and catalog dragging/HUD redesign are Claude's next reserved work. Known personnel balance/exploit issues are listed in the latest handoff. See [facility stories](facility-stories.md) and [mode starts](game-modes.md) for precise limits.
 
 ## Security/services continuation
 

@@ -309,7 +309,10 @@ namespace Cellblock.Core
                 travel = new Travel { Target = target, Revision = GeometryRevision, Path = new Queue<Point>(found ?? new List<Point>()) };
                 workerPaths[key] = travel;
             }
-            if (travel.Path.Count == 0) return false;
+            // Moving-target routes often begin at the current position. Consume that
+            // waypoint now so a refreshed escort/watch route still makes forward progress.
+            while(travel.Path.Count>0&&Geometry.Distance(position,travel.Path.Peek())<=.001f)travel.Path.Dequeue();
+            if (travel.Path.Count == 0) return Geometry.Distance(position,target)<.12f;
             Point next = travel.Path.Peek(), delta = next - position;
             if (!Routes.Clear(position, next)) { workerPaths.Remove(key); return false; }
             if (delta.Length <= speed) { position = next; travel.Path.Dequeue(); }
@@ -425,6 +428,7 @@ namespace Cellblock.Core
                 }
                 bool responding = staff.Role == "Officer" && !IsWarden(staff) && staff.SecurityRole != "Tower" && Escape.Detected && !Compromised(staff,Escapee) && Escape.Phase != "None";
                 Point capitalGoal=staff.Station;bool capitalEscort=!responding&&CapitalEscortTarget(staff,out capitalGoal);
+                Point secureGoal=staff.Station;bool secureEscort=!responding&&!capitalEscort&&SecureEscortTarget(staff,out secureGoal);
                 Resident escapee = responding ? Data.Residents.FirstOrDefault(r => r.Id == Escape.ResidentId) : null;
                 if (escapee != null)
                 {
@@ -433,6 +437,7 @@ namespace Cellblock.Core
                     staff.NextDutyMinute = Data.Minute; // refresh a moving target, including after a reload
                 }
                 else if(capitalEscort){staff.Destination=capitalGoal;staff.NextDutyMinute=Data.Minute;}
+                else if(secureEscort){staff.Destination=secureGoal;staff.NextDutyMinute=Data.Minute;}
                 else if (Data.Minute >= staff.NextDutyMinute)
                 {
                     Point goal = staff.Station;
@@ -463,6 +468,7 @@ namespace Cellblock.Core
                 }
                 if (responding) staff.Duty = "Responding to escape";
                 else if(capitalEscort)staff.Duty="Capital transfer escort";
+                else if(secureEscort)staff.Duty="Secure movement escort";
                 if (!at) continue;
                 if (staff.Role == "Technician")
                     foreach (Fixture camera in Data.Fixtures.Where(f => SecurityRules.Equipment(f.Kind) && Geometry.Distance(Geometry.AccessPoint(f), staff.Position) < 1)) camera.Condition = Math.Min(100, camera.Condition + 0.7f);

@@ -29,6 +29,9 @@ static partial class Program
             State state=RoundTrip(w.Data);state.FacilityStoryVersion=0;state.FacilityStories=null;World loaded=new World(state);
             Check(!loaded.Stories.CapitalIntakePending,"Legacy empty geometry inferred a new conviction");
         });
+        Test("early presentation cannot consume an authored intake before legal profiles exist",()=>{
+            World w=World.Start("modernize");w.EnsureFacilityStories();JusticeRules.EnsureProfiles(w.Data);w.EnsureFacilityStories();Check(w.Stories.CapitalCases.Count==1,"Pending intake was lost before profiles existed");
+        });
         Test("goals grant once and completed progress survives save",()=>{
             World w=StoryWorld();FacilityGoal goal=w.Stories.Goals.First(g=>g.Id=="inspection");w.Stories.InspectionsPassed=1;long cash=w.Data.CashCents;
             w.AdvanceMinutes(1);Check(goal.CompletedMinute>=0&&goal.Progress==1,"Goal not completed");

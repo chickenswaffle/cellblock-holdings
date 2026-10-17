@@ -147,6 +147,8 @@ namespace Cellblock.Core
             var present=Data.Residents.Where(IsPresent).ToList();if(present.Count==0)return 75;
             return Geometry.Clamp((float)present.Average(r=>r.Food*.35f+r.Health*.40f+ComfortAt(r.Home)*.25f),0,100);
         }
+        public int RequiredInspectionScore {get{return Data.Mode.ExplicitTerms?60+ModeTier.Level*5:65;}}
+        public int InspectionInterval {get{return Data.Mode.ExplicitTerms?Math.Max(1440,5760/ModeTier.Level):2880;}}
         public int CurrentInspectionScore()
         {
             float staff=Math.Min(100,Data.Staff.Count(s=>IsOnShift(s)&&s.Role=="Officer")*35+Data.Staff.Count(s=>IsOnShift(s)&&s.Role=="Caseworker")*25);
@@ -173,7 +175,7 @@ namespace Cellblock.Core
                 if(!Stories.Incidents.Any(e=>e.Kind=="Inspection"&&e.Phase!="Resolved"))ScheduleFacilityIncident("Inspection",120,Stories.InspectionsPassed%2==0?"State":"Federal");
                 if(Stories.InspectionsFailed>0&&!Stories.Incidents.Any(x=>x.Kind=="Pressure"&&x.SubjectId==""&&x.Phase!="Resolved")){var challenge=ScheduleFacilityIncident("Pressure",180);if(challenge!=null){challenge.SubjectId="";challenge.Title=Stories.Rival+" challenges the contract";challenge.Body="The rival operator is citing oversight failures. Keep inspection readiness above 65 to defend the renewal.";}}
                 if(Stories.Reputation<50&&!Stories.Incidents.Any(e=>e.Kind=="Protest"&&e.Phase!="Resolved"))ScheduleFacilityIncident("Protest",90);
-                Stories.NextIncidentMinute=Data.Minute+2880;
+                Stories.NextIncidentMinute=Data.Minute+InspectionInterval;
             }
             foreach(var n in Stories.Notables.Where(n=>Data.Minute>=n.NextPressureMinute))
             {
@@ -200,7 +202,7 @@ namespace Cellblock.Core
                     if(visitingCheckpoint==3&&arrived)
                     {
                         int score=e.Score/3+(e.Prepared?5:0);e.Score=score;
-                        if(score>=65){Stories.InspectionsPassed++;ResolveFacilityIncident(e,"Passed · "+score+"/100. Standards verified.",5,50000);}
+                        if(score>=RequiredInspectionScore){Stories.InspectionsPassed++;ResolveFacilityIncident(e,"Passed · "+score+"/100. Standards verified.",5,50000);}
                         else{Stories.InspectionsFailed++;ResolveFacilityIncident(e,"Improvement notice · "+score+"/100. Correct staffing and welfare before the next visit.",-8,-75000);}
                     }
                     else if(Data.Minute>=e.DeadlineMinute){Stories.InspectionsFailed++;ResolveFacilityIncident(e,"Visit could not finish: access or operational readiness needs attention.",-5,-35000);}
@@ -215,7 +217,7 @@ namespace Cellblock.Core
                     }
                     else if(e.Kind=="Pressure")
                     {
-                        if(e.SubjectId==""){bool defended=CurrentInspectionScore()>=65;ResolveFacilityIncident(e,defended?"Operational evidence supported the contract renewal.":"The challenge gained support; a federal follow-up is required.",defended?3:-6);if(!defended)ScheduleFacilityIncident("Inspection",180,"Federal");continue;}
+                        if(e.SubjectId==""){bool defended=CurrentInspectionScore()>=RequiredInspectionScore;ResolveFacilityIncident(e,defended?"Operational evidence supported the contract renewal.":"The challenge gained support; a federal follow-up is required.",defended?3:-6);if(!defended)ScheduleFacilityIncident("Inspection",180,"Federal");continue;}
                         Resident r=Data.Residents.FirstOrDefault(x=>x.Id==e.SubjectId);bool staffed=r!=null&&Data.Staff.Any(s=>IsOnShift(s)&&Geometry.Distance(s.Position,r.Position)<4&&SightLines.Clear(s.Position,r.Position));
                         bool eased=e.Prepared&&staffed&&IsPresent(r);NotableResident leader=Stories.Notables.FirstOrDefault(n=>n.ResidentId==e.SubjectId);if(leader!=null)leader.Influence=Math.Max(0,Math.Min(100,leader.Influence+(eased?-5:5)));
                         if(r!=null&&IsPresent(r)){r.Stress=Geometry.Clamp(r.Stress+(eased?-12:8),0,100);r.Safety=Geometry.Clamp(r.Safety+(eased?5:-5),0,100);}

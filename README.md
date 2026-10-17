@@ -2,7 +2,7 @@
 
 A Unity reboot of a prison ownership and management simulation for iPhone, iPad, Mac, and potentially Windows/Steam. The player chooses a contract, takes over an editable starter facility, and connects building decisions to people, construction, and business results.
 
-**Current milestone: local Unity playable.** The project imports and runs in Unity 6000.3.24f1 on this Mac. The engine-independent core passes 84 executable checks. The presentation now includes detailed procedural architecture and people, a categorized furnishing catalog, individual resident/social dynamics, physical crew/staff arrivals, staged construction, prison controls, live CCTV, and packaged prefab units. Native builds and actual phone performance remain unverified; the [visual study](docs/concepts/visual-direction-study.png) remains an art direction reference.
+**Current milestone: local Unity playable.** The project imports and runs in Unity 6000.3.24f1 on this Mac. The engine-independent core passes 133 executable checks. The new-holding flow offers City/County/State/Federal jurisdictions, twelve institution profiles and selected or random eligible locations with matching finances, populations and editable layouts. Play includes detailed people, personnel files/recruitment, live inspections, goals, protests, gang pressure, fictional capital-case proceedings, physical arrivals/building/security and packaged prefab units. See [mode integration](docs/game-modes.md) and [facility stories](docs/facility-stories.md). Native builds and actual phone performance remain unverified; the [visual study](docs/concepts/visual-direction-study.png) remains an art direction reference.
 
 ## Open on a Mac
 

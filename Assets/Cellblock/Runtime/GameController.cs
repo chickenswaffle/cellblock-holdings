@@ -11,7 +11,7 @@ namespace Cellblock.Unity
     public enum BuildTool { Inspect, Wall, Curve, Wing, Door, Bed, Table, Meals, MoveStart, MoveEnd, Bend, MoveFixture, Furnishing }
     public sealed class CompanySave { public string FileName, Title; }
 
-    public sealed class GameController : MonoBehaviour
+    public sealed partial class GameController : MonoBehaviour
     {
         public World World { get; private set; }
         public Plan Draft { get; private set; }
@@ -70,7 +70,8 @@ namespace Cellblock.Unity
                 {
                     State state = JsonUtility.FromJson<State>(File.ReadAllText(path));
                     ContractOffer offer = Cellblock.Core.World.Offers.FirstOrDefault(o => o.Id == state.ContractId);
-                    if (offer != null) title = offer.Name + " · Day " + (state.Minute / 1440 + 1) + " · " + GameHud.Money(state.CashCents) + " · " + name.Substring(8, 6);
+                    if(state.Mode!=null&&state.Mode.ExplicitTerms&&GameModes.TypeOf(state)!=null)offer=GameModes.Offer(GameModes.TypeOf(state),GameModes.LocationOf(state));
+                    if (offer != null) title = offer.Name + " · " + offer.City + " · Day " + (state.Minute / 1440 + 1) + " · " + GameHud.Money(state.CashCents) + " · " + name.Substring(8, 6);
                 }
                 catch { title += " · try backup recovery"; }
                 result.Add(new CompanySave { FileName = name, Title = title });
@@ -103,11 +104,11 @@ namespace Cellblock.Unity
             SetTool(BuildTool.Inspect); CameraPosition(true); hud.ShowMenu();
         }
         public bool StartCompany(string contract) { return CreateCompany(contract, false); }
-        bool CreateCompany(string contract, bool preview)
+        bool CreateCompany(string contract, bool preview, string modeType=null, string modeLocation=null)
         {
             if (World != null && !Save()) return false;
             presentationPreview = preview;
-            World = Cellblock.Core.World.Start(contract); saveId = Guid.NewGuid().ToString("N");
+            World = modeType==null?Cellblock.Core.World.Start(contract):Cellblock.Core.World.StartMode(modeType,modeLocation); saveId = Guid.NewGuid().ToString("N");
             World.Data.Speed = 0; watchedCameraId = ""; nextFeed = 0; nativeInputWasBlocked = true;
             Draft = null; SelectedWall = null; SelectedFixture = null; SelectedResident = null; SelectedStaff = null; hasStart = hasEnd = false;
             accumulator = 0; view.Refresh(World, true); view.Preview(null); SetTool(BuildTool.Inspect); Recenter(); Save();

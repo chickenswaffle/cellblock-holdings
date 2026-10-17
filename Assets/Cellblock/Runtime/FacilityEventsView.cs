@@ -7,16 +7,21 @@ namespace Cellblock.Unity
 {
     public sealed partial class FacilityView
     {
+        readonly HashSet<string> eventActorIds=new HashSet<string>();
+        readonly List<string> retiredEventActors=new List<string>();
+#if UNITY_EDITOR
+        public int PreviewVisitorActorCount {get{return eventActorIds.Count;}}
+#endif
         World eventViewWorld;
         readonly Dictionary<string,Transform> visitorProps=new Dictionary<string,Transform>();
         void RefreshFacilityEventsView(World world,bool force)
         {
-            if(!ReferenceEquals(eventViewWorld,world)){visitorProps.Clear();eventViewWorld=world;}
+            if(!ReferenceEquals(eventViewWorld,world)){visitorProps.Clear();eventActorIds.Clear();eventViewWorld=world;}
             foreach(FacilityIncident incident in world.Stories.Incidents.Where(e=>e.Phase!="Resolved"&&e.StartMinute<=world.Data.Minute))
             {
                 if(incident.Kind=="Inspection")
                 {
-                    Actor inspector;bool created=!actors.TryGetValue(incident.Id,out inspector);if(created)inspector=Person(incident.Id,true,"Inspector");
+                    Actor inspector;bool created=!actors.TryGetValue(incident.Id,out inspector);if(created){inspector=Person(incident.Id,true,"Inspector");eventActorIds.Add(incident.Id);}
                     inspector.Seen=true;inspector.Root.gameObject.SetActive(true);inspector.Motion.Position=incident.Visitor;inspector.Motion.WalkSpeed=.95f;
                     inspector.PoseArms=incident.Phase=="Reviewing";MoveActor(inspector,inspector.Motion,world,force||created);
                     if(inspector.PoseArms){inspector.Limbs[0].localRotation=Quaternion.Euler(-35,0,-8);inspector.Forearms[0].localRotation=Quaternion.Euler(-65,0,0);inspector.Limbs[1].localRotation=Quaternion.Euler(-25,0,8);inspector.Forearms[1].localRotation=Quaternion.Euler(-70,0,0);}
@@ -29,6 +34,13 @@ namespace Cellblock.Unity
                 }
                 if(incident.Kind=="Protest")for(int i=0;i<8;i++)RefreshCampaigner(world,incident,i,force);
             }
+            retiredEventActors.Clear();
+            foreach(string id in eventActorIds)
+            {
+                Actor old;if(!actors.TryGetValue(id,out old)||old.Seen)continue;
+                Clear(old.Root);Destroy(old.Root.gameObject);actors.Remove(id);visitorProps.Remove(id);retiredEventActors.Add(id);
+            }
+            foreach(string id in retiredEventActors)eventActorIds.Remove(id);
             foreach(CapitalCase capital in world.Stories.CapitalCases)
             {
                 string key="capital/"+capital.ResidentId;CourtVanView van;
@@ -42,7 +54,7 @@ namespace Cellblock.Unity
         }
         void RefreshCampaigner(World world,FacilityIncident incident,int index,bool force)
         {
-            string id=incident.Id+"/public/"+index;Actor actor;bool created=!actors.TryGetValue(id,out actor);if(created)actor=Person(id,true,"Visitor");
+            string id=incident.Id+"/public/"+index;Actor actor;bool created=!actors.TryGetValue(id,out actor);if(created){actor=Person(id,true,"Visitor");eventActorIds.Add(id);}
             actor.Seen=true;actor.Root.gameObject.SetActive(true);
             // Public sidewalk is outside the playable site. These visitors never enter resident navigation.
             float elapsed=world.Data.Minute-incident.StartMinute;float arrival=Mathf.Clamp01((elapsed-index*2)/32f);
