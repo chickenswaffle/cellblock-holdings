@@ -545,20 +545,25 @@ namespace Cellblock.Core
             List<Point> yards = BuildYardExtras(Data.Yard, walls, checkedFixtures, routes);
             // The meal plan the planned building would produce, with homes after any planned moves.
             MealPlan plan = BuildMealPlan(places, Data.Residents.Select(r => { HomeMove m = moves == null ? null : moves.LastOrDefault(x => x.Resident == r.Name); return m == null ? r.Home : m.Home; }).ToList());
-            if (Data.Staff.Any(staff => !PeopleDynamics.ClearStaffStation(staff.Position, routes, checkedFixtures) || !PeopleDynamics.ClearStaffStation(staff.Station, routes, checkedFixtures)))
+            if (Data.Staff.Any(staff => !PeopleDynamics.ClearStaffStation(staff.Station, routes, checkedFixtures)))
                 return "This plan blocks a staff station. Relocate the furnishing or change the wall plan.";
+            // Where someone happens to be standing only matters if a wall would trap them. A furnishing is installed
+            // by a crew later, and anyone in its way steps aside at handover (a sleeping owner beside the bed being moved).
+            var wallRoutes = new Navigation(walls);
+            if (Data.Staff.Any(staff => staff.Arrived && !wallRoutes.Clear(staff.Position, staff.Position)))
+                return "A staff member is inside the proposed wall. Wait or change this stage.";
             for (int i = 0; i < Data.Residents.Count; i++)
             {
                 Resident resident = Data.Residents[i];
                 // A floor mattress or an intake case is re-housed after construction rather than blocking it.
-                if (RouteExempt(resident)) { if (!routes.Clear(resident.Position, resident.Position) && IsPresent(resident)) return "A resident is inside the proposed wall or would lose access. Wait or change this stage."; continue; }
+                if (RouteExempt(resident)) { if (!wallRoutes.Clear(resident.Position, resident.Position) && IsPresent(resident)) return "A resident is inside the proposed wall or would lose access. Wait or change this stage."; continue; }
                 HomeMove move = moves == null ? null : moves.LastOrDefault(m => m.Resident == resident.Name);
                 Point home = move == null ? resident.Home : move.Home;
                 Point meal = plan.Places[plan.Place[i]], yard = i < 12 || yards.Count == 0 ? YardRow(Data.Yard, i % 12) : yards[(i - 12) % yards.Count];
                 if (!routes.Clear(meal, meal) || !routes.Clear(yard, yard) ||
                     routes.Find(home, meal) == null || routes.Find(home, yard) == null)
                     return "This plan cuts off " + resident.Name + "'s route to meals or the yard. Add a doorway or another route.";
-                if (routes.Find(resident.Position, meal) == null && routes.Find(resident.Position, home) == null)
+                if (IsPresent(resident) && wallRoutes.Find(resident.Position, meal) == null && wallRoutes.Find(resident.Position, home) == null)
                     return "A resident is inside the proposed wall or would lose access. Wait or change this stage.";
             }
             return "";
@@ -574,6 +579,60 @@ namespace Cellblock.Core
             if (blocked != "") { Notice = blocked; return false; }
             Data.Dining = table.Position; ClearResidentPaths();
             Notice = "Meal service moved. Watch travel times, delivery, and earned service payments."; return true;
+        }
+        // Furnishing placement: the nearest spot to where the player pointed that the quote will accept for walls, rooms
+        // and other items. Wall-drawing snap pulls points onto walls, which is right for walls and wrong for furniture:
+        // a bed dropped beside a wall should sit flush against it, not through it.
+        public const float FurnishingWallClearance = 0.13f;
+        string fitKey = ""; Point fitResult;
+        public Point FitFurnishing(string kind, float rotation, Point desired, string movingId = null)
+        {
+            FixtureDefinition definition = FixtureCatalog.Get(kind);
+            if (definition == null) return desired;
+            string key = kind + "|" + rotation + "|" + desired.X + "," + desired.Y + "|" + movingId + "|" + GeometryRevision + "|" + Data.Fixtures.Count + "|" + Data.Projects.Count(p => !p.Completed);
+            if (key == fitKey) return fitResult;
+            var walls = FutureWalls();
+            var segments = walls.SelectMany(w => Geometry.Segments(w, false)).Where(seg => Geometry.SegmentDistance(seg, new Segment(desired, desired)) < 4).ToList();
+            var fixtures = FutureFixtures().Where(f => f.Id != movingId && Geometry.Distance(f.Position, desired) < 5).ToList();
+            var rooms = Geometry.Rooms(walls);
+            bool outdoor = SecurityRules.Outdoor(kind);
+            // The space in front of the item must be walkable, as the quote requires.
+            var nav = new Navigation(walls, FutureFixtures().Where(f => f.Id != movingId).ToList());
+            bool Fits(Point at)
+            {
+                if (Math.Abs(at.X) >= Geometry.SiteX - 1 || Math.Abs(at.Y) >= Geometry.SiteY - 1) return false;
+                var footprint = Geometry.Footprint(new Fixture { Kind = kind, Position = at, Rotation = rotation });
+                if (!outdoor && !rooms.Any(room => footprint.All(q => Geometry.Contains(room, q)))) return false;
+                foreach (Segment seg in segments)
+                {
+                    if (Geometry.Contains(footprint, (seg.A + seg.B) * 0.5f)) return false;
+                    for (int i = 0; i < footprint.Count; i++)
+                        if (Geometry.SegmentDistance(seg, new Segment(footprint[i], footprint[(i + 1) % footprint.Count])) < FurnishingWallClearance) return false;
+                }
+                foreach (Fixture other in fixtures) if (Geometry.Overlap(footprint, Geometry.Footprint(other))) return false;
+                Point access = Geometry.AccessPoint(new Fixture { Kind = kind, Position = at, Rotation = rotation });
+                if (!outdoor && !rooms.Any(room => Geometry.Contains(room, access))) return false;
+                return nav.Clear(access, access);
+            }
+            Point best = desired;
+            if (!Fits(desired))
+            {
+                // Rings outward in 5 cm steps, up to a metre and a half (half a long bed plus clearance): the closest fit wins.
+                bool found = false;
+                for (int ring = 1; ring <= 30 && !found; ring++)
+                {
+                    float bestDistance = float.MaxValue;
+                    for (int y = -ring; y <= ring; y++) for (int x = -ring; x <= ring; x++)
+                    {
+                        if (Math.Max(Math.Abs(x), Math.Abs(y)) != ring) continue;
+                        Point candidate = desired + new Point(x * 0.05f, y * 0.05f);
+                        float d = Geometry.Distance(candidate, desired);
+                        if (d < bestDistance && Fits(candidate)) { best = candidate; bestDistance = d; found = true; }
+                    }
+                }
+            }
+            fitKey = key; fitResult = best;
+            return best;
         }
         public Quote Quote(Plan request)
         {
@@ -644,10 +703,15 @@ namespace Cellblock.Core
                 { result.Message = FixtureCatalog.Get(fixture.Kind).Name + " overlaps another item. Move it or include that item in the renovation."; return result; }
                 futureFixtures.Add(fixture);
             }
+            // Only conflicts this plan creates: its furnishings against every wall, and its walls against every furnishing.
+            // An existing item that already sits against an existing wall is not this plan's problem and must not block it.
+            var planWalls = new HashSet<Wall>(plan.Walls);
+            var planFixtures = new HashSet<Fixture>(plan.Fixtures);
             foreach (Fixture fixture in futureFixtures)
             {
                 var footprint = Geometry.Footprint(fixture);
-                foreach (Segment wall in future.SelectMany(w => Geometry.Segments(w, false)))
+                bool changed = planFixtures.Contains(fixture);
+                foreach (Segment wall in future.Where(w => changed || planWalls.Contains(w)).SelectMany(w => Geometry.Segments(w, false)))
                 {
                     if (Geometry.Contains(footprint, (wall.A + wall.B) * 0.5f) || Enumerable.Range(0, footprint.Count).Any(i =>
                         Geometry.SegmentDistance(wall, new Segment(footprint[i], footprint[(i + 1) % footprint.Count])) < 0.11f))
@@ -683,7 +747,9 @@ namespace Cellblock.Core
             Project priorDining = Data.Projects.LastOrDefault(p => !p.Completed && p.RelocatesDining);
             Point finalDining = plan.RelocatesDining ? plan.Dining : priorDining != null ? priorDining.Dining : Data.Dining;
             var futureRoutes = new Navigation(future, futureFixtures);
-            if (Data.Staff.Any(staff => !PeopleDynamics.ClearStaffStation(staff.Position, futureRoutes, futureFixtures) || !PeopleDynamics.ClearStaffStation(staff.Station, futureRoutes, futureFixtures)))
+            // A post must stay clear; nothing is installed directly on top of someone on duty. Passing near a person is fine.
+            if (Data.Staff.Any(staff => !PeopleDynamics.ClearStaffStation(staff.Station, futureRoutes, futureFixtures) ||
+                    (staff.Arrived && plan.Fixtures.Any(f => Geometry.Contains(Geometry.Footprint(f), staff.Position)))))
             { result.Message = "This plan blocks a staff station. Relocate the furnishing or change the wall plan."; return result; }
             foreach (Fixture fixture in plan.Fixtures)
             {
@@ -735,6 +801,15 @@ namespace Cellblock.Core
             Data.Projects.Add(project);
             Notice = Data.Crews.Count == 0 ? "Project approved. Hire a construction crew to begin." : "Project approved. Crews will begin preparation.";
             return true;
+        }
+        // After a handover, anyone standing where a new furnishing now is moves to the nearest clear spot.
+        void StepAside()
+        {
+            var nav = Routes;
+            foreach (Resident r in Data.Residents)
+                if (IsPresent(r) && !nav.Clear(r.Position, r.Position)) { r.Position = NearbyClear(r.Position, nav); RemoveResidentPath(r); r.NextDecisionMinute = Data.Minute; }
+            foreach (StaffMember s in Data.Staff)
+                if (s.Arrived && !PeopleDynamics.ClearStaffStation(s.Position, nav, Data.Fixtures)) s.Position = NearbyClear(s.Position, nav);
         }
         void InvalidateGeometry()
         {
@@ -796,7 +871,7 @@ namespace Cellblock.Core
                     foreach (HomeMove move in project.HomeMoves) Data.Residents.First(r => r.Name == move.Resident).Home = move.Home;
                     if (project.RelocatesDining) Data.Dining = project.Dining;
                     project.Completed = true; project.CompletedMinute = Data.Minute; project.Status = "Operational";
-                    InvalidateGeometry(); Notice = project.Name + " completed and handed over.";
+                    InvalidateGeometry(); StepAside(); Notice = project.Name + " completed and handed over.";
                     crew.Working = false; crew.WorkPhase = "Idle"; crew.Activity = "Project handed over"; break;
                 }
                 if (crew.ProjectId == "") crew.WorkPhase = "Idle";

@@ -9,5 +9,6 @@ static partial class Program
         RunKitchenChecks();
         RunCounselChecks();
         RunRoleChecks();
+        RunPlacementChecks();
     }
 }

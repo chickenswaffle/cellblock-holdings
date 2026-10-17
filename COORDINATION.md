@@ -247,6 +247,20 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
   - an escape-plan hook for escape intel;
   - optional note and meeting props.
 
+### 2026-10-17 — placement fix: furniture and exterior lights refused ("plan needs attention")
+
+- **User report:** exterior lights refused everywhere outside, and a bed moved inside its room refused as if it hit a wall. Reproduced in core with a probe across all 12 start layouts at four times of day. Three causes, all fixed in Claude's files:
+  1. **`Quote` re-checked every existing furnishing against every wall.** In the secure-cells layout (county-maximum, state-modernization) the second bed of each cell sits flush on the cell wall (0.00 m, under the 0.11 m clearance), so every plan failed with "A wall intersects furnishing": 0 of 80 light spots, every bed move. Now only conflicts the plan creates are checked: its furnishings against all walls, its walls against all furnishings.
+  2. **`CheckRoutes` treated anyone standing in a planned furnishing's clearance as trapped.** This caught the bed owner asleep beside the bed being moved, and staff walking past a light; about 25% of small bed moves failed. Now only walls trap people. Fixed staff posts (`Station`) still block, and Codex's direct-overlap rule is kept: no furnishing on top of a staff member. After handover, anyone a new item lands on steps aside (`StepAside`).
+  3. **Furniture placement used the wall-drawing snap.** `Geometry.Snap` pulls points onto walls within 0.65 m, so a bed or light dropped near a wall landed on it. Furniture tools now snap to the 0.5 m grid, then `World.FitFurnishing` settles the item at the nearest spot the quote accepts: flush against the wall with 0.13 m clearance, walkable access in front, inside a room unless outdoor, no overlap. Walls and wings keep the wall snap.
+- **Probe after the fix:** ordinary layouts 24/24 bed moves; secure-cells layouts 78/81 light spots. The rest are lights genuinely on a wall or an item.
+- **Checks:** 293/293 (5 new placement checks: unrelated construction in secure-cell starts, still refusing furniture through walls and walls through furniture, moving an occupied bed through handover with nobody left inside furniture, flush fitting against interior and exterior walls, walking past versus standing on). Unity typecheck passes for editor/macOS and iOS.
+- **For Codex (`ModeStarts.cs` `ModeLayout`, secure cells):** `Item("Bed",-9.5f,y+.9f,0)` puts the bed's edge exactly on the cell wall at `y`. y+1.05 would clear it. Construction no longer depends on it, but the bed visually touches the wall.
+- **Unity check request:**
+  - In county-maximum, place an exterior light anywhere in the yard: the quote is valid.
+  - Move a bed by dragging it against a wall: the preview settles flush, green, beside the wall.
+  - Move an occupied bed at night: the plan is accepted, and after handover the owner sleeps at the new bed.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:
