@@ -261,6 +261,15 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
   - Move a bed by dragging it against a wall: the preview settles flush, green, beside the wall.
   - Move an occupied bed at night: the plan is accepted, and after handover the owner sleeps at the new bed.
 
+### 2026-10-17 — mutation results for the economy scope; handoff
+
+- **Mutation testing:** 50 deliberate bugs across Economy, Informants, Kitchen, Counsel and Roles.
+  - The first pass caught 45; the 5 survivors got new or pinned checks and are now caught: 50/50.
+  - The survivors were the √ in exposure, protective custody out of fights, the holiday interval, the bribe write-up target and the defender delay.
+  - The exposure check exposed a real bug: a prevented attack removed its intel before exposure ran, so nobody who knew was ever exposed. Fixed.
+- **Final:** 293/293 core checks. Unity typecheck passes for editor/macOS and iOS. Builder balance on final code: 9/9 at 21 days, 9/9 at 35 days (federal rerun included).
+- **Handoff:** local locks released in Claude's clone. Rows stay Claude until you integrate `codex/claude-overload`.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:

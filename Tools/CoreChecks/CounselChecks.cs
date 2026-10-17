@@ -39,9 +39,12 @@ static partial class Program
             Check(Math.Abs(calm - (0.6f + pretrial / 60f)) < 0.001f && w.DefenderDelayDays == 0, "Calm load " + calm);
             w.Population.Backlog = 40;
             Check(Math.Abs(w.DefenderLoad - (1.6f + pretrial / 60f)) < 0.001f && w.DefenderDelayDays == (int)Math.Round((w.DefenderLoad - 1) * 3), "Overloaded load " + w.DefenderLoad + " delay " + w.DefenderDelayDays);
+            // A system 60 people behind: the office is at its 2.0 cap and continued hearings slip exactly 3 days.
+            w.Population.Backlog = 60;
+            Check(Math.Abs(w.DefenderLoad - 2f) < 0.001f && w.DefenderDelayDays == 3, "Capped load " + w.DefenderLoad + " delay " + w.DefenderDelayDays);
             Resident r = w.Data.Residents[0]; int next = w.Data.Minute + 4 * 1440;
             Hearing(w, r); r.Legal.NextCourtMinute = next; w.WatchHearings();
-            Check(r.Legal.NextCourtMinute == next + w.DefenderDelayDays * 1440 && w.Counsel.DaysDelayed == w.DefenderDelayDays, "The defender's delay was not applied");
+            Check(r.Legal.NextCourtMinute == next + 3 * 1440 && w.Counsel.DaysDelayed == 3, "The defender's delay was not applied");
         });
         Test("retainers scale with the charge; a quarter is due up front and the rest weekly", () => {
             World w = CourtWorld(); Resident r = w.Data.Residents[0]; TrustAccount a = w.AccountOf(r);
