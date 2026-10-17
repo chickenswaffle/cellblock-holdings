@@ -176,7 +176,7 @@ namespace Cellblock.Core
         bool WalkFresh(string key, ref Point position, Point target, float speed)
         {
             Travel travel;
-            if (workerPaths.TryGetValue(key, out travel) && travel.Path.Count == 0 && Geometry.Distance(position, target) >= 0.12f) workerPaths.Remove(key);
+            if (workerPaths.TryGetValue(key, out travel) && travel.Path.Count == 0 && Geometry.Distance(position, target) >= 0.12f) RemoveWorkerPath(key);
             return Walk(key, ref position, target, speed);
         }
         void BeginIntake(Resident resident)
@@ -393,7 +393,7 @@ namespace Cellblock.Core
             resident.Intake.Processed = true; resident.Intake.CompletedMinute = Data.Minute;
             resident.Legal.CooldownUntil = Data.Minute;
             s.Cases.Remove(c); s.Processed++;
-            workerPaths.Remove("intake/" + resident.Id); paths.Remove(resident); destinations.Remove(resident); resident.NextDecisionMinute = Data.Minute;
+            RemoveWorkerPath("intake/" + resident.Id); RemoveResidentPath(resident); resident.NextDecisionMinute = Data.Minute;
             string where = resident.FloorBed ? "a floor mattress (no free bed)" : "a bed";
             string skipped = c.Skipped.Count > 0 ? " Skipped: " + string.Join(", ", c.Skipped).ToLowerInvariant() + "." : "";
             PeopleDynamics.Record(Data, "intake", resident.Id, resident.Name + " completed " + resident.Intake.Level.ToLowerInvariant() + " intake in " + (Data.Minute - c.StartMinute) + " minutes and was housed on " + where + "." + skipped, 1);

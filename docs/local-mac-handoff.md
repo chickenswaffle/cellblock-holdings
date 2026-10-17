@@ -17,7 +17,7 @@ Read `README.md`, `CLAUDE.md`, `docs/reboot-vision.md`, and `docs/implementation
 3. Run `bash Tools/open-unity-mac.sh`, open the generated main scene, and enter Play mode. Inspect the output and controls; fix observed problems. Continue through a working local playable milestone.
 4. Use an independent critic subagent for focused design and implementation reviews, as requested by the user. Start from the existing implementation instead of restarting brainstorming. Ask only questions that materially block progress.
 
-The initial cloud milestone passed 27 core checks. The continued local milestone now passes 84 core checks and runs in the installed Unity 6000.3.24f1 editor on this Intel Mac. Project setup and Play mode have run locally. See `docs/implementation-status.md` for current evidence and limits. Native builds and actual phone/tablet performance remain unverified. Use **Cellblock → Open game and Play**, then choose or resume a holding; **Controls** explains camera input and **People** opens individual profiles; **Control** manages arrivals, staff, lighting, alarm, gates and live CCTV. Six prefab units have optional fitout packages. Builders physically collect/carry materials and use task-specific tools. One agent owns all Unity runs.
+The initial cloud milestone passed 27 core checks. The continued local milestone now passes 202 core checks and runs in the installed Unity 6000.3.24f1 editor on this Intel Mac. Project setup and Play mode have run locally. See `docs/implementation-status.md` for current evidence and limits. Native builds and actual phone/tablet performance remain unverified. Use **Cellblock → Open game and Play**, then choose or resume a holding; **Controls** explains camera input and **People** opens individual profiles; **Control** manages arrivals, staff, lighting, alarm, gates and live CCTV. Six prefab units have optional fitout packages. Builders physically collect/carry materials and use task-specific tools. One agent owns all Unity runs.
 
 ## Product direction
 
@@ -30,3 +30,11 @@ Initial hardware references are iPhone 17 Pro, an iPad Pro whose generation need
 ## Current parallel continuation
 
 Claude has a reserved prisoner-lives slice and has received opening-mode/HUD direction from the user. Read `docs/claude-lives-handoff.md` and `docs/claude-coordination-update.md`. Its separate personnel branch is preserved and must be reviewed before integration. Codex's current security/services mechanics and limitations are in `docs/security-and-services-status.md`. Use the latest shared branch, retaining Unity save/presence/typed construction fixes and physical officer response.
+
+## Latest combined continuation
+
+Personnel and the twelve-profile mode catalog through Claude `029e5d9` are integrated. Start a new holding through jurisdiction, institution and location; see docs/game-modes.md. The facility journal contains goals, actual inspection visits, demonstrations and capital-case records. Read docs/facility-stories.md and the latest COORDINATION.md before continuing. The resident-lives and drag/HUD work remains reserved for Claude; do not rebuild the integrated mode system.
+
+## October 17 integration
+
+Claude overload snapshot b470a10 is integrated with direct click-to-place doors and the material/character/lighting pass. Read `docs/direct-doors.md`, `docs/presentation-polish.md`, `docs/pressure-notes.md` and the latest shared log. Preserve current physical security assignments, explicit charter terms and authored-case migration. Undo history is runtime-only; drafts survive saves and company transitions clear history. The sole Unity runner remains Codex.

@@ -2,10 +2,18 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
+## October 17 checkpoint
+
+The combined core passes **202 checks**. Claude overload snapshot `b470a10` is integrated: population transfers, coach/intake, crowding, contraband, disturbances, audits, upgrade programs, resident poses and watch-only ride-along. Codex reviewed it with an independent critic, preserved physical custody/mode/accounting integration, replaced the audit capsule with an articulated visitor and refined the coach and resident presentation.
+
+Doors now use direct clicks on proposed or installed walls, live opening previews, retained earlier doors, curved splits, quote updates and undo. Drafts survive Unity JSON; loading/changing companies clears runtime history. [Door controls](direct-doors.md) and [presentation changes](presentation-polish.md) describe the behavior and limits.
+
+A focused twelve-frame actual Unity Play review passed with no runtime errors, including shared/exterior door hit tests, exact undo and world isolation, phone quote, bed/bench poses, ride/body camera restore, transfer/intake saves, drone/disturbance and real audit visitor. The final phone-footer bounds and clothing-cache lifetime assertions passed. The existing story/menu (21 frames) and construction/security (9 frames) regressions also passed with no runtime errors: **42 actual Game-view captures** in the final matrix. Small reports and the core transcript are in `docs/reviews/2026-10-17-*`; full local frames are in `Builds/PolishReview/2026-10-17/final`, `Builds/StoriesReview/2026-10-17/final` and `Builds/SecurityReview/2026-10-17/final`.
+
 ## Implemented
 
 - Unity project with separate engine-independent core, runtime presentation, and editor setup assemblies. The Mac launcher uses an installed editor; the current editor is **6000.3.24f1**.
-- Three contract starts with different reserves, populations, obligations, payment timing, and service bonuses; they share the editable starter building.
+- Three preserved legacy contract IDs plus a twelve-profile opening charter across City/County/State/Federal tiers and eligible selected/random locations. New holdings receive mode-specific terms, population, staffing and editable shared/dorm/secure/single-cell layouts. Existing saves preserve their terms and geometry.
 - Straight, diagonal, and quadratic curved walls; arc-length door openings; connected editable prefab wings; room/floor topology and routing derived from the building data.
 - Draft, approved construction, and operational geometry remain separate. Quotes, crews, wages, dependencies, handover, assignment-preserving bed replacements, and route checks connect building decisions to operation.
 - Twenty-three furnishing definitions in Housing, Hygiene, Dining, Recreation, Administration, Security, and Services. Each has a model, footprint, access side, material price, placement rotation, and quote/handover flow. The separate Structure category contains walls, curves, doors, and wings.
@@ -22,11 +30,19 @@ This records a working local development milestone, with the broader game still 
 - Integrated legal profiles (allegations/charges, sentences, court dates), court van/away visibility, release records, escape risk and warnings, close supervision, CCTV/guard/gate detection and interactive alarm controls. Mobile officers physically route to detected attempts; only actual proximity and wall sightlines can intercept.
 - Integer-cent accounting and reconciled ledger. Company saves preserve identities, plans, and jobs, with atomic replacement/backup recovery and version-1 social-field hydration. New/resumed companies start paused; no closed-game catch-up.
 
+## People, events and modes continuation
+
+133 core checks pass in the latest integration. Twenty-one focused people/events/mode Play frames and nine final security/construction regression frames pass with no runtime errors. Claude's personnel and mode catalog through `029e5d9` is integrated with Codex's security, physical custody, modal input guards and new-world wiring. Personnel files, recruitment, warden/nurse posts, legal reviews, health and fights are available. The shared moving-target route fix makes watch officers advance instead of repeatedly consuming their current-position waypoint.
+
+Facility goals, actual state/federal inspection visits, public demonstrations, rival contract pressure, named gang organizers/instigators, and fictional capital-case appeals/stays/escorted transport/outcome records persist on the explicit game clock. Characters have more detailed faces, clothing and equipment; public frontage has street furniture and planting. Close traffic yields or uses valid sidesteps. Supermax authorized movement requires actual nearby assigned mobile officers.
+
+The broader resident-lives/programs and catalog dragging/HUD redesign are Claude's next reserved work. Known personnel balance/exploit issues are listed in the latest handoff. See [facility stories](facility-stories.md) and [mode starts](game-modes.md) for precise limits.
+
 ## Security/services continuation
 
 Connected-door draft action; retained existing openings; eight new security/service items; installed-level models and upgrade quotes with stable IDs; power capacity, room wiring, utility metering, cooling, morale/stress; qualified officer tower/K9/armed assignments; visible dogs and tower lookouts; physical escape dispatch. Essential/Enhanced prefab packages include service installations. Quotes fold the inspector, repeated placement retains item/rotation, and Z rotates new placements. See [exact mechanics and limits](security-and-services-status.md).
 
-The actual Unity security/services review passed nine Game-view captures with no runtime errors, including Unity JSON upgrade saves, night illumination, outage, phone controls and repeat-placement purchase persistence. The new opening jurisdictions/facility profiles and richer prisoner lives are Claude's assigned continuation, not implemented claims here.
+The actual Unity security/services review passed nine Game-view captures with no runtime errors, including Unity JSON upgrade saves, night illumination, outage, phone controls and repeat-placement purchase persistence. Mode acquisition/layouts and the first resident-pose layer are integrated; additional authored lives and programs remain a Claude continuation.
 
 ## Validation on this Mac
 
@@ -36,7 +52,7 @@ The actual Unity security/services review passed nine Game-view captures with no
 | Installed Unity | 6000.3.24f1, Intel macOS | Actual local installation, not a cloud editor claim |
 | Editor import/API compilation | Successful | URP 17.3 bundled packages resolved by the installed editor; generated scene, retained material/shader, UI theme, and render assets |
 | Project setup | `CELLBLOCK_PROJECT_VALIDATION_PASSED` | Actual editor validation; fixed the clean untitled startup-scene failure that previously aborted batch mode |
-| .NET core checks | 84 passed, 0 failed | Geometry/construction/accounting, people/migration/conduct, arrivals/carpools, gate/work travel, carrying/resume, bay reservation, alarm, CCTV, reports, and 72 prefab/package/rotation quotes |
+| .NET core checks | 202 passed, 0 failed | Geometry/construction/accounting, people/migration/conduct, arrivals/carpools, gate/work travel, carrying/resume, bay reservation, alarm, CCTV, reports, and 72 prefab/package/rotation quotes |
 | Security/services Play review | Passed; nine actual captures, no runtime errors | Connected door, enhanced unit, two-crew handover, staffed tower, dog, wiring/upgrade/save, night/outage and repeat placement; `Builds/SecurityReview/2026-10-16/` |
 | Unity Play review | Passed; 16 actual Game-view captures; no runtime errors | Desktop/900×420 layout, contracts, catalog, profiles and named ties, live routines, connected wing quote, camera/full-height views, all furnishing models, and Unity JSON social-state round trip |
 | Operations Play review | Passed; 12 actual captures; no runtime errors | Native magnify initialization/direction, shared arrival queues and marked-bay parking, physical supply carry, articulated saw/hammer/drill, staged housing and capacity handover, CCTV, night alarm/lights, reports, and phone Control |
@@ -55,8 +71,8 @@ Manual pointer/trackpad feel and real finger gestures; device safe areas and lif
 
 ## Current gameplay boundaries
 
-The social system is an initial simulation, with small fictional affiliations and bounded history. Gangs do not yet control territory or inventories. Misconduct is an event/risk model, with no full investigation, bribery negotiation or contraband economy. Needs and personality affect wellbeing/contact/routines, but the complete health, security, programs, admissions, and employee systems remain ahead.
+The social system is an initial simulation, with small fictional affiliations and bounded history. Gangs do not yet control territory or inventories. Misconduct includes contraband intake/stashes/searches, staff smuggling risk and disturbances; full investigations and bribery negotiation remain ahead. Needs and personality affect wellbeing/contact/routines, but the complete health, security, programs, admissions, and employee systems remain ahead.
 
 Beds provide capacity and dining tables support meal service. Other catalog furnishings currently provide geometry and presentation; complete hygiene, recreation, administration-service and utility models remain ahead; camera maintenance is implemented. Starter buildings have one floor. The perimeter is visual, without validated security/escape rules.
 
-Production human models/animation, a larger authored asset library, varied starter models, supplier inventories and delivery logistics, staged relocation, renovation refunds, financing, insolvency recovery, multiple holdings, investing, IPOs, and platform delivery remain future work. See the design brief and README for the broader direction.
+Production human models/animation, a larger authored asset library, supplier inventories and delivery logistics, staged relocation, renovation refunds, financing, insolvency recovery, multiple holdings, investing, IPOs, and platform delivery remain future work. See the design brief and README for the broader direction.

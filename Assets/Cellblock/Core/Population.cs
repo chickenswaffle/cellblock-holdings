@@ -498,7 +498,7 @@ namespace Cellblock.Core
             Fixture bed = ChooseBed(resident);
             if (bed != null) { resident.Home = Geometry.AccessPoint(bed); resident.FloorBed = false; }
             else { resident.Home = FloorSpot(resident); resident.FloorBed = true; }
-            paths.Remove(resident); destinations.Remove(resident); resident.NextDecisionMinute = Data.Minute;
+            RemoveResidentPath(resident); resident.NextDecisionMinute = Data.Minute;
         }
         // A clear spot inside a housing room, away from beds, other mattresses and furnishings. Intake holding if none.
         Point FloorSpot(Resident resident)
@@ -697,7 +697,7 @@ namespace Cellblock.Core
                 if (wasRiot) FileWriteUp(r.Id, "Resident", "Riot participation", 3, r.Name + " took part in a riot.", ResponseOfficers().FirstOrDefault());
                 else FileWriteUp(r.Id, "Resident", "Group disturbance", 2, r.Name + " joined a group disturbance.", ResponseOfficers().FirstOrDefault());
                 r.Stress = Math.Max(0, r.Stress - (how == "burned out" ? 5 : 12));
-                paths.Remove(r); destinations.Remove(r); r.NextDecisionMinute = Data.Minute;
+                RemoveResidentPath(r); r.NextDecisionMinute = Data.Minute;
             }
             p.Unrest = Math.Max(0, p.Unrest - (how == "contained" ? 18 : 25)); p.CriticalSince = -1;
             string text = (wasRiot ? "Riot over: " : "Disturbance over: ") + (how == "contained" ? "officers contained it before it spread." : how == "retaken" ? "officers retook the area." : how == "dispersed" ? "the crowd dispersed." : "the rioters exhausted themselves after hours of damage.");

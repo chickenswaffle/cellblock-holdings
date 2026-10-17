@@ -200,25 +200,10 @@ namespace Cellblock.Core
         public int GeometryRevision { get { return Data.GeometryGeneration; } }
         public string Notice = "Choose a project, review its quote, and assign a crew.";
         Navigation navigation;
-        readonly Dictionary<Resident, Queue<Point>> paths = new Dictionary<Resident, Queue<Point>>();
+        readonly Dictionary<Resident, RouteCursor> paths = new Dictionary<Resident, RouteCursor>();
         readonly Dictionary<Resident, Point> destinations = new Dictionary<Resident, Point>();
         List<List<Point>> rooms;
-        // Contract terms follow the chartered facility type and location; the three original offers map to identical terms.
-        public ContractOffer Contract
-        {
-            get
-            {
-                string key = (Data.Mode == null ? "" : Data.Mode.TypeId + "|" + Data.Mode.LocationId) + "|" + Data.ContractId;
-                if (contractTerms == null || contractKey != key)
-                {
-                    FacilityType type = GameModes.TypeOf(Data);
-                    contractTerms = type == null ? Offers.First(c => c.Id == Data.ContractId) : GameModes.Offer(type, GameModes.LocationOf(Data));
-                    contractKey = key;
-                }
-                return contractTerms;
-            }
-        }
-        ContractOffer contractTerms; string contractKey = "";
+        public ContractOffer Contract { get { return Data.Mode!=null&&Data.Mode.ExplicitTerms ? GameModes.Offer(FacilityMode,ModeLocation) : Offers.First(c => c.Id == Data.ContractId); } }
         public Navigation Routes { get { return navigation ?? (navigation = new Navigation(Data.Walls, Data.Fixtures)); } }
         public List<List<Point>> Rooms { get { return rooms ?? (rooms = Geometry.Rooms(Data.Walls)); } }
         public int Day { get { return Data.Minute / 1440 + 1; } }
@@ -290,10 +275,11 @@ namespace Cellblock.Core
             Data = data;
             ValidateOperations();
             if (!Reconciles()) throw new ArgumentException("The saved ledger does not reconcile.");
+            RestoreMovementMemory();
             // Someone standing where the route planner cannot start (reached in a straight line, beside a furnishing
             // corner) goes back to their home on load instead of making the whole save unloadable.
             foreach (Resident r in Data.Residents)
-                if (IsPresent(r) && Routes.Clear(r.Home, r.Home) && Geometry.Distance(r.Position, r.Home) > 0.01f && Routes.Find(r.Position, r.Home) == null) r.Position = r.Home;
+                if (IsPresent(r) && Routes.Clear(r.Home, r.Home) && Geometry.Distance(r.Position, r.Home) > 0.01f && Routes.Find(r.Position, r.Home) == null) { r.Position = r.Home; RemoveResidentPath(r); }
             string blocked = CheckRoutes(Data.Walls);
             if (blocked != "") throw new ArgumentException("Invalid saved routes: " + blocked);
             var occupiedStations = new Navigation(Data.Walls, Data.Fixtures);
@@ -310,28 +296,7 @@ namespace Cellblock.Core
             var state = new State { ContractId = contractId, OpeningCapitalCents = offer.CapitalCents, CashCents = offer.CapitalCents };
             var world = new World(state);
             world.Book(-offer.AcquisitionCents, "acquisition", "Land and starter facility");
-            Facility.Starter(state); world.InitializeSecurity();
-            return world;
-        }
-        // A new company chartered from a facility type and location: that type's capital, the location's land price,
-        // a seed of its own, the starter building (with a booking desk near the sally port for state and federal
-        // institutions) and the type's population, staff and rules.
-        public static World StartCharter(string typeId, string locationId)
-        {
-            FacilityType type = GameModes.Type(typeId); ModeLocation location = GameModes.Location(locationId);
-            if (type == null || location == null || !GameModes.Tier(type.TierId).Locations.Contains(location.Id)) throw new ArgumentException("Unknown facility type or location.");
-            ContractOffer offer = GameModes.Offer(type, location);
-            string contract = type.ContractId != "" ? type.ContractId : type.TierId == "state" || type.TierId == "federal" ? "modernize" : "county";
-            var state = new State { ContractId = contract, OpeningCapitalCents = offer.CapitalCents, CashCents = offer.CapitalCents, Seed = PeopleDynamics.ContractSeed(type.Id + "@" + location.Id) };
-            state.Mode = new ModeState { Version = GameModes.Version, TypeId = type.Id, LocationId = location.Id };
-            var world = new World(state);
-            world.Book(-offer.AcquisitionCents, "acquisition", "Land and starter facility · " + type.Name);
-            Facility.Starter(state);
-            if (type.TierId == "state" || type.TierId == "federal")
-                state.Fixtures.Add(new Fixture { Id = "booking-desk-" + state.NextId++, Kind = "Desk", Position = new Point(0.4f, -6.6f) });
-            world.InitializeSecurity();
-            if (!world.ApplyMode(type.Id, location.Id)) throw new ArgumentException(world.Notice);
-            world.Notice = "Chartered " + type.Name + " in " + location.Name + ". " + type.SignatureRule;
+            Facility.Starter(state); world.InitializeSecurity(); world.InitializeNewFacilityStories();
             return world;
         }
         public string Id() { return "item-" + Data.NextId++; }
@@ -471,18 +436,28 @@ namespace Cellblock.Core
             }
             return plan;
         }
-        // With several shifts a person sets off 45 minutes before their block, so the walk and the decision delay do not eat the meal.
+        // Reused seats share a serving clock. Personal routine offsets must not overlap
+        // adjacent shifts or let early travel count as eating. Walking time is part of service.
         public bool MealDue(int index, Resident resident)
         {
             int shifts = MealShifts, shift = MealShift(index);
             if (shift >= MaxMealShifts) return false;
-            int minute = ((Data.Minute + resident.RoutineOffset) % 1440 + 1440) % 1440, block = 120 / shifts, lead = shifts > 1 ? 45 : 0;
-            // A long walk still ends in a meal: someone still hungry keeps their place for an hour past the block.
-            int grace = shifts > 1 && resident.Food < MealSated ? 60 : 0;
+            int minute = MealClock(resident, shifts), block = 120 / shifts;
+            // Nobody follows the last shift at a place, so someone still hungry after a long walk keeps it for another hour.
+            int grace = shifts > 1 && shift == shifts - 1 && resident.Food < MealSated ? 60 : 0;
             foreach (int start in new[] { 7 * 60, 12 * 60, 18 * 60 })
-                if (minute >= start + shift * block - lead && minute < start + (shift + 1) * block + grace) return shifts == 1 || resident.Food < MealSated || Geometry.Distance(resident.Position, ServiceDestination(index, true)) < 0.8f;
+                if (minute >= start + shift * block && minute < start + (shift + 1) * block + grace) return true;
             return false;
         }
+        public bool MealTravelDue(int index,Resident resident)
+        {
+            int shifts=MealShifts,shift=MealShift(index);if(shift>=MaxMealShifts)return false;
+            int minute=MealClock(resident,shifts),block=120/shifts,lead=shifts>1?Math.Min(45,block-1):0;
+            int grace = shifts > 1 && shift == shifts - 1 && resident.Food < MealSated ? 60 : 0;
+            foreach(int start in new[]{7*60,12*60,18*60})if(minute>=start+shift*block-lead&&minute<start+(shift+1)*block+grace)return true;
+            return false;
+        }
+        int MealClock(Resident resident,int shifts){return ((Data.Minute+(shifts>1?0:resident.RoutineOffset))%1440+1440)%1440;}
         public int MealPlaceCount { get { return CurrentMealPlan().Places.Count; } }
         public int MealShifts { get { return CurrentMealPlan().Shifts; } }
         // Roster indexes past the plan (checks probing future slots) continue the shifts after the planned ones.
@@ -495,7 +470,7 @@ namespace Cellblock.Core
         // Which shift's block of the two-hour window this person's clock is in.
         public int CurrentMealBlock(Resident resident, int shifts)
         {
-            int minute = ((Data.Minute + resident.RoutineOffset) % 1440 + 1440) % 1440, hour = minute / 60;
+            int minute = MealClock(resident,shifts), hour = minute / 60;
             int start = hour >= 18 ? 18 * 60 : hour >= 12 ? 12 * 60 : 7 * 60;
             return Math.Max(0, Math.Min(shifts - 1, (minute - start) * shifts / 120));
         }
@@ -595,7 +570,7 @@ namespace Cellblock.Core
             { Notice = "Meal service needs an installed table inside an enclosed, accessible room."; return false; }
             string blocked = CheckRoutes(Data.Walls, null, table.Position);
             if (blocked != "") { Notice = blocked; return false; }
-            Data.Dining = table.Position; paths.Clear(); destinations.Clear();
+            Data.Dining = table.Position; ClearResidentPaths();
             Notice = "Meal service moved. Watch travel times, delivery, and earned service payments."; return true;
         }
         public Quote Quote(Plan request)
@@ -761,7 +736,7 @@ namespace Cellblock.Core
         }
         void InvalidateGeometry()
         {
-            Data.GeometryGeneration++; navigation = null; rooms = null; paths.Clear(); destinations.Clear();
+            Data.GeometryGeneration++; navigation = null; rooms = null; ClearResidentPaths();workerPaths.Clear();Data.Movement.Routes.Clear();
         }
         void Construction()
         {
@@ -891,29 +866,34 @@ namespace Cellblock.Core
             {
                 Resident resident = Data.Residents[index];
                 bool skip = false; UpdateResidentCustody(resident, ref skip); PressureMovement(resident, ref skip); if (skip) continue;
-                bool meals = !Data.Operations.Lockdown && PeopleDynamics.IsMealWindow(Data.Minute + resident.RoutineOffset);
+                bool meals = !Data.Operations.Lockdown && MealDue(index,resident);
+                bool mealTravel = !Data.Operations.Lockdown && MealTravelDue(index,resident);
                 bool yard = !Data.Operations.Lockdown && PeopleDynamics.IsYardWindow(Data.Minute + resident.RoutineOffset);
                 // When the dining room has fewer places than residents, meals run in up to four shifts.
                 // Anyone beyond four shifts of places has no seat this window and waits at home.
-                if (!Data.Operations.Lockdown) meals = MealDue(index, resident);
-                Point target = meals || yard ? ServiceDestination(index, meals) : resident.Home;
+                Point mealSeat=ServiceDestination(index,true);
+                Point target = mealTravel ? mealSeat : yard ? ServiceDestination(index,false) : resident.Home;
                 ChooseResidentActivity(resident, ref target);
                 PressureTarget(resident, ref target);
                 Point prior;
-                Queue<Point> route;
+                RouteCursor route;
                 bool decisionDue = Data.Minute >= resident.NextDecisionMinute;
                 bool hasDestination = destinations.TryGetValue(resident, out prior);
                 bool hasRoute = paths.TryGetValue(resident, out route);
                 if (decisionDue && (!hasDestination || Geometry.Distance(prior, target) > 0.1f || !hasRoute || route.Count == 0))
                 {
                     List<Point> path = Routes.Find(resident.Position, target);
-                    paths[resident] = new Queue<Point>(path ?? new List<Point>()); destinations[resident] = target;
+                    SetResidentPath(resident,path,target);
                 }
                 if (decisionDue) resident.NextDecisionMinute = Data.Minute + PeopleDynamics.DecisionInterval(resident) + (index * 7 % 11);
                 if (!paths.TryGetValue(resident, out route))
                 { resident.Food = Geometry.Clamp(resident.Food - 0.025f, 0, 100); continue; }
                 route = paths[resident];
                 float remaining = 0.32f * resident.WalkSpeed;
+                // Arrive near the dining room early, then yield the occupied bench to the
+                // current shift. The final approach and eating begin only in our block.
+                if(mealTravel&&!meals&&Geometry.Distance(target,mealSeat)<.05f&&Routes.Clear(resident.Position,mealSeat))
+                    remaining=Math.Min(remaining,Math.Max(0,Geometry.Distance(resident.Position,mealSeat)-1.1f));
                 // Follow one clear waypoint segment per simulation step. Spending leftover
                 // movement on a second segment can shortcut across the corner of a wall.
                 if (route.Count > 0)
@@ -929,7 +909,7 @@ namespace Cellblock.Core
                     {
                         Point destination = destinations[resident];
                         List<Point> path = Routes.Find(resident.Position, destination);
-                        paths[resident] = new Queue<Point>(path ?? new List<Point>());
+                        SetResidentPath(resident,path,destination);
                     }
                 }
                 resident.Food = Geometry.Clamp(resident.Food + (meals && Geometry.Distance(resident.Position, target) < 0.8f ? 0.6f : -0.025f), 0, 100);

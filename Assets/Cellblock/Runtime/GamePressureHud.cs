@@ -20,6 +20,9 @@ namespace Cellblock.Unity
         readonly Dictionary<string, Button> upgradeButtons = new Dictionary<string, Button>();
         readonly List<RiskFactor> unrestScratch = new List<RiskFactor>();
 
+#if UNITY_EDITOR
+        public void PreviewPressure(){SwitchWorkspace(Workspace.Pressure);}
+#endif
         partial void BuildPressure()
         {
             StyleSheet style = Resources.Load<StyleSheet>("Pressure");

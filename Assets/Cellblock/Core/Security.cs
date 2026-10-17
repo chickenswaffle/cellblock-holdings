@@ -163,6 +163,7 @@ namespace Cellblock.Core
             Fixture post = Data.Fixtures.FirstOrDefault(f => f.Id == postId); StaffMember officer = Data.Staff.FirstOrDefault(s => s.Id == officerId && s.Role == "Officer");
             string required = role == "Tower" ? "GuardTower" : role == "K9" ? "Kennel" : role == "Armed" ? "Armory" : "";
             if (officer == null || post == null || required != post.Kind || (role == "Armed" && post.UpgradeLevel < 1)) { Notice = "Select an officer and an appropriate operational post; armed duty needs an upgraded armory."; return false; }
+            if(IsWarden(officer)||IsSuspended(officer)){Notice="Choose an available line officer for this security post.";return false;}
             if (!EquipmentOnline(post) || Data.Projects.Any(p => !p.Completed && p.RemoveFixtures.Contains(postId)))
             { Notice = "Restore this post and finish its construction before assigning staff."; return false; }
             if (officer.SecurityPostId == postId && officer.SecurityRole == role) return false;
@@ -170,6 +171,7 @@ namespace Cellblock.Core
             bool trained = role == "Armed" ? officer.ArmedTrained : role == "K9" ? officer.DogTrained : true;
             if (!trained && Data.CashCents < 75000) { Notice = "This qualification needs a $750 training payment."; return false; }
             if (!trained) { Book(-75000,"staff-training",officer.Name+" / "+role+" qualification"); if(role=="Armed") officer.ArmedTrained=true; else officer.DogTrained=true; }
+            PersonnelFile dutyFile=FileFor(officer);if(dutyFile!=null){dutyFile.Duty="";dutyFile.WatchId="";dutyFile.MenteeId="";}
             officer.SecurityRole=role; officer.SecurityPostId=postId; officer.SecurityDailyCents=role=="Armed"?10000:role=="K9"?8000:0; officer.PostArrivedMinute=-1; officer.NextDutyMinute=0;
             Notice=officer.Name+" assigned to "+role+" duty. Arrival, shift and reachable access remain required."; return true;
         }

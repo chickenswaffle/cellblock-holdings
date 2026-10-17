@@ -29,7 +29,7 @@ namespace Cellblock.Core
         {
             public Point Target;
             public int Revision;
-            public Queue<Point> Path;
+            public RouteCursor Path;
         }
         Navigation sightLines; int sightRevision = -1;
         public Navigation SightLines { get { if (sightLines == null || sightRevision != GeometryRevision) { sightLines = new Navigation(Data.Walls); sightRevision = GeometryRevision; } return sightLines; } }
@@ -182,7 +182,7 @@ namespace Cellblock.Core
             Notice = staff.Name + " is boarding transport. Duties begin on arrival and during their shift."; return true;
         }
         public bool IsOnShift(StaffMember staff)
-        { return staff.Arrived && ((Data.Minute % 1440 - staff.ShiftStart * 60 + 1440) % 1440) < 720; }
+        { return staff.Arrived && !IsSuspended(staff) && ((Data.Minute % 1440 - staff.ShiftStart * 60 + 1440) % 1440) < 720; }
         public void SetLights(bool on) { if (Data.Operations.Lights == on) return; Data.Operations.Lights = on; OperationalEvent(on ? "Facility lighting restored." : "Facility lights switched off; CCTV night visibility is reduced."); }
         public void SetGate(bool open) { if (Data.Operations.GateOpen == open) return; Data.Operations.GateOpen = open; OperationalEvent(open ? "Vehicle gate opened; waiting arrivals may proceed." : "Vehicle gate closed; inbound vehicles wait outside."); }
         public void SetAlarm(bool on)
@@ -195,7 +195,7 @@ namespace Cellblock.Core
         public void SetLockdown(bool on)
         {
             if (Data.Operations.Lockdown == on) return; Data.Operations.Lockdown = on;
-            paths.Clear(); destinations.Clear(); foreach (Resident resident in Data.Residents) resident.NextDecisionMinute = Data.Minute;
+            ClearResidentPaths(); foreach (Resident resident in Data.Residents) resident.NextDecisionMinute = Data.Minute;
             OperationalEvent(on ? "Lockdown: residents return to assigned housing; meal and yard routines are held." : "Lockdown lifted. Residents resume individual routines.");
         }
         public void SetCameras(bool on) { if (Data.Operations.CamerasEnabled == on) return; Data.Operations.CamerasEnabled = on; OperationalEvent(on ? "CCTV network enabled." : "CCTV network disabled."); }
@@ -306,12 +306,15 @@ namespace Cellblock.Core
             if (!workerPaths.TryGetValue(key, out travel) || travel.Revision != GeometryRevision || Geometry.Distance(travel.Target, target) > 0.05f)
             {
                 List<Point> found = Routes.Find(position, target);
-                travel = new Travel { Target = target, Revision = GeometryRevision, Path = new Queue<Point>(found ?? new List<Point>()) };
+                travel = new Travel { Target = target, Revision = GeometryRevision, Path = RememberPath("Worker",key,found,target) };
                 workerPaths[key] = travel;
             }
-            if (travel.Path.Count == 0) return false;
+            // Moving-target routes often begin at the current position. Consume that
+            // waypoint now so a refreshed escort/watch route still makes forward progress.
+            while(travel.Path.Count>0&&Geometry.Distance(position,travel.Path.Peek())<=.001f)travel.Path.Dequeue();
+            if (travel.Path.Count == 0) return Geometry.Distance(position,target)<.12f;
             Point next = travel.Path.Peek(), delta = next - position;
-            if (!Routes.Clear(position, next)) { workerPaths.Remove(key); return false; }
+            if (!Routes.Clear(position, next)) { RemoveWorkerPath(key); return false; }
             if (delta.Length <= speed) { position = next; travel.Path.Dequeue(); }
             else position += delta * (speed / delta.Length);
             return Geometry.Distance(position, target) < 0.12f;
@@ -423,7 +426,9 @@ namespace Cellblock.Core
                     staff.PostArrivedMinute = -1;
                     Walk(staff.Id, ref staff.Position, staff.Station, 0.34f); staff.Duty = "Off shift / rest"; continue;
                 }
-                bool responding = staff.Role == "Officer" && staff.SecurityRole != "Tower" && Escape.Detected && Escape.Phase != "None";
+                bool responding = staff.Role == "Officer" && !IsWarden(staff) && staff.SecurityRole != "Tower" && Escape.Detected && !Compromised(staff,Escapee) && Escape.Phase != "None";
+                Point capitalGoal=staff.Station;bool capitalEscort=!responding&&CapitalEscortTarget(staff,out capitalGoal);
+                Point secureGoal=staff.Station;bool secureEscort=!responding&&!capitalEscort&&SecureEscortTarget(staff,out secureGoal);
                 Resident escapee = responding ? Data.Residents.FirstOrDefault(r => r.Id == Escape.ResidentId) : null;
                 if (escapee != null)
                 {
@@ -431,6 +436,8 @@ namespace Cellblock.Core
                     if (Routes.Find(staff.Position, goal) != null) staff.Destination = goal;
                     staff.NextDutyMinute = Data.Minute; // refresh a moving target, including after a reload
                 }
+                else if(capitalEscort){staff.Destination=capitalGoal;staff.NextDutyMinute=Data.Minute;}
+                else if(secureEscort){staff.Destination=secureGoal;staff.NextDutyMinute=Data.Minute;}
                 else if (Data.Minute >= staff.NextDutyMinute)
                 {
                     Point goal = staff.Station;
@@ -450,7 +457,16 @@ namespace Cellblock.Core
                     staff.Destination = Routes.Find(staff.Position, goal) != null ? goal : staff.Station;
                     staff.NextDutyMinute = Data.Minute + (staff.Role == "Officer" ? 35 : 50);
                 }
-                bool at = Walk(staff.Id, ref staff.Position, staff.Destination, responding ? ResponseSpeed : 0.37f);
+                float pace=responding?ResponseSpeed:.37f;
+                if(!responding&&!capitalEscort&&!secureEscort&&staff.Role=="Officer"&&staff.SecurityRole=="")
+                {
+                    PersonnelFile assignment=FileFor(staff);
+                    Resident watched=assignment!=null&&assignment.Duty=="Watch"?Data.Residents.FirstOrDefault(r=>r.Id==assignment.WatchId&&IsPresent(r)):null;
+                    // A close watch can jog into position, then match a brisk resident.
+                    // Ordinary patrol pace and physical wall/door routing still apply.
+                    if(watched!=null)pace=Math.Max(pace,Math.Min(.68f,Math.Max(Geometry.Distance(staff.Position,watched.Position)>2.5f||!SightLines.Clear(staff.Position,watched.Position)?.68f:.37f,.32f*watched.WalkSpeed+.06f)));
+                }
+                bool at = Walk(staff.Id, ref staff.Position, staff.Destination, pace);
                 staff.Duty = !at ? staff.Role == "Officer" ? Data.Operations.Alarm ? "Responding to alarm" : "Patrolling" : "Walking to service" :
                     staff.Role == "Officer" ? Data.Operations.Alarm ? "Alarm welfare check" : "Welfare check" : staff.Role == "Caseworker" ? "Casework" : Data.Fixtures.Any(f => SecurityRules.Equipment(f.Kind)) ? "Maintaining equipment" : "Inspecting utilities";
                 if (staff.SecurityRole == "Tower" && Data.Fixtures.Any(f => f.Id == staff.SecurityPostId && f.Kind == "GuardTower"))
@@ -460,6 +476,8 @@ namespace Cellblock.Core
                     staff.Duty = !at ? "Walking to tower" : Data.Minute - staff.PostArrivedMinute < 5 ? "Climbing tower" : "Tower watch";
                 }
                 if (responding) staff.Duty = "Responding to escape";
+                else if(capitalEscort)staff.Duty="Capital transfer escort";
+                else if(secureEscort)staff.Duty="Secure movement escort";
                 if (!at) continue;
                 if (staff.Role == "Technician")
                     foreach (Fixture camera in Data.Fixtures.Where(f => SecurityRules.Equipment(f.Kind) && Geometry.Distance(Geometry.AccessPoint(f), staff.Position) < 1)) camera.Condition = Math.Min(100, camera.Condition + 0.7f);

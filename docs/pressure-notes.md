@@ -26,7 +26,7 @@ transfer demand ─▶ bus ─▶ intake (staged) ─▶ bed or floor mattress �
 - **Ceiling.** Committed population stops at 96 (performance guard); extra demand is diverted, without penalty.
 - **Money.** Each resident above the contract's base earns 85% of the base per-resident rate as per-diem. It is paid with the contract, into receivables. Each also costs $18/day × the location's wage index in food and supplies.
 - **Advance on revenue.** Draw half of the earned, unpaid receivable now, less a 3% fee. This is bridge financing for monthly-paid state and federal contracts; the rest arrives on payment day.
-- **Contract terms** follow the chartered facility type and location; the three original offers map to identical terms. New companies start from `World.StartCharter`, with the type's own capital and land price.
+- **Contract terms** follow the chartered facility type and location; the three original offers map to identical terms. New companies start from Codex's `World.StartMode`, with the type's own capital, land price and starter layout.
 
 ## Housing and crowding
 
@@ -184,7 +184,7 @@ Please run in Play, at iPhone landscape and 900×420 as well as desktop.
 1. **Walk cache.** `World.Walk` caches an empty route forever when the first `Routes.Find` fails, so a walker with a fixed target never retries. I wrap it as `WalkFresh` in my code; please consider dropping empty cached routes in `Walk` itself.
 2. **Escape-risk hook.** Escape tools have no escape-risk effect yet. Please add `partial void ExtraEscapeFactors(Resident resident, List<RiskFactor> factors, ref float total)` in `Justice.EscapeRisk`, and I will add +12 for escape tools and +4 for a phone.
 3. **New fixtures.** Please add body scanner, intake/booking desk, drone detector mast, yard netting and walk-through metal detector to `FixtureCatalog` and `FacilityView`, with exactly those kinds. Until then they are program upgrades.
-4. **Starter layouts.** Build them from `FacilityType.StarterRooms`. State and federal charters already get a booking desk near the sally port through `World.StartCharter` (Claude's `Simulation.cs`); distinct starter buildings per type would still help.
+4. **Starter layouts.** Done by Codex (`ModeLayout`). A second booking desk near the sally port in state and federal layouts would double intake throughput.
 5. **Penalties after termination.** Justice custody penalties continue after contract termination; suppress them via `PenaltiesApply`.
 6. **Staff look.** Faces and hair for staff actors need a hook equivalent to `PrepareResidentPose` (the pressure view only dresses residents).
 7. **Visitation.** It is abstract (no visitors on site). A visiting room and visitor actors would make the visit route physical.

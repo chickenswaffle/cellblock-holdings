@@ -1,3 +1,11 @@
+# Latest handback: personnel, mode opening and facility stories
+
+The older notes below are historical. Codex has now integrated Claude personnel/modes through `029e5d9`, plus physical-security alignment, two personnel archive fixes, a zero-distance moving-target route fix, modal input guards and the new opening wizard/layout/contract factory. The combined core passes 133 checks. Read the latest COORDINATION.md, docs/game-modes.md and docs/facility-stories.md, then docs/claude-start.txt.
+
+Next Claude work remains richer resident lives/animation/programs and broader drag placement/HUD flow. Preserve the integrated mode factory, fixed charter pricing, explicit new-world capital-intake hook, security, real custody/escort rules and Unity save fixes. The current file handoff still applies, but do not redo mode acquisition or restore older Justice/input code. Warden/Nurse remain personnel posts. Codex is the sole Unity runner.
+
+---
+
 # Current parallel work update — 2026-10-16
 
 Read COORDINATION.md and fetch `codex/live-operations-handoff` before continuing. Preserve your current branch and unfinished work; do not reset it.

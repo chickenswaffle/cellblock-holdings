@@ -24,3 +24,19 @@ Button.location-chip { min-width: 96px; }
 .compact .mode-card { padding: 10px; }
 .compact Button.tier-card { flex-basis: 140px; }
 .compact .tier-detail { display: none; }
+
+/* Fixed outer height keeps action buttons inside short landscape viewports. */
+.mode-card { height: 88%; }
+.mode-card > .personnel-head { flex-shrink: 0; }
+.mode-card .personnel-scroll { min-height: 0; flex-grow: 1; flex-shrink: 1; }
+.mode-footer { flex-direction: column; align-items: stretch; flex-shrink: 0; }
+.mode-summary { flex-shrink: 0; margin-bottom: 8px; }
+.mode-footer > .wrap-row { justify-content: flex-end; flex-shrink: 0; }
+.compact .mode-card { height: 100%; }
+.compact .mode-title { font-size: 19px; }
+.compact .mode-subtitle { font-size: 11px; }
+.compact .mode-step { margin-top: 9px; margin-bottom: 5px; }
+.compact .mode-summary { font-size: 12px; }
+.opening-charter { flex-shrink: 0; width: 100%; max-width: 1000px; padding: 25px; margin-top: 10px; margin-bottom: 25px; background-color: rgb(29,39,44); border-width: 1px; border-color: rgb(65,83,87); border-top-width: 3px; border-top-color: rgb(200,173,130); border-radius: 6px; }
+.opening-charter Button { margin-top: 14px; min-height: 50px; }
+.compact .opening-charter { padding: 18px; }

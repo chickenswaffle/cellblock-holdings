@@ -167,7 +167,7 @@ static partial class Program
         });
         Test("CCTV monitoring detects an attempt the first minute a camera sees it", () => {
             World world = County(); HoldOfficersFar(world);
-            StaffMember monitor = OnShiftOfficer(world); world.SetDuty(monitor.Id, "CCTV monitoring"); monitor.Position = monitor.Destination;
+            StaffMember monitor = OnShiftOfficer(world); world.SetDuty(monitor.Id, "CCTV monitoring"); monitor.NextDutyMinute=0;world.AdvanceMinutes(1);monitor.Position=monitor.Destination;
             world.Data.Fixtures.Add(new Fixture { Id = "personnel-check-camera", Kind = "CCTV", Position = new Point(-4.5f, -19), Rotation = 0 });
             world.AdvanceMinutes(1);
             Check(world.CctvMonitored && world.StageEscapeDemo(), world.Notice);

@@ -32,6 +32,7 @@ namespace Cellblock.Unity
             RefreshCourtVan(world, force);
             RefreshEscapeAlert(world);
             RefreshPersonnelView(world);
+            RefreshFacilityEventsView(world,force);
         }
 
         void BuildSallyPort()

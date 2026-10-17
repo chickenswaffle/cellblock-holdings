@@ -22,8 +22,6 @@ namespace Cellblock.Unity
         }
         readonly Dictionary<Actor, Look> looks = new Dictionary<Actor, Look>();
         readonly List<Actor> lostLooks = new List<Actor>();
-        static readonly Color[] HairColors = { new Color(0.10f, 0.08f, 0.07f), new Color(0.22f, 0.15f, 0.10f), new Color(0.36f, 0.26f, 0.16f), new Color(0.55f, 0.53f, 0.50f), new Color(0.16f, 0.12f, 0.09f) };
-        static readonly Color[] IrisColors = { new Color(0.16f, 0.10f, 0.06f), new Color(0.08f, 0.06f, 0.05f), new Color(0.22f, 0.32f, 0.38f), new Color(0.25f, 0.28f, 0.16f) };
 
         partial void PrepareResidentPose(Actor actor, Resident resident, World world)
         {
@@ -39,7 +37,9 @@ namespace Cellblock.Unity
         partial void AnimateResidentLife(Actor actor, Resident resident, World world)
         {
             Look look; if (!looks.TryGetValue(actor, out look)) return;
-            float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f), t = Time.unscaledTime + actor.Gait * 0.37f;
+            float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
+            if(world.Data.Speed>0)actor.PoseClock+=dt*Mathf.Sqrt(world.Data.Speed);
+            float t=actor.PoseClock+actor.Gait*.37f;
             look.Weight = Mathf.MoveTowards(look.Weight, look.Pose == LifePose.None ? 0 : 1, dt * 2.5f);
             // MoveActor has already posed every joint for walking this frame; blend from it by the pose weight.
             float w = look.Weight, ease = dt * 10;
@@ -115,7 +115,7 @@ namespace Cellblock.Unity
                 default:
                 {
                     // Idle: a slow weight shift so people standing still are not statues.
-                    if (actor.Speed < 0.05f) actor.Body.localRotation = Quaternion.Slerp(actor.Body.localRotation, Quaternion.Euler(Mathf.Sin(t * 0.8f) * 1.2f, 0, Mathf.Sin(t * 0.43f) * 1.6f), w * 0.3f);
+                    if (actor.Speed < 0.05f) actor.Body.localRotation = Quaternion.Slerp(actor.Body.localRotation, Quaternion.Euler(Mathf.Sin(t * 0.8f) * 1.2f, 0, Mathf.Sin(t * 0.43f) * 1.6f), 0.3f);
                     break;
                 }
             }
@@ -156,9 +156,12 @@ namespace Cellblock.Unity
                 foreach (Fixture f in world.Data.Fixtures)
                     if (f.Kind == "Table") { float d = Geometry.Distance(f.Position, resident.Position); if (d < best) { best = d; table = f; } }
                 if (table == null) return;
-                Vector3 toward = V(table.Position) - V(resident.Position); toward.y = 0;
-                if (toward.sqrMagnitude < 0.01f) return;
-                look.SeatYaw = Quaternion.LookRotation(toward).eulerAngles.y; look.SeatOffset = new Vector3(0, 0, 0.5f); look.HasSeat = true;
+                Quaternion tableRotation=Quaternion.Euler(0,table.Rotation,0);
+                Vector3 local=Quaternion.Inverse(tableRotation)*(V(resident.Position)-V(table.Position));
+                // Only the six physical bench places support sitting. Align to the bench,
+                // rather than diagonally toward the table's center and into a neighbor.
+                if(Mathf.Abs(Mathf.Abs(local.z)-1.45f)>.25f||Mathf.Abs(local.x)>.9f)return;
+                look.SeatYaw=table.Rotation+(local.z>0?180:0);look.SeatOffset=Vector3.forward*.55f;look.HasSeat=true;
             }
             else if (pose == LifePose.Sleep)
             {
@@ -172,6 +175,22 @@ namespace Cellblock.Unity
             else if (pose == LifePose.SleepFloor) { look.SeatYaw = 0; look.SeatOffset = new Vector3(0.45f, 0, 0.88f); look.HasSeat = true; }
         }
 
+#if UNITY_EDITOR
+        public bool PreviewLookBindingsAlive()
+        {
+            foreach(var pair in looks)
+            {
+                if(pair.Key.Root==null)continue;
+                foreach(var renderer in pair.Value.Shirt)if(renderer==null)return false;
+                foreach(var renderer in pair.Value.Trousers)if(renderer==null)return false;
+            }
+            return true;
+        }
+        public int PreviewLifePoseCount(string pose)
+        {
+            int count=0;foreach(var pair in looks)if(pair.Key.Root!=null&&pair.Key.Root.gameObject.activeInHierarchy&&pair.Value.Pose.ToString()==pose&&pair.Value.Weight>.95f&&pair.Key.Speed<.06f&&pair.Value.HasSeat)count++;return count;
+        }
+#endif
         static string Palette(World world, Resident resident)
         {
             if (world.InIntake(resident)) return "intake";
@@ -189,13 +208,13 @@ namespace Cellblock.Unity
                 case "minimum": shirt = new Color(0.36f, 0.50f, 0.38f); trousers = new Color(0.30f, 0.42f, 0.32f); break;
                 case "medium": shirt = new Color(0.64f, 0.56f, 0.39f); trousers = new Color(0.52f, 0.46f, 0.32f); break;
                 default:
-                    for (int i = 0; i < look.Shirt.Length; i++) look.Shirt[i].sharedMaterial = look.ShirtOriginal[i];
-                    for (int i = 0; i < look.Trousers.Length; i++) look.Trousers[i].sharedMaterial = look.TrousersOriginal[i];
+                    for (int i = 0; i < look.Shirt.Length; i++) if(look.Shirt[i]!=null)look.Shirt[i].sharedMaterial = look.ShirtOriginal[i];
+                    for (int i = 0; i < look.Trousers.Length; i++) if(look.Trousers[i]!=null)look.Trousers[i].sharedMaterial = look.TrousersOriginal[i];
                     return;
             }
             Material top = Material("uniform-jumpsuit-" + palette, shirt), bottom = Material("uniform-jumpsuit-" + palette + "-legs", trousers);
-            foreach (Renderer r in look.Shirt) r.sharedMaterial = top;
-            foreach (Renderer r in look.Trousers) r.sharedMaterial = bottom;
+            foreach (Renderer r in look.Shirt) if(r!=null)r.sharedMaterial = top;
+            foreach (Renderer r in look.Trousers) if(r!=null)r.sharedMaterial = bottom;
         }
         void PruneLooks()
         {
@@ -213,6 +232,9 @@ namespace Cellblock.Unity
             var shirts = new List<Renderer>(); var legs = new List<Renderer>();
             foreach (Renderer r in actor.Model.GetComponentsInChildren<Renderer>(true))
             {
+                // Combine deactivates source objects and destroys them at frame end.
+                // Cache only the live combined renderers, never those retired sources.
+                if(!r.gameObject.activeInHierarchy)continue;
                 string name = r.sharedMaterial == null ? "" : r.sharedMaterial.name;
                 if (name.StartsWith("uniform-")) shirts.Add(r); else if (name == "trousers") legs.Add(r);
             }
@@ -221,47 +243,8 @@ namespace Cellblock.Unity
             for (int i = 0; i < look.Shirt.Length; i++) look.ShirtOriginal[i] = look.Shirt[i].sharedMaterial;
             for (int i = 0; i < look.Trousers.Length; i++) look.TrousersOriginal[i] = look.Trousers[i].sharedMaterial;
 
-            // Same skin tone as the base body (FacilityView.Person picks it from the same seed).
-            int tone = seed % 4;
-            Color skin = tone == 0 ? new Color(0.43f, 0.29f, 0.21f) : tone == 1 ? new Color(0.65f, 0.45f, 0.32f) : tone == 2 ? new Color(0.77f, 0.60f, 0.45f) : new Color(0.55f, 0.37f, 0.28f);
-            string skinName = "skin-" + tone;
-            // Material names are cache keys, so every colour gets its own name.
-            bool older = seed / 7 % 5 == 0;
-            int hairIndex = older ? 3 : seed / 3 % 3 == 0 ? 0 : seed / 3 % 3 == 1 ? 1 : seed % 2 == 0 ? 4 : 2;
-            Color hair = HairColors[hairIndex], braid = new Color(hair.r * 0.8f, hair.g * 0.8f, hair.b * 0.8f);
-            string hairName = "hair-style-" + hairIndex;
-            Color iris = IrisColors[seed / 11 % IrisColors.Length];
-            Color lip = skin * 0.72f; lip.a = 1;
-
-            var face = new GameObject("Appearance").transform; face.SetParent(actor.Body, false); face.localPosition = Vector3.down * 0.9f;
-            for (int side = -1; side <= 1; side += 2)
-            {
-                Sphere(face, "Eye white", new Vector3(side * 0.043f, 1.648f, 0.1f), new Vector3(0.038f, 0.026f, 0.02f), "eye-white", new Color(0.92f, 0.91f, 0.88f));
-                Sphere(face, "Iris", new Vector3(side * 0.043f, 1.648f, 0.109f), new Vector3(0.02f, 0.022f, 0.012f), "iris-" + seed / 11 % IrisColors.Length, iris);
-                Transform brow = Box(face, "Brow", new Vector3(side * 0.046f, 1.683f, 0.104f), new Vector3(0.046f, 0.011f, 0.012f), hairName, hair);
-                brow.localRotation = Quaternion.Euler(0, 0, side * (seed % 3 - 1) * 6);
-                Sphere(face, "Ear", new Vector3(side * 0.112f, 1.624f, -0.004f), new Vector3(0.03f, 0.062f, 0.046f), skinName, skin);
-            }
-            Box(face, "Mouth", new Vector3(0, 1.566f, 0.111f), new Vector3(0.044f, 0.009f, 0.012f), "lips-" + tone, lip);
-            switch (seed / 5 % 6)
-            {
-                case 1: Sphere(face, "Afro", new Vector3(0, 1.745f, -0.012f), new Vector3(0.30f, 0.22f, 0.30f), hairName, hair); break;
-                case 2: Sphere(face, "Shaved head", new Vector3(0, 1.721f, -0.016f), new Vector3(0.232f, 0.136f, 0.232f), skinName, skin); break;
-                case 3: for (int row = -2; row <= 1; row++) Box(face, "Braid", new Vector3(row * 0.04f + 0.02f, 1.765f, -0.012f), new Vector3(0.016f, 0.014f, 0.21f), "hair-braid-" + hairIndex, braid); break;
-                case 4: Sphere(face, "Bun", new Vector3(0, 1.735f, -0.118f), new Vector3(0.09f, 0.09f, 0.09f), hairName, hair); break;
-                case 5: Shape(PrimitiveType.Capsule, face, "Ponytail", new Vector3(0, 1.62f, -0.13f), new Vector3(0.05f, 0.1f, 0.05f), hairName, hair); break;
-            }
-            int beard = seed / 13 % 7;
-            if (beard == 1) Box(face, "Moustache", new Vector3(0, 1.579f, 0.113f), new Vector3(0.052f, 0.013f, 0.012f), hairName, hair);
-            else if (beard == 2) Sphere(face, "Goatee", new Vector3(0, 1.535f, 0.094f), new Vector3(0.05f, 0.05f, 0.04f), hairName, hair);
-            else if (beard == 3) { Box(face, "Moustache", new Vector3(0, 1.579f, 0.113f), new Vector3(0.052f, 0.013f, 0.012f), hairName, hair); Sphere(face, "Beard", new Vector3(0, 1.528f, 0.06f), new Vector3(0.17f, 0.085f, 0.13f), hairName, hair); }
-            if (seed / 17 % 8 == 0)
-            {
-                Box(face, "Glasses", new Vector3(0, 1.65f, 0.12f), new Vector3(0.118f, 0.03f, 0.006f), "glasses", new Color(0.08f, 0.08f, 0.09f));
-                Box(face, "Lens", new Vector3(0, 1.648f, 0.123f), new Vector3(0.11f, 0.024f, 0.003f), "glasses-lens", new Color(0.3f, 0.36f, 0.4f));
-            }
-            Box(face, "Inmate tag", new Vector3(0.095f, 1.30f, 0.132f), new Vector3(0.07f, 0.034f, 0.008f), "linen", new Color(0.92f, 0.92f, 0.88f));
-            Combine(face);
+            // The shared Person factory already owns the detailed head, hair, glasses and ID.
+            // Add resident-specific markings without stacking a second face over that head.
             if (resident.Gang != "Unaffiliated")
             {
                 var ink = new GameObject("Tattoo").transform; ink.SetParent(actor.Forearms[seed % 2], false);

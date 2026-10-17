@@ -1,0 +1,10 @@
+.event-feed { position: absolute; left: 14px; top: 158px; padding: 12px; background-color: rgba(20,30,32,0.94); border-left-width: 3px; border-left-color: rgb(205,174,119); border-radius: 5px; }
+.event-kicker { color: rgb(218,192,149); font-size: 11px; -unity-font-style: bold; margin-bottom: 5px; white-space: normal; }
+.event-summary { color: rgb(232,231,219); font-size: 13px; white-space: normal; margin-bottom: 7px; }
+.event-overlay { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background-color: rgba(8,14,17,0.87); align-items: center; justify-content: center; padding: 12px; }
+.event-sheet { width: 94%; max-width: 740px; height: 94%; padding: 16px; border-radius: 7px; background-color: rgb(27,37,40); border-top-width: 2px; border-top-color: rgb(209,181,135); }
+.event-head { flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.event-scroll { flex-grow: 1; margin-top: 10px; }
+.event-card { padding: 13px; margin-bottom: 10px; background-color: rgba(60,73,76,0.5); border-radius: 4px; }
+.event-card Button { min-height: 44px; margin-top: 7px; white-space: normal; }
+.event-dossier { border-top-width: 1px; border-top-color: rgb(83,95,95); margin-top: 12px; padding-top: 10px; }

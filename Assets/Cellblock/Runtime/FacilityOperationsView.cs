@@ -119,6 +119,7 @@ namespace Cellblock.Unity
                 AnimateWorker(actor, member.Position, world, force || created, !member.Duty.StartsWith("Walking") && member.Duty != "Patrolling" && member.Duty != "Responding to alarm" && member.Duty != "Responding to escape" && world.IsOnShift(member), member.Role);
                 AnimateSecurityOfficer(actor, member, world, force || created);
                 actor.Marker.gameObject.SetActive(member.Id == selectedResidentId);
+                UpdateCharacterNameTag(actor,world.StaffTitle(member)+" "+member.Name,member.Id==selectedResidentId);
             }
             foreach (Crew crew in world.Data.Crews.Where(c => c.Arrived))
             {
@@ -213,10 +214,10 @@ namespace Cellblock.Unity
             if (facilitySun == null) facilitySun = GetComponentsInChildren<Light>().FirstOrDefault(l => l.type == LightType.Directional);
             float hour = world.Data.Minute % 1440 / 60f;
             float daylight = Mathf.SmoothStep(0, 1, Mathf.Clamp01(Mathf.Sin((hour - 6) / 12 * Mathf.PI) * 2));
-            if (facilitySun != null) { facilitySun.intensity = Mathf.Lerp(0.08f, 1.5f, daylight); facilitySun.transform.rotation = Quaternion.Euler(15 + daylight * 35, -32, 0); }
+            if (facilitySun != null) { facilitySun.intensity = Mathf.Lerp(0.08f, 1.75f, daylight); facilitySun.transform.rotation = Quaternion.Euler(15 + daylight * 35, -32, 0); }
             RenderSettings.ambientIntensity = Mathf.Lerp(0.18f, 1, daylight);
-            RenderSettings.ambientEquatorColor = Color.Lerp(new Color(0.055f, 0.065f, 0.10f), new Color(0.53f, 0.57f, 0.57f), daylight);
-            RenderSettings.ambientGroundColor = Color.Lerp(new Color(0.025f, 0.03f, 0.045f), new Color(0.30f, 0.32f, 0.28f), daylight);
+            RenderSettings.ambientEquatorColor = Color.Lerp(new Color(0.055f, 0.065f, 0.10f), new Color(0.43f, 0.48f, 0.50f), daylight);
+            RenderSettings.ambientGroundColor = Color.Lerp(new Color(0.025f, 0.03f, 0.045f), new Color(0.24f, 0.27f, 0.24f), daylight);
             RenderSettings.ambientSkyColor = Color.Lerp(new Color(0.08f, 0.11f, 0.20f), new Color(0.69f, 0.76f, 0.80f), daylight);
             if (force || lightingRevision != world.GeometryRevision)
             {

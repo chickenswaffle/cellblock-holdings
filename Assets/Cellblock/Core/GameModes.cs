@@ -47,7 +47,7 @@ namespace Cellblock.Core
     {
         public int Version;
         public string TypeId = "", LocationId = "";
-        public bool Applied;
+        public bool Applied, ExplicitTerms;
         public int AppliedMinute = -1;
     }
     public sealed partial class State
@@ -100,7 +100,7 @@ namespace Cellblock.Core
                 Impulsivity = 42, Discipline = 60, Patience = 58, Stress = 22, GangShare = 0.08f, PretrialShare = 0.15f,
                 SeverityWeights = new[] { 0.55f, 0.4f, 0.05f, 0f }, Offenses = new[] { "Driving under the influence", "Theft", "Fraud", "Probation violation", "Possession", "Trespass" },
                 SentenceMinDays = 15, SentenceMaxDays = 45, HearingCadenceMin = 2, HearingCadenceMax = 4,
-                PerimeterRisk = 6, GoodTimeScale = 1.5f, DefaultRegime = "Rehabilitative", StarterRooms = new[] { "Sign-in desk", "Open dormitory", "Classroom", "Dining", "Yard" } },
+                PerimeterRisk = 6, GoodTimeScale = 1.5f, DefaultRegime = "Rehabilitative", StarterRooms = new[] { "Sign-in desk", "Two dormitories", "Classroom", "Dining", "Yard" } },
             new FacilityType { Id = "city-downtown", TierId = "city", Name = "Downtown Detention", Stars = 2, Security = "Medium", Housing = "Shared cells",
                 Challenge = "Crowding and street feuds", Pitch = "A full house of people awaiting trial, with neighborhood feuds that follow them inside.",
                 SignatureRule = "Every bed is filled on day one; two street crews share the block. Fights ×1.2.",
@@ -129,7 +129,7 @@ namespace Cellblock.Core
                 Residents = 10, Beds = 12, CapitalCents = 34000000, AcquisitionCents = 22000000, DailyRevenueCents = 520000, DailyOperatingCents = 390000, DailyServiceBonusCents = 30000, PaymentDays = 7,
                 Impulsivity = 66, Discipline = 40, Patience = 40, Stress = 40, Safety = 76, GangShare = 0.5f, PretrialShare = 0.85f,
                 SeverityWeights = new[] { 0.05f, 0.25f, 0.45f, 0.25f }, Offenses = null, SentenceMinDays = 60, SentenceMaxDays = 365, HearingCadenceMin = 2, HearingCadenceMax = 5,
-                EscapeRiskOffset = 6, FightScale = 1.4f, GateClosedAtStart = true, ExtraOfficers = 1, StarterRooms = new[] { "Secure intake", "Three secure cells", "Dining", "Control desk", "Caged yard" } },
+                EscapeRiskOffset = 6, FightScale = 1.4f, GateClosedAtStart = true, ExtraOfficers = 1, StarterRooms = new[] { "Secure intake", "Six secure cells", "Dining", "Control desk", "Caged yard" } },
             // ---- State (hard) ----
             new FacilityType { Id = "state-minimum", TierId = "state", Name = "State Minimum Facility", Stars = 3, Security = "Minimum", Housing = "Dormitory",
                 Challenge = "Programs and walk-aways", Pitch = "Long sentences served on a low fence. Programs keep people invested; boredom and bad news from home send them over it.",
@@ -151,7 +151,7 @@ namespace Cellblock.Core
                 Residents = 10, Beds = 12, CapitalCents = 35000000, AcquisitionCents = 21000000, DailyRevenueCents = 540000, DailyOperatingCents = 410000, DailyServiceBonusCents = 35000, PaymentDays = 7,
                 Impulsivity = 56, Discipline = 48, Patience = 48, Stress = 34, GangShare = 0.35f, PretrialShare = 0.4f,
                 SeverityWeights = new[] { 0.2f, 0.3f, 0.35f, 0.15f }, Offenses = null, SentenceMinDays = 25, SentenceMaxDays = 225, HearingCadenceMin = 1, HearingCadenceMax = 5,
-                EscapeRiskOffset = 2, StaffPressureShift = 15, StartWarden = true, StarterRooms = new[] { "Intake", "Three secure cells", "Dining", "Office", "Yard" } },
+                EscapeRiskOffset = 2, StaffPressureShift = 15, StartWarden = true, StarterRooms = new[] { "Intake", "Six secure cells", "Dining", "Office", "Yard" } },
             // ---- Federal (expert) ----
             new FacilityType { Id = "federal-camp", TierId = "federal", Name = "Federal Prison Camp", Stars = 3, Security = "Minimum", Housing = "Dormitory",
                 Challenge = "Federal standards with no fence", Pitch = "Calm, educated residents serving years for financial crimes. Violence is rare; the danger is someone simply walking away, and federal auditors forgive nothing.",
@@ -169,14 +169,14 @@ namespace Cellblock.Core
                 SeverityWeights = new[] { 0f, 0.35f, 0.45f, 0.2f }, Offenses = Trafficking, SentenceMinDays = 365, SentenceMaxDays = 1800, HearingCadenceMin = 7, HearingCadenceMax = 14,
                 EscapeRiskOffset = 4, FightScale = 1.1f, StartWarden = true, StartNurse = true, StarterRooms = new[] { "Sally port", "Three shared cells", "Clinic", "Dining", "Control desk", "Yard" } },
             new FacilityType { Id = "federal-supermax", TierId = "federal", Name = "Federal Supermax", Stars = 5, Security = "Supermax", Housing = "Single cells",
-                Challenge = "Absolute control", Pitch = "Six of the most dangerous people in the system. Every movement is escorted, every mistake is front-page news.",
+                Challenge = "Absolute control", Pitch = "Six of the most dangerous people in the system. Routine movements are escorted, every mistake is front-page news.",
                 SignatureRule = "Escape risk +14; escape penalty $50,000; strict regime locked; gate closed; warden, nurse and three elite officers at start.",
                 Residents = 6, Beds = 12, CapitalCents = 45000000, AcquisitionCents = 28000000, DailyRevenueCents = 900000, DailyOperatingCents = 700000, DailyServiceBonusCents = 60000, PaymentDays = 28,
                 Impulsivity = 78, Discipline = 28, Patience = 28, Sociability = 40, Stress = 50, Safety = 62, Belonging = 34, GangShare = 0.6f, PretrialShare = 0.1f,
                 SeverityWeights = new[] { 0f, 0f, 0.3f, 0.7f }, Offenses = Supermax, SentenceMinDays = 3650, SentenceMaxDays = 7300, HearingCadenceMin = 10, HearingCadenceMax = 20,
                 EscapeRiskOffset = 14, FightScale = 1.6f, EscapePenaltyCents = 5000000, DefaultRegime = "Strict", RegimeLocked = true, GateClosedAtStart = true,
                 StartWarden = true, StartNurse = true, ExtraOfficers = 3, ExtraOfficerIntegrity = 86,
-                StarterRooms = new[] { "Secure sally port", "Six single cells", "Control room", "Clinic", "Individual exercise cages" } }
+                StarterRooms = new[] { "Secure sally port", "Twelve single cells", "Control room", "Clinic", "Escorted outdoor exercise" } }
         };
 
         public static readonly ModeLocation[] Locations = {
@@ -289,10 +289,12 @@ namespace Cellblock.Core
         {
             FacilityType type = GameModes.Type(typeId); ModeLocation location = GameModes.Location(locationId);
             if (type == null || location == null || !GameModes.Tier(type.TierId).Locations.Contains(location.Id)) { Notice = "Unknown facility type or location."; return false; }
-            if (Data.Mode.Applied && !CanChangeMode) { Notice = "The facility type can only be chosen before the first day's operations."; return false; }
+            if ((Stories.CapitalCases.Count>0 || CourtVan.Phase!="Idle") || (Data.Mode.Applied && !CanChangeMode)) { Notice = "The facility type can only be chosen before the first day's operations."; return false; }
+            if(Data.Mode.ExplicitTerms&&Data.Mode.Applied){Notice="A charter is fixed after acquisition. Create a new holding to choose different contract terms.";return false;}
             Data.Mode.TypeId = type.Id; Data.Mode.LocationId = location.Id;
             // A different earlier choice may have added starting staff; they are replaced, not stacked.
             foreach (StaffMember added in Data.Staff.Where(s => s.Id.StartsWith("staff-mode-")).ToArray()) RemoveStaff(added, "Charter changed");
+            Stories.CapitalIntakePending=false;
             ShapePopulation(type);
             foreach (Resident resident in Data.Residents) resident.Legal = new LegalProfile();
             JusticeRules.EnsureProfiles(Data);
@@ -301,7 +303,7 @@ namespace Cellblock.Core
             Data.Operations.GateOpen = !type.GateClosedAtStart;
             PersonnelRules.PostListing(Data);
             Data.Mode.Applied = true; Data.Mode.AppliedMinute = Data.Minute;
-            paths.Clear(); destinations.Clear();
+            ClearResidentPaths();
             string text = type.Name + " in " + location.Name + ". " + type.SignatureRule;
             PeopleDynamics.Record(Data, "operations", "mode", "Charter: " + text, 1); Notice = text;
             return true;

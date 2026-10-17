@@ -14,8 +14,9 @@ namespace Cellblock.Unity
         sealed class Piece { public Transform Root; public bool Seen; public Transform[] Spin; public Renderer Light; }
         readonly Dictionary<string, Material> materials = new Dictionary<string, Material>();
         readonly Dictionary<string, Piece> drones = new Dictionary<string, Piece>(), drops = new Dictionary<string, Piece>(), mattresses = new Dictionary<string, Piece>();
+        readonly Dictionary<Vector3,Mesh> coachMeshes=new Dictionary<Vector3,Mesh>();
         readonly List<string> stale = new List<string>();
-        Transform root, bus, riotZone, inspector, holding;
+        Transform root, bus, riotZone, holding;
         Renderer riotRenderer;
         World presented;
         int holdingRevision = -1, holdingLanes = -1;
@@ -30,7 +31,7 @@ namespace Cellblock.Unity
         {
             Material value;
             if (materials.TryGetValue(name, out value)) return value;
-            Material template = Resources.Load<Material>("BuildingMaterial");
+            Material template = Resources.Load<Material>(unlit?"LuminaireMaterial":"BuildingMaterial");
             if (template == null || template.shader == null)
                 throw new System.InvalidOperationException("BuildingMaterial is missing. Run Cellblock > Prepare project before Play or building a player.");
             value = new Material(template) { name = "pressure-" + name, color = color, enableInstancing = true };
@@ -46,7 +47,13 @@ namespace Cellblock.Unity
             renderer.shadowCastingMode = shadow ? ShadowCastingMode.On : ShadowCastingMode.Off;
             Destroy(item.GetComponent<Collider>()); return item.transform;
         }
-        Transform Box(Transform p, Vector3 at, Vector3 size, string m, Color c, bool shadow = true) { return Shape(PrimitiveType.Cube, p, at, size, m, c, shadow); }
+        Transform Box(Transform p, Vector3 at, Vector3 size, string m, Color c, bool shadow = true)
+        {
+            if(!m.StartsWith("coach-")||Mathf.Min(size.x,size.y,size.z)<.06f)return Shape(PrimitiveType.Cube,p,at,size,m,c,shadow);
+            Mesh mesh;if(!coachMeshes.TryGetValue(size,out mesh)){mesh=FacilityView.BeveledMesh(size,.12f);coachMeshes.Add(size,mesh);}
+            var item=new GameObject(m);item.transform.SetParent(p,false);item.transform.localPosition=at;item.AddComponent<MeshFilter>().sharedMesh=mesh;
+            var renderer=item.AddComponent<MeshRenderer>();renderer.sharedMaterial=Material(m,c);renderer.shadowCastingMode=shadow?ShadowCastingMode.On:ShadowCastingMode.Off;return item.transform;
+        }
         Transform Cylinder(Transform p, Vector3 at, Vector3 size, string m, Color c, bool shadow = true) { return Shape(PrimitiveType.Cylinder, p, at, size, m, c, shadow); }
         Transform Sphere(Transform p, Vector3 at, Vector3 size, string m, Color c, bool shadow = true) { return Shape(PrimitiveType.Sphere, p, at, size, m, c, shadow); }
 
@@ -56,7 +63,7 @@ namespace Cellblock.Unity
             if (!ReferenceEquals(world, presented))
             {
                 for (int i = root.childCount - 1; i >= 0; i--) Destroy(root.GetChild(i).gameObject);
-                drones.Clear(); drops.Clear(); mattresses.Clear(); bus = riotZone = inspector = holding = null; holdingRevision = -1;
+                drones.Clear(); drops.Clear(); mattresses.Clear(); bus = riotZone = holding = null; holdingRevision = -1;
                 presented = world;
             }
             dt = Mathf.Min(dt, 0.05f); clock += dt;
@@ -66,7 +73,7 @@ namespace Cellblock.Unity
             RefreshMattresses(world);
             RefreshHolding(world);
             RefreshRiot(world);
-            RefreshInspector(world, dt);
+
         }
 
         // ---- transfer coach ----------------------------------------------------------------------
@@ -87,7 +94,7 @@ namespace Cellblock.Unity
         Transform Coach()
         {
             Transform coach = new GameObject("Transfer coach").transform; coach.SetParent(root, false);
-            Color white = new Color(0.86f, 0.87f, 0.84f), stripe = new Color(0.16f, 0.27f, 0.44f), glass = new Color(0.12f, 0.17f, 0.2f), tyre = new Color(0.08f, 0.08f, 0.08f);
+            Color white = new Color(0.77f, 0.79f, 0.76f), stripe = new Color(0.16f, 0.27f, 0.44f), glass = new Color(0.12f, 0.17f, 0.2f), tyre = new Color(0.08f, 0.08f, 0.08f);
             Box(coach, new Vector3(0, 1.55f, 0), new Vector3(2.5f, 2.4f, 9.6f), "coach-body", white);
             Box(coach, new Vector3(0, 1.15f, 0), new Vector3(2.52f, 0.28f, 9.62f), "coach-stripe", stripe);
             for (int side = -1; side <= 1; side += 2)
@@ -104,6 +111,22 @@ namespace Cellblock.Unity
                 }
             Box(coach, new Vector3(-0.8f, 0.85f, 4.83f), new Vector3(0.3f, 0.16f, 0.03f), "lamp-head", new Color(0.95f, 0.9f, 0.7f), false);
             Box(coach, new Vector3(0.8f, 0.85f, 4.83f), new Vector3(0.3f, 0.16f, 0.03f), "lamp-head", new Color(0.95f, 0.9f, 0.7f), false);
+            Box(coach,new Vector3(0,2.82f,-.4f),new Vector3(1.65f,.26f,2.15f),"coach-roof-vent",new Color(.53f,.57f,.56f));
+            for(int slat=0;slat<8;slat++)Box(coach,new Vector3(-.65f+slat*.185f,2.96f,-.4f),new Vector3(.045f,.015f,1.8f),"coach-metal",stripe);
+            for(int side=-1;side<=1;side+=2)
+            {
+                Box(coach,new Vector3(side*.86f,.62f,4.85f),new Vector3(.58f,.18f,.12f),"coach-metal",stripe);
+                Box(coach,new Vector3(side*1.42f,2.02f,4.25f),new Vector3(.18f,.36f,.30f),"coach-mirror",stripe);
+                Box(coach,new Vector3(side*1.28f,1.51f,3.62f),new Vector3(.045f,.065f,.28f),"coach-metal",stripe);
+                for(int window=0;window<7;window++)Box(coach,new Vector3(side*1.28f,2.05f,-3.8f+window*1.12f),new Vector3(.035f,.77f,.075f),"coach-window-post",white);
+                for(int axle=-1;axle<=1;axle+=2)
+                {
+                    Transform hub=Cylinder(coach,new Vector3(side*1.295f,.48f,axle*3.3f),new Vector3(.46f,.025f,.46f),"coach-metal",new Color(.48f,.51f,.51f));hub.localRotation=Quaternion.Euler(0,0,90);
+                }
+            }
+            Box(coach,new Vector3(0,.43f,4.84f),new Vector3(2.3f,.20f,.18f),"coach-bumper",stripe);
+            Box(coach,new Vector3(0,.78f,4.84f),new Vector3(.9f,.28f,.05f),"coach-grille",new Color(.13f,.17f,.18f));
+            Box(coach,new Vector3(0,.45f,4.95f),new Vector3(.4f,.13f,.025f),"coach-plate",new Color(.68f,.72f,.68f));
             return coach;
         }
 
@@ -248,27 +271,6 @@ namespace Cellblock.Unity
             riotRenderer.transform.localScale = new Vector3(12 * pulse + 2, 0.004f, 12 * pulse + 2);
             for (int i = 1; i < riotZone.childCount; i++) riotZone.GetChild(i).gameObject.SetActive(riot.Phase == "Riot");
         }
-        void RefreshInspector(World world, float dt)
-        {
-            AuditState audit = world.Population.Audit;
-            if (inspector == null)
-            {
-                inspector = new GameObject("Inspector").transform; inspector.SetParent(root, false);
-                Color suit = new Color(0.17f, 0.19f, 0.24f), skin = new Color(0.62f, 0.45f, 0.34f);
-                Shape(PrimitiveType.Capsule, inspector, new Vector3(0, 0.92f, 0), new Vector3(0.38f, 0.48f, 0.26f), "suit", suit);
-                Sphere(inspector, new Vector3(0, 1.6f, 0), new Vector3(0.22f, 0.27f, 0.23f), "inspector-skin", skin);
-                Box(inspector, new Vector3(0.19f, 1.08f, 0.16f), new Vector3(0.2f, 0.27f, 0.02f), "clipboard", new Color(0.55f, 0.42f, 0.28f));
-                Box(inspector, new Vector3(0.19f, 1.1f, 0.172f), new Vector3(0.16f, 0.2f, 0.005f), "paper", new Color(0.92f, 0.92f, 0.88f));
-                Box(inspector, new Vector3(0, 1.32f, 0.12f), new Vector3(0.06f, 0.08f, 0.01f), "lamp-badge", new Color(0.85f, 0.75f, 0.35f), false);
-            }
-            bool active = audit.Phase == "In progress";
-            inspector.gameObject.SetActive(active);
-            if (!active) return;
-            Vector3 target = FacilityView.V(audit.Inspector, 0.14f), travel = target - inspector.position;
-            if (travel.sqrMagnitude > 200) inspector.position = target;
-            inspector.position = Vector3.MoveTowards(inspector.position, target, Mathf.Max(1, world.Data.Speed) * 1.6f * dt + travel.magnitude * dt);
-            travel.y = 0;
-            if (travel.sqrMagnitude > 0.0004f) inspector.rotation = Quaternion.Slerp(inspector.rotation, Quaternion.LookRotation(travel), 1 - Mathf.Exp(-dt * 6));
-        }
+        void OnDestroy(){foreach(Material material in materials.Values)Destroy(material);foreach(Mesh mesh in coachMeshes.Values)Destroy(mesh);}
     }
 }

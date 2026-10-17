@@ -10,6 +10,7 @@ static partial class Program
     static partial void RunIntegrationChecks();
     static partial void RunLivesChecks();
     static partial void RunSecurityChecks();
+    static partial void RunFacilityStoryChecks();
     static int passed, failed;
     static void Check(bool condition, string message) { if (!condition) throw new Exception(message); }
     static void Test(string name, Action test)
@@ -524,7 +525,7 @@ static partial class Program
             resumed.AdvanceMinutes(1);
             Check(resumed.Data.Crews[0].WorkPhase == "Carrying" && resumed.Data.Crews[0].SupplyLoadMinutes == 3, "Loading discarded a delivered supply batch after handover");
         });
-        RunJusticeChecks(); RunIntegrationChecks(); RunLivesChecks(); RunSecurityChecks();
+        RunJusticeChecks(); RunIntegrationChecks(); RunLivesChecks(); RunSecurityChecks(); RunFacilityStoryChecks(); RunModeStartChecks();RunDirectDoorChecks();RunMealFlowChecks();RunMovementMemoryChecks();
         Console.WriteLine("\n" + passed + " passed, " + failed + " failed. These checks exercise the C# core; they do not run Unity.");
         Environment.ExitCode = failed == 0 ? 0 : 1;
     }

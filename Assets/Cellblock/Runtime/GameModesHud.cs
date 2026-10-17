@@ -15,7 +15,9 @@ namespace Cellblock.Unity
         ScrollView modeScroll;
         string pickTier = "county", pickType = "county-intake", pickLocation = "briar-county";
         bool pickRandomLocation;
-        int surpriseCount;
+        int surpriseCount,modeStep;
+        bool modePickerOpen;
+        Button modeNext,modeBack,modeCreate;
         System.Action<string, string> onCharter;
 
         void BuildModePicker()
@@ -45,25 +47,27 @@ namespace Cellblock.Unity
             modeSummary = Text("", "mode-summary"); footer.Add(modeSummary);
             var buttons = Element("wrap-row");
             buttons.Add(Action("Surprise me", Surprise, "quiet"));
-            buttons.Add(Action("Charter facility  →", Charter, "primary"));
+            modeBack=Action("Back",()=>{modeStep--;RebuildModePicker();modeScroll.scrollOffset=Vector2.zero;},"quiet");buttons.Add(modeBack);
+            modeNext=Action("Continue  →",()=>{modeStep++;RebuildModePicker();modeScroll.scrollOffset=Vector2.zero;},"primary");buttons.Add(modeNext);
+            modeCreate=Action("Charter facility  →",Charter,"primary");buttons.Add(modeCreate);
             footer.Add(buttons); card.Add(footer);
         }
 
         // Hosts the charter screen. With no callback it re-charters the current company (first day only).
         public void ShowModePicker(System.Action<string, string> charter)
         {
-            onCharter = charter;
+            CloseInteractionSheets();modePickerOpen=true;modeStep=0;onCharter = charter;
             World world = game.World;
             if (world != null) { pickType = world.FacilityMode.Id; pickTier = world.FacilityMode.TierId; pickLocation = world.ModeLocation.Id; pickRandomLocation = false; }
             modeSheet.style.display = DisplayStyle.Flex; modeSheet.BringToFront();
             RebuildModePicker(); modeScroll.scrollOffset = Vector2.zero;
         }
-        void HideModePicker() { if (modeSheet != null) modeSheet.style.display = DisplayStyle.None; }
+        void HideModePicker() { modePickerOpen=false;if (modeSheet != null) modeSheet.style.display = DisplayStyle.None; }
 
         void RefreshCharterRow(World world)
         {
             if (charterRow == null || world == null) return;
-            charterRow.style.display = world.CanChangeMode ? DisplayStyle.Flex : DisplayStyle.None;
+            charterRow.style.display = DisplayStyle.None;
             charterLine.text = "Charter · " + world.FacilityMode.Name + " · " + world.ModeLocation.Name + "   ·   " + world.ModeTier.Name + " / " + world.ModeTier.Difficulty;
         }
 
@@ -73,6 +77,12 @@ namespace Cellblock.Unity
         void RebuildModePicker()
         {
             modeTiers.Clear(); modeTypes.Clear(); modeLocations.Clear();
+            modeTiers.style.display=modeStep==0?DisplayStyle.Flex:DisplayStyle.None;
+            modeTypes.style.display=modeStep==1?DisplayStyle.Flex:DisplayStyle.None;
+            modeLocations.style.display=modeStep==2?DisplayStyle.Flex:DisplayStyle.None;
+            var steps=modeScroll.Query<Label>(className:"mode-step").ToList();for(int i=0;i<steps.Count;i++)steps[i].style.display=i==modeStep?DisplayStyle.Flex:DisplayStyle.None;
+            modeBack.style.display=modeStep==0?DisplayStyle.None:DisplayStyle.Flex;modeNext.style.display=modeStep<2?DisplayStyle.Flex:DisplayStyle.None;modeCreate.style.display=modeStep==2?DisplayStyle.Flex:DisplayStyle.None;
+
             foreach (ModeTier tier in GameModes.Tiers)
             {
                 ModeTier chosen = tier;
@@ -124,7 +134,8 @@ namespace Cellblock.Unity
                     "   ·   " + (place.CourtDriveMinutes == 0 ? "courthouse in town" : place.CourtDriveMinutes + " min drive to court") + "   ·   local charge: " + place.CrimeFlavor.ToLowerInvariant(), "type-stat"));
             }
             FacilityType selected = GameModes.Type(pickType);
-            modeSummary.text = "Overall  " + Stars5(selected.Stars) + "   ·   " + current.Name + " / " + current.Difficulty + "   ·   " + selected.Name + (pickRandomLocation ? " · random location" : place != null ? " · " + place.Name : "");
+            ContractOffer terms=GameModes.Offer(selected,pickRandomLocation?null:place);
+            modeSummary.text = "Step "+(modeStep+1)+" / 3  ·  " + Stars5(selected.Stars) + "   ·   " + current.Name + " / " + current.Difficulty + "   ·   " + selected.Name + (pickRandomLocation ? " · random location" : place != null ? " · " + place.Name : "")+"\nReserve "+Money(terms.CapitalCents-terms.AcquisitionCents)+" · acquisition "+Money(terms.AcquisitionCents)+" · base revenue "+Money(terms.DailyRevenueCents)+" / day · operations "+Money(terms.DailyOperatingCents)+" / day · paid every "+terms.PaymentDays+" days";
         }
 
         void Surprise()
@@ -132,7 +143,7 @@ namespace Cellblock.Unity
             int seed = (game.World != null ? game.World.Data.Seed : 7) + ++surpriseCount * 7919;
             string type, location;
             GameModes.Random(seed, "", out type, out location);
-            pickType = type; pickTier = GameModes.Type(type).TierId; pickLocation = location; pickRandomLocation = false;
+            modeStep=2;pickType = type; pickTier = GameModes.Type(type).TierId; pickLocation = location; pickRandomLocation = false;
             RebuildModePicker();
         }
 

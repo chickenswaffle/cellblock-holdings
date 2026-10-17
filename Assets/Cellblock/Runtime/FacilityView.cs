@@ -17,7 +17,8 @@ namespace Cellblock.Unity
         Transform structures, planned, ghost, people;
         sealed class Actor
         {
-            public Transform Root, Model, Body, Marker, SecurityProp;
+            public Transform Root, Model, Body, Head, Marker, SecurityProp;
+            public TextMesh NameTag;
             public Transform[] Limbs;
             public float Speed, Gait, TurnRate;
             public List<Point> RenderRoute;
@@ -48,16 +49,20 @@ namespace Cellblock.Unity
         {
             Material value;
             if (materials.TryGetValue(name, out value)) return value;
-            Material template = Resources.Load<Material>("BuildingMaterial");
+            string surface = Surface(name);
+            bool emission=name=="ghost"||name=="planned"||name=="handle"||name=="lamp"||name=="ceiling-on"||name=="alarm"||name=="door-outline";
+            bool detailed=surface!=null&&surface!="grass";
+            Material template = Resources.Load<Material>(emission?"LuminaireMaterial":detailed?"DetailedBuildingMaterial":"BuildingMaterial");
             if (template == null || template.shader == null)
                 throw new System.InvalidOperationException("BuildingMaterial is missing. Run Cellblock > Prepare project before Play or building a player.");
             value = new Material(template) { name = name, color = color, enableInstancing = true };
             bool metal = name.Contains("steel") || name.Contains("metal") || name == "cap";
             bool glass = name == "glass" || name == "screen";
-            if (value.HasProperty("_Smoothness")) value.SetFloat("_Smoothness", glass ? 0.74f : metal ? 0.4f : 0.16f);
+            if (value.HasProperty("_Smoothness")) value.SetFloat("_Smoothness", glass ? 0.74f : metal ? 0.48f : name.StartsWith("skin") ? .28f : surface=="fabric" ? .12f : .22f);
             if (value.HasProperty("_SpecColor")) value.SetColor("_SpecColor", metal ? new Color(0.3f, 0.33f, 0.34f) : new Color(0.08f, 0.08f, 0.08f));
-            string surface = Surface(name);
+            if(value.HasProperty("_Metallic"))value.SetFloat("_Metallic",metal?.50f:0);
             if (surface != null) value.mainTexture = Texture(surface);
+            if(detailed){value.SetTexture("_BumpMap",SurfaceNormal(surface));value.SetFloat("_BumpScale",.65f);}
             if (name == "grass" || name == "site-grass")
             {
                 Texture2D meadow = Resources.Load<Texture2D>("Textures/GroundMeadow");
@@ -67,7 +72,7 @@ namespace Cellblock.Unity
                     value.color = name == "site-grass" ? new Color(0.88f, 0.94f, 0.85f) : new Color(0.74f, 0.83f, 0.72f);
                 }
             }
-            if (name == "ghost" || name == "planned" || name == "handle" || name == "lamp")
+            if (emission)
             {
                 value.EnableKeyword("_EMISSION");
                 value.SetColor("_EmissionColor", color * (name == "lamp" ? 0.8f : 0.18f));
@@ -132,7 +137,7 @@ namespace Cellblock.Unity
             sun.transform.SetParent(transform, false); sun.type = LightType.Directional;
             sun.transform.rotation = Quaternion.Euler(43, -32, 0); sun.intensity = 1.5f;
             sun.color = new Color(1f, 0.93f, 0.83f); sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.68f; sun.shadowBias = 0.035f; sun.shadowNormalBias = 0.25f;
+            sun.shadowStrength = 0.82f; sun.shadowBias = 0.02f; sun.shadowNormalBias = 0.14f;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.69f, 0.76f, 0.80f);
             RenderSettings.ambientEquatorColor = new Color(0.46f, 0.51f, 0.52f);
@@ -141,9 +146,11 @@ namespace Cellblock.Unity
             RenderSettings.fogMode = FogMode.Linear; RenderSettings.fogStartDistance = 115; RenderSettings.fogEndDistance = 210;
             Transform site = Root("Site and landscape · presentation");
             Landscape(site);
+            PublicFrontage(site);
             Combine(site);
         }
 
+        Transform propertyBoundary;
         void Landscape(Transform site)
         {
             float siteX = Geometry.SiteX, siteY = Geometry.SiteY;
@@ -189,11 +196,13 @@ namespace Cellblock.Unity
                 Box(site, "Entry paving joint", new Vector3(-5.35f + i * 1.34f, 0.10f, -10), new Vector3(0.014f, 0.01f, 3.5f), "joint", new Color(0.47f, 0.50f, 0.46f));
             // The visible property boundary is the same rectangle used by quote validation.
             // Leave its six metre entrance open; this fence is presentation, not a route barrier.
-            Fence(site, new Point(-siteX, siteY), new Point(siteX, siteY));
-            Fence(site, new Point(-siteX, -siteY), new Point(-5, -siteY));
-            Fence(site, new Point(1, -siteY), new Point(siteX, -siteY));
-            Fence(site, new Point(-siteX, -siteY), new Point(-siteX, siteY));
-            Fence(site, new Point(siteX, -siteY), new Point(siteX, siteY));
+            if(propertyBoundary==null)propertyBoundary=Root("Property boundary");
+            Fence(propertyBoundary, new Point(-siteX, siteY), new Point(siteX, siteY));
+            Fence(propertyBoundary, new Point(-siteX, -siteY), new Point(-5, -siteY));
+            Fence(propertyBoundary, new Point(1, -siteY), new Point(siteX, -siteY));
+            Fence(propertyBoundary, new Point(-siteX, -siteY), new Point(-siteX, siteY));
+            Fence(propertyBoundary, new Point(siteX, -siteY), new Point(siteX, siteY));
+            Combine(propertyBoundary);
             for (int i = 0; i < 4; i++)
             {
                 float x = i < 2 ? -5.05f : 1.05f, z = i % 2 == 0 ? -siteY + 0.2f : -siteY + 1.8f;
@@ -293,7 +302,7 @@ namespace Cellblock.Unity
             Destroy(item.GetComponent<Collider>()); return item.transform;
         }
         Transform Box(Transform parent, string name, Vector3 position, Vector3 scale, string material, Color color)
-        { return Shape(PrimitiveType.Cube, parent, name, position, scale, material, color); }
+        { return SoftEdge(name,material,scale)?SoftBox(parent,name,position,scale,material,color):Shape(PrimitiveType.Cube, parent, name, position, scale, material, color); }
         Transform Sphere(Transform parent, string name, Vector3 position, Vector3 scale, string material, Color color)
         { return Shape(PrimitiveType.Sphere, parent, name, position, scale, material, color); }
         Transform Cylinder(Transform parent, string name, Vector3 position, Vector3 scale, string material, Color color)
@@ -329,7 +338,7 @@ namespace Cellblock.Unity
                         Vector3 p = vertices[i], n = normals[i];
                         uv[i] = Mathf.Abs(n.y) > 0.65f ? new Vector2(p.x, p.z) : Mathf.Abs(n.z) > Mathf.Abs(n.x) ? new Vector2(p.x, p.y) : new Vector2(p.z, p.y);
                     }
-                    mesh.uv = uv;
+                    mesh.uv = uv; mesh.RecalculateTangents();
                 }
                 combined.Add(mesh);
             }
@@ -728,13 +737,11 @@ namespace Cellblock.Unity
             Color skin = index % 4 == 0 ? new Color(0.43f, 0.29f, 0.21f) : index % 4 == 1 ? new Color(0.65f, 0.45f, 0.32f) : index % 4 == 2 ? new Color(0.77f, 0.60f, 0.45f) : new Color(0.55f, 0.37f, 0.28f);
             string skinName = "skin-" + index % 4;
             Color uniform = staff ? role == "Builder" ? new Color(0.91f, 0.60f, 0.12f) : role == "Officer" ? new Color(0.19f, 0.27f, 0.33f) : role == "Technician" ? new Color(0.30f, 0.39f, 0.44f) : new Color(0.39f, 0.47f, 0.43f) :
-                index % 2 == 0 ? new Color(0.59f, 0.43f, 0.30f) : new Color(0.54f, 0.40f, 0.29f);
-            string uniformName = staff ? "uniform-staff-" + role : "uniform-" + index % 2;
+                index % 2 == 0 ? new Color(0.38f, 0.48f, 0.51f) : new Color(0.44f, 0.52f, 0.53f);
+            if(role=="Visitor")uniform=new[]{new Color(.37f,.43f,.51f),new Color(.46f,.31f,.27f),new Color(.34f,.43f,.35f),new Color(.57f,.50f,.35f)}[index%4];
+            if(role=="Inspector")uniform=new Color(.30f,.34f,.39f);
+            string uniformName = staff ? "uniform-staff-" + role + (role=="Visitor"?"-"+index%4:"") : "uniform-" + index % 2;
             Capsule(body, "Neck", new Vector3(0, 1.48f, 0), new Vector3(0.115f, 0.085f, 0.115f), skinName, skin);
-            Sphere(body, "Head", new Vector3(0, 1.62f, 0), new Vector3(0.225f, 0.29f, 0.24f), skinName, skin);
-            Sphere(body, "Hair", new Vector3(0, 1.72f, -0.016f), new Vector3(0.226f, 0.13f, 0.225f), "hair-" + index % 2,
-                index % 2 == 0 ? new Color(0.18f, 0.15f, 0.12f) : new Color(0.27f, 0.23f, 0.17f));
-            Sphere(body, "Nose", new Vector3(0, 1.61f, 0.118f), new Vector3(0.048f, 0.060f, 0.063f), skinName, skin);
             Capsule(body, "Shirt", new Vector3(0, 1.20f, 0), new Vector3(0.38f, 0.29f, 0.25f), uniformName, uniform);
             Box(body, "Shirt seam", new Vector3(0.065f, 1.25f, 0.129f), new Vector3(0.007f, 0.30f, 0.012f), "seam", new Color(0.38f, 0.31f, 0.24f));
             Box(body, "Chest pocket", new Vector3(-0.09f, 1.31f, 0.126f), new Vector3(0.10f, 0.10f, 0.018f), uniformName, uniform);
@@ -744,9 +751,11 @@ namespace Cellblock.Unity
                 Box(body, "Duty belt", new Vector3(0, 0.96f, 0), new Vector3(0.34f, 0.045f, 0.25f), "rubber", new Color(0.10f, 0.12f, 0.12f));
             }
             Capsule(body, "Hips", new Vector3(0, 0.92f, 0), new Vector3(0.32f, 0.13f, 0.24f), "trousers", new Color(0.30f, 0.34f, 0.33f));
+            DressCharacter(body,index,staff,role,uniformName,uniform);
             Combine(body);
             var torso = new GameObject("Waist / upper-body pivot").transform; torso.SetParent(model, false); torso.localPosition = Vector3.up * 0.9f;
             body.SetParent(torso, false); body.localPosition = Vector3.down * 0.9f;
+            Transform head=DetailedHead(torso,index,skinName,skin,staff);
             var parts = new Transform[4];
             var forearms = new Transform[2]; var hands = new Transform[2]; var knees = new Transform[2];
             for (int i = 0; i < 4; i++)
@@ -771,14 +780,17 @@ namespace Cellblock.Unity
                     Transform knee = new GameObject("Knee").transform; knee.SetParent(pivot, false); knee.localPosition = new Vector3(0, -0.40f, 0);
                     Capsule(knee, "Lower trouser leg", new Vector3(0, -0.19f, 0), new Vector3(0.135f, 0.20f, 0.15f), "trousers", new Color(0.30f, 0.34f, 0.33f));
                     Sphere(knee, "Work shoe", new Vector3(0, -0.41f, 0.052f), new Vector3(0.16f, 0.14f, 0.29f), "rubber", new Color(0.10f, 0.12f, 0.12f));
+                    Box(knee,"Shoe sole",new Vector3(0,-.46f,.052f),new Vector3(.162f,.035f,.28f),"rubber",new Color(.08f,.09f,.09f));
+                    for(int lace=0;lace<3;lace++)Box(knee,"Boot lace",new Vector3(0,-.355f,.04f+lace*.035f),new Vector3(.075f,.009f,.008f),"shoe-lace",new Color(.23f,.24f,.22f));
+                    Box(knee,"Trouser side seam",new Vector3(side*.067f,-.19f,0),new Vector3(.008f,.32f,.014f),"trouser-seam",new Color(.24f,.28f,.28f));
                     Combine(knee); knees[i - 2] = knee;
                 }
                 parts[i] = pivot;
             }
-            root.localScale = Vector3.one * (0.96f + index % 4 * 0.025f);
+            root.localScale = new Vector3(.94f+index%5*.025f,.96f+index%4*.025f,.94f+index%5*.025f);
             Transform marker = Cylinder(root, "Selected person", new Vector3(0, 0.015f, 0), new Vector3(0.72f, 0.008f, 0.72f), "handle", Teal);
             marker.gameObject.SetActive(false);
-            var actor = new Actor { Root = root, Model = model, Body = torso, Limbs = parts, Marker = marker, Staff = staff, Motion = new Resident(), Forearms = forearms, Hands = hands, Knees = knees, Gait = index % 97 * 0.13f, TurnRate = 7 + index % 5 };
+            var actor = new Actor { Root = root, Model = model, Body = torso, Head = head, Limbs = parts, Marker = marker, Staff = staff, Motion = new Resident(), Forearms = forearms, Hands = hands, Knees = knees, Gait = index % 97 * 0.13f, TurnRate = 7 + index % 5 };
             if (role == "Builder")
             {
                 Sphere(body, "Hard hat", new Vector3(0, 1.79f, 0), new Vector3(0.28f, 0.16f, 0.29f), "hi-vis", new Color(0.96f, 0.77f, 0.14f));
@@ -786,6 +798,7 @@ namespace Cellblock.Unity
                 Box(body, "Reflective vest band", new Vector3(0, 1.20f, 0.14f), new Vector3(0.34f, 0.06f, 0.018f), "reflective", new Color(0.94f, 0.94f, 0.80f));
                 CreateBuilderKit(actor);
             }
+            CreateCharacterNameTag(actor);
             actors.Add(id, actor); return actor;
         }
 
@@ -866,7 +879,7 @@ namespace Cellblock.Unity
                 }
                 else { actor.RenderRoute = null; actor.RouteIndex = 0; }
                 float baseSpeed = 1.6f * Mathf.Max(1, world.Data.Speed) * resident.WalkSpeed;
-                float desiredSpeed = Mathf.Min(baseSpeed * 1.35f, baseSpeed + gap * 2.2f);
+                float desiredSpeed = Mathf.Min(baseSpeed * 1.20f, gap / (0.16f / Mathf.Sqrt(Mathf.Max(1,world.Data.Speed))));
                 actor.Speed = Mathf.MoveTowards(actor.Speed, desiredSpeed, dt * baseSpeed * 8);
                 Vector3 candidate = Vector3.MoveTowards(previous, waypoint, actor.Speed * dt);
                 if (world.Routes.Clear(from, new Point(candidate.x, candidate.z))) actor.Root.position = candidate;
@@ -881,6 +894,7 @@ namespace Cellblock.Unity
                 actor.Root.rotation = Quaternion.Slerp(actor.Root.rotation, rotation, 1 - Mathf.Exp(-actor.TurnRate * dt));
                 actor.Gait += movement.magnitude * (7.0f + resident.WalkSpeed * 0.6f);
             }
+            AnimateCharacterDetail(actor,resident,world,walking,dt);
             float stride = walking ? Mathf.Clamp01(speed / 1.3f) : 0;
             float swing = Mathf.Sin(actor.Gait) * 21 * stride;
             for (int leg = 0; leg < 2; leg++) actor.Knees[leg].localRotation = Quaternion.Slerp(actor.Knees[leg].localRotation,
@@ -905,7 +919,7 @@ namespace Cellblock.Unity
             if (!object.ReferenceEquals(presentedWorld, world))
             {
                 foreach (Actor oldActor in actors.Values) { Clear(oldActor.Root); Destroy(oldActor.Root.gameObject); }
-                actors.Clear();
+                actors.Clear(); looks.Clear();
                 foreach (ProjectView oldProject in constructionViews.Values) { Clear(oldProject.Root); Destroy(oldProject.Root.gameObject); }
                 constructionViews.Clear();
                 if (transportRoot != null) Clear(transportRoot); trucks.Clear();
@@ -920,6 +934,7 @@ namespace Cellblock.Unity
                 foreach (Fixture fixture in world.Data.Fixtures) FixtureView(structures, fixture);
                 Combine(structures);
             }
+            if(propertyBoundary!=null)propertyBoundary.gameObject.SetActive(world.FacilityMode.PerimeterRisk<=0);
             RefreshConstruction(world, force);
             foreach (Actor actor in actors.Values) actor.Seen = false;
             for (int i = 0; i < world.Data.Residents.Count; i++)
@@ -931,6 +946,7 @@ namespace Cellblock.Unity
                 if (created) actor = Person(id);
                 actor.Seen = true; actor.Root.gameObject.SetActive(true);
                 actor.Marker.gameObject.SetActive(id == selectedResidentId);
+                UpdateCharacterNameTag(actor,resident.Name,id==selectedResidentId);
                 PrepareResidentPose(actor, resident, world);
                 MoveActor(actor, resident, world, force || created);
                 AnimateResidentLife(actor, resident, world);
@@ -978,7 +994,7 @@ namespace Cellblock.Unity
             previewHash = hash; Clear(ghost);
             if (plan != null)
             {
-                foreach (Wall wall in plan.Walls) WallView(ghost, wall, "ghost");
+                foreach (Wall wall in plan.Walls){WallView(ghost, wall, "ghost");if(wall.Door>=0)DoorPlanFrame(ghost,wall);}
                 foreach (Fixture fixture in plan.Fixtures) FixtureView(ghost, fixture, "ghost");
             }
             if (selected != null)
@@ -1036,6 +1052,7 @@ namespace Cellblock.Unity
                 if (filter.sharedMesh != null && filter.sharedMesh.name.StartsWith("Generated ")) Destroy(filter.sharedMesh);
             foreach (Material material in materials.Values) Destroy(material);
             foreach (Texture2D texture in textures.Values) Destroy(texture);
+            foreach(Mesh mesh in bevels.Values)Destroy(mesh);
         }
     }
 }

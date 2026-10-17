@@ -48,7 +48,7 @@ static partial class Program
             State old = PreJusticeSave(source.Data);
             Check(old.JusticeVersion == 0, "The emulated old save still carries a justice marker");
             World first = new World(old), second = new World(PreJusticeSave(source.Data)), normal = new World(RoundTrip(source.Data));
-            Check(first.Data.JusticeVersion == 1 && first.Data.Residents.All(r => r.Legal.Ready && r.Legal.Charges.Count > 0), "Old residents were not given legal profiles");
+            Check(first.Data.JusticeVersion == JusticeRules.Version && first.Data.Residents.All(r => r.Legal.Ready && r.Legal.Charges.Count > 0), "Old residents were not given legal profiles");
             Check(Enumerable.Range(0, first.Data.Residents.Count).All(i => LegalJson(first.Data.Residents[i]) == LegalJson(second.Data.Residents[i])), "Hydration is not deterministic");
             Check(WithoutLegal(first.Data.Residents) == WithoutLegal(normal.Data.Residents), "Hydration changed names, ids, homes, positions or needs");
             Check(first.Data.CashCents == source.Data.CashCents && first.Data.Ledger.Count == source.Data.Ledger.Count && first.Reconciles(), "Hydration charged or credited money");

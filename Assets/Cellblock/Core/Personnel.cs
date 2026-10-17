@@ -394,11 +394,11 @@ namespace Cellblock.Core
             return f != null && f.Duty == "Watch" && f.WatchId == resident.Id && WatchReliability(officer, resident) == 0 && IsOnShift(officer);
         }
         bool OnDuty(string duty) { return Data.Staff.Any(s => IsOnShift(s) && !IsSuspended(s) && FileFor(s) != null && FileFor(s).Duty == duty); }
-        public bool CctvMonitored { get { return OnDuty("CCTV monitoring"); } }
-        public bool CourtEscortOnDuty { get { return OnDuty("Court escort"); } }
+        public bool CctvMonitored { get { return Data.Staff.Any(s=>IsOnShift(s)&&!IsSuspended(s)&&FileFor(s)!=null&&FileFor(s).Duty=="CCTV monitoring"&&Geometry.Distance(s.Position,DeskPoint())<2); } }
+        public bool CourtEscortOnDuty { get { return Data.Staff.Any(s=>IsOnShift(s)&&!IsSuspended(s)&&FileFor(s)!=null&&FileFor(s).Duty=="Court escort"&&Geometry.Distance(s.Position,JusticeRules.SallyPort)<2&&SightLines.Clear(s.Position,JusticeRules.SallyPort)); } }
         public List<Resident> GoodTimeEligible()
         {
-            return Data.Residents.Where(r => r.Legal.Ready && r.Legal.Status == "Sentenced" && r.Legal.Custody == "In facility" && r.Legal.PendingReview == "" &&
+            return Data.Residents.Where(r => (CapitalCaseFor(r.Id)==null||CapitalCaseFor(r.Id).Stage=="Commuted") && r.Legal.Ready && r.Legal.Status == "Sentenced" && r.Legal.Custody == "In facility" && r.Legal.PendingReview == "" &&
                 (Data.Minute - r.Legal.TransferMinute) / 1440 + r.Legal.PriorCustodyDays >= 5 && Data.Minute - r.Legal.GoodTimeMinute >= 10 * 1440 && RecentWriteUps(r, 7) == 0 &&
                 r.Legal.ReleaseMinute - Data.Minute > 3 * 1440).ToList();
         }
@@ -527,6 +527,7 @@ namespace Cellblock.Core
             PersonnelFile file = FileFor(staff);
             if (staff == null || file == null || staff.Role != "Officer" || file.RankLevel < 3) { Notice = "Only a lieutenant or captain can be appointed warden."; return false; }
             if (Warden != null) { Notice = "Remove the current warden from post first."; return false; }
+            ClearSecurityAssignment(staff.Id);
             file.Post = "Warden"; file.Duty = ""; file.WatchId = ""; file.MenteeId = ""; staff.DailyCents = staff.DailyCents * 130 / 100; staff.ShiftStart = 8; staff.Station = DeskPoint();
             file.Credibility = Math.Max(20, Math.Min(95, (int)staff.Integrity + file.Experience));
             AddDiscipline(file, "Promotion", "Appointed warden", "Facility owner");
@@ -561,7 +562,7 @@ namespace Cellblock.Core
                     else { staff.Pressure = Math.Min(100, staff.Pressure + 6); staff.Favoritism = Math.Min(100, staff.Favoritism + 3); }
                     break;
                 case "Suspension":
-                    file.SuspendedUntil = Data.Minute + 2880; staff.Pressure = Math.Min(100, staff.Pressure + 8);
+                    ClearSecurityAssignment(staff.Id); file.SuspendedUntil = Data.Minute + 2880; staff.Pressure = Math.Min(100, staff.Pressure + 8);
                     if (corrective) staff.Integrity = Math.Min(100, staff.Integrity + 4); else staff.Favoritism = Math.Max(0, staff.Favoritism - 10);
                     break;
                 case "Final warning": staff.Pressure = Math.Min(100, staff.Pressure + 10); if (corrective) staff.Integrity = Math.Min(100, staff.Integrity + 2); break;
@@ -588,7 +589,7 @@ namespace Cellblock.Core
         void RemoveStaff(StaffMember staff, string reason)
         {
             PersonnelFile file = FileFor(staff);
-            RemovePassenger(staff.Id); Data.Staff.Remove(staff); workerPaths.Remove(staff.Id);
+            RemovePassenger(staff.Id); Data.Staff.Remove(staff); RemoveWorkerPath(staff.Id);
             if (file != null) { file.DepartedMinute = Data.Minute; file.Duty = ""; file.WatchId = ""; file.MenteeId = ""; file.Caseload.Clear(); AddDiscipline(file, "Departure", reason, ActingAuthority); }
             foreach (PersonnelFile other in Personnel.Files.Where(f => f.DepartedMinute < 0 && f.MenteeId == staff.Id)) { other.MenteeId = ""; if (other.Duty == "Mentoring") other.Duty = ""; }
             // Keep the archive bounded, dropping the oldest departed files first.
@@ -609,6 +610,7 @@ namespace Cellblock.Core
             if (staff.SecurityRole != "") { Notice = staff.Name + " holds a " + staff.SecurityRole.ToLowerInvariant() + " post. Release the post in Security first."; return false; }
             StaffMember existing = WatcherOf(resident);
             if (existing != null && existing != staff) { PersonnelFile other = FileFor(existing); other.Duty = ""; other.WatchId = ""; }
+            ClearSecurityAssignment(staff.Id);
             file.Duty = "Watch"; file.WatchId = resident.Id; file.MenteeId = "";
             Notice = staff.Name + " is assigned to keep eyes on " + resident.Name + " during their shift.";
             return true;
@@ -619,7 +621,8 @@ namespace Cellblock.Core
             PersonnelFile file = FileFor(staff);
             if (staff == null || file == null || Array.IndexOf(PersonnelRules.DutiesFor(staff.Role, file), duty) < 0 || duty == "Watch" || duty == "Mentoring")
             { Notice = "That duty is not available for this role."; return false; }
-            if (duty != "" && staff.SecurityRole != "") { Notice = staff.Name + " holds a " + staff.SecurityRole.ToLowerInvariant() + " post. Release the post in Security first."; return false; }
+            if(duty!=""&&staff.SecurityRole!=""){Notice=staff.Name+" holds a security post. Release it in Security first.";return false;}
+
             file.Duty = duty; file.WatchId = ""; file.MenteeId = "";
             Notice = staff.Name + (duty == "" ? " returns to regular duties." : " assigned to " + duty.ToLowerInvariant() + ".");
             return true;
@@ -644,6 +647,7 @@ namespace Cellblock.Core
             PersonnelFile file = FileFor(mentor), junior = FileFor(mentee);
             if (mentor == null || mentee == null || mentor == mentee || file == null || junior == null || mentor.Role != "Officer" || mentee.Role != "Officer" || file.Post != "" ||
                 file.RankLevel <= junior.RankLevel) { Notice = "A mentor must be a higher-ranked line officer than their mentee."; return false; }
+            ClearSecurityAssignment(mentor.Id);
             file.Duty = "Mentoring"; file.MenteeId = mentee.Id; file.WatchId = "";
             Notice = mentor.Name + " is mentoring " + mentee.Name + ". Their habits rub off, for better or worse.";
             return true;
@@ -917,6 +921,8 @@ namespace Cellblock.Core
                     staff.Integrity = Geometry.Clamp(staff.Integrity + (lead.Integrity - staff.Integrity) * 0.0004f, 0, 100);
                     staff.Pressure = Geometry.Clamp(staff.Pressure + (lead.Integrity >= 60 ? -0.003f : lead.Integrity < 45 ? 0.002f : 0), 0, 100);
                 }
+                Point capitalGoal;if(CapitalEscortTarget(staff,out capitalGoal)||SecureEscortTarget(staff,out capitalGoal))continue;
+                if (staff.SecurityRole != "" || (Escape.Detected && staff.Role=="Officer" && !IsWarden(staff))) continue;
                 if (file.Post == "Warden") { Direct(staff, DeskPoint(), "Warden's office"); continue; }
                 if (file.Post == "Nurse") { SickCall(staff, file); continue; }
                 switch (file.Duty)
@@ -937,7 +943,7 @@ namespace Cellblock.Core
                     case "Gate post": Direct(staff, PersonnelRules.GatePost, "Gate post"); break;
                     case "Intake": Direct(staff, IntakeStations()[0] + new Point(0.9f, -0.4f), "Intake desk"); break;
                     case "Court escort":
-                        if (CourtVan.Phase == "Boarding" || CourtVan.Phase == "Unloading") Direct(staff, CourtVan.Board + new Point(1.2f, 0.4f), "Court escort");
+                        if (CourtVan.Phase == "Inbound" || CourtVan.Phase == "At gate" || CourtVan.Phase == "Boarding" || CourtVan.Phase == "Unloading") Direct(staff, CourtVan.Board + new Point(1.2f, 0.4f), "Court escort");
                         break;
                     case "CCTV monitoring": Direct(staff, DeskPoint() + new Point(-0.9f, 0), "CCTV monitoring"); break;
                     case "Perimeter patrol":
@@ -1146,7 +1152,7 @@ namespace Cellblock.Core
             Resident mover = a.Impulsivity >= b.Impulsivity ? a : b;
             Fixture bed = HousingBeds().Where(f => !BedTaken(f) && !Geometry.Contains(room, f.Position)).OrderBy(f => Geometry.Distance(f.Position, mover.Home)).FirstOrDefault();
             if (bed == null) return;
-            mover.Home = Geometry.AccessPoint(bed); mover.FloorBed = false; paths.Remove(mover); destinations.Remove(mover);
+            mover.Home = Geometry.AccessPoint(bed); mover.FloorBed = false; RemoveResidentPath(mover);
             PeopleDynamics.Record(Data, "housing", mover.Id, mover.Name + " was moved to another housing room after the fight.", 1);
         }
         void MinorInfraction()

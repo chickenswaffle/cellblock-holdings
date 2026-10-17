@@ -1,82 +1,31 @@
-# Game modes: jurisdiction, facility type and location
+# Choosing a holding
 
-Owner: Claude (`Core/GameModes.cs`, `Runtime/GameModesHud.cs`, `Resources/GameModes.uss`, `Tools/CoreChecks/GameModesChecks.cs`). All charges, courts and institutions are fictional game content.
+The opening screen now uses Claude's mode catalog through an integrated three-step charter: **jurisdiction → institution → location**. City, County, State and Federal express increasing oversight difficulty. The institution defines its population and operational problem; a federal camp is different from a federal supermax. Locations can be selected or drawn from the chosen jurisdiction. All places and rules are fictional game content.
 
-A new company picks three things:
+The catalog has twelve institutions and eight locations. The final step shows acquisition, operating reserve, daily base income/commitments and the payment cycle. A charter is fixed at acquisition; a different contract starts a separate holding. Existing company slots and legacy terms are preserved. Saved holding labels show institution and location.
 
-1. **Jurisdiction tier** (City / County / State / Federal): the difficulty. It sets penalty scale, wages, applicant vetting, oversight and audit cadence, transfer pressure and the intake standard.
-2. **Facility type** (three per tier): the specific institution and its core problem. It sets population, temperaments, gangs, charges, court cadence, release odds, starting staff, regime, gate and escape rules.
-3. **Location** (eight, each eligible for some tiers): land price, wage index, labor quality, experience, court drive time and a local charge.
+## What changes in play
 
-`World.ApplyMode(typeId, locationId)` reshapes a first-day company: population, legal records, staff, regime, gate and hiring board. Saves keep the choice in `State.Mode`. The three original contract cards map to `county-intake`, `county-reentry` and `state-modernization` with identical terms. Older saves take that mapping additively without changing their people.
+- Seeded population traits, gang share, pretrial share, charge categories, sentence lengths and hearing cadence.
+- Applicant quality/wages, starting warden/nurse/officers, staff pressure, regime and gate state.
+- Actual acquisition and ongoing contract terms; location-adjusted land cost and court travel time. Existing saves use their original contract terms; only the new factory applies explicit catalog prices.
+- Editable layouts: shared housing, two open dormitories, six secure double cells or twelve individual cells. Starting population follows the institution and spare beds remain usable capacity. Appropriate starts include medical furnishings and installed powered monitoring. The catalog's room names are guidance, not a complete functional room-zoning system.
+- Supermax routine movement and authorized court/release movement need an assigned mobile officer within actual distance and line of sight. Officers visibly walk to their assigned resident and accompany movement. Escape attempts deliberately breach authorized movement rules.
+- Open-campus starts hide the presentation boundary fence and have increased walk-away risk. Installed barriers remain separate editable equipment.
+- More demanding jurisdictions require stronger inspection scores and more frequent oversight. Legacy companies retain their earlier inspection settings.
 
-## Tiers
+## Integration details for Claude
 
-| Tier | Difficulty | Penalties | Wages | Applicant integrity | Locations |
-| --- | --- | --- | --- | --- | --- |
-| City | Easy | ×0.75 | ×0.85 | -4 | Northbridge, Port Ellery, Halvern, Lakewood, East Tolland |
-| County | Normal | ×1 | ×1 | +0 | Briar County, Lakewood, Cedar Falls, East Tolland |
-| State | Hard | ×1.5 | ×1.15 | +4 | Mason Ridge, Northbridge, Halvern, Cedar Falls |
-| Federal | Expert | ×2.5 | ×1.35 | +12 | Mason Ridge, Halvern, Port Ellery, Cedar Falls, Northbridge, Briar County, Lakewood, East Tolland |
+`World.StartMode(typeId, locationId)` performs acquisition, layout creation and ApplyMode as one opening operation. `State.Mode.ExplicitTerms` selects catalog financial terms; the three legacy `World.Offers` aliases remain for compatibility and existing checks. `GameController.StartModeCompany` creates a fresh save slot. `GameModesHud.ShowModePicker` hosts the wizard; it holds world input/clock. The charter row for re-chartering an operating facility is hidden. Explicit acquired charters reject ApplyMode so pricing cannot be switched for free.
 
-How tiers drive population pressure (`docs/pressure-notes.md`):
+Codex integrated your two personnel archive fixes from `029e5d9`. `Walk` now consumes a zero-distance first route point immediately, fixing moving-target watch/escort replans that previously stood still. Existing security duty assignments, actual CCTV monitoring/escort presence and modal input guards remain preserved. Warden and Nurse stay personnel posts; no role migration is needed in this pass.
 
-| Tier | Transfers per base resident per day | Daily growth | Audit every | Crowding limit | Residents per officer | Intake required (included) |
-| --- | --- | --- | --- | --- | --- | --- |
-| City | 0.22 | 4% | 10 days | 125% | 14 | Basic (Basic) |
-| County | 0.12 | 4% | 7 days | 115% | 12 | Basic (Basic) |
-| State | 0.08 | 5% | 5 days | 110% | 10 | Enhanced (Standard) |
-| Federal | 0.06 | 5% | 4 days | 100% | 8 | Federal (Federal) |
+The broader catalog dragging/placement/HUD redesign and new Lives files remain your handoff. Codex only changed existing menu creation, mode company creation, contract lookup/save labels and explicit new-world initialization for this integration. No ConstructionGuides or Cellblock.uss edit was made.
 
-Contraband pressure also follows the tier: drone runs per 30 minutes are 0.2% / 0.4% / 0.8% / 0.6%, and carried-in rates at intake are 18% / 15% / 12% / 8%. The staff corruption share (30% / 25% / 25% / 12%) scales staff smuggling.
+## Evidence and limits
 
-## Facility types
+Core checks enumerate every supported mode/location pairing, assert housing capacity, resident/service routes, chosen finances and save/load terms, and check actual nearby escorts and moving-target progress. Unity Play evidence covers all charter steps, desktop/phone layout, camp/supermax starts and Unity JSON. Native phone/tablet touch, sustained performance, advanced room zoning and long-run balance remain separate work. Review the final transcript/report rather than treating catalog descriptions as proof of every later feature.
 
-| Facility type | Tier | Security / housing | Residents / beds | Daily revenue / operating | Paid every | Challenge | Signature rule |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| City Holding Center (`city-holding`) | City | Minimum / Holding cells | 10 / 12 | $3,300 / $2,300 | 7 d | Churn | Hearings every 1–2 days, and many residents are released at court. |
-| Municipal Work Release (`city-work-release`) | City | Minimum / Dormitory | 8 / 12 | $3,600 / $2,600 | 7 d | Trust | Open campus: walk-away risk +6. Good-time credit ×1.5. Rehabilitative regime. |
-| Downtown Detention (`city-downtown`) | City | Medium / Shared cells | 12 / 12 | $4,200 / $3,000 | 7 d | Crowding and street feuds | Every bed is filled on day one; two street crews share the block. Fights ×1.2. |
-| County Intake Jail (`county-intake`) | County | Medium / Shared cells | 12 / 12 | $4,100 / $2,900 | 7 d | Intake and court calendars | Seven in ten residents await trial. |
-| County Reentry Campus (`county-reentry`) | County | Minimum / Shared cells | 8 / 12 | $4,400 / $3,300 | 28 d | Release readiness | Most residents are sentenced with release dates in weeks. Good-time ×1.2. |
-| County Maximum Wing (`county-maximum`) | County | Maximum / Secure cells | 10 / 12 | $5,200 / $3,900 | 7 d | Violence before trial | Gate closed at start; escape risk +6; fights ×1.4; one extra officer. |
-| State Minimum Facility (`state-minimum`) | State | Minimum / Dormitory | 12 / 12 | $4,800 / $3,600 | 28 d | Programs and walk-aways | Low fence: walk-away risk +6. Good-time ×1.3. You start with a warden. |
-| State Medium Prison (`state-medium`) | State | Medium / Shared cells | 12 / 12 | $5,600 / $4,200 | 28 d | Gang politics | Seven in ten residents are gang-affiliated; corrupt applicants +10%; fights ×1.3. Warden and an extra officer at start. |
-| State Facility Modernization (`state-modernization`) | State | Maximum / Secure cells | 10 / 12 | $5,400 / $4,100 | 7 d | Old building, tired staff | Staff start worn down (+15 pressure); escape risk +2; you start with a warden. |
-| Federal Prison Camp (`federal-camp`) | Federal | Minimum / Dormitory | 10 / 12 | $6,200 / $4,500 | 28 d | Federal standards with no fence | No perimeter fence: walk-away risk +10. Fights ×0.5. Penalties ×2.5. Warden and nurse at start. |
-| Federal Correctional Institution (`federal-fci`) | Federal | Medium / Shared cells | 12 / 12 | $7,000 / $5,200 | 28 d | Trafficking networks | Corrupt applicants +15%; gangs common; escape risk +4. Warden and nurse at start. |
-| Federal Supermax (`federal-supermax`) | Federal | Supermax / Single cells | 6 / 12 | $9,000 / $7,000 | 28 d | Absolute control | Escape risk +14; escape penalty $50,000; strict regime locked; gate closed; warden, nurse and three elite officers at start. |
+For Lives integration: `ChooseResidentActivity` must be a pure target query. The secure-escort planner also calls it to assign officers before routine movement. Book programs, update memories and advance work only in `AdvanceLives`, once per explicit game minute and only after actual arrival/presence checks.
 
-## Locations
-
-| Location | Wage index | Land index | Labor quality | Court drive | Local charge |
-| --- | --- | --- | --- | --- | --- |
-| Briar County | ×0.95 | ×0.85 | +0 | 0 min | Livestock theft |
-| Lakewood | ×1 | ×1.05 | +4 | 0 min | Burglary |
-| Northbridge | ×1.05 | ×0.9 | -2 | 15 min | Possession with intent to sell |
-| Port Ellery | ×1.1 | ×1.2 | -4 | 15 min | Smuggling |
-| Cedar Falls | ×0.9 | ×0.75 | +6 | 35 min | Driving under the influence |
-| Mason Ridge | ×0.92 | ×0.7 | +2 | 40 min | Assault |
-| Halvern | ×1.12 | ×1.25 | +3 | 0 min | Bribery |
-| East Tolland | ×0.88 | ×0.8 | -6 | 20 min | Copper theft |
-
-## Checks
-
-`Tools/CoreChecks/GameModesChecks.cs` pins every rule a mode drives:
-
-- catalog consistency, and the original contracts mapping additively;
-- population, charges, courts and staff per type;
-- penalty scale and the fixed supermax penalty;
-- wages and labor quality at a shared location, land index and the escape offset;
-- charge severity and pretrial share, and gang share across seeds;
-- good-time credit, fight scale and release bias on an identical population;
-- the location's court drive, charter timing, two-day runs per type and malformed saves.
-
-All 24 deliberate mode mutants are killed.
-
-## New-game flow (wired)
-
-- The new-game menu opens the charter screen (`ShowModePicker`), and the three classic offers stay as quick starts.
-- `World.StartCharter(typeId, locationId)` books the type's own capital and the location's land price and seeds the population per type and location. It adds a booking desk near the sally port for state and federal types, then applies the mode.
-- `World.Contract` derives its terms from the chartered type and location.
-- Still open (Codex): distinct starter buildings per type from `FacilityType.StarterRooms`/`Housing`/`Beds`.
+Claude’s catalog design and roadmap notes from b470a10 are preserved in [the design appendix](claude-game-modes-design.md). Current integration status above takes precedence over earlier wiring requests.

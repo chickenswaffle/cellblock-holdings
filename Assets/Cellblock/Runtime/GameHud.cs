@@ -44,12 +44,12 @@ namespace Cellblock.Unity
         World rosterWorld;
         Button residentsToggle, staffToggle, staffSupport, buildRotate, catalogToggle;
         readonly Dictionary<int, Button> speedButtons = new Dictionary<int, Button>();
-        Button approve, repeatPlacement, draftConnection, hire, release, facilityTab, buildTab, peopleTab, companyTab, cameraToggle, snap, height, planView, perspectiveView;
+        Button approve, repeatPlacement, draftConnection, undoDoor, hire, release, facilityTab, buildTab, peopleTab, companyTab, cameraToggle, snap, height, planView, perspectiveView;
         Workspace workspace;
         bool inspectorOpen = true, cameraOpen, compact, layoutReady, guideOpen, hadDraft;
         object previousSelection;
         float nextRefresh;
-        public bool BlocksWorldInput { get { return guideOpen || (menu != null && menu.style.display.value != DisplayStyle.None); } }
+        public bool BlocksWorldInput { get { return InteractionModalOpen || guideOpen || (menu != null && menu.style.display.value != DisplayStyle.None); } }
         public Vector2 WorldViewCenter { get; private set; } = new Vector2(0.5f, 0.5f);
         public static string Money(long cents) { return "$" + (cents / 100d).ToString("N0", CultureInfo.InvariantCulture); }
 
@@ -464,16 +464,32 @@ namespace Cellblock.Unity
             }
         }
 
+        Label directDoorHint;
+#if UNITY_EDITOR
+        public string PreviewDoorLayout {get{return "Quote "+quote.worldBound+" / approve "+approve.worldBound+" / viewport "+root.worldBound;}}
+        public bool PreviewDoorControlsFit()
+        {
+            Rect viewport=root.worldBound,card=quote.worldBound;var actions=quote.Q<VisualElement>(className:"quote-actions");
+            foreach(Button button in actions.Query<Button>().ToList())
+            {
+                Rect b=button.worldBound;
+                if(b.width<44||b.height<43.5f||b.xMin<viewport.xMin+8||b.xMax>viewport.xMax-8||b.yMin<card.yMin||b.yMax>card.yMax-4||b.yMax>viewport.yMax-8)return false;
+            }
+            return true;
+        }
+#endif
         void BuildQuote()
         {
             quote = Panel("quote");
-            var content = new ScrollView(ScrollViewMode.Vertical); content.horizontalScrollerVisibility = ScrollerVisibility.Hidden; quote.Add(content);
+            directDoorHint=Text("Click a wall for a door · Command/Ctrl+Z to undo", "muted");directDoorHint.style.marginLeft=16;directDoorHint.style.marginTop=10;directDoorHint.style.marginRight=16;directDoorHint.style.flexShrink=0;quote.Add(directDoorHint);
+            var content = new ScrollView(ScrollViewMode.Vertical); content.horizontalScrollerVisibility = ScrollerVisibility.Hidden; content.style.minHeight=0;content.style.flexGrow=1;content.style.flexShrink=1;quote.Add(content);
             content.Add(Text("CAPITAL PROJECT / REVIEW", "eyebrow"));
             quoteTitle = Text("", "card-title"); quoteCost = Text("", "quote-cost"); quoteText = Text("", "body");
             content.Add(quoteTitle); content.Add(quoteCost); content.Add(quoteText);
-            draftConnection=Action("Add connecting door", () => game.BeginDraftConnection(), "quiet");content.Add(draftConnection);
+            draftConnection=Action("Click a wall to add a door", () => game.BeginDraftConnection(), "quiet");content.Add(draftConnection);
+            undoDoor=Action("Undo last door",()=>game.UndoDoor(),"quiet");content.Add(undoDoor);
             content.Add(Text("Materials are charged on approval. Crew wages accrue as time runs. New space opens at handover.", "muted"));
-            var actions = Element("quote-actions");
+            var actions = Element("quote-actions");actions.style.flexShrink=0;actions.style.minHeight=52;
             approve = Action("Approve project", () => { game.Confirm(); Refresh(true); }, "primary");
             repeatPlacement=Action("Approve & place another",()=>{game.ConfirmAndRepeat();Refresh(true);},"quiet");content.Add(repeatPlacement);
             actions.Add(approve); actions.Add(Action("Discard", () => { game.Cancel(); Refresh(true); }, "quiet")); quote.Add(actions);
@@ -533,7 +549,7 @@ namespace Cellblock.Unity
             header.style.display = menuOpen ? DisplayStyle.None : DisplayStyle.Flex;
             navigation.style.display = menuOpen ? DisplayStyle.None : DisplayStyle.Flex;
             bool building = workspace == Workspace.Build;
-            bool reviewing = game.Draft != null && !game.PlacingConnection;
+            bool reviewing = game.Draft != null;
             float dockOffset = reviewing ? 0 : compact ? 76 : 98;
             if (reviewing) { inspectorOpen = false; cameraOpen = false; }
             cameraToggle.SetEnabled(!reviewing);
@@ -562,7 +578,7 @@ namespace Cellblock.Unity
             WorldViewCenter = new Vector2((worldLeft + Mathf.Max(0, worldRight - worldLeft) * 0.5f) / root.resolvedStyle.width,
                 (worldBottom + Mathf.Max(0, root.resolvedStyle.height - worldTop - worldBottom) * 0.5f) / root.resolvedStyle.height);
             status.style.display = !menuOpen && game.World != null && game.Draft == null ? DisplayStyle.Flex : DisplayStyle.None;
-            quote.style.display = !menuOpen && game.Draft != null && !game.PlacingConnection ? DisplayStyle.Flex : DisplayStyle.None;
+            quote.style.display = !menuOpen && game.Draft != null ? DisplayStyle.Flex : DisplayStyle.None;
             status.style.left = left; status.style.right = right + contextWidth;
             status.style.bottom = bottom + (building ? dockOffset : 0);
             status.style.maxWidth = compact ? 610 : 720;
@@ -624,56 +640,24 @@ namespace Cellblock.Unity
             body.Add(Text("Your next holding.", "menu-title"));
             body.Add(Text("Build the institution. Run the company.", "menu-subtitle"));
             body.Add(Text("Acquire an editable facility. Keep cash in reserve for operations, crews, and improvements.", "menu-intro"));
-            var cards = Element("cards"); int index = 0;
-            // The full new-game flow: jurisdiction, institution and location, each with its own terms.
-            var charter = Element("contract-card"); charter.AddToClassList("charter-card");
-            var charterTop = Element("contract-topline"); charterTop.Add(Text("NEW / CHARTER", "eyebrow")); charterTop.Add(Text("12 INSTITUTIONS", "contract-tag")); charter.Add(charterTop);
-            charter.Add(Text("CITY · COUNTY · STATE · FEDERAL", "contract-city")); charter.Add(Text("Charter a facility", "contract-title"));
-            charter.Add(Text("Choose the jurisdiction for the difficulty, an institution for its core problem, and the place to build it. Each comes with its own capital, land price, population, staff, rules, transfer pressure and inspections.", "contract-description"));
-            charter.Add(Action("Choose a charter  →", () => ShowModePicker((type, location) => AcquireCharter(type, location)), "primary acquire-button"));
-            cards.Add(charter);
-            foreach (ContractOffer offer in World.Offers)
-            {
-                ContractOffer selected = offer;
-                var card = Element("contract-card");
-                var cardTop = Element("contract-topline"); cardTop.Add(Text("0" + (++index) + " / ACQUISITION", "eyebrow"));
-                cardTop.Add(Text(offer.PaymentDays == 7 ? "WEEKLY" : "28 DAY CYCLE", "contract-tag")); card.Add(cardTop);
-                card.Add(Text(offer.City.ToUpperInvariant(), "contract-city")); card.Add(Text(offer.Name, "contract-title"));
-                card.Add(Text(offer.Description, "contract-description"));
-                var reserve = Element("reserve-block"); reserve.Add(Text("OPERATING RESERVE", "metric-label"));
-                reserve.Add(Text(Money(offer.CapitalCents - offer.AcquisitionCents), "reserve-value")); card.Add(reserve);
-                card.Add(Action("Acquire · " + Money(offer.AcquisitionCents) + "  →", () => AcquireCompany(selected), "primary compact-acquire"));
-                var details = Element("contract-details");
-                Button detailToggle = null;
-                detailToggle = Action("Financial terms  +", () =>
-                {
-                    bool expanded = !details.ClassListContains("expanded");
-                    details.EnableInClassList("expanded", expanded); detailToggle.text = "Financial terms  " + (expanded ? "−" : "+");
-                }, "quiet contract-detail-toggle"); card.Add(detailToggle);
-                details.Add(FinanceRow("Starting capital", Money(offer.CapitalCents)));
-                details.Add(FinanceRow("Land + starter facility", "− " + Money(offer.AcquisitionCents)));
-                details.Add(FinanceRow("Base revenue / day", Money(offer.DailyRevenueCents)));
-                details.Add(FinanceRow("Operations / day", "− " + Money(offer.DailyOperatingCents)));
-                details.Add(FinanceRow("Verified service / day", "up to " + Money(offer.DailyServiceBonusCents)));
-                details.Add(Text(offer.Residents + " starting residents · editable one-floor facility", "contract-footnote")); card.Add(details);
-                Button choose = Action("Acquire facility  →", () => AcquireCompany(selected), "primary acquire-button");
-                choose.AddToClassList("primary"); choose.AddToClassList("acquire-button"); card.Add(choose); cards.Add(card);
-            }
-            body.Add(cards);
+            var charter=Element("opening-charter");
+            charter.Add(Text("01 / CHARTER A NEW FACILITY","eyebrow"));
+            charter.Add(Text("Choose your jurisdiction.","contract-title"));
+            charter.Add(Text("City · County · State · Federal. Choose the institution and location, review its operating reserve and rules, then start with a matching editable facility.","contract-description"));
+            charter.Add(Action("Choose facility & difficulty  →",()=>ShowModePicker(AcquireModeCompany),"primary"));body.Add(charter);
+
             body.Add(Text("Separate saves for every holding. Game time advances only while you play.", "menu-footer")); Layout();
         }
 
+        void AcquireModeCompany(string type,string location)
+        {
+            if(!game.StartModeCompany(type,location))return;
+            menu.style.display=DisplayStyle.None;workspace=Workspace.Facility;inspectorOpen=!compact;cameraOpen=false;previousSelection=null;Refresh(true);Layout();
+            if(!PlayerPrefs.HasKey("cellblock-controls-v2"))ShowGuide(true);
+        }
         void AcquireCompany(ContractOffer offer)
         {
             if (!game.StartCompany(offer.Id)) return;
-            menu.style.display = DisplayStyle.None; workspace = Workspace.Facility;
-            inspectorOpen = !compact; cameraOpen = false; previousSelection = null; Refresh(true); Layout();
-            if (!PlayerPrefs.HasKey("cellblock-controls-v2")) ShowGuide(true);
-        }
-
-        void AcquireCharter(string typeId, string locationId)
-        {
-            if (!game.StartCharter(typeId, locationId)) return;
             menu.style.display = DisplayStyle.None; workspace = Workspace.Facility;
             inspectorOpen = !compact; cameraOpen = false; previousSelection = null; Refresh(true); Layout();
             if (!PlayerPrefs.HasKey("cellblock-controls-v2")) ShowGuide(true);
@@ -741,6 +725,7 @@ namespace Cellblock.Unity
         }
         public void CloseOverlays()
         {
+            CloseInteractionSheets();
             if (guideOpen) { CloseGuide(); return; }
             if (game.World != null && menu != null) menu.style.display = DisplayStyle.None;
             cameraOpen = false; Layout();
@@ -842,18 +827,21 @@ namespace Cellblock.Unity
                 }
             }
             cameraTitle.text = game.CameraModeLabel; height.text = game.HeightLabel;
-            quote.style.display = game.Draft != null && !game.PlacingConnection ? DisplayStyle.Flex : DisplayStyle.None;
-            status.style.display = game.Draft != null && !game.PlacingConnection ? DisplayStyle.None : DisplayStyle.Flex;
+            quote.style.display = game.Draft != null ? DisplayStyle.Flex : DisplayStyle.None;
+            directDoorHint.style.display=game.Draft!=null&&game.Draft.Walls.Count>0?DisplayStyle.Flex:DisplayStyle.None;
+            status.style.display = game.Draft != null ? DisplayStyle.None : DisplayStyle.Flex;
             if (game.Draft != null)
             {
                 Quote q = game.CurrentQuote;
-                draftConnection.style.display=game.Draft.Walls.Count>=3?DisplayStyle.Flex:DisplayStyle.None;
+                undoDoor.style.display=game.CanUndoDoor?DisplayStyle.Flex:DisplayStyle.None;
+                draftConnection.style.display=game.Draft.Walls.Count>0?DisplayStyle.Flex:DisplayStyle.None;
                 repeatPlacement.style.display=game.CanRepeatPlacement?DisplayStyle.Flex:DisplayStyle.None;
                 repeatPlacement.SetEnabled(q!=null&&q.Valid);
                 quoteTitle.text = game.Draft.Name; quoteCost.text = q != null && q.Valid ? Money(q.MaterialCents) + "  upfront" : "Plan needs attention";
                 quoteText.text = q == null ? "Reviewing plan…" : q.Valid
                     ? "Estimated work: " + q.CrewMinutes.ToString("0") + " crew-minutes\n" + q.Message + (world.Data.Crews.Count == 0 ? "\nHire a crew in Facility before work can begin." : "")
                     : q.Message;
+                if(game.Draft.Walls.Count>0)quoteText.text+="\n\nClick any wall in the 3D plan to add a door. Drag or use arrows to move; pinch/scroll to zoom. Undo restores your previous plan.";
                 quoteCost.EnableInClassList("negative", q != null && !q.Valid); approve.SetEnabled(q != null && q.Valid);
             }
             RefreshSecurity(world);

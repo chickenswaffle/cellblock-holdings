@@ -39,7 +39,8 @@ namespace Cellblock.Core
                     if (string.IsNullOrEmpty(resident.Temperament)) resident.Temperament = Temperaments[Pick(state.Seed, resident.Id, 1) % Temperaments.Length];
                     if (string.IsNullOrEmpty(resident.Clique)) resident.Clique = Cliques[Pick(state.Seed, resident.Id, 2) % Cliques.Length];
                     if (string.IsNullOrEmpty(resident.Gang)) resident.Gang = GangFor(state.Seed, resident.Id);
-                    if (resident.NextDecisionMinute < state.Minute) resident.NextDecisionMinute = state.Minute + (int)(Pick(state.Seed, resident.Id, 3) % 17);
+                    // A past decision is due on the next active tick. Loading must not
+                    // postpone it (custody/intake can legitimately leave it in the past).
                 }
             }
             // Version-1 saves have no relationship graph. Build it once from the stored simulation seed.
