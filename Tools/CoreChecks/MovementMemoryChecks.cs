@@ -26,5 +26,13 @@ static partial class Program
             Reject(s=>s.Movement.Version=99);Reject(s=>s.Movement.Routes.Add(s.Movement.Routes[0]));Reject(s=>s.Movement.Routes[0].Next=-1);
             Reject(s=>s.Movement.Routes[0].Points.Add(new Point(float.NaN,0)));Reject(s=>s.Movement.Routes[0].Target=new Point(3000,0));
         });
+        Test("cached route with a false destination is discarded and replanned",()=>{
+            World w=County();w.AdvanceMinutes(60);State state=RoundTrip(w.Data);
+            var route=state.Movement.Routes.First(r=>r.Kind=="Resident"&&r.Points.Count>0);string key=route.Key;
+            route.Target+=new Point(.5f,0);World restored=new World(state);
+            Check(!restored.Data.Movement.Routes.Any(r=>r.Kind=="Resident"&&r.Key==key),"Mismatched endpoint was restored");
+            Check(restored.Data.Residents.First(r=>r.Id==key).NextDecisionMinute==restored.Data.Minute,"Resident did not get a new decision");
+            restored.AdvanceMinutes(1);Check(restored.Reconciles(),"Replanning affected cash");
+        });
     }
 }

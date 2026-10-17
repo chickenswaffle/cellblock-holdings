@@ -12,6 +12,7 @@ static partial class Program
     }
     static partial void RunSecurityChecks()
     {
+        RunSearchlightChecks();
         Test("security upgrades preserve identity and stay inactive until handover",()=>{
             World w=County();Fixture camera=AddSecurity(w,"CCTV",new Point(-18,6));
             string id=camera.Id;float basic=w.CameraRangeFor(camera);long cash=w.Data.CashCents;

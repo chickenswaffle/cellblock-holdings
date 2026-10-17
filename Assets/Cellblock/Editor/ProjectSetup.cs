@@ -159,6 +159,7 @@ namespace Cellblock.Editor
                 throw new InvalidOperationException("The retained player material/shader is missing.");
             foreach(string retained in new[]{"DetailedBuildingMaterial","LuminaireMaterial"})
                 if(Resources.Load<Material>(retained)==null)throw new InvalidOperationException("Missing retained material: "+retained);
+            if(Resources.Load<Shader>("SearchlightBeam")==null)throw new InvalidOperationException("Missing retained searchlight shader.");
             Debug.Log("CELLBLOCK_PROJECT_VALIDATION_PASSED");
         }
     }

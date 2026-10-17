@@ -9,6 +9,7 @@ namespace Cellblock.Core
         public bool GridEnabled = true;
         public List<Point> WiredRooms = new List<Point>();
         public List<SecurityDog> Dogs = new List<SecurityDog>();
+        public List<TowerLightControl> TowerLights = new List<TowerLightControl>();
         public double UtilityRemainder;
     }
     [Serializable] public sealed class SecurityDog
@@ -67,7 +68,7 @@ namespace Cellblock.Core
         // construction, so neither queries nor a quote can grant power, comfort or detection early.
         void InitializeSecurity()
         {
-            if (Data.SecurityVersion < 0 || Data.SecurityVersion > 1) throw new ArgumentException("Unsupported security save version.");
+            if (Data.SecurityVersion < 0 || Data.SecurityVersion > 2) throw new ArgumentException("Unsupported security save version.");
             if (Data.SecurityVersion == 0 && Data.Walls.Count > 0)
             {
                 Data.Security = new SecurityState();
@@ -93,6 +94,7 @@ namespace Cellblock.Core
                 if(staff.Role!="Officer"||post==null||post.Kind!=required||!postIds.Add(post.Id)||staff.SecurityDailyCents!=wage||role=="K9"&&!staff.DogTrained||role=="Armed"&&(!staff.ArmedTrained||post.UpgradeLevel<1))throw new ArgumentException("Invalid security post assignment.");
             }
             if(Data.Security.Dogs.Select(d=>d.Id).Distinct().Count()!=Data.Security.Dogs.Count||Data.Security.Dogs.Select(d=>d.KennelId).Distinct().Count()!=Data.Security.Dogs.Count)throw new ArgumentException("Duplicate dog team.");
+            InitializeSearchlights();
         }
         void ReconcileSecurityPosts()
         {
@@ -136,7 +138,7 @@ namespace Cellblock.Core
         public bool IsIlluminated(Point point)
         {
             if (!Night) return true;
-            if (Data.Operations.Lights && Data.Fixtures.Any(f=>f.Kind=="GuardTower"&&f.UpgradeLevel>0&&EquipmentOnline(f)&&StaffAtPost(f,"Tower")&&Geometry.Distance(f.Position,point)<12&&SightLines.Clear(f.Position,point)))return true;
+            if (SearchlightAt(point) != null) return true;
             if (Data.Operations.Lights && Rooms.Any(r => Geometry.Contains(r,point) && RoomPowered(r))) return true;
             return Data.Fixtures.Any(f => f.Kind == "Floodlight" && Data.Operations.Lights && EquipmentOnline(f) && Geometry.Distance(f.Position,point) <= LightRange(f) && SightLines.Clear(f.Position,point));
         }
@@ -202,6 +204,7 @@ namespace Cellblock.Core
         public static bool NearPerimeter(Point p) { return Geometry.SiteX-Math.Abs(p.X)<3.5f || Geometry.SiteY-Math.Abs(p.Y)<3.5f; }
         public string SecurityDetectionAt(Point point)
         {
+            if(SearchlightAt(point)!=null)return "tower searchlight";
             foreach(Fixture tower in Data.Fixtures.Where(f=>f.Kind=="GuardTower"&&EquipmentOnline(f)))
                 if(StaffAtPost(tower,"Tower")&&Geometry.Distance(tower.Position,point)<=12+tower.UpgradeLevel*4&&SightLines.Clear(tower.Position,point))return "staffed guard tower";
             foreach(Fixture wire in Data.Fixtures.Where(f=>f.Kind=="PerimeterWire"&&f.UpgradeLevel==2&&EquipmentOnline(f)))
@@ -223,6 +226,7 @@ namespace Cellblock.Core
         void AdvanceSecurity()
         {
             ReconcileSecurityPosts();
+            AdvanceSearchlights();
             if(Data.Security.GridEnabled&&PowerOnline)
             {
                 // Starter lighting is already in contract operating costs. Only added equipment

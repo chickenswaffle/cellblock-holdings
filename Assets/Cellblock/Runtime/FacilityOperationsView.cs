@@ -214,11 +214,13 @@ namespace Cellblock.Unity
             if (facilitySun == null) facilitySun = GetComponentsInChildren<Light>().FirstOrDefault(l => l.type == LightType.Directional);
             float hour = world.Data.Minute % 1440 / 60f;
             float daylight = Mathf.SmoothStep(0, 1, Mathf.Clamp01(Mathf.Sin((hour - 6) / 12 * Mathf.PI) * 2));
-            if (facilitySun != null) { facilitySun.intensity = Mathf.Lerp(0.08f, 1.75f, daylight); facilitySun.transform.rotation = Quaternion.Euler(15 + daylight * 35, -32, 0); }
-            RenderSettings.ambientIntensity = Mathf.Lerp(0.18f, 1, daylight);
-            RenderSettings.ambientEquatorColor = Color.Lerp(new Color(0.055f, 0.065f, 0.10f), new Color(0.43f, 0.48f, 0.50f), daylight);
-            RenderSettings.ambientGroundColor = Color.Lerp(new Color(0.025f, 0.03f, 0.045f), new Color(0.24f, 0.27f, 0.24f), daylight);
-            RenderSettings.ambientSkyColor = Color.Lerp(new Color(0.08f, 0.11f, 0.20f), new Color(0.69f, 0.76f, 0.80f), daylight);
+            if (facilitySun != null) { facilitySun.intensity = Mathf.Lerp(0.15f, 1.75f, daylight); facilitySun.transform.rotation = Quaternion.Euler(15 + daylight * 35, -32, 0); }
+            // Cool moonlight keeps silhouettes and work readable; operational illumination
+            // still comes from the core's powered local lights and staffed searchlight cone.
+            RenderSettings.ambientIntensity = Mathf.Lerp(0.28f, 1, daylight);
+            RenderSettings.ambientEquatorColor = Color.Lerp(new Color(0.085f, 0.105f, 0.15f), new Color(0.43f, 0.48f, 0.50f), daylight);
+            RenderSettings.ambientGroundColor = Color.Lerp(new Color(0.040f, 0.05f, 0.07f), new Color(0.24f, 0.27f, 0.24f), daylight);
+            RenderSettings.ambientSkyColor = Color.Lerp(new Color(0.12f, 0.16f, 0.26f), new Color(0.69f, 0.76f, 0.80f), daylight);
             if (force || lightingRevision != world.GeometryRevision)
             {
                 if (lightRoot == null) lightRoot = Root("Facility luminaires"); Clear(lightRoot); facilityLights.Clear(); luminaireMeshes.Clear(); lightingRevision = world.GeometryRevision;

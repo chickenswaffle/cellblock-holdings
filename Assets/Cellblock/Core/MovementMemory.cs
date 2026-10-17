@@ -87,7 +87,11 @@ namespace Cellblock.Core
             PruneMovementMemory();
             foreach(SavedRoute route in memory.Routes.ToList())
             {
-                Point previous;RouteOwner(route,out previous);bool clear=true;
+                Point previous;RouteOwner(route,out previous);
+                // A cache cannot claim a different destination than its actual endpoint.
+                // Empty routes represent a failed/exhausted query and remain legal. Drop a
+                // mismatched non-empty cache, allowing the normal owner to replan safely.
+                bool clear=route.Points.Count==0||Geometry.Distance(route.Points[route.Points.Count-1],route.Target)<.01f;
                 for(int i=route.Next;i<route.Points.Count;i++){if(!Routes.Clear(previous,route.Points[i])){clear=false;break;}previous=route.Points[i];}
                 if(!clear){memory.Routes.Remove(route);if(route.Kind=="Resident")Data.Residents.First(r=>r.Id==route.Key).NextDecisionMinute=Data.Minute;continue;}
                 var cursor=new RouteCursor(route);

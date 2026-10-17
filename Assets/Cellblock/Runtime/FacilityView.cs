@@ -17,7 +17,7 @@ namespace Cellblock.Unity
         Transform structures, planned, ghost, people;
         sealed class Actor
         {
-            public Transform Root, Model, Body, Head, Marker, SecurityProp;
+            public Transform Root, Model, Body, Head, Marker, SecurityProp, WatchProp;
             public TextMesh NameTag;
             public Transform[] Limbs;
             public float Speed, Gait, TurnRate;
@@ -919,7 +919,7 @@ namespace Cellblock.Unity
             if (!object.ReferenceEquals(presentedWorld, world))
             {
                 foreach (Actor oldActor in actors.Values) { Clear(oldActor.Root); Destroy(oldActor.Root.gameObject); }
-                actors.Clear(); looks.Clear();
+                actors.Clear(); looks.Clear();residentActorIds.Clear();staffActorIds.Clear();actorRetireMinute=-1;
                 foreach (ProjectView oldProject in constructionViews.Values) { Clear(oldProject.Root); Destroy(oldProject.Root.gameObject); }
                 constructionViews.Clear();
                 if (transportRoot != null) Clear(transportRoot); trucks.Clear();
@@ -955,7 +955,33 @@ namespace Cellblock.Unity
             RefreshOperations(world, force);
             RefreshJustice(world, force);
             foreach (Actor actor in actors.Values) if (!actor.Seen) actor.Root.gameObject.SetActive(false);
+            RetireDepartedActors(world);
         }
+
+        readonly HashSet<string> residentActorIds=new HashSet<string>();
+        readonly HashSet<string> staffActorIds=new HashSet<string>();
+        int actorRetireMinute=-1,retireResidentCount=-1,retireStaffCount=-1;
+        // Being away at court is temporary. A roster removal is permanent; retire its meshes
+        // and appearance binding rather than retaining every released person for the whole game.
+        void RetireDepartedActors(World world)
+        {
+            if(actorRetireMinute==world.Data.Minute&&retireResidentCount==world.Data.Residents.Count&&retireStaffCount==world.Data.Staff.Count&&
+                world.Data.Residents.All(r=>residentActorIds.Contains(r.Id))&&world.Data.Staff.All(s=>staffActorIds.Contains(s.Id)))return;
+            actorRetireMinute=world.Data.Minute;retireResidentCount=world.Data.Residents.Count;retireStaffCount=world.Data.Staff.Count;
+            var residents=new HashSet<string>(world.Data.Residents.Select(r=>r.Id));
+            var staff=new HashSet<string>(world.Data.Staff.Select(s=>s.Id));
+            foreach(string id in residentActorIds.Where(id=>!residents.Contains(id)).Concat(staffActorIds.Where(id=>!staff.Contains(id))).ToArray())
+            {
+                Actor actor;if(!actors.TryGetValue(id,out actor))continue;
+                looks.Remove(actor);Clear(actor.Root);Destroy(actor.Root.gameObject);actors.Remove(id);
+                if(selectedResidentId==id)selectedResidentId=null;
+            }
+            residentActorIds.Clear();residentActorIds.UnionWith(residents);staffActorIds.Clear();staffActorIds.UnionWith(staff);
+        }
+#if UNITY_EDITOR
+        public int PreviewResidentActorCount {get{return actors.Count(p=>residentActorIds.Contains(p.Key));}}
+        public int PreviewLookCount {get{return looks.Count;}}
+#endif
 
         static int Hash(int hash, Wall wall)
         {
