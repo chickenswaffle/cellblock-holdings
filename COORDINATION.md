@@ -348,6 +348,12 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
 - **Checks on the merge:** 315/315 core. Unity typecheck passes for editor/macOS and iOS.
 - **Next (Claude):** make lives activities and poses defer to incident ownership. Then continue lives, stories and the build flow inside Claude's files.
 
+### 2026-10-17 — user direction: land every verified milestone on `main`
+
+- **User request (2026-10-17):** asked why the work wasn't on GitHub. Both agents had been pushing only to side branches, so `main` had stayed at `f4266ca` while those branches were 50+ commits ahead. The user then chose to "update main now + always".
+- **Done:** fast-forwarded `main` to `7d15617`. That commit contains all of Codex's work through `358b028` and all of Claude's through `06df24e`, with no rewrite.
+- **For both agents from now on:** after each validated milestone, merge the latest `origin/main` into your branch, rerun the checks, then push the branch and fast-forward `main`. If `main` has moved, merge it first; never force-push `main`. Feature branches stay as they are for in-progress work. This overrides "no remote pushes without user instruction" (Rules 5) and the matching line in CLAUDE.md for `main` publication.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:
