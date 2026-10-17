@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
@@ -11,8 +12,8 @@ namespace Cellblock.Editor
     // clone that no other editor has open, starting Unity for iOS so the project imports for that platform once:
     //   Unity -batchmode -nographics -quit -projectPath <clone> -buildTarget iOS -executeMethod Cellblock.Editor.IosBuild.Simulator -logFile <log>
     // The Xcode project lands in Builds/iOS/<Simulator|Device>; xcodebuild compiles, signs and uploads it from there.
-    // CELLBLOCK_BUILD_NUMBER sets the build number for a TestFlight upload. Player settings are restored afterwards,
-    // so a build never leaves the shared ProjectSettings changed.
+    // CELLBLOCK_BUILD_NUMBER sets the build number and CELLBLOCK_BUNDLE_ID the bundle identifier for a TestFlight
+    // upload. Player settings are restored afterwards, so a build never leaves the shared ProjectSettings changed.
     public static class IosBuild
     {
         const string ScenePath = "Assets/Cellblock/Scenes/Main.unity";
@@ -27,7 +28,7 @@ namespace Cellblock.Editor
             ProjectSetup.Validate();
             iOSSdkVersion sdkBefore = PlayerSettings.iOS.sdkVersion;
             AppleMobileArchitectureSimulator architectureBefore = PlayerSettings.iOS.simulatorSdkArchitecture;
-            string buildBefore = PlayerSettings.iOS.buildNumber;
+            string buildBefore = PlayerSettings.iOS.buildNumber, bundleBefore = PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.iOS);
             string output = Path.Combine("Builds", "iOS", folder);
             try
             {
@@ -37,6 +38,8 @@ namespace Cellblock.Editor
                     ? AppleMobileArchitectureSimulator.ARM64 : AppleMobileArchitectureSimulator.X86_64;
                 string number = Environment.GetEnvironmentVariable("CELLBLOCK_BUILD_NUMBER");
                 if (!string.IsNullOrEmpty(number)) PlayerSettings.iOS.buildNumber = number;
+                string bundle = Environment.GetEnvironmentVariable("CELLBLOCK_BUNDLE_ID");
+                if (!string.IsNullOrEmpty(bundle)) PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, bundle);
                 BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
                 {
                     scenes = new[] { ScenePath }, locationPathName = output,
@@ -49,7 +52,8 @@ namespace Cellblock.Editor
             finally
             {
                 PlayerSettings.iOS.sdkVersion = sdkBefore; PlayerSettings.iOS.simulatorSdkArchitecture = architectureBefore;
-                PlayerSettings.iOS.buildNumber = buildBefore; AssetDatabase.SaveAssets();
+                PlayerSettings.iOS.buildNumber = buildBefore; PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, bundleBefore);
+                AssetDatabase.SaveAssets();
             }
         }
     }

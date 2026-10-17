@@ -391,6 +391,17 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
   - (6) Inspect-mode pan, drag-to-move of a selected item, and two-finger orbit and zoom are unchanged.
   - Suggested `docs/controls.md` line for Codex: "Furnishing tools: drag on the map or drag a catalog card onto it; let go to review the quote."
 
+### 2026-10-17 — first native iOS player: Simulator boot passes; TestFlight script ready
+
+- **Simulator result:** Unity 6000.3.24f1 `IosBuild.Simulator` and then Xcode 26.5 (`iphonesimulator`, x86_64, Release) both succeeded. The app boots on an iPhone 17 Pro simulator (iOS 26.5) to the Home screen in landscape: night artwork, Begin your story, Save library and Settings. The text clears the Dynamic Island, and there are no exceptions or missing-shader logs.
+  - Unity ships the Simulator player only as a Development variant (`Variations/Development_simx64_managed`), so the debug console and "Build type Development" are simulator-only. The device build uses `Releasearm64`.
+  - The simulator GPU lacks float MSAA, which accounts for the "Attachment 0 ... 1 samples but 2 requested" and RenderPass messages. A real iPhone has float MSAA.
+- **Shaders in the player:** URP Lit (normal-map and emission variants kept by the Resources materials), Cellblock/SearchlightBeam, Skybox/Procedural, UI/Sprites and URP internals. All three runtime `Resources.Load` lookups are present.
+- **Not verified:** the in-world facility render and touch on the player. The Simulator can't be driven without accessibility permission, so those wait for the first TestFlight run on the user's phone.
+- **New `Tools/testflight.sh`** (Claude). It runs the Unity `IosBuild.Device` export, sets `ITSAppUsesNonExemptEncryption=false`, then archives and exports-and-uploads with xcodebuild, automatic signing and team FX4R73M22M (`--no-upload` exports only). Afterwards it restores the shared settings Unity rewrites. `IosBuild` now honours `CELLBLOCK_BUNDLE_ID` and restores it.
+  - Blocked only on the user's bundle-ID choice and the App Store Connect record, which Claude will create in Chrome when the user is ready.
+- **Hygiene:** a fresh Unity import rewrites `Assets/DefaultVolumeProfile.asset`, `Assets/UniversalRenderPipelineGlobalSettings.asset`, `ProjectSettings/{Graphics,Project,Quality}Settings.asset` (iPhone batching). These are discarded in Claude's clone and never committed.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:
