@@ -2,6 +2,12 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
+## October 17 numbered HUD and navigation
+
+[Numbered meters](hud-metrics.md) now show resident needs/personality, staff condition, final escape risk and signed contributing factors, power, morale, perimeter, CCTV observations, equipment condition and construction progress. People has fixed Profile / Risk / Record / Roster shortcuts with a retained name; Control has Switches / CCTV / Team / Power / Reports. Highlights follow manual scrolling. Subject changes, reopening Control and resizing preserve a usable section start. Risk colors use the actual 35/55 thresholds; a displayed number cannot round across its classification boundary. Protective factors appear alongside danger factors, and all factors use a shared centered scale.
+
+Implementation `2f54ce4` preserves Claude's reserved main HUD/build/theme and lives/personnel/pressure source. The independent critic reviewed the source and actual desktop/phone images. A phone resize/heading failure was fixed before the final passing run. The latest **215/215 core checks and 36 actual Unity captures passed, no runtime errors**: 20 focused meter/navigation frames and 16 existing general regression frames. The review asserts 44px targets, readable numbers, section jumps, stale-selection reset, resize handling, manual scroll highlights and world-input blocking at 1600, 900 and 640 widths. Full frames: `Builds/MetricsReview/2026-10-17/final/` and `Builds/PresentationReview/2026-10-17/metrics-regression/`; committed evidence: `docs/reviews/2026-10-17-metrics-*`. Actual device touch/performance remains unmeasured.
+
 ## October 17 night-watch continuation
 
 The current core passes **215 checks / 0 failures**. Claude's published `650e3ce` and balance note `db6ad58` are integrated. They preserve nearest-free dining places, last-shift meal grace and trays, stranded-resident load repair, contract advances/net solvency and night-shift fixes. The critic found no confirmed regression in that published snapshot. Claude retains its active lives/personnel/pressure/HUD work; the economy design is preserved separately.
