@@ -2,7 +2,17 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
-## October 17 numbered HUD and navigation
+## October 17 Home, safe Continue, settings and command HUD
+
+Source milestone **`3fc7417`** integrates Claude's published economy/informants/kitchen/counsel/role snapshot `9c88d9e` (merge `243441f`). The combined core passes **286 checks / 0 failures**. The new [Home and save flow](home-save-and-settings.md) has original imported night-campus artwork, a prominent Continue card, a separate sorted save library, visible configurable autosave, backup recovery and persistent failure/retry feedback. Global settings group save frequency, interface size, frame cap, shadows, reduced motion, camera controls and audio. The bottom icon dock, header actions and always-visible capacity/stress/risk bars make the main HUD visibly different.
+
+The final frontend review passed **23 actual Unity Game-view captures, errors empty**, on the corrected source. It uses isolated real files in Temp and checks stale/missing/malformed pointers, newest ordering, correct selected-slot identity, pause on load, autosave/backup, damaged-primary archival without losing the good backup, failure/retry, preference persistence/application, first-use Home and actual charter acquisition producing one resumable slot. Claude's economy/intelligence/counsel/kitchen demos round-trip through Unity JSON; a real counter is quoted/built before the kitchen demo. Changing a rider releases the previous controlled role, preventing hidden old-person cards.
+
+An independent critic reviewed the source and actual desktop/phone/narrow images. Corrections include explicit title texture metadata, full phone action visibility within the actual scroll viewport, debounced volume persistence, one-level Back, meaningful capacity colors including zero-bed custody, and vSync disabled so the selected desktop frame cap applies. Earlier artwork, fixture and clipping attempts are superseded. Final broader regression results are recorded below before publication. Actual phone touch/safe areas, native stripped builds, achieved frame rate and sustained performance remain unmeasured. The title artwork is an illustration, not gameplay rendering.
+
+Full local frontend frames: `Builds/FrontendReview/2026-10-17/final/`. Committed transcript/report: `docs/reviews/2026-10-17-frontend-core.txt` and `docs/reviews/2026-10-17-frontend-unity.json`. See COORDINATION.md for the exact existing-file ownership exception; Claude's charter/build/catalog mechanics and lives/personnel/economy remain reserved.
+
+## Earlier October 17 numbered HUD and navigation
 
 [Numbered meters](hud-metrics.md) now show resident needs/personality, staff condition, final escape risk and signed contributing factors, power, morale, perimeter, CCTV observations, equipment condition and construction progress. People has fixed Profile / Risk / Record / Roster shortcuts with a retained name; Control has Switches / CCTV / Team / Power / Reports. Highlights follow manual scrolling. Subject changes, reopening Control and resizing preserve a usable section start. Risk colors use the actual 35/55 thresholds; a displayed number cannot round across its classification boundary. Protective factors appear alongside danger factors, and all factors use a shared centered scale.
 
@@ -66,7 +76,7 @@ The actual Unity security/services review passed nine Game-view captures with no
 | Installed Unity | 6000.3.24f1, Intel macOS | Actual local installation, not a cloud editor claim |
 | Editor import/API compilation | Successful | URP 17.3 bundled packages resolved by the installed editor; generated scene, retained material/shader, UI theme, and render assets |
 | Project setup | `CELLBLOCK_PROJECT_VALIDATION_PASSED` | Actual editor validation; fixed the clean untitled startup-scene failure that previously aborted batch mode |
-| .NET core checks | 215 passed, 0 failed | Geometry/construction/accounting, people/migration/conduct, arrivals/carpools, gate/work travel, carrying/resume, bay reservation, alarm, CCTV, reports, and 72 prefab/package/rotation quotes |
+| .NET core checks | 286 passed, 0 failed | Geometry/construction/accounting, people/migration/conduct, arrivals/carpools, gate/work travel, carrying/resume, bay reservation, alarm, CCTV, reports, and 72 prefab/package/rotation quotes |
 | Security/services Play review | Passed; 17 final actual captures, no runtime errors | Connected building, physical staffing, directed searchlights, narrow walls/openings, Unity JSON, power loss, phone controls and actor lifetimes; `Builds/SecurityReview/2026-10-17/night-watch-final/` |
 | Unity Play review | Passed; 16 actual Game-view captures; no runtime errors | Desktop/900×420 layout, contracts, catalog, profiles and named ties, live routines, connected wing quote, camera/full-height views, all furnishing models, and Unity JSON social-state round trip |
 | Operations Play review | Passed; 12 actual captures; no runtime errors | Native magnify initialization/direction, shared arrival queues and marked-bay parking, physical supply carry, articulated saw/hammer/drill, staged housing and capacity handover, CCTV, night alarm/lights, reports, and phone Control |

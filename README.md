@@ -2,9 +2,9 @@
 
 A Unity reboot of a prison ownership and management simulation for iPhone, iPad, Mac, and potentially Windows/Steam. The player chooses a contract, takes over an editable starter facility, and connects building decisions to people, construction, and business results.
 
-**Current milestone: local Unity playable.** The project imports and runs in Unity 6000.3.24f1 on this Mac. The engine-independent core passes 215 executable checks. The new-holding flow offers City/County/State/Federal jurisdictions, twelve institution profiles and selected or random eligible locations with matching finances, populations and editable layouts. Play includes detailed people, personnel files/recruitment, transfer coaches and staged intake, contraband and disturbances, live inspections, goals, protests, fictional capital-case proceedings, physical arrivals/building/security and packaged prefab units. See [mode integration](docs/game-modes.md) and [facility stories](docs/facility-stories.md). The previous night-watch review passed 50 actual Unity Game-view captures with no runtime errors. Native builds and actual phone performance remain unverified; the [visual study](docs/concepts/visual-direction-study.png) remains an art direction reference.
+**Current milestone: local Unity playable.** The project imports and runs in Unity 6000.3.24f1 on this Mac. The combined engine-independent core passes 286 executable checks, including Claude’s published economy, intelligence, kitchen, counsel and role-card systems. The new-holding flow offers City/County/State/Federal jurisdictions, twelve institution profiles and selected or random eligible locations with matching finances, populations and editable layouts. Play includes detailed people, personnel files/recruitment, transfer coaches and staged intake, contraband and disturbances, live inspections, goals, protests, fictional capital-case proceedings, physical arrivals/building/security and packaged prefab units. See [mode integration](docs/game-modes.md) and [facility stories](docs/facility-stories.md). The previous night-watch review passed 50 actual Unity Game-view captures with no runtime errors. Native builds and actual phone performance remain unverified; the [visual study](docs/concepts/visual-direction-study.png) remains an art direction reference.
 
-Numbered [HUD meters and fixed section navigation](docs/hud-metrics.md) now make People and Control easier to read: signed escape factors, needs, staff, power, CCTV and construction progress. The latest HUD continuation passed **215 core checks and 36 actual Unity captures**, with no runtime errors (20 focused HUD + 16 general regression).
+The new [Home, Continue, save library, settings and command HUD](docs/home-save-and-settings.md) use a shared night-campus/ink/brass theme. Continue finds the last played usable holding or the newest available fallback. Autosave is visible and configurable, with protected backup recovery. The centered six-workspace dock and live capacity/stress/risk meters make the in-game change visible; [People/Control section navigation and numbered meters](docs/hud-metrics.md) remain integrated. See [current validation](docs/implementation-status.md) for the final review counts and limits.
 
 ## Open on a Mac
 
@@ -38,18 +38,18 @@ That command is an editor preparation check, not a gameplay or device test. The 
 
 ## First construction session
 
-1. Choose a contract. The initial offers differ in starting capital, acquisition cost, population, operating costs, payment timing, and a verified meal-service bonus. They currently share the starter-building kit.
+1. From Home, choose **Continue your holding**, or **New Holding** to choose jurisdiction, facility type and location. New facilities differ in terms, population, capital and editable layout. The first-use screen offers one clear **Begin your story** action.
 2. Inspect the facility. Tap a wall or furnishing to expose its editing controls.
 3. Hire a construction crew. Mobilization costs $500; each hired crew costs $800 per game day, including idle time. These are illustrative balancing values.
 4. Open **Build → Prefabs**, choose a unit and Shell / Essential / Enhanced package, then tap the starter building's lower-right outer corner. That attachment is at world position `(2, -8)` and shares its existing boundary and doorway. Pinch/zoom closer for placement. Review the quote and approve.
 5. Add another crew to compare parallel progress. Preparation, limited work fronts, prior projects, and handover prevent unlimited acceleration. Transport shares available seats, parks in a reserved marked bay, then disembarks. Builders survey, collect/carry supplies, and use task-specific tools at reachable work fronts. Approved construction is shown in ochre; its elements become operational at project handover.
 6. After handover, inspect the wing's curved wall. Use **Bend**, **Move start**, or **Move end** to change the actual component. Doors, bed/table installation, furnishing moves/rotation, and demolition use the same quote/approval flow.
 7. Use **Build → Dining → Meal service** on an installed table to change the destination. Routes and service attendance affect verified meal-service earnings. **Company** shows cash, unpaid earnings, costs, and the cash ledger.
-8. Save and resume from the contract menu. Separate company saves remain selectable. Approved jobs and unapproved complete plans persist; an unfinished first/second drawing tap is not a complete plan and is not saved.
+8. Use **Menu → Continue playing** to return to this session, or **Save Library** to select another holding. Autosave defaults to 30 seconds; **Settings → General** changes its interval. The header shows save status and offers Retry if saving fails. Approved jobs and unapproved complete plans persist; an unfinished first/second drawing tap is not a complete plan and is not saved.
 
 Desktop: **left drag in Select / Inspect or while reviewing a plan** or **middle drag** to pan; **arrows / WASD** also pan. **Right drag / Alt + drag** or **Q / E** orbit. **R / F** tilt, Mac trackpad pinch and the wheel zoom toward the pointer, **Home** centers, **Space** pauses, and **Escape** discards an unapproved plan. Click inside Unity's Game view to give it keyboard focus.
 
-Touch: tap to select/place, one-finger drag in Select / Inspect or while reviewing a plan to pan, and two fingers to pan/pinch/twist in any tool. **Camera** includes pan arrows, tilt, orbit, zoom, 3D / plan, and cutaway controls. **Controls** reopens the guide. See [the controls and first-improvement guide](docs/controls.md).
+Touch: tap to select/place, one-finger drag in Select / Inspect or while reviewing a plan to pan, and two fingers to pan/pinch/twist in any tool. **Camera** includes pan arrows, tilt, orbit, zoom, 3D / plan, and cutaway controls. **Guide** reopens the guide; **Settings → Controls** includes the camera reference and speed/easing options. See [the controls and first-improvement guide](docs/controls.md).
 
 The game clock is player controlled. Closing, suspending, or unfocusing the game stops progression. Resume does not apply elapsed wall-clock time. Resumed saves start paused.
 
@@ -81,7 +81,7 @@ Read [the Claude handoff](docs/claude-handoff.md) and [shared coordination](COOR
 
 ## Population pressure and presentation
 
-**Pressure** shows transfers, intake lanes, crowding, contraband, unrest, audits and upgrade programs. Choose a transfer policy, staff actual intake stations, improve beds/meal capacity and respond to disturbances. Contract pressure and cent-based costs persist in saves. **People → Ride along** follows a present resident or staff member with an optional body-camera inset; Escape returns to the build camera. This is a watch camera.
+**Operations** (formerly Pressure) shows transfers, intake lanes, crowding, contraband, unrest, audits and upgrade programs. Choose a transfer policy, staff actual intake stations, improve beds/meal capacity and respond to disturbances. Contract pressure and cent-based costs persist in saves. **People → Ride along** follows a present resident or staff member with an optional body-camera inset; Escape returns to the build camera. This is a watch camera.
 
 The presentation pass adds beveled furniture, fabric/tile/wood/concrete relief, distinct clothing, articulated everyday poses, detailed audit visitors and transfer coach, and revised shadows/contact shading. See [presentation notes and limits](docs/presentation-polish.md).
 
