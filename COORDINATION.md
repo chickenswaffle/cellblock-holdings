@@ -365,6 +365,32 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
 - **Checks:** 317/317 core, including 2 new checks. All 3 targeted mutants were caught. Unity typecheck passes for editor/macOS and iOS.
 - **Unity check request:** stage the fight demo while one participant is reading at a shelf or sitting at the TV. They should stand and walk without a seated or reading carry-over, and the Life card should show no activity until the scene resolves.
 
+### 2026-10-17 — user assignment: iOS / TestFlight builds go to Claude, from Claude's own clone
+
+- **User request (2026-10-17):** "a playable version I can put on TestFlight so I can play it a bit on my phone". When asked who builds, the user chose Claude, from Claude's own clone.
+- **What this means:** native iOS player builds and TestFlight uploads are Claude's, run against `ClaudeWorkspace/cellblock-holdings` only. Codex's checkout and its open editor are never touched. Codex keeps the unity-editor scope for its checkout: Play reviews, captures and `ProjectSetup`. Claude does not edit `ProjectSetup.cs` or any other existing Editor file.
+- **New file (Claude):** `Assets/Cellblock/Editor/IosBuild.cs` (+ meta). `IosBuild.Simulator` / `IosBuild.Device` call `ProjectSetup.Validate()`, build the Xcode project into the ignored `Builds/iOS/<Simulator|Device>`, and restore the iOS player settings afterwards.
+- **Open decision (user):** the bundle ID is undecided ("later"). Codex's `ProjectSetup` still writes `com.cellblockholdings.game`. No App Store Connect record will be created until the user picks; if the choice differs, Claude will ask Codex for that one-line change.
+- **First step:** an iOS Simulator build, which needs no signing, to find native-player problems (stripped shaders, Resources, safe areas) before a device build.
+
+### 2026-10-17 — build flow: drag to place, and drag from a catalog card (Codex handoff request item 1)
+
+- **Files (Claude's opening-and-build-ui):** `GameController.cs` input and `GameHud.cs` catalog cards only. No frontend, shell, incident or settings code was touched.
+- **Drag to place:** with a furnishing, bed, table or prefab tool active, a one-finger or left-mouse drag that starts on the map now shows the fitted ghost and opens the quote when you let go. Before, letting go did nothing and a separate exact tap was needed.
+  - On touch the ghost sits about 0.42 in above the finger, so the finger doesn't hide it. A plain tap still places at the exact point.
+  - Moving an already-selected furnishing keeps its exact, unlifted position.
+- **Drag from the catalog:** a furnishing card arms on press (`PressedCatalogKind`, via a TrickleDown `PointerDownEvent`). If the pointer leaves the panel before letting go, the controller selects that furnishing, closes the compact inspector and lets the ghost follow the pointer. Letting go over the map opens the quote. Letting go over the interface cancels the placement and keeps the tool selected.
+  - A pinch, a blocked-input overlay, a touch cancel, a ride-along and an open quote all cancel or refuse the drag.
+- **Checks:** no core change (317/317). Unity typecheck passes for editor/macOS and iOS.
+- **Unity check request:**
+  - (1) Choose a bunk card and drag across the floor: the ghost follows, and letting go opens the quote.
+  - (2) Press a bunk card in the catalog, drag onto the map and let go: the quote opens.
+  - (3) Drag a card off the panel, then back over the panel, and let go: no quote, and the bunk tool stays selected.
+  - (4) On a phone layout, the compact inspector closes when the drag leaves it.
+  - (5) A two-finger pinch during a placement drag places nothing.
+  - (6) Inspect-mode pan, drag-to-move of a selected item, and two-finger orbit and zoom are unchanged.
+  - Suggested `docs/controls.md` line for Codex: "Furnishing tools: drag on the map or drag a catalog card onto it; let go to review the quote."
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:

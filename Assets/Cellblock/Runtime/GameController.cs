@@ -48,7 +48,7 @@ namespace Cellblock.Unity
         float accumulator, autosave, previewTime;
         bool appPaused, unfocused, dragging, gesture, hasStart, hasEnd, pointerOwnedByUI, pointerOrbit, pointerActive;
         // Drag-to-move: pressing on the selected furnishing and dragging moves it instead of panning the camera.
-        bool fixtureGrab, fixtureDragging;
+        bool fixtureGrab, fixtureDragging, placingDrag;
         bool planView, presentationPreview;
         Point start, end;
         Vector2 pointerDown, lastPointer;
@@ -121,7 +121,7 @@ namespace Cellblock.Unity
                 case BuildTool.Wing: Instruction = "PREFAB WING · Tap its lower-left connection point. Every wall remains editable after construction."; break;
                 case BuildTool.Door: Instruction = "DOOR · Tap an existing wall where the opening should go."; break;
                 case BuildTool.Bed: case BuildTool.Table: Instruction = tool.ToString().ToUpperInvariant() + " · Tap a location, then review the fit-out project."; break;
-                case BuildTool.Furnishing: Instruction = FixtureCatalog.Get(PlacementFixtureKind).Name.ToUpperInvariant() + " · Tap a position. Review the fit, cost, and access before approving."; break;
+                case BuildTool.Furnishing: Instruction = FixtureCatalog.Get(PlacementFixtureKind).Name.ToUpperInvariant() + " · Tap a position, or drag and let go. Review the fit, cost, and access before approving."; break;
                 case BuildTool.Meals: Instruction = "MEAL SERVICE · Tap an installed table to move meal service and compare travel times."; break;
                 case BuildTool.MoveStart: case BuildTool.MoveEnd: Instruction = "WALL EDIT · Tap the new endpoint position."; break;
                 case BuildTool.Bend: Instruction = "WALL EDIT · Tap the bend position. Straight walls can become curves."; break;
@@ -301,7 +301,7 @@ namespace Cellblock.Unity
         {
             if (hud.BlocksWorldInput)
             {
-                pointerActive = false; pointerOwnedByUI = true; dragging = false; gesture = Input.touchCount > 0;
+                pointerActive = false; pointerOwnedByUI = true; dragging = false; gesture = Input.touchCount > 0; placingDrag = false; hud.ClearCatalogPress();
                 if (Input.GetKeyDown(KeyCode.Escape)) hud.NavigateBack();
                 return;
             }
@@ -309,6 +309,7 @@ namespace Cellblock.Unity
             {
                 if (Input.touchCount >= 2)
                 {
+                    placingDrag = false;
                     Touch a = Input.GetTouch(0), b = Input.GetTouch(1);
                     if (pinchFingerA != a.fingerId || pinchFingerB != b.fingerId)
                     {
@@ -338,24 +339,30 @@ namespace Cellblock.Unity
                     pointerDown = lastPointer = touch.position; dragging = false; pointerActive = true;
                     pointerOwnedByUI = hud.IsOverUI(touch.position);
                     if (pointerOwnedByUI) gesture = true;
-                    fixtureGrab = !pointerOwnedByUI && GrabbingSelectedFixture(touch.position); fixtureDragging = false;
+                    fixtureGrab = !pointerOwnedByUI && GrabbingSelectedFixture(touch.position); fixtureDragging = false; placingDrag = false;
                 }
+                float slop = Mathf.Max(10, Screen.dpi > 0 ? Screen.dpi * 0.04f : 15);
+                // A catalog card pressed and dragged off the panel becomes that furnishing, following the finger.
+                if (touch.phase == TouchPhase.Moved && pointerActive && pointerOwnedByUI && Vector2.Distance(pointerDown, touch.position) > slop && !hud.IsOverUI(touch.position) && BeginCardDrag())
+                { gesture = false; dragging = true; }
                 if (touch.phase == TouchPhase.Moved && !gesture)
                 {
-                    if (Vector2.Distance(pointerDown, touch.position) > Mathf.Max(10, Screen.dpi > 0 ? Screen.dpi * 0.04f : 15)) dragging = true;
+                    if (Vector2.Distance(pointerDown, touch.position) > slop) dragging = true;
                     if (dragging && fixtureGrab && !fixtureDragging) BeginFixtureDrag();
+                    if (dragging && !fixtureDragging && !pointerOwnedByUI && PlacementTool && Draft == null) placingDrag = true;
                     if (dragging && (Tool == BuildTool.Inspect || Draft!=null)) Pan(lastPointer, touch.position);
                     lastPointer = touch.position;
-                    if (!hud.IsOverUI(touch.position)) PreviewAt(touch.position);
+                    if (!hud.IsOverUI(touch.position)) PreviewAt(placingDrag ? Lifted(touch.position) : touch.position);
                 }
                 if (touch.phase == TouchPhase.Ended)
                 {
                     if (fixtureDragging) EndFixtureDrag(touch.position);
+                    else if (placingDrag && !gesture) EndPlacementDrag(Lifted(touch.position), touch.position);
                     else if (pointerActive && !pointerOwnedByUI && !gesture && !dragging && !hud.IsOverUI(touch.position)) Tap(touch.position);
-                    fixtureGrab = false;
+                    fixtureGrab = false; placingDrag = false; hud.ClearCatalogPress();
                     gesture = false; pointerActive = false; pointerOwnedByUI = false;
                 }
-                if (touch.phase == TouchPhase.Canceled) { gesture = false; pointerActive = false; pointerOwnedByUI = false; dragging = false; if (fixtureDragging) { fixtureDragging = false; SetTool(BuildTool.Inspect); } fixtureGrab = false; }
+                if (touch.phase == TouchPhase.Canceled) { gesture = false; pointerActive = false; pointerOwnedByUI = false; dragging = false; if (fixtureDragging) { fixtureDragging = false; SetTool(BuildTool.Inspect); } fixtureGrab = false; placingDrag = false; hud.ClearCatalogPress(); }
                 return;
             }
             if (gesture) { gesture = false; pointerActive = false; pointerOwnedByUI = false; }
@@ -367,12 +374,14 @@ namespace Cellblock.Unity
             {
                 pointerDown = lastPointer = cursor; dragging = false; pointerActive = true; pointerOwnedByUI = hud.IsOverUI(cursor);
                 pointerOrbit = Input.GetMouseButton(1) || (Input.GetMouseButton(0) && (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt)));
-                fixtureGrab = Input.GetMouseButtonDown(0) && !pointerOrbit && !pointerOwnedByUI && GrabbingSelectedFixture(cursor); fixtureDragging = false;
+                fixtureGrab = Input.GetMouseButtonDown(0) && !pointerOrbit && !pointerOwnedByUI && GrabbingSelectedFixture(cursor); fixtureDragging = false; placingDrag = false;
             }
             bool holding = Input.GetMouseButton(0) || Input.GetMouseButton(1) || Input.GetMouseButton(2);
             if (pointerActive && holding && Vector2.Distance(pointerDown, cursor) > 6) dragging = true;
             if (dragging && fixtureGrab && !fixtureDragging && Input.GetMouseButton(0)) BeginFixtureDrag();
-            if (fixtureDragging && holding) PreviewAt(cursor);
+            if (dragging && pointerOwnedByUI && Input.GetMouseButton(0) && !hud.IsOverUI(cursor)) BeginCardDrag();
+            if (dragging && !fixtureDragging && !pointerOwnedByUI && !pointerOrbit && Input.GetMouseButton(0) && PlacementTool && Draft == null) placingDrag = true;
+            if ((fixtureDragging || placingDrag) && holding) PreviewAt(cursor);
             if (pointerActive && holding && dragging && !pointerOwnedByUI)
             {
                 Vector2 delta = cursor - lastPointer;
@@ -380,8 +389,9 @@ namespace Cellblock.Unity
                 else if (Input.GetMouseButton(2) || (Input.GetMouseButton(0) && (Tool == BuildTool.Inspect || Draft!=null))) Pan(lastPointer, cursor);
             }
             if (Input.GetMouseButtonUp(0) && fixtureDragging) EndFixtureDrag(cursor);
+            else if (Input.GetMouseButtonUp(0) && placingDrag) EndPlacementDrag(cursor, cursor);
             else if (Input.GetMouseButtonUp(0) && pointerActive && !pointerOwnedByUI && !pointerOrbit && !dragging && !hud.IsOverUI(cursor)) Tap(cursor);
-            if (Input.GetMouseButtonUp(0)) fixtureGrab = false;
+            if (Input.GetMouseButtonUp(0)) { fixtureGrab = false; placingDrag = false; hud.ClearCatalogPress(); }
             if (!holding) pointerActive = false;
             if (!hud.IsOverUI(cursor))
             {
@@ -419,6 +429,26 @@ namespace Cellblock.Unity
             previewTime = 0; hud.Refresh(true);
         }
         // Letting go over the floor proposes the move with its quote; letting go over the interface cancels it.
+        // New placements: a drag shows the item where it would go and letting go asks for the quote. On touch the item
+        // sits a little above the finger, so the finger never hides what it places; a plain tap still places exactly.
+        bool PlacementTool { get { return Tool == BuildTool.Bed || Tool == BuildTool.Table || Tool == BuildTool.Furnishing || Tool == BuildTool.Wing; } }
+        static Vector2 Lifted(Vector2 screen) { return screen + new Vector2(0, Screen.dpi > 0 ? Screen.dpi * 0.42f : 64); }
+        bool BeginCardDrag()
+        {
+            string kind = hud.PressedCatalogKind;
+            if (kind == null || Draft != null || RideAlongActive) return false;
+            hud.ClearCatalogPress(); hud.PlaceFromCatalog(kind);
+            if (Tool != BuildTool.Furnishing || PlacementFixtureKind != kind) return false;
+            pointerOwnedByUI = false; placingDrag = true; previewTime = 0;
+            Instruction = FixtureCatalog.Get(kind).Name.ToUpperInvariant() + " · Drag it into place and let go to review the quote. Let go over the panel to cancel.";
+            hud.Refresh(true); return true;
+        }
+        void EndPlacementDrag(Vector2 placed, Vector2 pointer)
+        {
+            placingDrag = false;
+            if (hud.IsOverUI(pointer)) { view.Preview(null, SelectedWall, SelectedFixture); guides.Show(null); PlacementSummary = "Placement cancelled"; hud.Refresh(true); return; }
+            Tap(placed);
+        }
         void EndFixtureDrag(Vector2 screen)
         {
             fixtureDragging = false; fixtureGrab = false;
@@ -466,7 +496,7 @@ namespace Cellblock.Unity
             }
             else if (preview != null && preview.Fixtures.Count > 0)
             {
-                PlacementSummary = FixtureCatalog.Get(preview.Fixtures[0].Kind).Name + " · " + (Snapping ? "0.5 m snap" : "free placement") + " · tap to review";
+                PlacementSummary = FixtureCatalog.Get(preview.Fixtures[0].Kind).Name + " · " + (Snapping ? "0.5 m snap" : "free placement") + (placingDrag || fixtureDragging ? " · let go to review" : " · tap or drag to place");
                 guides.ShowFixture(preview.Fixtures[0]);
             }
             else if (Tool != BuildTool.Inspect) { PlacementSummary = hasStart ? "Choose the next point" : "Tap to begin · drag with two fingers to move"; guides.Show(null); }

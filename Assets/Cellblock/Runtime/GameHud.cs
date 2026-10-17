@@ -183,6 +183,8 @@ namespace Cellblock.Unity
                 FixtureDefinition item = definition;
                 Button button = CatalogCard(item.Name, item.Description, Money(item.PriceCents) + " materials",
                     item.Width.ToString("0.##") + " × " + item.Depth.ToString("0.##") + " m", () => ChooseFixture(item.Id));
+                // Pressing a card arms a drag: if the pointer leaves the panel before letting go, the controller places it.
+                button.RegisterCallback<PointerDownEvent>(e => PressedCatalogKind = item.Id, TrickleDown.TrickleDown);
                 categoryItems[item.Category].Add(button); fixtureButtons.Add(item.Id, button);
             }
             Button meals = CatalogCard("Meal service destination", "Select an installed dining table as the service destination. Routes affect verified meal delivery.", "Operational action", "DINING", () => ChooseTool(BuildTool.Meals));
@@ -210,6 +212,10 @@ namespace Cellblock.Unity
             foreach (var entry in categoryButtons) entry.Value.EnableInClassList("selected", entry.Key == catalogCategory);
             foreach (var entry in categoryItems) entry.Value.style.display = entry.Key == catalogCategory && (!compact || !catalogExpanded) ? DisplayStyle.Flex : DisplayStyle.None;
         }
+        // The catalog card under the pointer since it was pressed, until the controller sees the pointer released.
+        public string PressedCatalogKind { get; private set; }
+        public void ClearCatalogPress() { PressedCatalogKind = null; }
+        public void PlaceFromCatalog(string kind) { ChooseFixture(kind); }
         void ChooseFixture(string kind)
         {
             workspace = Workspace.Build; game.SetFixtureTool(kind);
