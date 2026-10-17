@@ -206,7 +206,9 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
 - **Evidence:**
   - 208/208 core checks (union of both parents' 175 and 202 test names; none lost).
   - Offline Unity typecheck passes for editor/macOS and iOS.
-  - Builder balance rerun on the merged code: 21 days: 9/9 survive across county-intake, state-medium and federal-camp, with 0 riots, 0 strikes and 0 starving (trays cover anyone past four shifts). 35-day result in the next entry.
+  - Builder balance rerun on the merged code: 21 days: 9/9 survive across county-intake, state-medium and federal-camp, with 0 riots, 0 strikes and 0 starving (trays cover anyone past four shifts). 35 days: 9/9 survive with no termination and nobody starving.
+    - Federal camp and state medium: 0 strikes.
+    - County intake is the tightest: 0/2/2 strikes, 0–2 riots, unrest 75–91 against 58–74 before the merge. Watch county balance when Lives and Economy land.
 - **Design for review:** `docs/economy-and-roles-plan.md` (user request). It covers:
   - prisoner trust fund, jobs and wages;
   - commissary with a weekly price index;
