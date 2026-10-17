@@ -11,7 +11,7 @@ namespace Cellblock.Unity
     public enum BuildTool { Inspect, Wall, Curve, Wing, Door, Bed, Table, Meals, MoveStart, MoveEnd, Bend, MoveFixture, Furnishing }
     public sealed class CompanySave { public string FileName, Title; }
 
-    public sealed class GameController : MonoBehaviour
+    public sealed partial class GameController : MonoBehaviour
     {
         public World World { get; private set; }
         public Plan Draft { get; private set; }
@@ -97,6 +97,7 @@ namespace Cellblock.Unity
             cameraRig.clearFlags = CameraClearFlags.SolidColor; cameraRig.backgroundColor = new Color(0.66f, 0.73f, 0.77f);
             PresentationLighting.Configure(cameraRig, transform);
             view = new GameObject("Facility presentation").AddComponent<FacilityView>(); view.transform.SetParent(transform); view.Initialize();
+            pressureView = new GameObject("Population pressure presentation").AddComponent<FacilityPressureView>(); pressureView.transform.SetParent(transform); pressureView.Initialize();
             guides = new GameObject("Construction measurements").AddComponent<ConstructionGuides>(); guides.transform.SetParent(transform); guides.Initialize(cameraRig);
             hud = new GameObject("Management interface").AddComponent<GameHud>(); hud.transform.SetParent(transform); hud.Initialize(this);
             view.Refresh(Cellblock.Core.World.Start(Cellblock.Core.World.Offers[0].Id), true);
@@ -107,6 +108,7 @@ namespace Cellblock.Unity
         {
             if (World != null && !Save()) return false;
             presentationPreview = preview;
+            EndRideAlongSilently();
             World = Cellblock.Core.World.Start(contract); saveId = Guid.NewGuid().ToString("N");
             World.Data.Speed = 0; watchedCameraId = ""; nextFeed = 0; nativeInputWasBlocked = true;
             Draft = null; SelectedWall = null; SelectedFixture = null; SelectedResident = null; SelectedStaff = null; hasStart = hasEnd = false;
@@ -190,11 +192,11 @@ namespace Cellblock.Unity
             }
             else accumulator = 0;
             if (SelectedFixture != null) SelectedFixture = World.Data.Fixtures.FirstOrDefault(f => f.Id == SelectedFixture.Id);
-            InputUpdate(magnification); view.Refresh(World); view.SetWatchedCamera(WatchedCamera); hud.Refresh();
+            InputUpdate(magnification); view.Refresh(World); view.SetWatchedCamera(WatchedCamera); pressureView.Refresh(World, Time.unscaledDeltaTime); UpdateRideAlong(); hud.Refresh();
             autosave += Time.unscaledDeltaTime;
             if (autosave >= 30) { autosave = 0; Save(false); }
         }
-        void LateUpdate() { if (cameraRig != null) CameraPosition(); RefreshCameraFeed(); }
+        void LateUpdate() { if (cameraRig != null) { if (RideAlongActive) RideAlongCamera(); else CameraPosition(); } RefreshCameraFeed(); RefreshBodyCam(); }
         void CameraPosition(bool immediate = false)
         {
             float blend = immediate ? 1 : 1 - Mathf.Exp(-Time.unscaledDeltaTime * 14);
@@ -256,7 +258,7 @@ namespace Cellblock.Unity
             var request = new UnityEngine.Rendering.Universal.UniversalRenderPipeline.SingleCameraRequest { destination = cctvTexture };
             UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(cctvCamera, request);
         }
-        void OnDestroy() { if (cctvTexture != null) { cctvTexture.Release(); Destroy(cctvTexture); } }
+        void OnDestroy() { if (cctvTexture != null) { cctvTexture.Release(); Destroy(cctvTexture); } ReleaseBodyCam(); }
         public void Orbit(float horizontalDegrees, float verticalDegrees)
         { yaw += horizontalDegrees; pitch = Mathf.Clamp(pitch + verticalDegrees, 28, 78); }
         public void Zoom(float amount) { distance = Mathf.Clamp(distance * Mathf.Exp(-amount * 0.12f), 11, 85); }
@@ -298,7 +300,7 @@ namespace Cellblock.Unity
             if (Ground(previous, out a) && Ground(current, out b)) focus += FacilityView.V(a - b);
             ClampFocus();
         }
-        void ClampFocus() { focus.x = Mathf.Clamp(focus.x, -35, 35); focus.z = Mathf.Clamp(focus.z, -30, 30); focus.y = 0; }
+        void ClampFocus() { if (RideAlongActive) return; focus.x = Mathf.Clamp(focus.x, -35, 35); focus.z = Mathf.Clamp(focus.z, -30, 30); focus.y = 0; }
         void InputUpdate(float magnification)
         {
             if (hud.BlocksWorldInput)
@@ -382,8 +384,9 @@ namespace Cellblock.Unity
                 if (!holding) PreviewAt(cursor);
             }
             lastPointer = cursor;
-            if (Input.GetKeyDown(KeyCode.Escape)) Cancel();
+            if (Input.GetKeyDown(KeyCode.Escape)) { if (RideAlongActive) StopRideAlong(); else Cancel(); }
             if (Input.GetKeyDown(KeyCode.Space)) World.Data.Speed = World.Data.Speed == 0 ? 1 : 0;
+            if (RideAlongActive && Input.GetKeyDown(KeyCode.Tab)) NextRideAlong(Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) ? -1 : 1);
             if (Input.GetKeyDown(KeyCode.Home)) Recenter();
             if (Input.GetKeyDown(KeyCode.Z) && Draft == null && (Tool == BuildTool.Furnishing || Tool == BuildTool.Wing)) RotatePlacement();
             Vector2 movement = new Vector2((Input.GetKey(KeyCode.RightArrow) || Input.GetKey(KeyCode.D) ? 1 : 0) - (Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.A) ? 1 : 0),
@@ -653,6 +656,7 @@ namespace Cellblock.Unity
         {
             if (!presentationPreview) throw new InvalidOperationException("Only disposable previews can use this review helper.");
             string residentId = SelectedResident == null ? "" : SelectedResident.Id;
+            EndRideAlongSilently();
             World = new World(JsonUtility.FromJson<State>(JsonUtility.ToJson(World.Data)));
             SelectedResident = World.Data.Residents.FirstOrDefault(r => r.Id == residentId); SelectedStaff = null;
             SelectedWall = null; SelectedFixture = null; accumulator = 0; nextFeed = 0;
@@ -702,6 +706,7 @@ namespace Cellblock.Unity
                     restored = new World(JsonUtility.FromJson<State>(File.ReadAllText(path + ".bak")));
                     restored.Notice = "Recovered the previous successful save. Your original file is retained.";
                 }
+                EndRideAlongSilently();
                 World = restored; watchedCameraId = ""; nextFeed = 0; nativeInputWasBlocked = true; presentationPreview = false; World.Data.Speed = 0; accumulator = 0; saveId = name.Substring(8, 32);
                 Draft = null; CurrentQuote = null; SelectedWall = null; SelectedFixture = null; SelectedResident = null; SelectedStaff = null;
                 view.Refresh(World, true); SetTool(BuildTool.Inspect); Recenter();

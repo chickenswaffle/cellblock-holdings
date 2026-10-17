@@ -1,0 +1,37 @@
+/* Population pressure workspace, alert banner and ride-along card. Loaded by GamePressureHud; other style sheets are not modified. */
+.pressure-heading { flex-direction: row; justify-content: space-between; align-items: center; }
+.pressure-heading .section-label { margin-top: 0; }
+.pressure-line { white-space: normal; font-size: 12px; color: rgb(214, 222, 213); margin-bottom: 8px; }
+.pressure-small { white-space: normal; font-size: 11px; color: rgb(160, 176, 174); margin-bottom: 8px; }
+.pressure-strong { font-size: 12px; letter-spacing: 1px; -unity-font-style: bold; color: rgb(236, 232, 218); margin-bottom: 4px; }
+
+.unrest-meter { height: 10px; margin: 2px 0 6px 0; border-radius: 5px; overflow: hidden; background-color: rgb(40, 50, 52); border-width: 1px; border-color: rgb(70, 86, 87); }
+.unrest-fill { height: 100%; border-radius: 5px; background-color: rgb(96, 154, 120); }
+.unrest-fill.tense { background-color: rgb(208, 170, 86); }
+.unrest-fill.volatile { background-color: rgb(214, 124, 62); }
+.unrest-fill.critical { background-color: rgb(206, 66, 52); }
+
+.riot-card { padding: 9px 10px 1px 10px; margin: 6px 0 4px 0; border-left-width: 3px; border-left-color: rgb(206, 66, 52); border-radius: 3px; background-color: rgb(56, 32, 30); }
+
+.intake-row { white-space: normal; font-size: 11px; color: rgb(205, 214, 206); padding: 5px 8px; margin-bottom: 3px; border-radius: 3px; background-color: rgb(32, 41, 44); }
+.intake-row.waiting { color: rgb(240, 196, 150); background-color: rgb(58, 42, 30); }
+
+.upgrade-category { color: rgb(150, 170, 168); font-size: 9px; letter-spacing: 1.4px; margin-top: 10px; margin-bottom: 4px; }
+.upgrade-row { flex-direction: row; align-items: center; padding: 7px 8px; margin-bottom: 4px; border-radius: 4px; background-color: rgb(32, 41, 44); }
+.upgrade-row.planned { opacity: 0.6; }
+.upgrade-text { flex-grow: 1; flex-shrink: 1; white-space: normal; font-size: 11px; color: rgb(214, 222, 213); margin-right: 6px; }
+Button.upgrade-buy { min-width: 58px; min-height: 40px; flex-shrink: 0; }
+
+.pressure-alert { position: absolute; min-height: 36px; padding: 8px 12px; justify-content: center; border-width: 1px; border-color: rgb(196, 152, 82); border-radius: 6px; background-color: rgba(52, 42, 26, 0.96); }
+.pressure-alert.severe { border-color: rgb(214, 80, 62); background-color: rgba(70, 28, 24, 0.97); }
+.pressure-alert-text { white-space: normal; font-size: 12px; letter-spacing: 0.8px; -unity-font-style: bold; color: rgb(246, 226, 196); }
+
+.ride-panel { position: absolute; padding: 10px 12px; border-width: 1px; border-color: rgb(69, 80, 82); border-radius: 7px; background-color: rgba(25, 32, 35, 0.97); }
+.ride-head { flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.ride-title { flex-shrink: 1; white-space: normal; font-size: 12px; letter-spacing: 1px; -unity-font-style: bold; color: rgb(236, 232, 218); }
+.ride-feed { width: 100%; height: 150px; margin-bottom: 8px; border-radius: 4px; border-width: 1px; border-color: rgb(80, 94, 95); background-color: rgb(10, 12, 13); -unity-background-scale-mode: scale-and-crop; }
+.ride-info { white-space: normal; font-size: 11px; color: rgb(205, 214, 206); margin-bottom: 6px; }
+
+.compact .ride-feed { height: 112px; }
+.compact .ride-panel { padding: 8px 10px; }
+.narrow .ride-feed { height: 96px; }

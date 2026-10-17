@@ -14,7 +14,10 @@ namespace Cellblock.Unity
         partial void BuildLives();
         partial void RefreshLives(World world, Resident resident);
         partial void RefreshJustice(World world, Resident resident);
-        enum Workspace { Facility, Build, People, Company, Control }
+        partial void BuildPressure();
+        partial void RefreshPressure(World world);
+        partial void LayoutPressure(float left, float right, float top, bool menuOpen);
+        enum Workspace { Facility, Build, People, Company, Control, Pressure }
         GameController game;
         PanelSettings panelSettings;
         int displayWidth, displayHeight;
@@ -81,7 +84,7 @@ namespace Cellblock.Unity
             BuildNavigation();
             inspector = new ScrollView(ScrollViewMode.Vertical); inspector.name = "inspector"; inspector.AddToClassList("inspector");
             ((ScrollView)inspector).horizontalScrollerVisibility = ScrollerVisibility.Hidden; root.Add(inspector);
-            BuildInspector(); BuildCatalog(); BuildPeople(); BuildJustice(); BuildLives(); BuildControl(); BuildSecurity();
+            BuildInspector(); BuildCatalog(); BuildPeople(); BuildJustice(); BuildLives(); BuildControl(); BuildSecurity(); BuildPressure();
             BuildTools();
             BuildCamera();
             status = Panel("status");
@@ -141,7 +144,8 @@ namespace Cellblock.Unity
             buildTab = Action("Build", () => SwitchWorkspace(Workspace.Build));
             peopleTab = Action("People", () => SwitchWorkspace(Workspace.People));
             companyTab = Action("Company", () => SwitchWorkspace(Workspace.Company));
-            tabs.Add(facilityTab); tabs.Add(buildTab); tabs.Add(peopleTab); tabs.Add(companyTab); controlTab = Action("Control", () => SwitchWorkspace(Workspace.Control)); tabs.Add(controlTab); navigation.Add(tabs);
+            tabs.Add(facilityTab); tabs.Add(buildTab); tabs.Add(peopleTab); tabs.Add(companyTab); controlTab = Action("Control", () => SwitchWorkspace(Workspace.Control)); tabs.Add(controlTab);
+            pressureTab = Action("Pressure", () => SwitchWorkspace(Workspace.Pressure)); pressureTab.tooltip = "Transfers, intake, contraband, unrest, audits and upgrades"; tabs.Add(pressureTab); navigation.Add(tabs);
             var utilities = Element("navigation-utilities");
             cameraToggle = Action("Camera", () => { cameraOpen = !cameraOpen; if (compact && cameraOpen) inspectorOpen = false; Layout(); }, "quiet");
             utilities.Add(cameraToggle); utilities.Add(Action("Controls", () => ShowGuide(false), "quiet")); navigation.Add(utilities);
@@ -533,11 +537,11 @@ namespace Cellblock.Unity
             float dockOffset = reviewing ? 0 : compact ? 76 : 98;
             if (reviewing) { inspectorOpen = false; cameraOpen = false; }
             cameraToggle.SetEnabled(!reviewing);
-            facilityTab.SetEnabled(!reviewing); buildTab.SetEnabled(!reviewing); peopleTab.SetEnabled(!reviewing); companyTab.SetEnabled(!reviewing); controlTab.SetEnabled(!reviewing);
+            facilityTab.SetEnabled(!reviewing); buildTab.SetEnabled(!reviewing); peopleTab.SetEnabled(!reviewing); companyTab.SetEnabled(!reviewing); controlTab.SetEnabled(!reviewing); pressureTab.SetEnabled(!reviewing);
             tools.style.display = building && !menuOpen && !reviewing ? DisplayStyle.Flex : DisplayStyle.None;
             tools.style.left = left; tools.style.right = StyleKeyword.Auto; tools.style.bottom = bottom;
             inspector.style.display = inspectorOpen && !menuOpen ? DisplayStyle.Flex : DisplayStyle.None;
-            float panelWidth = compact ? (root.resolvedStyle.width < 700 ? 280 : 300) : workspace == Workspace.Control ? 360 : workspace == Workspace.People ? 350 : workspace == Workspace.Build ? 344 : 314;
+            float panelWidth = compact ? (root.resolvedStyle.width < 700 ? 280 : 300) : workspace == Workspace.Control || workspace == Workspace.Pressure ? 360 : workspace == Workspace.People ? 350 : workspace == Workspace.Build ? 344 : 314;
             float utilityWidth = Mathf.Max(0, root.resolvedStyle.width - left - right - (compact && inspectorOpen ? panelWidth + 16 : 0));
             tools.style.width = Mathf.Min(480, utilityWidth);
             if (compact && inspectorOpen && utilityWidth < 260) tools.style.display = DisplayStyle.None;
@@ -569,6 +573,7 @@ namespace Cellblock.Unity
             menu.style.paddingTop = top + (compact ? 8 : 16); menu.style.paddingBottom = bottom;
             guide.style.paddingLeft = left; guide.style.paddingRight = right; guide.style.paddingTop = top; guide.style.paddingBottom = bottom;
             cameraToggle.EnableInClassList("selected", cameraOpen);
+            LayoutPressure(left, right, navTop + 54, menuOpen);
         }
 
         public bool IsOverUI(Vector2 screen)
@@ -750,11 +755,12 @@ namespace Cellblock.Unity
             foreach (var pair in speedButtons) pair.Value.EnableInClassList("selected", pair.Key == world.Data.Speed);
             foreach (var pair in toolButtons) pair.Value.EnableInClassList("selected", pair.Key == game.Tool);
             foreach (var pair in fixtureButtons) pair.Value.EnableInClassList("selected", game.Tool == BuildTool.Furnishing && pair.Key == game.PlacementFixtureKind);
-            RefreshCatalog(); RefreshPeople(world); RefreshControl(world); RefreshPrefabSelector();
+            RefreshCatalog(); RefreshPeople(world); RefreshControl(world); RefreshPrefabSelector(); RefreshPressure(world);
             facilityTab.EnableInClassList("selected", workspace == Workspace.Facility);
             buildTab.EnableInClassList("selected", workspace == Workspace.Build);
             companyTab.EnableInClassList("selected", workspace == Workspace.Company);
             peopleTab.EnableInClassList("selected", workspace == Workspace.People); controlTab.EnableInClassList("selected", workspace == Workspace.Control);
+            pressureTab.EnableInClassList("selected", workspace == Workspace.Pressure);
             FixtureDefinition activeFixture = FixtureCatalog.Get(game.PlacementFixtureKind);
             bool furnishingTool = game.Tool == BuildTool.Furnishing || game.Tool == BuildTool.Bed || game.Tool == BuildTool.Table;
             buildRotate.style.display = furnishingTool || game.Tool == BuildTool.Wing ? DisplayStyle.Flex : DisplayStyle.None;
@@ -770,9 +776,9 @@ namespace Cellblock.Unity
             placement.text = game.PlacementSummary; placement.style.display = string.IsNullOrEmpty(game.PlacementSummary) ? DisplayStyle.None : DisplayStyle.Flex;
             notice.text = world.Notice; notice.style.display = string.IsNullOrEmpty(world.Notice) ? DisplayStyle.None : DisplayStyle.Flex;
             bool company = workspace == Workspace.Company;
-            sectionTitle.text = workspace == Workspace.Control ? "CONTROL / LIVE OPERATIONS" : company ? "COMPANY / ACCOUNTS" : workspace == Workspace.Build ? "BUILD / CATALOG" : workspace == Workspace.People ? "PEOPLE / CULTURE" : "FACILITY / OPERATIONS";
+            sectionTitle.text = workspace == Workspace.Pressure ? "PRESSURE / OVERLOAD" : workspace == Workspace.Control ? "CONTROL / LIVE OPERATIONS" : company ? "COMPANY / ACCOUNTS" : workspace == Workspace.Build ? "BUILD / CATALOG" : workspace == Workspace.People ? "PEOPLE / CULTURE" : "FACILITY / OPERATIONS";
             FixtureDefinition selectedFixture = game.SelectedFixture != null ? FixtureCatalog.Get(game.SelectedFixture.Kind) : null;
-            facilityTitle.text = workspace == Workspace.Control ? "Prison control" : company ? "The business" : workspace == Workspace.Build ? "Construction catalog" : workspace == Workspace.People ? "People & culture" : game.SelectedWall != null ? "Wall details" : game.SelectedFixture != null ? (selectedFixture != null ? selectedFixture.Name : game.SelectedFixture.Kind) : world.Contract.Name;
+            facilityTitle.text = workspace == Workspace.Pressure ? "Population pressure" : workspace == Workspace.Control ? "Prison control" : company ? "The business" : workspace == Workspace.Build ? "Construction catalog" : workspace == Workspace.People ? "People & culture" : game.SelectedWall != null ? "Wall details" : game.SelectedFixture != null ? (selectedFixture != null ? selectedFixture.Name : game.SelectedFixture.Kind) : world.Contract.Name;
             overview.text = world.Data.Residents.Count + " residents  /  " + world.Capacity + " beds  /  " + world.Rooms.Count + " enclosed spaces";
             companyPane.style.display = company ? DisplayStyle.Flex : DisplayStyle.None;
             facilityPane.style.display = workspace == Workspace.Facility ? DisplayStyle.Flex : DisplayStyle.None;
