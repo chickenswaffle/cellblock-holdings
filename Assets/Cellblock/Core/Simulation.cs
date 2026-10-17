@@ -203,7 +203,22 @@ namespace Cellblock.Core
         readonly Dictionary<Resident, Queue<Point>> paths = new Dictionary<Resident, Queue<Point>>();
         readonly Dictionary<Resident, Point> destinations = new Dictionary<Resident, Point>();
         List<List<Point>> rooms;
-        public ContractOffer Contract { get { return Offers.First(c => c.Id == Data.ContractId); } }
+        // Contract terms follow the chartered facility type and location; the three original offers map to identical terms.
+        public ContractOffer Contract
+        {
+            get
+            {
+                string key = (Data.Mode == null ? "" : Data.Mode.TypeId + "|" + Data.Mode.LocationId) + "|" + Data.ContractId;
+                if (contractTerms == null || contractKey != key)
+                {
+                    FacilityType type = GameModes.TypeOf(Data);
+                    contractTerms = type == null ? Offers.First(c => c.Id == Data.ContractId) : GameModes.Offer(type, GameModes.LocationOf(Data));
+                    contractKey = key;
+                }
+                return contractTerms;
+            }
+        }
+        ContractOffer contractTerms; string contractKey = "";
         public Navigation Routes { get { return navigation ?? (navigation = new Navigation(Data.Walls, Data.Fixtures)); } }
         public List<List<Point>> Rooms { get { return rooms ?? (rooms = Geometry.Rooms(Data.Walls)); } }
         public int Day { get { return Data.Minute / 1440 + 1; } }
@@ -365,6 +380,7 @@ namespace Cellblock.Core
             return fixtures;
         }
         public const int MaxMealShifts = 4;
+        public const float MealSated = 88;
         // Meal places: six around each table in the dining room plus one per dining chair there. A roster larger
         // than the places eats in shifts; each person keeps one place and one shift.
         public Point ServiceDestination(int index, bool meals, Point? dining = null) { return ServiceDestination(index, meals, dining, null, null); }
@@ -374,11 +390,10 @@ namespace Cellblock.Core
             int slot = Math.Max(0, index);
             if (!meals)
             {
-                // The first twelve keep the original yard rows; a larger roster fills wider rows on either side.
-                if (slot < 12) return Data.Yard + new Point((slot % 3 - 1) * 1.1f, (slot / 3 - 1.5f) * 0.8f);
-                int extra = slot - 12, column = extra % 6, row = extra / 6;
-                float x = column < 3 ? -4.4f + column * 1.1f : 2.2f + (column - 3) * 1.1f;
-                return Data.Yard + new Point(x, (row % 16 - 7) * 0.8f + (row / 16) * 0.4f);
+                // The first twelve keep the original yard rows; a larger roster uses the clear spots beside them.
+                if (slot < 12) return YardRow(Data.Yard, slot);
+                List<Point> extras = walls == null && fixtures == null ? YardExtras() : BuildYardExtras(Data.Yard, walls ?? Data.Walls, fixtures ?? Data.Fixtures, null);
+                return extras.Count == 0 ? YardRow(Data.Yard, slot % 12) : extras[(slot - 12) % extras.Count];
             }
             List<Point> places = walls == null && fixtures == null ? MealPlaces(dining ?? Data.Dining) : BuildMealPlaces(dining ?? Data.Dining, walls ?? Data.Walls, fixtures ?? Data.Fixtures);
             return places[slot % places.Count];
@@ -389,8 +404,10 @@ namespace Cellblock.Core
             int shifts = MealShifts, shift = MealShift(index);
             if (shift >= MaxMealShifts) return false;
             int minute = ((Data.Minute + resident.RoutineOffset) % 1440 + 1440) % 1440, block = 120 / shifts, lead = shifts > 1 ? 45 : 0;
+            // A long walk still ends in a meal: someone still hungry keeps their place for an hour past the block.
+            int grace = shifts > 1 && resident.Food < MealSated ? 60 : 0;
             foreach (int start in new[] { 7 * 60, 12 * 60, 18 * 60 })
-                if (minute >= start + shift * block - lead && minute < start + (shift + 1) * block) return true;
+                if (minute >= start + shift * block - lead && minute < start + (shift + 1) * block + grace) return shifts == 1 || resident.Food < MealSated || Geometry.Distance(resident.Position, ServiceDestination(index, true)) < 0.8f;
             return false;
         }
         public int MealPlaceCount { get { return MealPlaces(Data.Dining).Count; } }
@@ -444,11 +461,38 @@ namespace Cellblock.Core
             return places;
         }
         int mealPlacesFixtures = -1;
+        static Point YardRow(Point yard, int slot) { return yard + new Point((slot % 3 - 1) * 1.1f, (slot / 3 - 1.5f) * 0.8f); }
+        List<Point> yardExtras; int yardRevision = -1, yardFixtures = -1;
+        List<Point> YardExtras()
+        {
+            if (yardExtras == null || yardRevision != GeometryRevision || yardFixtures != Data.Fixtures.Count)
+            { yardExtras = BuildYardExtras(Data.Yard, Data.Walls, Data.Fixtures, Routes); yardRevision = GeometryRevision; yardFixtures = Data.Fixtures.Count; }
+            return yardExtras;
+        }
+        // Rows on either side of the original twelve, kept only where the ground is clear outdoors, so a tower or a new
+        // building in the yard removes a spot rather than stranding the person assigned to it.
+        static List<Point> BuildYardExtras(Point yard, List<Wall> walls, List<Fixture> fixtures, Navigation nav)
+        {
+            nav = nav ?? new Navigation(walls, fixtures);
+            List<List<Point>> rooms = Geometry.Rooms(walls);
+            var places = new List<Point>();
+            for (int extra = 0; extra < 96; extra++)
+            {
+                int column = extra % 6, row = extra / 6;
+                float x = column < 3 ? -4.4f + column * 1.1f : 2.2f + (column - 3) * 1.1f;
+                Point p = yard + new Point(x, (row % 16 - 7) * 0.8f + (row / 16) * 0.4f);
+                if (Math.Abs(p.X) > Geometry.SiteX - 1 || Math.Abs(p.Y) > Geometry.SiteY - 1) continue;
+                if (!PeopleDynamics.ClearStaffStation(p, nav, fixtures) || rooms.Any(r => Geometry.Contains(r, p))) continue;
+                places.Add(p);
+            }
+            return places;
+        }
         string CheckRoutes(List<Wall> walls, List<HomeMove> moves = null, Point? dining = null, List<Fixture> fixtures = null)
         {
             List<Fixture> checkedFixtures = fixtures ?? Data.Fixtures;
             var routes = new Navigation(walls, checkedFixtures);
             List<Point> places = BuildMealPlaces(dining ?? Data.Dining, walls, checkedFixtures, null, routes);
+            List<Point> yards = BuildYardExtras(Data.Yard, walls, checkedFixtures, routes);
             if (Data.Staff.Any(staff => !PeopleDynamics.ClearStaffStation(staff.Position, routes, checkedFixtures) || !PeopleDynamics.ClearStaffStation(staff.Station, routes, checkedFixtures)))
                 return "This plan blocks a staff station. Relocate the furnishing or change the wall plan.";
             for (int i = 0; i < Data.Residents.Count; i++)
@@ -458,7 +502,7 @@ namespace Cellblock.Core
                 if (RouteExempt(resident)) { if (!routes.Clear(resident.Position, resident.Position) && IsPresent(resident)) return "A resident is inside the proposed wall or would lose access. Wait or change this stage."; continue; }
                 HomeMove move = moves == null ? null : moves.LastOrDefault(m => m.Resident == resident.Name);
                 Point home = move == null ? resident.Home : move.Home;
-                Point meal = places[i % places.Count], yard = ServiceDestination(i, false);
+                Point meal = places[i % places.Count], yard = i < 12 || yards.Count == 0 ? YardRow(Data.Yard, i % 12) : yards[(i - 12) % yards.Count];
                 if (!routes.Clear(meal, meal) || !routes.Clear(yard, yard) ||
                     routes.Find(home, meal) == null || routes.Find(home, yard) == null)
                     return "This plan cuts off " + resident.Name + "'s route to meals or the yard. Add a doorway or another route.";
@@ -740,7 +784,8 @@ namespace Cellblock.Core
                         if (shift >= MaxMealShifts) { due++; continue; }
                         if (CurrentMealBlock(resident, shifts) != shift) continue;
                         due++;
-                        if (Geometry.Distance(resident.Position, ServiceDestination(person, true)) < 0.8f) served++;
+                        // Someone who has already eaten their fill counts as served for the rest of the block.
+                        if (Geometry.Distance(resident.Position, ServiceDestination(person, true)) < 0.8f || (shifts > 1 && resident.Food >= MealSated)) served++;
                     }
                     Data.RevenueRemainder += Contract.DailyServiceBonusCents * (due == 0 ? 0 : served / (double)due) / 360.0;
                 }

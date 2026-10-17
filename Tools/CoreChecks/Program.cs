@@ -328,7 +328,8 @@ static partial class Program
             Check(moved > 0 && moved < first.Data.Residents.Count, "Initial routine departures were not staggered");
             // Residents whose breakfast shift has passed wait for the yard at 10:00 (with their routine offset).
             first.AdvanceMinutes(180);
-            Check(first.Data.Residents.All(r => Geometry.Distance(r.Position, startingPositions[r.Id]) > 0.02f),
+            // Cellmates separated in housing after an early fight stay home by design.
+            Check(first.Data.Residents.Where(r => r.SeparatedUntil <= first.Data.Minute).All(r => Geometry.Distance(r.Position, startingPositions[r.Id]) > 0.02f),
                 "Residents did not eventually leave their initial positions");
         });
         Test("version-1 saves hydrate missing people fields without changing money or identities", () => {

@@ -624,6 +624,20 @@ namespace Cellblock.Core
             Notice = staff.Name + (duty == "" ? " returns to regular duties." : " assigned to " + duty.ToLowerInvariant() + ".");
             return true;
         }
+        // Any line staff member, nurse included, can move between the day (08:00) and night (20:00) shift.
+        // The warden keeps office hours.
+        public bool SetShift(string staffId, int startHour)
+        {
+            StaffMember staff = Data.Staff.FirstOrDefault(s => s.Id == staffId);
+            PersonnelFile file = FileFor(staff);
+            if (staff == null || file == null || (startHour != 8 && startHour != 20)) return false;
+            if (file.Post == "Warden") { Notice = "The warden keeps office hours."; return false; }
+            if (staff.ShiftStart == startHour) return true;
+            staff.ShiftStart = startHour; staff.Pressure = Math.Min(100, staff.Pressure + 4);
+            Notice = staff.Name + " moves to the " + (startHour == 8 ? "day" : "night") + " shift (" + startHour.ToString("00") + ":00).";
+            PeopleDynamics.Record(Data, "staff-career", staff.Id, Notice, 1);
+            return true;
+        }
         public bool SetMentee(string mentorId, string menteeId)
         {
             StaffMember mentor = Data.Staff.FirstOrDefault(s => s.Id == mentorId), mentee = Data.Staff.FirstOrDefault(s => s.Id == menteeId);
@@ -1006,9 +1020,13 @@ namespace Cellblock.Core
                     else if (Data.Minute - resident.NeglectSince >= 720)
                     {
                         // After 12 untreated hours the person is taken to an outside hospital: one penalty, and they return stabilized.
-                        if (PenaltiesApply) Book(-Scaled(PersonnelRules.WelfarePenaltyCents), "welfare-penalty", "Untreated injury / " + resident.Name);
-                        Personnel.WelfareViolations++; resident.NeglectSince = -1; resident.Health = Math.Max(resident.Health, 60);
-                        string text = "Welfare violation: " + resident.Name + " went 12 hours with a serious untreated injury and was taken to an outside hospital. The contract charged " + JusticeRules.Dollars(Scaled(PersonnelRules.WelfarePenaltyCents)) + ". A nurse prevents this.";
+                        // The cause decides the advice: missed meals need meal places, injuries need a nurse.
+                        bool hunger = resident.Food < 25;
+                        if (PenaltiesApply) Book(-Scaled(PersonnelRules.WelfarePenaltyCents), "welfare-penalty", (hunger ? "Malnutrition / " : "Untreated injury / ") + resident.Name);
+                        Personnel.WelfareViolations++; resident.NeglectSince = -1; resident.Health = Math.Max(resident.Health, 60); if (hunger) resident.Food = Math.Max(resident.Food, 60);
+                        string text = hunger
+                            ? "Welfare violation: " + resident.Name + " became seriously ill from missed meals and was taken to an outside hospital. The contract charged " + JusticeRules.Dollars(Scaled(PersonnelRules.WelfarePenaltyCents)) + ". Add dining places, or homes closer to the dining room."
+                            : "Welfare violation: " + resident.Name + " went 12 hours with a serious untreated injury and was taken to an outside hospital. The contract charged " + JusticeRules.Dollars(Scaled(PersonnelRules.WelfarePenaltyCents)) + ". A nurse prevents this.";
                         PeopleDynamics.Record(Data, "welfare", resident.Id, text, 4); Notice = text;
                     }
                 }

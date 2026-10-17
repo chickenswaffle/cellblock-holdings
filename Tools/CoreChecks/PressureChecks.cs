@@ -71,6 +71,20 @@ static partial class Program
             world.SetGate(true);
             RunUntil(world, () => world.Population.Received == 3, 200, "Unloading after the gate opened");
         });
+        Test("a bus held two hours at a closed gate turns back as refusals; a gate-post officer admits it", () => {
+            World shut = County(); Hold(shut); shut.SetGate(false);
+            Check(shut.StageTransferDemo(4), shut.Notice);
+            RunUntil(shut, () => shut.Population.Bus.Phase == "At gate", 200, "Bus at the gate");
+            RunUntil(shut, () => shut.Population.Bus.Phase == "Departing", 130, "The bus turning back");
+            Check(shut.Population.Refused == 4 && Ledger(shut, "contract-penalty") == -4 * 30000 && shut.Population.Received == 0, "Turned-away transfers were not refused and fined");
+            World posted = County(); Hold(posted); posted.SetGate(false);
+            StaffMember guard = OnShiftOfficer(posted);
+            Check(posted.SetDuty(guard.Id, "Gate post"), posted.Notice); guard.NextDutyMinute = 0;
+            RunUntil(posted, () => Geometry.Distance(guard.Position, PersonnelRules.GatePost) < 1, 200, "The guard reaching the gate post");
+            Check(posted.StageTransferDemo(3), posted.Notice);
+            RunUntil(posted, () => posted.Population.Received == 3, 300, "The gate post admitting the bus");
+            Check(!posted.Data.Operations.GateOpen, "Admitting the bus opened the gate for everything");
+        });
         Test("accept-to-capacity refuses beyond free beds with a scaled fine; accept-all houses on the floor", () => {
             World strict = Chartered("county-intake", "briar-county"); strict.SetTransferPolicy("Accept to capacity");
             int free = Math.Max(0, strict.Capacity - strict.Data.Residents.Count);
@@ -254,9 +268,11 @@ static partial class Program
             Check(world.StageAuditDemo(), world.Notice);
             RunUntil(world, () => world.Population.Reports.Count == 1, 400, "The audit");
             Check(world.Population.Reports[0].Result == "Fail" && world.ContractTerminated && world.Standing == "Contract terminated", "Three strikes did not terminate the contract");
-            long receivable = world.Data.ReceivableCents; float backlog = world.Population.Backlog;
-            world.AdvanceMinutes(600);
-            Check(world.Data.ReceivableCents == receivable && world.Population.Backlog == 0 && !world.PenaltiesApply, "Revenue or transfers continued after termination");
+            long receivable = world.Data.ReceivableCents; float backlog = world.Population.Backlog; long fines = Ledger(world, "contract-penalty") + Ledger(world, "welfare-penalty");
+            for (int d = 0; d < 9; d++) world.AdvanceMinutes(1440);
+            // Money already earned is still paid on the next payment day; nothing new accrues.
+            Check(world.Data.ReceivableCents <= receivable && world.Population.Backlog == 0 && !world.PenaltiesApply, "Revenue or transfers continued after termination");
+            Check(Ledger(world, "contract-penalty") + Ledger(world, "welfare-penalty") == fines && world.Population.Reports.Count == 1, "Audits or fines continued after termination");
         });
         Test("deep debt makes the company insolvent and ends the contract", () => {
             World world = County(); world.Data.CashCents = world.InsolvencyCents - 100;

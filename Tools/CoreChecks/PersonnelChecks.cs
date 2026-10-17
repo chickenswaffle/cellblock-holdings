@@ -114,7 +114,8 @@ static partial class Program
             Check(Math.Abs(world.EscapeRisk(resident) - Math.Max(0, before - 18)) < 0.01f, "An integrity-80 watch did not cut risk by 18");
             world.AdvanceMinutes(300);
             PersonnelFile file = FileOf(world, officer);
-            Check(file.WatchMinutes > 250 && file.WatchCloseMinutes / (float)file.WatchMinutes > 0.85f, "The watch officer did not stay close: " + file.WatchCloseMinutes + "/" + file.WatchMinutes);
+            // With duty-target hysteresis the watcher stays close 82-96% of the time; re-planning every minute gives 41-69%.
+            Check(file.WatchMinutes > 250 && file.WatchCloseMinutes / (float)file.WatchMinutes > 0.75f, "The watch officer did not stay close: " + file.WatchCloseMinutes + "/" + file.WatchMinutes);
             Check(!world.Personnel.WriteUps.Any(w => w.SubjectId == officer.Id && w.Category == "Neglect of duty"), "A watch officer keeping pace was written up for neglect");
             officer.FavoredGang = resident.Gang; officer.Favoritism = 40;
             Check(world.WatchReliability(officer, resident) == 0, "A watch officer who favors the resident's gang still counted");

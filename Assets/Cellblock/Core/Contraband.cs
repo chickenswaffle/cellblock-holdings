@@ -156,8 +156,18 @@ namespace Cellblock.Core
         {
             if (Data.Mode == null || !Data.Mode.Applied) return;
             ContrabandState c = Contraband;
-            // Released people take what they were holding with them.
-            if (c.Items.Count > 0) c.Items.RemoveAll(i => i.Place != "Dropped" && Find(i.HolderId) == null);
+            // Released people take what they were holding with them; a recovery assignment ends when its officer
+            // is gone, off shift, posted elsewhere or no longer a line officer.
+            if (c.Items.Count > 0)
+            {
+                c.Items.RemoveAll(i => i.Place != "Dropped" && Find(i.HolderId) == null);
+                foreach (ContrabandItem item in c.Items)
+                    if (item.AssignedStaffId != "")
+                    {
+                        StaffMember officer = Data.Staff.FirstOrDefault(s => s.Id == item.AssignedStaffId);
+                        if (officer == null || !IsOnShift(officer) || officer.SecurityRole != "" || IsSuspended(officer) || FileFor(officer) == null || FileFor(officer).Post != "") item.AssignedStaffId = "";
+                    }
+            }
             TrackCourtReturns();
             AdvanceDrones();
             PickUpDrops();
@@ -381,7 +391,10 @@ namespace Cellblock.Core
                 string custody = r.Legal.Ready ? r.Legal.Custody : "";
                 bool back = (r.LastCustody == "At court" || r.LastCustody == "Aboard") && (custody == "Escorted" || custody == "In facility");
                 r.LastCustody = custody;
-                if (!back || JusticeRules.Unit(Data.Seed, r.Id, "court-carry", r.Legal.Appearances) >= 0.06f) continue;
+                if (!back) continue;
+                // Every return search takes officer time and annoys the person searched.
+                if (Contraband.SearchReturns) { r.Stress = Math.Min(100, r.Stress + 1); foreach (StaffMember s in ResponseOfficers()) s.Pressure = Math.Min(100, s.Pressure + 0.3f); }
+                if (JusticeRules.Unit(Data.Seed, r.Id, "court-carry", r.Legal.Appearances) >= 0.06f) continue;
                 string kind = JusticeRules.Unit(Data.Seed, r.Id, "court-kind", r.Legal.Appearances) < 0.6f ? "Tobacco" : "Drugs";
                 if (Contraband.SearchReturns && JusticeRules.Unit(Data.Seed, r.Id, "court-search", r.Legal.Appearances) < 0.6f)
                 { Contraband.Seized++; FileWriteUp(r.Id, "Resident", "Contraband after court", 1, "A return search found " + ContrabandRules.Label(kind) + " on " + r.Name + " after court.", ResponseOfficers().FirstOrDefault()); }

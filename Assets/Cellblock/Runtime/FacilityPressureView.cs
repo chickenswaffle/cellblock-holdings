@@ -119,7 +119,7 @@ namespace Cellblock.Unity
                 float altitude = d.Phase == "Hover" ? 2.6f : d.Phase == "Outbound" || d.Phase == "Repelled" ? 8 : Mathf.Lerp(2.8f, 7.5f, Mathf.Clamp01(Geometry.Distance(d.Position, d.Target) / 18));
                 Vector3 target = FacilityView.V(d.Position, altitude) + new Vector3(0, Mathf.Sin(clock * 3.1f) * 0.06f, 0);
                 piece.Root.position = Vector3.Lerp(piece.Root.position, target, 1 - Mathf.Exp(-dt * 6));
-                foreach (Transform rotor in piece.Spin) rotor.localRotation = Quaternion.Euler(0, clock * 1800 % 360, 0);
+                for (int i = 0; i < 4; i++) piece.Spin[i].localRotation = Quaternion.Euler(0, clock * 1800 % 360, 0);
                 // Package hangs until the drop; a detected drone blinks red.
                 piece.Spin[4].gameObject.SetActive(d.Phase == "Inbound" || d.Phase == "Hover");
                 piece.Light.enabled = d.Detected ? (clock * 3 % 1) < 0.5f : (clock * 1.2f % 1) < 0.15f;

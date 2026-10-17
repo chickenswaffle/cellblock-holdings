@@ -267,6 +267,20 @@ namespace Cellblock.Unity
             if (blocker != "") Body(blocker, "muted");
             if (staff.Role == "Officer" && file.Post == "" && file.RankLevel + 1 >= 2)
                 Body("Sergeants and above supervise their shift: the officers under them drift toward the supervisor's integrity, for better or worse.", "muted");
+            if (file.Post != "Warden")
+            {
+                Section("SHIFT");
+                Body(staff.Role == "Officer" ? "Officers cover both shifts in turn. Move one to balance coverage." :
+                    "Intake screening and casework only happen while someone is on shift. Put a nurse or caseworker on nights for evening arrivals.", "muted");
+                var shifts = Element("wrap-row");
+                foreach (int start in new[] { 8, 20 })
+                {
+                    int chosen = start;
+                    Button button = Do(start == 8 ? "Day 08:00" : "Night 20:00", () => world.SetShift(staff.Id, chosen), "personnel-tab");
+                    button.EnableInClassList("selected", staff.ShiftStart == start); shifts.Add(button);
+                }
+                sheetScroll.Add(shifts);
+            }
             if (file.Post == "Warden" || file.Post == "Nurse")
             {
                 Section("DUTY");

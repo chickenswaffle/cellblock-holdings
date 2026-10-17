@@ -252,7 +252,12 @@ namespace Cellblock.Unity
             pressureAlert.style.left = left; pressureAlert.style.top = top; pressureAlert.style.width = Mathf.Max(200, width);
             if (menuOpen) pressureAlert.style.display = DisplayStyle.None;
             bool alert = pressureAlert.style.display.value == DisplayStyle.Flex;
-            ridePanel.style.left = left; ridePanel.style.top = top + (alert ? 44 : 0); ridePanel.style.width = Mathf.Max(220, width);
+            float alertHeight = alert && !float.IsNaN(pressureAlert.resolvedStyle.height) && pressureAlert.resolvedStyle.height > 0 ? pressureAlert.resolvedStyle.height + 8 : alert ? 52 : 0;
+            ridePanel.style.left = left; ridePanel.style.top = top + alertHeight; ridePanel.style.width = Mathf.Max(220, width);
+            // Never past the bottom safe margin: the monitor shrinks first, then the card clips its last lines.
+            float available = root.resolvedStyle.height - (top + alertHeight) - 64;
+            ridePanel.style.maxHeight = Mathf.Max(120, available);
+            rideFeed.style.height = Mathf.Clamp(available - 150, 56, compact ? 112 : 150);
             if (menuOpen) ridePanel.style.display = DisplayStyle.None;
         }
     }

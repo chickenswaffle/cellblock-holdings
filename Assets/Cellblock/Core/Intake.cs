@@ -144,7 +144,14 @@ namespace Cellblock.Core
         public bool BodyScanner { get { return UpgradeLevel("body-scanner") > 0; } }
         public List<IntakeStage> IntakeStages { get { return IntakeRules.StagesFor(IntakeLevel, BodyScanner); } }
         public IntakeCase IntakeCaseFor(Resident resident) { return resident == null ? null : Data.Intake.Cases.FirstOrDefault(c => c.ResidentId == resident.Id); }
-        public bool InIntake(Resident resident) { return resident != null && Data.Intake != null && Data.Intake.Cases.Any(c => c.ResidentId == resident.Id); }
+        // Called for every actor every frame by the views, so it avoids LINQ and closures.
+        public bool InIntake(Resident resident)
+        {
+            if (resident == null || Data.Intake == null) return false;
+            List<IntakeCase> cases = Data.Intake.Cases;
+            for (int i = 0; i < cases.Count; i++) if (cases[i].ResidentId == resident.Id) return true;
+            return false;
+        }
         public bool Classified(Resident resident) { return resident.Intake.Classified; }
         public string KnownGang(Resident resident) { return resident.Intake.Classified ? resident.Intake.KnownGang : "Unknown"; }
         public string SecurityLevelOf(Resident resident) { return resident.Intake.SecurityLevel == "" ? "Unclassified" : resident.Intake.SecurityLevel; }
@@ -210,8 +217,9 @@ namespace Cellblock.Core
             if (!IsOnShift(s) || !s.Arrived || !IntakeRoleMatches(s, role) || IsSuspended(s) || s.SecurityRole != "" || (s.Role == "Officer" && (responding || RiotActive))) return false;
             // The nurse attends a serious patient before an intake screening.
             if (role == "Nurse" && Data.Residents.Any(r => IsPresent(r) && r.Health < 40 && !InIntake(r))) return false;
+            // Personnel direction only moves staff with a file, so intake only picks them.
             PersonnelFile f = FileFor(s);
-            return f == null || f.Duty == "Intake" || (f.Duty == "" && f.Post == (role == "Nurse" ? "Nurse" : ""));
+            return f != null && (f.Duty == "Intake" || (f.Duty == "" && f.Post == (role == "Nurse" ? "Nurse" : "")));
         }
         // Each minute, free staff go to the nearest case waiting for their role (intake duty first), so one officer
         // working two lanes does not walk back and forth between them.
@@ -262,7 +270,8 @@ namespace Cellblock.Core
             if (s.Cases.Count > 0)
             {
                 List<Point> stations = IntakeStations();
-                foreach (IntakeCase c in s.Cases) if (c.Lane >= stations.Count) { c.Lane = -1; c.StaffId = ""; }
+                // A lane removed by construction sends its case back to holding; it resumes at the first step not yet done.
+                foreach (IntakeCase c in s.Cases) if (c.Lane >= stations.Count) { c.Lane = -1; c.StaffId = ""; if (c.Stage != "Housing") c.Stage = "Holding"; }
                 AssignIntakeStaff(stations);
                 var lanesInUse = new HashSet<int>(s.Cases.Where(c => c.Lane >= 0 && c.Lane < stations.Count).Select(c => c.Lane));
                 foreach (IntakeCase c in s.Cases.ToList())

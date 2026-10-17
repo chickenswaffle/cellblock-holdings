@@ -14,6 +14,7 @@ namespace Cellblock.Unity
         bool rideStaff, bodyCamOn = true, savedPlanView;
         Vector3 savedFocus, rideHeading = Vector3.forward, ridePrevious;
         float savedDistance, savedYaw, savedPitch, rideYawOffset, rideBoom = 7.5f, rideTilt = 42, nextBodyFrame;
+        const float RideReferenceDistance = 40, RideReferencePitch = 52;
         Camera bodyCam;
         RenderTexture bodyTexture;
 
@@ -33,6 +34,9 @@ namespace Cellblock.Unity
             Vector3 position;
             if (!view.TryGetPersonPosition(id, out position)) { Message("That person is not on site right now."); return false; }
             if (!RideAlongActive) { savedFocus = focus; savedDistance = distance; savedYaw = yaw; savedPitch = pitch; savedPlanView = planView; }
+            // Orbit and zoom input moves the shared fields away from a mid-range reference, so a build camera parked at a
+            // zoom or tilt limit cannot pin the boom.
+            distance = RideReferenceDistance; pitch = RideReferencePitch; yaw = savedYaw;
             rideId = id; rideStaff = staff; rideYawOffset = 0; ridePrevious = position; rideBoom = 7.5f; rideTilt = 42;
             displayedFocus = position;
             SelectedWall = null; SelectedFixture = null; Tool = BuildTool.Inspect; guides.Show(null); view.Preview(null);
@@ -98,8 +102,8 @@ namespace Cellblock.Unity
             if (!view.TryGetPersonPosition(rideId, out position)) { CameraPosition(); return; }
             // Orbit and zoom input still arrive through the shared camera fields; read them as offsets.
             rideYawOffset += Mathf.DeltaAngle(savedYaw, yaw); yaw = savedYaw;
-            rideTilt = Mathf.Clamp(rideTilt + (pitch - savedPitch), 32, 62); pitch = savedPitch;
-            rideBoom = Mathf.Clamp(rideBoom * (distance / Mathf.Max(1, savedDistance)), 4.5f, 14); distance = savedDistance;
+            rideTilt = Mathf.Clamp(rideTilt + (pitch - RideReferencePitch), 32, 62); pitch = RideReferencePitch;
+            rideBoom = Mathf.Clamp(rideBoom * (distance / RideReferenceDistance), 4.5f, 14); distance = RideReferenceDistance;
             float blend = 1 - Mathf.Exp(-Time.unscaledDeltaTime * 6);
             float heading = Mathf.Atan2(rideHeading.x, rideHeading.z) * Mathf.Rad2Deg + rideYawOffset;
             displayedYaw = Mathf.LerpAngle(displayedYaw, heading, blend);

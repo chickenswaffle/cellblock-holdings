@@ -35,3 +35,5 @@ Button.upgrade-buy { min-width: 58px; min-height: 40px; flex-shrink: 0; }
 .compact .ride-feed { height: 112px; }
 .compact .ride-panel { padding: 8px 10px; }
 .narrow .ride-feed { height: 96px; }
+.ride-panel { overflow: hidden; }
+.ride-feed { flex-shrink: 1; min-height: 56px; }

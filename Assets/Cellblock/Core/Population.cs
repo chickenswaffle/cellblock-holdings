@@ -251,6 +251,7 @@ namespace Cellblock.Core
         {
             if (Data.Mode == null || !Data.Mode.Applied) return;
             ScheduleAudit();
+            if (housingRevision < 0) housingRevision = GeometryRevision;
             if (Data.Minute % 60 == 0) AdvanceDemand();
             AdvanceBus();
             AdvanceIntake();
@@ -330,7 +331,7 @@ namespace Cellblock.Core
             int hour = Data.Minute / 60 % 24;
             if (bus.Phase == "Idle")
             {
-                if (p.Terminated || p.Backlog < 1 || hour < 6 || hour >= 20) return;
+                if (p.Terminated || p.Backlog < 1 || hour < 6 || hour >= 18) return;
                 if (p.Backlog < 4 && Data.Minute - p.LastBusMinute < 8 * 60) return;
                 int wanted = Math.Min(PopulationRules.BusCapacity, (int)p.Backlog);
                 int room = PopulationRules.PopulationCeiling - CommittedPopulation;
@@ -365,8 +366,9 @@ namespace Cellblock.Core
                 Point next = PopulationRules.NextWaypoint(bus);
                 if (DriveBus(bus, next))
                 {
-                    // Waypoint 1 is the vehicle gate: the bus stops there while it is closed.
-                    if (bus.Waypoint == 1 && !Data.Operations.GateOpen)
+                    // Waypoint 1 is the vehicle gate: the bus stops there while it is closed, unless an officer on the
+                    // gate post admits the authorized transfer without opening the gate to everything else.
+                    if (bus.Waypoint == 1 && !Data.Operations.GateOpen && !GatePostAdmits())
                     { bus.Phase = "At gate"; bus.PhaseMinute = Data.Minute; Notice = "The transfer bus is waiting at the closed vehicle gate."; return; }
                     if (bus.Waypoint < PopulationRules.BusInbound.Length - 1) bus.Waypoint++;
                     else { bus.Phase = "Unloading"; bus.PhaseMinute = Data.Minute; }
@@ -375,7 +377,17 @@ namespace Cellblock.Core
             }
             if (bus.Phase == "At gate")
             {
-                if (Data.Operations.GateOpen) { bus.Phase = "Inbound"; bus.Waypoint = 2; bus.PhaseMinute = Data.Minute; }
+                if (Data.Operations.GateOpen || GatePostAdmits()) { bus.Phase = "Inbound"; bus.Waypoint = 2; bus.PhaseMinute = Data.Minute; }
+                else if (Data.Minute - bus.PhaseMinute >= 120)
+                {
+                    // Keeping the gate shut is a refusal: the bus turns back and the contract charges for every seat.
+                    int refused = bus.Passengers - bus.Unloaded; p.Refused += refused;
+                    long fine = PenaltiesApply ? Scaled(PopulationRules.RefusalCents) * refused : 0;
+                    Book(-fine, "contract-penalty", "Transfers turned away at the closed gate");
+                    string text = "The transfer bus waited two hours at the closed gate and turned back. " + refused + " transfer" + (refused == 1 ? " was" : "s were") + " refused; the contract charged " + JusticeRules.Dollars(fine) + ".";
+                    PeopleDynamics.Record(Data, "transfer", "population", text, 3); Notice = text;
+                    bus.Phase = "Departing"; bus.Waypoint = 3; bus.PhaseMinute = Data.Minute; bus.Passengers = bus.Unloaded;
+                }
                 return;
             }
             if (bus.Phase == "Unloading")
@@ -400,6 +412,10 @@ namespace Cellblock.Core
                     else { bus.Phase = "Idle"; bus.Passengers = 0; bus.Unloaded = 0; bus.PhaseMinute = Data.Minute; }
                 }
             }
+        }
+        bool GatePostAdmits()
+        {
+            return Data.Staff.Any(s => IsOnShift(s) && s.SecurityRole == "" && FileFor(s) != null && FileFor(s).Duty == "Gate post" && Geometry.Distance(s.Position, PersonnelRules.GatePost) < 4);
         }
         static bool DriveBus(TransferBus bus, Point target)
         {
@@ -508,7 +524,7 @@ namespace Cellblock.Core
             foreach (Resident resident in Data.Residents.Where(r => IsPresent(r) && !InIntake(r)).ToList())
             {
                 // Construction can cover a mattress; the person moves to a new spot.
-                if (resident.FloorBed && geometryChanged && (!Routes.Clear(resident.Home, resident.Home) || !Rooms.Any(room => Geometry.Contains(room, resident.Home)))) HouseResident(resident);
+                if (resident.FloorBed && (!Rooms.Any(room => Geometry.Contains(room, resident.Home)) || (geometryChanged && !Routes.Clear(resident.Home, resident.Home)))) HouseResident(resident);
                 if (resident.FloorBed && HousingBeds().Any(b => !BedTaken(b)))
                 {
                     HouseResident(resident);
@@ -680,6 +696,7 @@ namespace Cellblock.Core
         void ScheduleAudit()
         {
             AuditState a = Population.Audit;
+            if (Population.Terminated) return;
             if (a.NextMinute < 0) { a.NextMinute = (Day + Standard.AuditDays - 1) * 1440 + 600; a.Phase = "Scheduled"; SnapshotAudit(a); }
         }
         void TriggerAudit(string reason)
@@ -699,6 +716,8 @@ namespace Cellblock.Core
         void AdvanceAudit()
         {
             AuditState a = Population.Audit;
+            // No contract, no inspections: the oversight body stops visiting a terminated company.
+            if (Population.Terminated) { if (a.Phase != "Scheduled") { a.Phase = "Scheduled"; a.StartMinute = -1; } return; }
             if (a.Phase == "Scheduled" && a.NextMinute - Data.Minute <= 1440 && a.NextMinute > Data.Minute)
             {
                 a.Phase = "Announced"; a.AnnouncedMinute = Data.Minute;
@@ -741,8 +760,10 @@ namespace Cellblock.Core
             int waiting = Data.Intake.Cases.Count(c => Data.Minute - c.StartMinute > 12 * 60);
             if (waiting > 0) Find("Intake", 5, waiting + " " + (waiting == 1 ? "person has" : "people have") + " waited over 12 hours in intake holding.");
             int fights = Personnel.Fights - a.Fights, assaults = Population.Assaults - a.Assaults, riots = Population.Riots - a.Riots;
-            if (fights > 0) Find("Violence", Math.Min(20, fights * 3), fights + " fight" + (fights == 1 ? "" : "s") + " with injuries since the last inspection.");
-            if (assaults > 0) Find("Violence", Math.Min(16, assaults * 4), assaults + " assault" + (assaults == 1 ? "" : "s") + " with a weapon.");
+            // Violence is judged per ten residents, so a larger facility is not punished for its size alone.
+            float per10 = 10f / Math.Max(10, present);
+            if (fights > 0) Find("Violence", Math.Min(20, (int)Math.Ceiling(fights * 2 * per10)), fights + " fight" + (fights == 1 ? "" : "s") + " with injuries since the last inspection (" + (fights * per10).ToString("0.#") + " per ten residents).");
+            if (assaults > 0) Find("Violence", Math.Min(16, (int)Math.Ceiling(assaults * 4 * per10)), assaults + " assault" + (assaults == 1 ? "" : "s") + " with a weapon.");
             if (riots > 0) Find("Violence", Math.Min(50, riots * 25), riots + " riot" + (riots == 1 ? "" : "s") + ".");
             int welfare = Personnel.WelfareViolations - a.Welfare, crises = Data.Intake.Crises - a.Crises, overdoses = Data.Contraband.Overdoses - a.Overdoses;
             if (welfare > 0) Find("Welfare", Math.Min(16, welfare * 4), welfare + " welfare violation" + (welfare == 1 ? "" : "s") + " for untreated injuries.");
