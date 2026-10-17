@@ -17,6 +17,9 @@ namespace Cellblock.Unity
         partial void BuildPressure();
         partial void RefreshPressure(World world);
         partial void LayoutPressure(float left, float right, float top, bool menuOpen);
+        partial void BuildEconomy();
+        partial void RefreshEconomy(World world);
+        partial void RefreshMoney(World world, Resident resident);
         enum Workspace { Facility, Build, People, Company, Control, Pressure }
         GameController game;
         PanelSettings panelSettings;
@@ -84,7 +87,7 @@ namespace Cellblock.Unity
             BuildNavigation();
             inspector = new ScrollView(ScrollViewMode.Vertical); inspector.name = "inspector"; inspector.AddToClassList("inspector");
             ((ScrollView)inspector).horizontalScrollerVisibility = ScrollerVisibility.Hidden; root.Add(inspector);
-            BuildInspector(); BuildCatalog(); BuildPeople(); BuildJustice(); BuildLives(); BuildControl(); BuildSecurity(); BuildPressure();
+            BuildInspector(); BuildCatalog(); BuildPeople(); BuildJustice(); BuildLives(); BuildControl(); BuildSecurity(); BuildPressure(); BuildEconomy();
             BuildTools();
             BuildCamera();
             status = Panel("status");
@@ -385,7 +388,7 @@ namespace Cellblock.Unity
                 personMetricValues[2].EnableInClassList("negative", staff.Risk >= 30);
                 personEffects.text = PeopleDynamics.StaffEffect(staff) + "\nStaff support adds 8 integrity, relieves 25 pressure, and reduces favoritism by 10.";
             }
-            RefreshJustice(world, selected); RefreshLives(world, selected);
+            RefreshJustice(world, selected); RefreshLives(world, selected); RefreshMoney(world, selected);
             var history = world.Data.History.AsEnumerable().Reverse().Take(historyRows.Length).ToArray();
             for (int i = 0; i < historyRows.Length; i++)
             {
@@ -755,7 +758,7 @@ namespace Cellblock.Unity
             foreach (var pair in speedButtons) pair.Value.EnableInClassList("selected", pair.Key == world.Data.Speed);
             foreach (var pair in toolButtons) pair.Value.EnableInClassList("selected", pair.Key == game.Tool);
             foreach (var pair in fixtureButtons) pair.Value.EnableInClassList("selected", game.Tool == BuildTool.Furnishing && pair.Key == game.PlacementFixtureKind);
-            RefreshCatalog(); RefreshPeople(world); RefreshControl(world); RefreshPrefabSelector(); RefreshPressure(world);
+            RefreshCatalog(); RefreshPeople(world); RefreshControl(world); RefreshPrefabSelector(); RefreshPressure(world); RefreshEconomy(world);
             facilityTab.EnableInClassList("selected", workspace == Workspace.Facility);
             buildTab.EnableInClassList("selected", workspace == Workspace.Build);
             companyTab.EnableInClassList("selected", workspace == Workspace.Company);

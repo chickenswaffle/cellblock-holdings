@@ -195,6 +195,8 @@ namespace Cellblock.Core
         partial void AdvancePressure();
         partial void PressureMovement(Resident resident, ref bool skip);
         partial void PressureTarget(Resident resident, ref Point target);
+        // Food gained (or lost) this minute; the kitchen and prison economy adjust it.
+        partial void MealGain(Resident resident, int index, bool meals, ref float gain);
         public bool IsPresent(Resident resident) { bool present = true; ResidentPresence(resident, ref present); return present; }
         public readonly State Data;
         public int GeometryRevision { get { return Data.GeometryGeneration; } }
@@ -830,6 +832,10 @@ namespace Cellblock.Core
                     {
                         Resident resident = Data.Residents[person];
                         if (!IsPresent(resident) || InIntake(resident)) continue;
+                        // The kitchen line eats at the counter while it serves.
+                        if (OnKitchenDuty(resident)) { due++; served++; continue; }
+                        // Protective custody eats in the cell.
+                        if (resident.ProtectiveCustody) continue;
                         int shift = MealShift(person), shifts = MealShifts;
                         if (shift >= MaxMealShifts) { due++; continue; }
                         if (CurrentMealBlock(resident, shifts) != shift) continue;
@@ -912,7 +918,9 @@ namespace Cellblock.Core
                         SetResidentPath(resident,path,destination);
                     }
                 }
-                resident.Food = Geometry.Clamp(resident.Food + (meals && Geometry.Distance(resident.Position, target) < 0.8f ? 0.6f : -0.025f), 0, 100);
+                float gain = meals && Geometry.Distance(resident.Position, target) < 0.8f ? 0.6f : -0.025f;
+                MealGain(resident, index, meals, ref gain);
+                resident.Food = Geometry.Clamp(resident.Food + gain, 0, 100);
             }
         }
     }

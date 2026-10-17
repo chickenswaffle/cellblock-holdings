@@ -37,7 +37,7 @@ namespace Cellblock.Core
     {
         public const int Version = 1;
         static UpgradeTier T(string name, long price, long daily, string effect) { return new UpgradeTier { Name = name, PriceCents = price, DailyCents = daily, Effect = effect }; }
-        public static readonly string[] Categories = { "Intake", "Contraband", "Visits and mail", "Staff and response", "Health and safety", "Services" };
+        public static readonly string[] Categories = { "Intake", "Contraband", "Intelligence", "Visits and mail", "Staff and response", "Health and safety", "Services" };
         public static readonly UpgradeDefinition[] All = {
             new UpgradeDefinition { Id = "intake-program", Name = "Intake program", Category = "Intake", Description = "Staged processing of every transfer. Federal institutions run the full program by statute.",
                 Tiers = new[] { T("Standard intake", 800000, 9000, "Strip search, property, nurse medical screening, basic classification."),
@@ -75,15 +75,29 @@ namespace Cellblock.Core
             new UpgradeDefinition { Id = "smoke-detection", Name = "Smoke detection", Category = "Health and safety", Description = "Detectors in housing.",
                 Tiers = new[] { T("Smoke detection", 600000, 1500, "Fires are caught early with minor damage.") } },
             new UpgradeDefinition { Id = "commissary", Name = "Commissary", Category = "Services", Description = "A legal store for snacks, hygiene items and stamps.",
-                Tiers = new[] { T("Commissary", 900000, 3000, "Lowers unrest; less demand for smuggled tobacco. Earns $1.50 per resident per day.") } },
+                Tiers = new[] { T("Commissary", 900000, 3000, "A weekly store day for every resident: sales at your markup, from moving supplier prices."),
+                    T("Commissary stockroom", 600000, 4000, "Buy up to two weeks of stock ahead when the supplier list is low.") } },
+            new UpgradeDefinition { Id = "kitchen", Name = "Kitchen", Category = "Services", Description = "Cook on site at the serving counters instead of buying catered meals.",
+                Tiers = new[] { T("Kitchen line", 900000, 3000, "With a cook on shift, meals are cooked from your menu: cheaper than catering, three line jobs per counter."),
+                    T("Industrial kitchen", 1800000, 6000, "Four line jobs per counter, half the food-poisoning risk, and the line cooks breakfast without a cook.") } },
+            new UpgradeDefinition { Id = "law-library", Name = "Law library", Category = "Services", Description = "Legal texts, forms and a quiet room for preparing a case.",
+                Tiers = new[] { T("Law library", 250000, 1000, "Residents without a lawyer can file their own motion; legal access calms the population.") } },
+            new UpgradeDefinition { Id = "tool-control", Name = "Tool control", Category = "Health and safety", Description = "Shadow boards and sign-out for knives and kitchen tools.",
+                Tiers = new[] { T("Shadow boards", 150000, 500, "Ninety percent fewer knives go missing from the kitchen.") } },
             new UpgradeDefinition { Id = "phones", Name = "Monitored resident phones", Category = "Services", Description = "Recorded phone access for calls home.",
-                Tiers = new[] { T("Resident phones", 700000, 2000, "Lowers unrest and the pull of contraband phones. Earns $1 per resident per day.") } },
+                Tiers = new[] { T("Resident phones", 700000, 2000, "Calls home at your per-minute rate: the facility keeps a 40% commission, families send more.") } },
             // ---- planned: committed in the roadmap, not yet simulated ----
             new UpgradeDefinition { Id = "transport-fleet", Name = "Transport fleet", Category = "Intake", Status = "Planned", Description = "Larger and more transfer buses, then an owned fleet." },
             new UpgradeDefinition { Id = "video-court", Name = "Video court", Category = "Intake", Status = "Planned", Description = "Remote hearings that cut court van runs." },
             new UpgradeDefinition { Id = "classification-housing", Name = "Classification housing units", Category = "Intake", Status = "Planned", Description = "Separate minimum, medium and maximum units the classifier fills automatically." },
-            new UpgradeDefinition { Id = "informants", Name = "Confidential informants", Category = "Contraband", Status = "Planned", Description = "Residents who trade information about stashes and planned attacks." },
-            new UpgradeDefinition { Id = "internal-affairs", Name = "Internal affairs unit", Category = "Staff and response", Status = "Planned", Description = "Investigations of staff misconduct and smuggling rings." },
+            new UpgradeDefinition { Id = "informants", Name = "Intelligence unit", Category = "Intelligence", Description = "Trained handlers for confidential informants.",
+                Tiers = new[] { T("Intelligence unit", 1200000, 6000, "Runs up to six informants instead of two; meetings are half as noticeable.") } },
+            new UpgradeDefinition { Id = "tip-line", Name = "Anonymous tip line", Category = "Intelligence", Description = "A phone line and kiosk for anonymous reports.",
+                Tiers = new[] { T("Tip line", 350000, 1500, "Twice as many tips; half come by phone, and more of those are invented.") } },
+            new UpgradeDefinition { Id = "records-security", Name = "Secure legal records", Category = "Intelligence", Description = "Sealed cooperation records and controlled access to files.",
+                Tiers = new[] { T("Secure records", 400000, 1000, "Gangs cannot find cooperation deals in court papers; staff leaks are much rarer.") } },
+            new UpgradeDefinition { Id = "internal-affairs", Name = "Internal affairs unit", Category = "Intelligence", Description = "Investigations of staff misconduct and smuggling rings.",
+                Tiers = new[] { T("Internal affairs", 800000, 6000, "Investigations always uncover a smuggling officer; informant names almost never leak.") } },
             new UpgradeDefinition { Id = "staff-academy", Name = "Staff academy", Category = "Staff and response", Status = "Planned", Description = "Training tiers that raise skill, integrity and promotion speed." },
             new UpgradeDefinition { Id = "medical-unit", Name = "Medical unit", Category = "Health and safety", Status = "Planned", Description = "Infirmary beds, a doctor on call and medication-assisted treatment." },
             new UpgradeDefinition { Id = "education", Name = "Education and work programs", Category = "Services", Status = "Planned", Description = "Classes, kitchen and industry jobs that pay and reduce reoffending." },
@@ -157,13 +171,11 @@ namespace Cellblock.Core
         void AccrueUpgradeCosts()
         {
             UpgradeState u = Data.Upgrades;
-            long income = (UpgradeLevel("commissary") > 0 ? 150 : 0) + (UpgradeLevel("phones") > 0 ? 100 : 0);
-            int present = Data.Residents.Count(IsPresent);
-            u.DailyRemainder += (UpgradeDailyCents - income * present) / 1440.0;
+            // Store sales and phone commissions are booked by the prison economy as they happen.
+            u.DailyRemainder += UpgradeDailyCents / 1440.0;
             long whole = (long)Math.Floor(u.DailyRemainder);
             u.DailyRemainder -= whole;
             if (whole > 0) Book(-whole, "programs", "Upgrade running costs");
-            else if (whole < 0) Book(-whole, "programs", "Commissary and phone income");
         }
     }
 }

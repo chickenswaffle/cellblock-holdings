@@ -14,7 +14,13 @@ namespace Cellblock.Unity
         Button pressureTab, acceptAll, acceptCapacity, moratorium, advance, shakedown, searchYard, searchReturns, searchVisits;
         VisualElement pressurePane, unrestFill, riotCard, upgradeList, pressureAlert, ridePanel, rideFeed, riderRow;
         Label pressureStatus, unrestLabel, unrestFactors, transferInfo, intakeInfo, intakeProgram, contrabandInfo, riotInfo, auditInfo, auditFindings, alertText, rideTitle, rideInfo;
-        Button rideBodyCam, rideButton;
+        Button rideBodyCam, rideButton, roleToggle;
+        Label roleGoals;
+        const int RoleCardRows = 2;
+        readonly VisualElement[] roleCards = new VisualElement[RoleCardRows];
+        readonly Label[] roleCardTexts = new Label[RoleCardRows];
+        readonly Button[,] roleCardButtons = new Button[RoleCardRows, 4];
+        readonly string[] roleCardIds = new string[RoleCardRows];
         readonly Label[] intakeRows = new Label[6];
         readonly Dictionary<string, Label> upgradeLabels = new Dictionary<string, Label>();
         readonly Dictionary<string, Button> upgradeButtons = new Dictionary<string, Button>();
@@ -59,6 +65,8 @@ namespace Cellblock.Unity
             searchVisits = Action("Search after visits", () => { game.World.SetSearchPolicy("visits", !game.World.Contraband.SearchAfterVisits); Refresh(true); }, "quiet"); searches.Add(searchVisits);
             shakedown = Action("Shakedown", () => { game.World.Shakedown(); Refresh(true); }, "primary"); searches.Add(shakedown);
             pressurePane.Add(searches);
+            BuildIntel(pressurePane);
+            BuildCounsel(pressurePane);
 
             pressurePane.Add(Text("AUDITS", "section-label"));
             auditInfo = Text("", "pressure-line"); pressurePane.Add(auditInfo);
@@ -106,7 +114,23 @@ namespace Cellblock.Unity
             rideButtons.Add(Action("◀ Previous", () => game.NextRideAlong(-1), "quiet"));
             rideButtons.Add(Action("Next ▶", () => game.NextRideAlong(1), "quiet"));
             rideBodyCam = Action("Body cam", () => game.ToggleBodyCam(), "quiet"); rideButtons.Add(rideBodyCam);
+            roleToggle = Action("Take the role", () => game.ToggleRole(), "quiet"); roleToggle.tooltip = "Make this person's decisions; the simulation still walks them"; rideButtons.Add(roleToggle);
             ridePanel.Add(rideButtons);
+            // Decisions for the person whose role the player has taken.
+            roleGoals = Text("", "ride-info"); ridePanel.Add(roleGoals);
+            for (int i = 0; i < RoleCardRows; i++)
+            {
+                int row = i;
+                var card = Element("role-card"); roleCardTexts[i] = Text("", "role-card-text"); card.Add(roleCardTexts[i]);
+                var choices = Element("economy-chips");
+                for (int j = 0; j < 4; j++)
+                {
+                    int option = j;
+                    Button b = Action("", () => { if (roleCardIds[row] != null) game.World.ChooseCard(roleCardIds[row], option); Refresh(true); }, "quiet");
+                    roleCardButtons[i, j] = b; choices.Add(b);
+                }
+                card.Add(choices); roleCards[i] = card; ridePanel.Add(card);
+            }
 
             riderRow = Element("staff-file-row");
             riderRow.Add(Text("See their day from close up, with a body-cam view.", "staff-line"));
@@ -187,6 +211,8 @@ namespace Cellblock.Unity
                 (world.Data.Minute - cb.LastShakedownMinute < 1440 ? "\nNext shakedown from " + JusticeRules.When(cb.LastShakedownMinute + 1440) + "." : "");
             searchYard.EnableInClassList("selected", cb.SearchAfterYard); searchReturns.EnableInClassList("selected", cb.SearchReturns); searchVisits.EnableInClassList("selected", cb.SearchAfterVisits);
             shakedown.SetEnabled(world.Data.Minute - cb.LastShakedownMinute >= 1440);
+            RefreshIntel(world);
+            RefreshCourts(world);
 
             AuditState a = p.Audit;
             auditInfo.text = standard.Oversight + ": " + (a.Phase == "In progress" ? "inspecting now (" + (world.Data.Minute - a.StartMinute) + " of 240 min)" : a.NextMinute >= 0 ? "next " + JusticeRules.When(a.NextMinute) + (a.Reason != "Routine" ? " · " + a.Reason.ToLowerInvariant() : "") : "scheduling") +
@@ -235,6 +261,7 @@ namespace Cellblock.Unity
             rideBodyCam.EnableInClassList("selected", game.BodyCamOn);
             rideFeed.style.display = game.BodyCamOn ? DisplayStyle.Flex : DisplayStyle.None;
             rideFeed.style.backgroundImage = Background.FromRenderTexture(game.RideAlongFeed as RenderTexture);
+            RefreshRole(world);
             Resident r = game.RideAlongResident; StaffMember s = game.RideAlongStaff;
             if (r != null)
             {
@@ -249,6 +276,32 @@ namespace Cellblock.Unity
             {
                 rideTitle.text = s.Name.ToUpperInvariant() + " · " + world.StaffTitle(s).ToUpperInvariant();
                 rideInfo.text = s.Duty + "\nPressure " + Mathf.RoundToInt(s.Pressure) + " · integrity " + Mathf.RoundToInt(s.Integrity) + (world.IsOnShift(s) ? " · on shift" : " · off shift");
+            }
+        }
+
+        void RefreshRole(World world)
+        {
+            bool taken = world.ControlledId != "" && world.ControlledId == game.RideAlongId;
+            roleToggle.EnableInClassList("selected", taken);
+            string role = world.RoleOf(game.RideAlongId);
+            bool possible = role == "Prisoner" || role == "Officer" || role == "Warden";
+            roleToggle.SetEnabled(possible || taken); roleToggle.text = taken ? "Hand back the role" : "Take the role";
+            roleGoals.style.display = taken ? DisplayStyle.Flex : DisplayStyle.None;
+            roleGoals.text = taken ? world.RoleGoals() + (world.Roles.Log.Count > 0 ? "\nLast: " + world.Roles.Log[world.Roles.Log.Count - 1] : "") : "";
+            var cards = taken ? world.PendingCards.Where(c => c.PersonId == world.ControlledId).OrderBy(c => c.CreatedMinute).Take(RoleCardRows).ToList() : new List<RoleCard>();
+            for (int i = 0; i < RoleCardRows; i++)
+            {
+                RoleCard c = i < cards.Count ? cards[i] : null;
+                roleCards[i].style.display = c == null ? DisplayStyle.None : DisplayStyle.Flex;
+                roleCardIds[i] = c == null ? null : c.Id;
+                if (c == null) continue;
+                roleCardTexts[i].text = c.Title.ToUpperInvariant() + " · " + Mathf.Max(0, c.ExpiresMinute - world.Data.Minute) + " min to decide\n" + c.Text;
+                for (int j = 0; j < 4; j++)
+                {
+                    Button b = roleCardButtons[i, j];
+                    b.style.display = j < c.Options.Count ? DisplayStyle.Flex : DisplayStyle.None;
+                    if (j < c.Options.Count) { b.text = c.Options[j]; b.EnableInClassList("selected", j == c.Default); b.tooltip = j == c.Default ? "What they would do if you do not decide" : ""; }
+                }
             }
         }
 

@@ -33,6 +33,7 @@ namespace Cellblock.Core
         public Point Inspector = new Point(-2, -14);
         // Cumulative counters at the last audit, so each report covers only its own period.
         public int Fights, Welfare, Escapes, MissedHearings, Lapsed, Seized, Skipped, Riots, Assaults, Refused, Overdoses, Crises, Trays, Minute;
+        public int SnitchAssaults, IgnoredWarnings, TipsFalse, TipsConfirmed, Poisonings;
     }
     [Serializable] public sealed class Disturbance
     {
@@ -194,7 +195,7 @@ namespace Cellblock.Core
                 throw Invalid("transfer bus");
             AuditState a = p.Audit;
             if (Array.IndexOf(AuditPhases, a.Phase) < 0 || a.Reason == null || a.StartMinute > state.Minute || !Road(a.Inspector) || a.Waypoint < 0 ||
-                new[] { a.Fights, a.Welfare, a.Escapes, a.MissedHearings, a.Lapsed, a.Seized, a.Skipped, a.Riots, a.Assaults, a.Refused, a.Overdoses, a.Crises, a.Trays }.Any(n => n < 0) || a.Minute > state.Minute)
+                new[] { a.Fights, a.Welfare, a.Escapes, a.MissedHearings, a.Lapsed, a.Seized, a.Skipped, a.Riots, a.Assaults, a.Refused, a.Overdoses, a.Crises, a.Trays, a.SnitchAssaults, a.IgnoredWarnings, a.TipsFalse, a.TipsConfirmed, a.Poisonings }.Any(n => n < 0) || a.Minute > state.Minute)
                 throw Invalid("audit schedule");
             Disturbance riot = p.Riot;
             var ids = new HashSet<string>(state.Residents.Where(r => r != null).Select(r => r.Id));
@@ -247,6 +248,11 @@ namespace Cellblock.Core
             IntakeRules.Hydrate(state);
             ContrabandRules.Hydrate(state);
             UpgradeRules.Hydrate(state);
+            EconomyRules.Hydrate(state);
+            IntelRules.Hydrate(state);
+            KitchenRules.Hydrate(state);
+            CounselRules.Hydrate(state);
+            RoleRules.Hydrate(state);
         }
 
         partial void AdvancePressure()
@@ -266,6 +272,11 @@ namespace Cellblock.Core
             AdvanceAudit();
             AccruePopulationCosts();
             AccrueUpgradeCosts();
+            AdvanceEconomy();
+            AdvanceIntel();
+            AdvanceKitchen();
+            AdvanceCounsel();
+            AdvanceRoles();
         }
 
         partial void PressureMovement(Resident resident, ref bool skip)
@@ -276,7 +287,8 @@ namespace Cellblock.Core
         {
             Disturbance riot = Population.Riot;
             if (riot.Phase != "None" && riot.Rioters.Contains(resident.Id)) target = NearbyClear(riot.Center + RallyOffset(resident), Routes);
-            else if (resident.SeparatedUntil > Data.Minute) target = resident.Home;
+            else if (resident.SeparatedUntil > Data.Minute || resident.ProtectiveCustody) target = resident.Home;
+            else JobTarget(resident, ref target);
         }
         Point RallyOffset(Resident resident)
         {
@@ -583,8 +595,10 @@ namespace Cellblock.Core
             if (Data.Operations.Lockdown) Add("Lockdown restrictions", 6);
             if (Personnel.Regime == "Strict") Add("Strict regime", -4);
             else if (Personnel.Regime == "Rehabilitative") Add("Rehabilitative regime", -3);
-            if (UpgradeLevel("commissary") > 0) Add("Commissary access", -3 * UpgradeLevel("commissary"));
-            if (UpgradeLevel("phones") > 0) Add("Monitored phone access", -2 * UpgradeLevel("phones"));
+            EconomyUnrest(present, Add);
+            IntelUnrest(present, Add);
+            KitchenUnrest(present, Add);
+            CounselUnrest(present, Add);
             if (factors != null) factors.Sort((x, y) => Math.Abs(y.Points).CompareTo(Math.Abs(x.Points)));
             return Geometry.Clamp(total, 0, 100);
         }
@@ -622,7 +636,7 @@ namespace Cellblock.Core
         bool StartDisturbance(bool demo = false)
         {
             PopulationState p = Population;
-            var present = Data.Residents.Where(r => IsPresent(r) && !InIntake(r) && r.Legal.Ready && r.Legal.Custody == "In facility").ToList();
+            var present = Data.Residents.Where(r => IsPresent(r) && !InIntake(r) && !r.ProtectiveCustody && r.Legal.Ready && r.Legal.Custody == "In facility").ToList();
             // The flashpoint is the place with the most stressed people together.
             var groups = present.GroupBy(r => RoomKeyOf(RoomOf(r.Position))).Select(g => new { Key = g.Key, People = g.ToList(), Heat = g.Sum(r => r.Stress) }).OrderByDescending(g => g.Heat).ThenBy(g => g.Key, StringComparer.Ordinal).ToList();
             var flash = groups.FirstOrDefault(g => g.People.Count(r => r.Stress >= (demo ? 0 : 45) || r.Gang != "Unaffiliated") >= 3);
@@ -664,7 +678,7 @@ namespace Cellblock.Core
                     riot.Phase = "Riot"; p.Riots++;
                     SetLockdown(true);
                     // Residents nearby who are already on edge join in.
-                    foreach (Resident r in Data.Residents.Where(x => IsPresent(x) && !InIntake(x) && x.Legal.Custody == "In facility" && x.Stress >= 40 && !riot.Rioters.Contains(x.Id) && Geometry.Distance(x.Position, riot.Center) <= 10))
+                    foreach (Resident r in Data.Residents.Where(x => IsPresent(x) && !InIntake(x) && !x.ProtectiveCustody && x.Legal.Custody == "In facility" && x.Stress >= 40 && !riot.Rioters.Contains(x.Id) && Geometry.Distance(x.Position, riot.Center) <= 10))
                         riot.Rioters.Add(r.Id);
                     riot.PeakRioters = Math.Max(riot.PeakRioters, riot.Rioters.Count);
                     long penalty = PenaltiesApply ? Scaled(PopulationRules.RiotPenaltyCents) : 0;
@@ -738,6 +752,8 @@ namespace Cellblock.Core
             a.Lapsed = Personnel.LapsedWriteUps; a.Seized = Data.Contraband.Seized; a.Skipped = Data.Intake.SkippedStages; a.Riots = Population.Riots;
             a.Assaults = Population.Assaults; a.Refused = Population.Refused; a.Overdoses = Data.Contraband.Overdoses; a.Crises = Data.Intake.Crises;
             a.Trays = Population.TrayMeals; a.Minute = Data.Minute;
+            if (Data.IntelWork != null) { a.SnitchAssaults = IntelWork.SnitchAssaults; a.IgnoredWarnings = IntelWork.IgnoredWarnings; a.TipsFalse = IntelWork.TipsFalse; a.TipsConfirmed = IntelWork.TipsConfirmed; }
+            if (Data.Kitchen != null) a.Poisonings = Kitchen.Poisonings;
         }
         public bool StageAuditDemo() { AuditState a = Population.Audit; if (a.Phase == "In progress") return false; a.NextMinute = Data.Minute + 1; a.Reason = "Unannounced inspection"; a.Phase = "Announced"; return true; }
         void AdvanceAudit()
@@ -807,6 +823,9 @@ namespace Cellblock.Core
             int escapes = Data.Justice.Escapes - a.Escapes, missed = Data.Justice.MissedHearings - a.MissedHearings;
             if (escapes > 0) Find("Security", Math.Min(30, escapes * 15), escapes + " escape" + (escapes == 1 ? "" : "s") + ".");
             if (missed > 0) Find("Records", Math.Min(9, missed * 3), missed + " missed court hearing" + (missed == 1 ? "" : "s") + ".");
+            EconomyFindings(Find);
+            IntelFindings(Find, a);
+            KitchenFindings(Find, a);
             if (sample)
             {
                 int found = AuditContrabandSweep();

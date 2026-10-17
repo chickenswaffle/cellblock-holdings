@@ -4,5 +4,10 @@ static partial class Program
     static partial void RunLivesChecks()
     {
         RunPressureChecks();
+        RunEconomyChecks();
+        RunIntelChecks();
+        RunKitchenChecks();
+        RunCounselChecks();
+        RunRoleChecks();
     }
 }

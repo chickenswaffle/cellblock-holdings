@@ -58,10 +58,27 @@ namespace Cellblock.Unity
         {
             if (!RideAlongActive) return;
             rideId = "";
+            if (World != null) World.ReleaseRole();
             focus = savedFocus; distance = savedDistance; yaw = savedYaw; pitch = savedPitch; planView = savedPlanView;
             if (bodyCam != null) bodyCam.enabled = false;
         }
         public void ToggleBodyCam() { bodyCamOn = !bodyCamOn; hud.Refresh(true); }
+        // Taking the role of the person being followed: their decisions arrive as cards, and play pauses for each new one.
+        int seenCards;
+        public void ToggleRole()
+        {
+            if (World == null || !RideAlongActive) return;
+            if (World.ControlledId == rideId) { World.ReleaseRole(); Message("Decisions are back with " + (rideStaff ? SelectedStaff.Name : SelectedResident.Name) + "."); }
+            else if (World.TakeRole(rideId)) { seenCards = World.Roles.NextId; Message(World.Notice); }
+            else Message(World.Notice);
+            hud.Refresh(true);
+        }
+        void WatchRoleCards()
+        {
+            if (World == null || World.ControlledId == "") return;
+            if (World.Roles.NextId > seenCards && World.PendingCards.Any(c => c.PersonId == World.ControlledId))
+            { seenCards = World.Roles.NextId; World.Data.Speed = 0; hud.Refresh(true); }
+        }
         // Cycles through people who are on site, residents then staff, in roster order.
         public void NextRideAlong(int direction)
         {
@@ -79,6 +96,7 @@ namespace Cellblock.Unity
         void UpdateRideAlong()
         {
             if (!RideAlongActive || World == null) return;
+            WatchRoleCards();
             bool present = rideStaff ? World.Data.Staff.Any(s => s.Id == rideId && s.Arrived) : World.Data.Residents.Any(r => r.Id == rideId && World.IsPresent(r));
             Vector3 position;
             if (!present || !view.TryGetPersonPosition(rideId, out position))

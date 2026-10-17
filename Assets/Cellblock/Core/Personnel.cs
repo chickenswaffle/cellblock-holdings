@@ -78,14 +78,15 @@ namespace Cellblock.Core
         // Off-shift rest recovers this much pressure per game hour; a 12-hour break offsets about ten residents per on-shift officer.
         public const float RestRecoveryPerHour = 0.75f;
         public const int CommendationDays = 3, WriteUpLapseDays = 3;
-        public static readonly string[] Kinds = { "Officer", "Caseworker", "Technician", "Nurse", "Warden" };
+        public static readonly string[] Kinds = { "Officer", "Caseworker", "Technician", "Nurse", "Warden", "Cook" };
         public static readonly string[] Regimes = { "Rehabilitative", "Balanced", "Strict" };
-        public static readonly string[] OfficerDuties = { "", "Watch", "Gate post", "Court escort", "CCTV monitoring", "Perimeter patrol", "Cell checks", "Mentoring", "Intake" };
+        public static readonly string[] OfficerDuties = { "", "Watch", "Gate post", "Court escort", "CCTV monitoring", "Perimeter patrol", "Cell checks", "Mentoring", "Intake", "Intelligence" };
         public static readonly string[] CaseworkerDuties = { "", "Counseling", "Reentry planning", "Intake" };
         static readonly string[] OfficerRanks = { "Officer", "Senior Officer", "Sergeant", "Lieutenant", "Captain" };
         static readonly string[] CaseworkerRanks = { "Caseworker", "Senior Caseworker", "Case Manager" };
         static readonly string[] TechnicianRanks = { "Technician", "Senior Technician" };
         static readonly string[] NurseRanks = { "Nurse", "Charge Nurse" };
+        static readonly string[] CookRanks = { "Cook", "Head Cook" };
         public static readonly string[] DisciplineLevels = { "Commendation", "Verbal warning", "Written warning", "Suspension", "Final warning" };
         static readonly string[] WriteUpStatuses = { "Open", "Dismissed", "Sanctioned", "Referred", "Closed" };
         public static readonly Point GatePost = new Point(-1.1f, -22.0f);
@@ -99,7 +100,7 @@ namespace Cellblock.Core
 
         public static string[] Ladder(string role, string post)
         {
-            return post == "Nurse" ? NurseRanks : role == "Officer" ? OfficerRanks : role == "Caseworker" ? CaseworkerRanks : TechnicianRanks;
+            return post == "Nurse" ? NurseRanks : post == "Cook" ? CookRanks : role == "Officer" ? OfficerRanks : role == "Caseworker" ? CaseworkerRanks : TechnicianRanks;
         }
         public static string Title(string role, PersonnelFile file)
         {
@@ -110,7 +111,7 @@ namespace Cellblock.Core
         public static string KindOf(string role, PersonnelFile file) { return file.Post != "" ? file.Post : role; }
         public static string[] DutiesFor(string role, PersonnelFile file)
         {
-            if (file.Post == "Warden" || file.Post == "Nurse") return new[] { "" };
+            if (file.Post == "Warden" || file.Post == "Nurse" || file.Post == "Cook") return new[] { "" };
             return role == "Officer" ? OfficerDuties : role == "Caseworker" ? CaseworkerDuties : new[] { "" };
         }
         public static string IntegrityBand(float integrity) { return integrity >= 72 ? "High" : integrity >= 50 ? "Mixed" : "Low"; }
@@ -134,6 +135,7 @@ namespace Cellblock.Core
                 case "Technician": return new[] { "Tolland Alarm & Camera", "Halvern Security Group", "Ridgeway Fire & Safety", "Port Ellery Transit Systems" };
                 case "Nurse": return new[] { "St. Brennan Regional Hospital", "Lakewood Urgent Care", "Briar County Health Department", "Mason Ridge Clinic" };
                 case "Warden": return new[] { "Northbridge State Correctional", "Briar County Detention Center", "Lakewood Detention Center" };
+                case "Cook": return new[] { "Halvern Hospital Food Service", "Lakewood School District Kitchens", "Port Ellery Galley Supply", "Briar County Senior Meals" };
             }
             return new[] { "Briar County Detention Center", "Lakewood City Jail", "Northbridge State Correctional", "Halvern Security Group", "Port Ellery Transit Police", "Mason Ridge Juvenile Services" };
         }
@@ -145,6 +147,7 @@ namespace Cellblock.Core
                 case "Technician": return Pick(seed, key + "title", new[] { "Security systems technician", "Low-voltage installer", "Camera network technician" });
                 case "Nurse": return Pick(seed, key + "title", new[] { "Registered nurse", "Correctional nurse", "Emergency nurse" });
                 case "Warden": return Pick(seed, key + "title", new[] { "Deputy warden", "Captain of operations", "Assistant superintendent" });
+                case "Cook": return Pick(seed, key + "title", new[] { "Institutional cook", "Line cook", "Food service supervisor" });
             }
             return Pick(seed, key + "title", new[] { "Detention officer", "Correctional officer", "Security officer", "Transit officer" });
         }
@@ -160,7 +163,7 @@ namespace Cellblock.Core
             string earlier = employers[(Array.IndexOf(employers, employer) + 1) % employers.Length];
             string band = IntegrityBand(integrity);
             int years = Math.Max(1, experience), earlierYears = Math.Max(1, experience / 3);
-            string role = kind == "Officer" ? "corrections" : kind == "Caseworker" ? "casework" : kind == "Technician" ? "security systems" : kind == "Nurse" ? "nursing" : "facility leadership";
+            string role = kind == "Officer" ? "corrections" : kind == "Caseworker" ? "casework" : kind == "Technician" ? "security systems" : kind == "Nurse" ? "nursing" : kind == "Cook" ? "institutional food service" : "facility leadership";
             string gangLine = favoredGang != "" ? " " + first + " grew up a few doors from several " + favoredGang + " members and still sees them socially." : "";
             if (band == "High")
                 backstory = Pick(seed, key + "story", new[] {
@@ -187,7 +190,7 @@ namespace Cellblock.Core
                 earlierTitle + ", " + earlier + " · " + earlierYears + (earlierYears == 1 ? " year" : " years") };
             if (band == "Low") resume.Add("Gap · " + (6 + Hash(key + "gap", seed) % 9) + " months between positions (not explained)");
             resume.Add("TRAINING · " + (kind == "Nurse" ? "RN licence, BLS, correctional health basics" : kind == "Technician" ? "Low-voltage certification, camera network maintenance" :
-                kind == "Caseworker" ? "Trauma-informed practice, reentry planning" : kind == "Warden" ? "Facility management, use-of-force review board" : "Defensive tactics, report writing, first aid"));
+                kind == "Caseworker" ? "Trauma-informed practice, reentry planning" : kind == "Cook" ? "Food handler certificate, institutional kitchen safety" : kind == "Warden" ? "Facility management, use-of-force review board" : "Defensive tactics, report writing, first aid"));
             string referee = Pick(seed, key + "ref", First) + " " + Pick(seed, key + "refl", Last);
             references = new List<string> {
                 band == "High" ? referee + ", " + employer + ": \"Honest to a fault. I'd hire them again tomorrow.\"" :
@@ -215,7 +218,7 @@ namespace Cellblock.Core
             int age = 23 + (int)(Unit(seed, key + "age") * 30) + (kind == "Warden" ? 12 : 0);
             int experience = Math.Max(1, Math.Min(age - 21, (int)(Unit(seed, key + "exp") * (kind == "Warden" ? 22 : 14)) + (kind == "Warden" ? 8 : 1) +
                 (tier != null ? tier.ApplicantExperienceShift : 0) + (place != null ? place.ExperienceBonus : 0)));
-            long baseCents = kind == "Warden" ? 90000 : kind == "Nurse" ? 52000 : kind == "Caseworker" ? 44000 : kind == "Technician" ? 36000 : 40000;
+            long baseCents = kind == "Warden" ? 90000 : kind == "Nurse" ? 52000 : kind == "Caseworker" ? 44000 : kind == "Technician" ? 36000 : kind == "Cook" ? 22000 : 40000;
             // Experience and a clean record cost more; the cheapest applicants carry the most risk.
             long asking = (long)(baseCents * (0.86 + experience * 0.025 + (integrity - 60) * 0.004) * (tier != null ? tier.WageScale : 1) * (place != null ? place.WageIndex : 1));
             var candidate = new Candidate { Id = "candidate-" + serial, Name = name, Kind = kind, FavoredGang = gang, Age = age, Experience = experience, Integrity = integrity,
@@ -290,6 +293,9 @@ namespace Cellblock.Core
             bool needWarden = !state.Staff.Any(s => s != null && FileFor(state, s.Id) != null && FileFor(state, s.Id).Post == "Warden") && !personnel.Candidates.Any(c => c.Kind == "Warden");
             var kinds = new List<string> { "Officer", "Officer", "Officer", "Caseworker", "Nurse", "Technician" };
             if (needWarden) kinds[2] = "Warden";
+            // A kitchen with no cook on staff advertises for one.
+            bool kitchen = state.Upgrades != null && state.Upgrades.Owned.Any(o => o.Id == "kitchen");
+            if (kitchen && !state.Staff.Any(s => s != null && FileFor(state, s.Id) != null && FileFor(state, s.Id).Post == "Cook") && !personnel.Candidates.Any(c => c.Kind == "Cook")) kinds.Insert(1, "Cook");
             int room = CandidateLimit - personnel.Candidates.Count;
             if (needWarden && room < kinds.Count) { kinds.Remove("Warden"); kinds.Insert(0, "Warden"); }
             foreach (string kind in kinds.Take(Math.Max(0, room))) personnel.Candidates.Add(MakeCandidate(state, kind, personnel.NextId++));
@@ -328,7 +334,7 @@ namespace Cellblock.Core
                 string role = staff != null ? staff.Role : "Officer";
                 if (string.IsNullOrEmpty(f.StaffId) || f.Face == null || f.Caseload == null || f.Resume == null || f.References == null || f.Discipline == null || f.Remarks == null ||
                     f.Name == null || f.Post == null || f.Duty == null || f.WatchId == null || f.MenteeId == null ||
-                    (f.Post != "" && f.Post != "Warden" && f.Post != "Nurse") || (staff != null && ((f.Post == "Warden" && role != "Officer") || (f.Post == "Nurse" && role != "Caseworker"))) ||
+                    (f.Post != "" && f.Post != "Warden" && f.Post != "Nurse" && f.Post != "Cook") || (staff != null && ((f.Post == "Warden" && role != "Officer") || (f.Post == "Nurse" && role != "Caseworker") || (f.Post == "Cook" && role != "Technician"))) ||
                     f.RankLevel < 0 || f.RankLevel >= Ladder(role, f.Post).Length || (staff != null && Array.IndexOf(DutiesFor(role, f), f.Duty) < 0) ||
                     f.Caseload.Count > 3 || f.Discipline.Count > DisciplineLimit || f.Remarks.Count > RemarkLimit || f.Resume.Count > 12 ||
                     f.Discipline.Any(d => d == null || d.Minute < 0 || d.Minute > state.Minute || string.IsNullOrEmpty(d.Level)) ||
@@ -435,17 +441,18 @@ namespace Cellblock.Core
             if (c == null) return false;
             if (c.Kind == "Warden" && Warden != null) { Notice = "The facility already has a warden."; return false; }
             if (c.Kind == "Nurse" && Data.Staff.Count(IsNurse) >= 2) { Notice = "Two nurses already cover sick call."; return false; }
-            string role = c.Kind == "Warden" ? "Officer" : c.Kind == "Nurse" ? "Caseworker" : c.Kind;
+            if (c.Kind == "Cook" && Data.Staff.Count(IsCook) >= 2) { Notice = "Two cooks already run the kitchen."; return false; }
+            string role = c.Kind == "Warden" ? "Officer" : c.Kind == "Nurse" ? "Caseworker" : c.Kind == "Cook" ? "Technician" : c.Kind;
             int before = Data.Staff.Count;
             if (!HireStaff(role) || Data.Staff.Count != before + 1) return false;
             StaffMember staff = Data.Staff[Data.Staff.Count - 1];
             staff.Name = c.Name; staff.Integrity = c.Integrity; staff.Pressure = c.Pressure; staff.Favoritism = c.Favoritism; staff.FavoredGang = c.FavoredGang;
             staff.DailyCents = c.AskingCents;
-            if (c.Kind == "Warden" || c.Kind == "Nurse") staff.ShiftStart = 8;
+            if (c.Kind == "Warden" || c.Kind == "Nurse" || c.Kind == "Cook") staff.ShiftStart = 8;
             if (c.Kind == "Warden") staff.Station = staff.Destination = DeskPoint();
             PersonnelFile file = PersonnelRules.FileFor(Data, staff.Id);
             if (file == null) { file = new PersonnelFile { StaffId = staff.Id }; Personnel.Files.Add(file); }
-            file.Name = c.Name; file.Post = c.Kind == "Warden" ? "Warden" : c.Kind == "Nurse" ? "Nurse" : ""; file.Face = c.Face; file.Age = c.Age; file.Experience = c.Experience;
+            file.Name = c.Name; file.Post = c.Kind == "Warden" ? "Warden" : c.Kind == "Nurse" ? "Nurse" : c.Kind == "Cook" ? "Cook" : ""; file.Face = c.Face; file.Age = c.Age; file.Experience = c.Experience;
             file.Hometown = c.Hometown; file.PriorEmployer = c.PriorEmployer; file.Backstory = c.Backstory; file.Resume = c.Resume; file.References = c.References;
             file.BackgroundNote = c.Checked ? c.BackgroundNote : ""; file.HiredMinute = Data.Minute; file.NextReviewMinute = PersonnelRules.NextReview(Data.Minute, Personnel.Files.Count);
             file.RankLevel = c.Kind != "Warden" && c.Experience >= 8 ? 1 : 0;
@@ -914,6 +921,7 @@ namespace Cellblock.Core
                 // A disturbance pulls every line officer; then intake lanes and detected contraband drops.
                 if (staff.Role == "Officer" && file.Post == "" && RiotActive) { Direct(staff, Population.Riot.Center + new Point(file.RankLevel % 2 == 0 ? 1.6f : -1.6f, 1.2f), "Riot response"); continue; }
                 if (file.Post != "Warden" && DirectIntakeStaff(staff)) continue;
+                if (file.Post == "" && DirectIntelStaff(staff)) continue;
                 if (file.Post == "" && DirectContrabandStaff(staff)) continue;
                 // Supervision: officers drift toward the integrity of the most senior officer on their shift.
                 if (lead != null && lead != staff && staff.Role == "Officer" && !IsWarden(staff) && (IsWarden(lead) ? 9 : FileFor(lead).RankLevel) > file.RankLevel)
@@ -925,6 +933,7 @@ namespace Cellblock.Core
                 if (staff.SecurityRole != "" || (Escape.Detected && staff.Role=="Officer" && !IsWarden(staff))) continue;
                 if (file.Post == "Warden") { Direct(staff, DeskPoint(), "Warden's office"); continue; }
                 if (file.Post == "Nurse") { SickCall(staff, file); continue; }
+                if (file.Post == "Cook") { Direct(staff, CookStation(), HasKitchen ? "Cooking" : "Waiting for a kitchen"); continue; }
                 switch (file.Duty)
                 {
                     case "Watch":
@@ -946,6 +955,7 @@ namespace Cellblock.Core
                         if (CourtVan.Phase == "Inbound" || CourtVan.Phase == "At gate" || CourtVan.Phase == "Boarding" || CourtVan.Phase == "Unloading") Direct(staff, CourtVan.Board + new Point(1.2f, 0.4f), "Court escort");
                         break;
                     case "CCTV monitoring": Direct(staff, DeskPoint() + new Point(-0.9f, 0), "CCTV monitoring"); break;
+                    case "Intelligence": Direct(staff, DeskPoint() + new Point(0.9f, 0.5f), "Intelligence office"); break;
                     case "Perimeter patrol":
                     {
                         Point[] route = PersonnelRules.PerimeterRoute;
@@ -1063,7 +1073,7 @@ namespace Cellblock.Core
         // Residents with serious tension who meet can fight. A nearby officer usually defuses it first.
         void CheckFights()
         {
-            var present = Data.Residents.Where(r => IsPresent(r) && !InIntake(r) && r.SeparatedUntil <= Data.Minute && r.Legal.Ready && r.Legal.Custody == "In facility" && r.Legal.RestrictedUntil <= Data.Minute).ToList();
+            var present = Data.Residents.Where(r => IsPresent(r) && !InIntake(r) && !r.ProtectiveCustody && r.SeparatedUntil <= Data.Minute && r.Legal.Ready && r.Legal.Custody == "In facility" && r.Legal.RestrictedUntil <= Data.Minute).ToList();
             for (int i = 0; i < present.Count; i++)
             for (int j = i + 1; j < present.Count; j++)
             {
@@ -1075,6 +1085,8 @@ namespace Cellblock.Core
                 chance *= (Personnel.Regime == "Strict" ? 0.7f : Personnel.Regime == "Rehabilitative" ? 1.1f : 1f) * FacilityMode.FightScale;
                 if (a.DrunkUntil > Data.Minute || b.DrunkUntil > Data.Minute) chance *= 1.6f;
                 if ((a.Dependency > 30 && a.HighUntil <= Data.Minute) || (b.Dependency > 30 && b.HighUntil <= Data.Minute)) chance *= 1.25f;
+                // A planned attack, or a known snitch facing a gang member.
+                chance *= IntelFightFactor(a, b);
                 if (JusticeRules.Unit(Data.Seed, a.Id + b.Id, "fight", Data.Minute / 30) >= chance) continue;
                 Confront(a, b, link, present);
             }
@@ -1137,6 +1149,7 @@ namespace Cellblock.Core
                 else { FileWriteUp(a.Id, "Resident", "Fighting", 2, text, reporter); FileWriteUp(b.Id, "Resident", "Fighting", 2, text, reporter); }
                 SeparateAfterFight(a, b);
                 PeopleDynamics.Record(Data, "fight", a.Id, text, 3); Notice = text;
+                AfterFight(a, b);
             }
         }
         // Officers on shift separate the two afterwards: six hours in housing, a keep-separate order, and a move
