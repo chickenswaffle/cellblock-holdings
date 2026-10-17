@@ -21,7 +21,7 @@ namespace Cellblock.Unity
                 var officers=game.World.Data.Staff.Where(s=>s.Role=="Officer").ToList();
                 if(officers.Count==0){game.Message("Hire an officer in Control first.");return;}
                 int index=officers.FindIndex(s=>s.Id==securityOfficerId);securityOfficerId=officers[(index+1)%officers.Count].Id;Refresh(true);
-            });fixturePane.Add(chooseOfficer);
+            });chooseOfficer.style.whiteSpace=WhiteSpace.Normal;chooseOfficer.style.height=64;fixturePane.Add(chooseOfficer);
             assignPost=Action("Assign",()=>{
                 Fixture f=game.SelectedFixture;if(f==null)return;
                 string role=f.Kind=="GuardTower"?"Tower":f.Kind=="Kennel"?"K9":"Armed";
@@ -60,7 +60,7 @@ namespace Cellblock.Unity
                 bool trained=f.Kind=="Kennel"?officer.DogTrained:f.Kind=="Armory"?officer.ArmedTrained:true;
                 securityInfo.text+="\n"+(trained?"Qualification ready":"Qualification: $750 once before assignment")+(f.Kind=="Kennel"?" · duty +$80/day":f.Kind=="Armory"?" · duty +$100/day":" · standard officer wage");
             }
-            chooseOfficer.text=officer==null?"Hire an officer in Control":"Officer: "+officer.Name+" · tap to cycle";
+            chooseOfficer.text=officer==null?"Hire an officer in Control":"Choose: "+officer.Name+"\nTap to cycle candidates";
             var assigned=world.Data.Staff.FirstOrDefault(s=>s.SecurityPostId==f.Id);
             assignPost.text=assigned!=null?"Assigned: "+assigned.Name:f.Kind=="Kennel"?"Assign K9 handler · +$80/day":f.Kind=="Armory"?"Assign armed duty · +$100/day":"Assign tower lookout";
             assignPost.SetEnabled(officer!=null&&assigned==null&&(f.Kind!="Armory"||f.UpgradeLevel>0));clearPost.SetEnabled(assigned!=null);

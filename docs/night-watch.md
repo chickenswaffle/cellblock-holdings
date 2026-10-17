@@ -27,7 +27,7 @@ Light can detect a resident outside the ordinary lookout range, while illuminati
 4. `FacilitySearchlightView.cs` owns the separate rotating head, yoke, lens, hinges, fins, binocular watch pose and reusable coverage mesh. Uniform rays plus wall/opening endpoints and clearance tangents prevent broad sampling from missing narrow barriers. Ray endpoints use the core's wall clearance. The Resources shader retains the transparent beam for player builds.
 5. `GameSecurityHud.cs` owns selected-tower operating controls and Control feedback. Claude may reorganize the broader HUD; preserve these Build/Refresh hooks and the named controls.
 
-The clock determines sweep phase. Pausing freezes it; reloading preserves it. No real-world elapsed time is applied. Player builds and device performance remain separate acceptance work.
+The clock determines sweep phase. Live lamp motion interpolates briefly between simulation headings; paused views snap exactly to the authoritative direction. Pausing freezes the phase; reloading preserves it. No real-world elapsed time is applied. Player builds and device performance remain separate acceptance work.
 
 ## Follow-on design priorities
 

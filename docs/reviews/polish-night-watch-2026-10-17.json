@@ -1,0 +1,20 @@
+{
+    "passed": true,
+    "editor": "6000.3.24f1",
+    "message": "Actual Unity Play: projected pointer hit tests on proposed wall, quote/no purchase, exact undo, Unity JSON draft restore, company-switch history isolation, phone quote, bed/meal poses, ride/body camera and restore, pressure desktop/phone, physical coach/intake + Unity JSON, drone, disturbance, actual audit visitor and all furnishing materials. Synthetic camera projection exercises the pointer hit path; physical device touch and sustained performance remain unmeasured.",
+    "errors": [],
+    "captures": [
+        "01-clicked-door-quote.png",
+        "02-phone-door-review.png",
+        "03-residents-resting.png",
+        "04-meal-poses.png",
+        "05-resident-ride-along.png",
+        "06-pressure-workspace.png",
+        "07-transfer-and-intake.png",
+        "08-contraband-drone.png",
+        "09-disturbance.png",
+        "10-phone-pressure.png",
+        "11-pressure-inspector.png",
+        "12-material-and-furniture-study.png"
+    ]
+}

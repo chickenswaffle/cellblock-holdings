@@ -159,7 +159,8 @@ namespace Cellblock.Unity
             {
                 Point ladder=tower.Position+(Geometry.AccessPoint(tower)-tower.Position)*.86f;
                 // Climb vertically at the real access side, then step onto the deck.
-                Vector3 platform=V(climb<1?ladder:tower.Position,.14f+4.1f*climb);offset=actor.Root.InverseTransformPoint(platform);
+                Vector3 stand=Quaternion.Euler(0,tower.Rotation,0)*new Vector3(.65f,0,.55f);
+                Vector3 platform=climb<1?V(ladder,.14f+4.1f*climb):V(tower.Position,4.24f)+stand;offset=actor.Root.InverseTransformPoint(platform);
             }
             actor.Model.localPosition=Vector3.Lerp(actor.Model.localPosition,offset,snap?1:1-Mathf.Exp(-Time.unscaledDeltaTime*6));
             if(climb>0&&climb<1)

@@ -14,6 +14,9 @@ namespace Cellblock.Unity
             public Light Light;
             public Mesh Mesh;
             public MeshRenderer Beam;
+            public Renderer Lens;
+            public readonly MaterialPropertyBlock LensProperties=new MaterialPropertyBlock();
+            public int LensState=-1;
             public float NextRefresh;
             public int Minute=-1, Revision=-1, Level;
             public float Bearing=-1, ClearDistance, VisualBearing=float.NaN;
@@ -68,7 +71,7 @@ namespace Cellblock.Unity
             var beam=new GameObject("Wall-clipped beam and ground pool");beam.transform.SetParent(root,false);beam.layer=29;
             var mesh=new Mesh{name="Generated clipped searchlight",indexFormat=IndexFormat.UInt32};mesh.MarkDynamic();beam.AddComponent<MeshFilter>().sharedMesh=mesh;
             var renderer=beam.AddComponent<MeshRenderer>();renderer.sharedMaterial=SearchlightMaterial();renderer.shadowCastingMode=ShadowCastingMode.Off;renderer.receiveShadows=false;
-            var view=new SearchlightView{Root=root,Pan=pan,Head=head,Light=light,Mesh=mesh,Beam=renderer,Level=tower.UpgradeLevel};
+            var view=new SearchlightView{Root=root,Pan=pan,Head=head,Light=light,Mesh=mesh,Beam=renderer,Level=tower.UpgradeLevel,Lens=head.GetComponentsInChildren<Renderer>().FirstOrDefault(r=>r.sharedMaterial.name=="lamp")};
             searchlights.Add(tower.Id,view);return view;
         }
         void RefreshSearchlights(World world,bool force)
@@ -80,6 +83,8 @@ namespace Cellblock.Unity
                 SearchlightView view;if(!searchlights.TryGetValue(tower.Id,out view))view=CreateSearchlight(tower);
                 view.Root.position=V(tower.Position,0);
                 bool active=world.SearchlightOnline(tower);view.Beam.enabled=active;view.Light.enabled=active&&view.ClearDistance>2;
+                if(view.Lens!=null&&view.LensState!=(active?1:0))
+                {view.LensState=active?1:0;view.LensProperties.SetColor("_EmissionColor",active?new Color(.94f,.91f,.72f)*.8f:Color.black);view.Lens.SetPropertyBlock(view.LensProperties);}
                 float targetBearing=world.SearchlightBearing(tower);
                 float bearing=force||world.Data.Speed==0||float.IsNaN(view.VisualBearing)?targetBearing:Mathf.LerpAngle(view.VisualBearing,targetBearing,1-Mathf.Exp(-Time.unscaledDeltaTime*18*Mathf.Sqrt(world.Data.Speed)));
                 view.VisualBearing=bearing;view.Pan.localRotation=Quaternion.Euler(0,bearing,0);
