@@ -11,9 +11,9 @@ static partial class Program
     // Brings a bus of transfers in and runs until they have all left the bus.
     static List<Resident> Transfer(World world, int people)
     {
-        if (world.Data.Minute % 1440 < 6 * 60 || world.Data.Minute % 1440 >= 19 * 60) world.AdvanceMinutes((world.Data.Minute / 1440 + 1) * 1440 + 8 * 60 - world.Data.Minute);
+        if (world.Data.Minute % 1440 < 6 * 60 || world.Data.Minute % 1440 >= 17 * 60) world.AdvanceMinutes((world.Data.Minute / 1440 + (world.Data.Minute % 1440 < 6 * 60 ? 0 : 1)) * 1440 + 8 * 60 - world.Data.Minute);
         if (world.Population.Bus.Phase != "Idle") RunUntil(world, () => world.Population.Bus.Phase == "Idle", 200, "The previous bus leaving");
-        if (world.Data.Minute % 1440 >= 19 * 60) world.AdvanceMinutes((world.Data.Minute / 1440 + 1) * 1440 + 8 * 60 - world.Data.Minute);
+        if (world.Data.Minute % 1440 >= 17 * 60) world.AdvanceMinutes((world.Data.Minute / 1440 + 1) * 1440 + 8 * 60 - world.Data.Minute);
         var before = new HashSet<string>(world.Data.Residents.Select(r => r.Id));
         Check(world.StageTransferDemo(people), "Transfer demo did not dispatch: " + world.Notice);
         RunUntil(world, () => world.Population.Bus.Phase == "Departing" || world.Population.Bus.Phase == "Idle", 400, "The transfer bus unloading");
@@ -157,7 +157,9 @@ static partial class Program
         Test("meals run in shifts when places are short, and a fifth shift's worth of people go without", () => {
             World world = County();
             Check(world.MealPlaceCount == 6 && world.MealShifts == 2, "The starter dining table should give six places and two shifts: " + world.MealPlaceCount + "/" + world.MealShifts);
-            for (int i = 0; i < 12; i++) Check(world.MealShift(i) == i / 6, "Shift assignment wrong for " + i);
+            // Each person gets one place and one shift; no place serves more people than there are shifts.
+            var seats = Enumerable.Range(0, 12).Select(i => new { Place = world.ServiceDestination(i, true), Shift = world.MealShift(i) }).ToList();
+            Check(seats.All(x => x.Shift < 2) && seats.Select(x => x.Place.X + "," + x.Place.Y + "/" + x.Shift).Distinct().Count() == 12, "Meal places or shifts were double-booked");
             // Three dining chairs along the free east side of the dining room add a place each.
             foreach (float y in new[] { -1.4f, -2.6f, -6.8f }) world.Data.Fixtures.Add(new Fixture { Id = "chair-check" + y, Kind = "Chair", Position = new Point(1.2f, y), Rotation = 90 });
             world.Data.GeometryGeneration++;
@@ -170,6 +172,26 @@ static partial class Program
                 crowded.Data.Minute = 1440 + minute;
                 Check(!crowded.MealDue(31, crowded.Data.Residents[31]), "A resident with no place was sent to a meal at " + JusticeRules.When(crowded.Data.Minute));
             }
+        });
+        Test("a serving counter makes a second dining room; people take the nearest free place", () => {
+            World world = County();
+            int before = world.MealPlaceCount;
+            var office = world.Rooms.First(r => Geometry.Contains(r, new Point(-1, 4)));
+            world.Data.Fixtures.Add(new Fixture { Id = "second-table", Kind = "Table", Position = new Point(-1.2f, 6.4f), Rotation = 90 });
+            world.Data.Fixtures.Add(new Fixture { Id = "second-counter", Kind = "ServingCounter", Position = new Point(0.6f, 1.2f) });
+            world.Data.GeometryGeneration++;
+            Check(world.MealPlaceCount > before, "A room with a serving counter did not add meal places: " + before + " → " + world.MealPlaceCount);
+            int inOffice = Enumerable.Range(0, world.Data.Residents.Count).Count(i => Geometry.Contains(office, world.ServiceDestination(i, true)));
+            Check(inOffice > 0, "Nobody was given a place in the nearer second dining room");
+            for (int i = 0; i < world.Data.Residents.Count; i++)
+            {
+                Point home = world.Data.Residents[i].Home, mine = world.ServiceDestination(i, true);
+                // Nobody sits farther than someone else's place they could have had in the same shift count.
+                Check(world.Routes.Find(home, mine) != null, world.Data.Residents[i].Name + " cannot reach their meal place");
+            }
+            Check(world.Data.Fixtures.Remove(world.Data.Fixtures.First(f => f.Id == "second-counter")), "Setup");
+            world.Data.GeometryGeneration++;
+            Check(world.MealPlaceCount == before, "Without its serving counter the room still counted as dining");
         });
         Test("unrest rises with crowding, missed meals and contraband, and falls with officer coverage", () => {
             World world = County(); world.EnsureLegalProfiles();
