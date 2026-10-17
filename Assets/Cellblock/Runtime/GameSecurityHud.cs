@@ -33,10 +33,11 @@ namespace Cellblock.Unity
                 Refresh(true);
             },"quiet");fixturePane.Add(clearPost);
             BuildSearchlightControls();
-            controlPane.Add(Text("POWER / COMFORT / SECURITY","section-label"));
+            controlPowerAnchor=Text("POWER / COMFORT / SECURITY","section-label");controlPane.Add(controlPowerAnchor);
             powerInfo=Text("","body");controlPane.Add(powerInfo);
             gridSwitch=Action("Grid",()=>{game.World.Data.Security.GridEnabled=!game.World.Data.Security.GridEnabled;Refresh(true);});controlPane.Add(gridSwitch);
             controlPane.Add(Text("New units need a distribution panel for room power. Cooling raises local comfort over time. K9 and armed duty add wages; each new qualification costs $750 once. Staffed towers and nearby dog teams detect through real sightlines. Select equipment in the world for upgrades and assignments.","muted"));
+            BuildSecurityMeters();
         }
         void RefreshSecurity(World world)
         {
@@ -45,6 +46,7 @@ namespace Cellblock.Unity
                 "Added equipment: $0.18/kWh · "+world.Data.Staff.Count(world.IsOnShift)+" on shift\nStaff morale "+(world.Data.Staff.Count==0?"—":world.Data.Staff.Average(s=>s.Morale).ToString("0"))+" / 100 · "+world.Data.Security.Dogs.Count+" dogs\n"+(world.DispatchOnline?"Staffed dispatch console online":"Dispatch console unstaffed or offline")+"\nEffective perimeter reinforcement "+(world.PerimeterIntegrity*100).ToString("0.0")+"%\n"+world.Data.Fixtures.Count(world.SearchlightOnline)+" active searchlights · "+world.SearchlightSleepers+" sleeping residents exposed";
             gridSwitch.text=world.Data.Security.GridEnabled?"Isolate electricity":"Restore electricity";
             Fixture f=game.SelectedFixture;
+            RefreshSecurityMeters(world,f);
             RefreshSearchlightControls(world,f);
             if(f==null)return;
             securityInfo.text=SecurityRules.LevelName(f.UpgradeLevel)+" · condition "+f.Condition.ToString("0")+"%\n"+SecurityRules.Features(f.Kind,f.UpgradeLevel)+"\n"+world.EquipmentStatus(f)+"\nDemand "+SecurityRules.Demand(f).ToString("0.00")+" kW · local comfort "+world.ComfortAt(f.Position).ToString("0")+"/100";

@@ -1,0 +1,28 @@
+{
+    "passed": true,
+    "editor": "6000.3.24f1",
+    "message": "Actual Unity Play: numbered resident/staff/trait/risk/security/build bars; signed factor semantics; stable fixed navigation; profile/risk/record/roster and five Control shortcuts; readable track numbers, 44px button bounds and UI world-input blocking at 1600, 900 and 640 widths. No real device touch/performance claim.",
+    "errors": [],
+    "captures": [
+        "01-resident-profile-desktop.png",
+        "02-signed-risk-desktop.png",
+        "03-expanded-factors-desktop.png",
+        "04-court-record-desktop.png",
+        "05-roster-desktop.png",
+        "06-staff-profile-desktop.png",
+        "07-control-desktop.png",
+        "08-cctv-shortcut.png",
+        "09-team-shortcut.png",
+        "10-power-shortcut.png",
+        "11-shift-report-shortcut.png",
+        "12-phone-profile.png",
+        "13-phone-risk.png",
+        "14-phone-roster.png",
+        "15-phone-control.png",
+        "16-phone-power.png",
+        "17-narrow-control.png",
+        "18-narrow-staff.png",
+        "19-project-progress.png",
+        "20-scroll-aware-navigation.png"
+    ]
+}

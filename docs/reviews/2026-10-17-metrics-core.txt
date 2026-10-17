@@ -1,0 +1,218 @@
+PASS three opening contracts have distinct terms and reconciled acquisition cash
+PASS starter residents have routes to meals and yard
+PASS all catalog items quote, hand over, block navigation, and survive save/load
+PASS room faces retain doors as room boundaries and triangulate their area
+PASS curved walls share a real door opening with navigation
+PASS diagonal boundaries block both travel directions
+PASS prefab attachment removes shared wall and does not charge twice
+PASS partially shared straight boundaries retain only uncovered geometry
+PASS closing an occupied cell door is rejected before payment
+PASS planned construction does not change operational geometry
+PASS additional crews accelerate parallel construction with paid labor
+PASS a finished prefab remains editable through the same wall model
+PASS pause advances neither construction nor finance
+PASS saved in-progress construction resumes without duplicate charges
+PASS reopening a save does not apply elapsed real time
+PASS earnings are receivables until the contractual payment day
+PASS residents never move through a completed wall
+PASS out-of-bounds and folded curves are rejected
+PASS save with a corrupted ledger is rejected
+PASS a partial prefab join retains its door only on the correct fragment
+PASS nested building boundaries generate non-overlapping floor area
+PASS occupied bed removal requires a replacement and a valid relocation
+PASS renovations validate the resident's actual service destination
+PASS staff stations cannot overlap furniture and legacy staff migrate around it
+PASS invalid numeric geometry cannot erase collision
+PASS malformed pending work and negative crew rates cannot load
+PASS different viable circulation layouts change verified service earnings
+PASS moving the active meal-service table also relocates its service point
+PASS unapproved plans can be saved without charging for construction
+PASS resident identity and relationships are seeded, stable, and staggered
+PASS version-1 saves hydrate missing people fields without changing money or identities
+PASS social thresholds and high-risk guard misconduct create traceable wellbeing consequences
+PASS new hires carpool only before departure and release preserves trip references
+PASS closed gate and inbound travel cannot earn construction progress
+PASS arrival and physical work resume without duplicate fees or reset progress
+PASS alarm and lockdown persist without invalidating structural routes
+PASS casework requires an arrived on-duty worker at the resident
+PASS CCTV honors handover, direction, walls and network power
+PASS prefab packages and quarter turns quote as one editable project
+PASS shift report boundary persists and cannot duplicate on reload
+PASS builders collect and carry supplies before physical work and resume mid-carry
+PASS transport reserves separate marked bays and slows before unloading
+PASS legacy operations migrate builder workflow once without changing purchases
+PASS simultaneous crew and staff hires keep headway at a closed gate
+PASS enhanced housing shared arrivals disembark after a held gate
+PASS later-project carry survives a save after geometry handover
+PASS pre-justice saves gain stable legal profiles without changing people, money or buildings
+PASS legal profiles persist exactly and a new facility has a hearing on its first full day
+PASS a regular court day dispatches at 07:15 and accounts for every docketed resident
+PASS the court van boards, leaves the site, holds hearings and returns, with residents hidden while away
+PASS a mid-trip save resumes the court run without replaying transport or fees
+PASS absent residents are excluded from CCTV coverage, and pause/load never advance the court run
+PASS a closed vehicle gate holds the court van and the missed hearing is charged once
+PASS lockdown during court boarding becomes a missed hearing
+PASS escape risk follows individual traits and facility conditions
+PASS high-risk residents are warned at least two game hours before any attempt
+PASS with the gate open and no guard or camera, an attempt succeeds once and the resident is returned later
+PASS a closed gate holds the attempt, and the alarm shortens the officers' response
+PASS only an operational camera with a clear line of sight detects an attempt
+PASS close supervision is charged once per game day, including across a reload
+PASS released residents leave the roster, free their bed, and never block construction
+PASS a late court van still boards, and a van held inside the gate is abandoned only there
+PASS re-enabling close supervision on a paid day costs nothing more
+PASS an officer detects an attempt only with a clear line of sight
+PASS legal event history is bounded and malformed justice saves are rejected
+PASS pre-personnel saves gain staff files, a hiring pool and health without changing staff
+PASS backstories, references and background checks follow true integrity and gang ties
+PASS hiring a candidate brings them in by shuttle with their name, pay, integrity and file
+PASS promotions need service, sergeant needs the warden, and pay and morale move by fixed amounts
+PASS a supervisor's integrity pulls their shift toward it, for better or worse
+PASS a watch officer shadows the resident and cuts escape risk by their reliability
+PASS an honest watch officer stops an attempt; one who favors the resident's gang looks away
+PASS without the gate post duty, the same held-far officer does not stop the attempt
+PASS a gate post stops an attempt at an open gate
+PASS a court escort moves residents to the van during lockdown
+PASS CCTV monitoring detects an attempt the first minute a camera sees it
+PASS a nurse treats an injury; without one, neglect brings one welfare penalty per 12 hours
+PASS residents with serious tension fight unless an officer is close enough to defuse it
+PASS the warden's office reviews write-ups, refers them to court and earns or loses credibility
+PASS write-ups wait for a warden, and good-time and expedited hearings need one
+PASS supervisors' remarks are honest unless the supervisor shares the employee's favors
+PASS staff misconduct becomes a write-up unless a compromised supervisor buries it
+PASS terminations go through the warden, pay severance and archive the file
+PASS the strict regime trades stress for control and only the warden can set it
+PASS malformed personnel saves are rejected; references to people who left are dropped on load
+PASS rest between shifts recovers pressure; a default county company keeps its opening staff for two weeks
+PASS a burnout warning reaches the owner once a day before anyone resigns
+PASS minor injuries heal within a day without a nurse; serious ones barely improve
+PASS a commendation counts once every three game days
+PASS a paid background check survives the listing refresh
+PASS a demotion takes back exactly the latest raise
+PASS a court referral at the charge limit is refused without a fee
+PASS without a warden, minor write-ups lapse after three days and serious ones wait; overflow drops the least serious
+PASS security posts and escape responses own their officer's destination
+PASS the mode catalog is complete, ordered by difficulty and internally consistent
+PASS original contracts take their mapped mode additively, and old saves keep their people
+PASS each facility type shapes population, charges, courts and staff distinctly
+PASS penalties scale with the jurisdiction and the supermax penalty is fixed
+PASS the labor market follows the jurisdiction and the location
+PASS a remote location's court drive moves the van's schedule earlier
+PASS the charter can change only before operations, and replaces rather than stacks staff
+PASS every facility type runs two game days and reloads cleanly
+PASS charges and pretrial share follow the facility type
+PASS gang presence follows the facility type across seeds
+PASS land prices follow the location and the escape-risk offset follows the population
+PASS good-time credit, release at court and fights scale with the facility type on an identical population
+PASS a chartered company books its own type's capital and land, and every type starts and reloads
+PASS malformed mode saves are rejected
+OK social contact while away at court: no relationship change.
+PASS construction discriminators strip Unity phantom null payloads without losing work
+PASS an empty Unity inline draft does not become a blocked build plan
+PASS blocked release waits for a real exit and resumes after access is restored
+PASS staff misconduct leaves absent people unchanged
+PASS pre-pressure saves gain transfers, intake, contraband and upgrades without changing people or cash
+PASS transfers start on the first evening and arrive by bus with unique people and mode-shaped records
+PASS the transfer bus waits at a closed gate
+PASS a bus held two hours at a closed gate turns back as refusals; a gate-post officer admits it
+PASS accept-to-capacity refuses beyond free beds with a scaled fine; accept-all houses on the floor
+PASS a transfer moratorium pauses demand for two days at a scaled cost, once a week
+PASS the committed population never exceeds the ceiling; extra demand is diverted
+PASS a floor sleeper moves to a bed when one frees up, and a mattress never blocks construction
+PASS extra residents earn a per-diem with the contract and cost food and supplies
+PASS meals run in shifts when places are short, and a fifth shift's worth of people go without
+PASS a serving counter makes a second dining room; people take the nearest free place
+PASS people who miss the dining room get a tray instead of starving; trays cost money and are audited
+PASS someone standing where routes cannot start is sent home on load instead of breaking the save
+PASS unrest rises with crowding, missed meals and contraband, and falls with officer coverage
+PASS a bed, meals and safety let stress settle; a floor mattress wears people down
+PASS a disturbance is contained by enough officers; otherwise it becomes a riot with damage, penalty and an audit
+PASS a response team retakes a riot that officers held far away cannot
+PASS audits are announced, take four hours and report findings from real counters
+PASS federal facilities run the federal program; state monitors fail standard intake until it is enhanced
+PASS three failed audits within 30 days terminate the contract: revenue, transfers and fines stop
+PASS an advance on earned revenue pays half now for a 3% fee; money owed keeps a company solvent
+PASS deep debt makes the company insolvent and ends the contract
+PASS intake programs scale from four basic steps to the full federal program, in order and with the right staff
+PASS a step needs its staff at the station; with no nurse, medical screening is skipped after an hour and audited
+PASS desks built near the sally port add intake lanes that run cases at the same time
+PASS a better intake search finds more of what transfers carry; missed items come inside with the person
+PASS medical and mental health screening treat what arrives; an unscreened crisis risk can become a welfare crisis
+PASS classification turns known enemies into keep-separate orders and housing keeps them apart
+PASS people in intake are held out of routines, fights and escape attempts until housed
+PASS a screened crisis risk goes on a three-day watch and never becomes a crisis
+PASS one officer working two lanes never causes a skipped step; a missed search brings the item inside
+PASS housing keeps a classified arrival out of a room with a known enemy when another bed is free
+PASS after a fight, officers on shift separate the pair for six hours with a keep-separate order
+PASS a resident watched by an officer does not collect a dropped package
+PASS a drone flies in and drops its payload; detection, defeat and netting change the outcome
+PASS a dropped package is collected by a resident when unwatched, or recovered by an officer who detected it
+PASS cell checks find stashed contraband unless the officer favors the holder's gang
+PASS a shakedown seizes most hidden items, costs overtime, angers residents and waits a day
+PASS narcotics relieve stress, build dependency and withdrawal; naloxone reverses an overdose
+PASS a weapon turns a fight into an assault with a serious injury
+PASS corrupt staff smuggle on shift change; staff screening catches most of it
+PASS video visitation ends hand-offs; photocopied mail stops most drug mail
+PASS a managed-access system silences contraband phones and finds them
+PASS a released resident's contraband and feuds leave with them; older saves with orphans still load
+PASS contraband saves round-trip and malformed items are rejected
+PASS upgrades charge their exact price, enforce prerequisites, run daily and never sell planned items
+PASS commissary and resident phones lower unrest and earn per resident
+PASS two identical companies stay identical through a week of transfers, contraband and audits
+PASS searchlight is a directed cone with real installation and operating gates
+PASS tower aim is independent of footprint and deterministic across paused reload
+PASS searchlight stops at walls and respects actual door openings
+PASS sleep exposure requires a present resting resident and never stacks towers
+PASS old security saves hydrate controls and malformed light data is rejected
+PASS light controls survive actual upgrade construction and Unity-independent reload
+PASS security upgrades preserve identity and stay inactive until handover
+PASS new shells need wiring while legacy rooms retain power
+PASS camera upgrades require power and night light is local
+PASS qualified security assignments use one officer and one post
+PASS dog detection requires nearby handler and dog rests without staffing
+PASS tower requires arrival, climb, shift and condition
+PASS comfort is local, powered and affects morale over game time
+PASS added utility cents reconcile across save and isolation
+PASS perimeter equipment is bounded by placement and actual coverage
+PASS draft connection preserves existing openings and quotes whole unit
+PASS all fitout kits include wired service and enhanced local cooling
+PASS two crews clear connected enhanced fitout for handover
+PASS unavailable posts reject assignments before training and saved posts validate
+PASS armed deterrence requires a real nearby qualified officer
+PASS security save validation rejects nonfinite measures
+PASS legacy company gains stories without changing charges or charging cash
+PASS legacy empty modernize companies never receive a fabricated intake
+PASS early presentation cannot consume an authored intake before legal profiles exist
+PASS goals grant once and completed progress survives save
+PASS incident responses charge once and preserve deadlines through reload
+PASS inspector follows a physical round trip before issuing a finding
+PASS protest independent visit schedules real federal oversight
+PASS notable identities remain stable and absent people do not receive pressure effects
+PASS ordinary allegations cannot create a capital sentence
+PASS capital counsel is paid once and automatic reviews take explicit time
+PASS capital stay blocks transfer and is paid only once
+PASS capital transfer requires actual officer and reserves bay
+PASS capital escort walks, boards real van, and only later reports disposition
+PASS capital saves reject missing review clock and forged transfer custody
+PASS traffic through meal routes retains reachable positions and varied progress
+PASS all 12 opening modes build reachable housing and preserve exact chosen financial terms
+PASS single cells and open dormitories generate genuinely different editable geometry
+PASS supermax residents wait for real escort proximity and proceed with a mobile officer
+PASS watch officers advance toward a moving target instead of replanning in place
+PASS an acquired explicit charter cannot switch financial terms for free
+PASS mode opening rejects mismatched jurisdiction locations
+PASS a click cuts a door into a proposed wall without buying or altering the original plan
+PASS clicking the proposed shared edge preserves the old entrance and connects the unit
+PASS failed corner and duplicate door clicks retain the entire pending plan
+PASS successive clicks keep all prior planned doors and metadata
+PASS a second curved-wall opening retains the exact curve and original doorway
+PASS shared openings reject gaps between the former three sample points
+PASS door clicks reject obstructing fixtures without mutating or charging
+PASS shared meal seats never serve overlapping shifts despite personality offsets
+PASS an incoming meal shift cannot eat early at the prior shift's seat
+PASS resident and staff route cursors continue across a mid-walk save
+PASS legacy route hydration preserves overdue decisions and invalidates old geometry
+PASS malformed movement caches are rejected without trusting waypoint data
+PASS cached route with a false destination is discarded and replanned
+
+215 passed, 0 failed. These checks exercise the C# core; they do not run Unity.
