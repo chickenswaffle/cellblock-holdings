@@ -8,7 +8,7 @@ This records a working local development milestone, with the broader game still 
 - Three contract starts with different reserves, populations, obligations, payment timing, and service bonuses; they share the editable starter building.
 - Straight, diagonal, and quadratic curved walls; arc-length door openings; connected editable prefab wings; room/floor topology and routing derived from the building data.
 - Draft, approved construction, and operational geometry remain separate. Quotes, crews, wages, dependencies, handover, assignment-preserving bed replacements, and route checks connect building decisions to operation.
-- Fifteen furnishing definitions in Housing, Hygiene, Dining, Recreation, Administration, and Security. Each has a model, footprint, access side, material price, placement rotation, and quote/handover flow. The separate Structure category contains walls, curves, doors, and wings.
+- Twenty-three furnishing definitions in Housing, Hygiene, Dining, Recreation, Administration, Security, and Services. Each has a model, footprint, access side, material price, placement rotation, and quote/handover flow. The separate Structure category contains walls, curves, doors, and wings.
 - More detailed procedural architecture, furniture, human proportions and clothing, parking, vehicles, perimeter, landscaping, and ground texture. Static meshes combine by material. Cutaway/full-height presentation, contact shading, and tone mapping improve spatial readability.
 - Smooth perspective/plan camera, pointer-anchored wheel zoom, Select-mode drag pan, middle-button pan, arrows/WASD, orbit/tilt keys, and two-finger pan/pinch/twist code. Camera buttons and a dismissible controls guide provide alternatives.
 - Reworked contract menu and Facility/Build/People/Company workspaces. Responsive panels, categorized cards, dimensions, construction quotes, accounts, and a compact utility dock.
@@ -19,8 +19,14 @@ This records a working local development milestone, with the broader game still 
 - Six prefab units with Shell / Essential / Enhanced packages, all editable after construction.
 - Control workspace for lights, alarm, gate, lockdown, camera power, hiring, transport and eight-hour shift reports. Placeable CCTV has condition, directional wall-aware coverage, lighting-dependent range and a selected live feed with full-height occlusion. Alarm coordinates restrictions/stand-down and has visual/audio cues.
 - Universal native macOS AppKit magnify plugin; mobile pinch direction and ownership handling; queued Mac events drain through modals/focus changes.
-- Integrated legal profiles (allegations/charges, sentences, court dates), court van/away visibility, release records, escape risk and warnings, close supervision, CCTV/guard/gate detection and interactive alarm controls. Original abstract response timer remains a boundary for the physical-security milestone.
+- Integrated legal profiles (allegations/charges, sentences, court dates), court van/away visibility, release records, escape risk and warnings, close supervision, CCTV/guard/gate detection and interactive alarm controls. Mobile officers physically route to detected attempts; only actual proximity and wall sightlines can intercept.
 - Integer-cent accounting and reconciled ledger. Company saves preserve identities, plans, and jobs, with atomic replacement/backup recovery and version-1 social-field hydration. New/resumed companies start paused; no closed-game catch-up.
+
+## Security/services continuation
+
+Connected-door draft action; retained existing openings; eight new security/service items; installed-level models and upgrade quotes with stable IDs; power capacity, room wiring, utility metering, cooling, morale/stress; qualified officer tower/K9/armed assignments; visible dogs and tower lookouts; physical escape dispatch. Essential/Enhanced prefab packages include service installations. Quotes fold the inspector, repeated placement retains item/rotation, and Z rotates new placements. See [exact mechanics and limits](security-and-services-status.md).
+
+The actual Unity security/services review passed nine Game-view captures with no runtime errors, including Unity JSON upgrade saves, night illumination, outage, phone controls and repeat-placement purchase persistence. The new opening jurisdictions/facility profiles and richer prisoner lives are Claude's assigned continuation, not implemented claims here.
 
 ## Validation on this Mac
 
@@ -30,7 +36,8 @@ This records a working local development milestone, with the broader game still 
 | Installed Unity | 6000.3.24f1, Intel macOS | Actual local installation, not a cloud editor claim |
 | Editor import/API compilation | Successful | URP 17.3 bundled packages resolved by the installed editor; generated scene, retained material/shader, UI theme, and render assets |
 | Project setup | `CELLBLOCK_PROJECT_VALIDATION_PASSED` | Actual editor validation; fixed the clean untitled startup-scene failure that previously aborted batch mode |
-| .NET core checks | 69 passed, 0 failed | Geometry/construction/accounting, people/migration/conduct, arrivals/carpools, gate/work travel, carrying/resume, bay reservation, alarm, CCTV, reports, and 72 prefab/package/rotation quotes |
+| .NET core checks | 84 passed, 0 failed | Geometry/construction/accounting, people/migration/conduct, arrivals/carpools, gate/work travel, carrying/resume, bay reservation, alarm, CCTV, reports, and 72 prefab/package/rotation quotes |
+| Security/services Play review | Passed; nine actual captures, no runtime errors | Connected door, enhanced unit, two-crew handover, staffed tower, dog, wiring/upgrade/save, night/outage and repeat placement; `Builds/SecurityReview/2026-10-16/` |
 | Unity Play review | Passed; 16 actual Game-view captures; no runtime errors | Desktop/900×420 layout, contracts, catalog, profiles and named ties, live routines, connected wing quote, camera/full-height views, all furnishing models, and Unity JSON social-state round trip |
 | Operations Play review | Passed; 12 actual captures; no runtime errors | Native magnify initialization/direction, shared arrival queues and marked-bay parking, physical supply carry, articulated saw/hammer/drill, staged housing and capacity handover, CCTV, night alarm/lights, reports, and phone Control |
 | Combined justice Play review | Passed; eight captures; no runtime errors | Legal desktop/phone layout, court boarding/absence/return, mid-court Unity JSON reload, furnishing install/move/removal saves, detected escape, alarm interception and ledger. A subsequent deterministic capture-timing pass is running. |

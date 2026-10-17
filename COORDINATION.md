@@ -15,16 +15,17 @@ Read this file before editing, before every Unity/build run, and before every co
 
 | Scope | Files/resources | Owner | State |
 | --- | --- | --- | --- |
-| game-core | `Assets/Cellblock/Core/`, `Tools/CoreChecks/` | Codex | Active: arrivals, work travel, operations, prefabs |
-| game-runtime | `Assets/Cellblock/Runtime/`, native trackpad plugin | Codex | Active: workers, vehicles, progress, staff animation, CCTV, pinch |
-| game-ui | `GameHud*`, `Cellblock.uss` | Codex | Active: prison controls, hiring, prefab packages |
-| unity-editor | Installed editor, `Assets/Cellblock/Editor/`, generated settings, all builds | Codex | Active: sole runner |
-| justice | Only new `Core/Justice.cs`, `Runtime/GameJusticeHud.cs`, `Runtime/FacilityJusticeView.cs`, `Resources/Justice.uss`, `Tools/CoreChecks/JusticeChecks.cs`, their metas, and `docs/justice-notes.md` | Codex integration (Claude released); Claude's `codex/claude-personnel` branch carries justice changes listed in the Claude log, for Codex review | Integrated and reviewed in Unity: legal profiles, court transport, escape-attempt gameplay (see `docs/justice-notes.md`) |
-| personnel | Only new `Core/Personnel.cs`, `Runtime/GamePersonnelHud.cs`, `Runtime/PortraitElement.cs`, `Runtime/FacilityPersonnelView.cs`, `Resources/Personnel.uss`, `Tools/CoreChecks/PersonnelChecks.cs`, their metas, `docs/personnel-notes.md`; wired through Claude's justice hook implementations | Claude (claimed 2026-10-16, branch `codex/claude-personnel`, user-confirmed split: Claude staff careers, Codex security equipment) | Ready for Codex integration: staff files, recruitment, ranks, discipline, watch/special duties, warden and nurse posts, write-ups, fights and health (`docs/personnel-notes.md`) |
-| resident-lives | Only new `Core/Lives.cs`, `Runtime/FacilityLivesView.cs`, `Runtime/GameLivesHud.cs`, `Resources/Lives.uss`, `Tools/CoreChecks/LivesChecks.cs`, their metas and `docs/lives-notes.md` | Reserved for Claude (next handoff, unclaimed) | Prisoner animation, daily activities, memories and stories; see `docs/claude-lives-handoff.md` |
-| documentation | README, controls/status/handoff, coordination tooling | Codex | Active milestone updates; each agent may edit only its own log below |
+| game-core | `Assets/Cellblock/Core/`, `Tools/CoreChecks/`, excluding Simulation.cs and the exact new scopes below | Codex | Idle at security checkpoint `a6d2afc`; preserve 84 checks and physical security |
+| game-runtime | Existing runtime renderers/operations/native plugin, excluding GameController.cs, GameHud.cs and ConstructionGuides.cs | Codex | Idle at `a6d2afc`; preserve current staff/worker/security visuals |
+| game-ui | Existing GameOperationsHud.cs and GameSecurityHud.cs integration | Codex | Idle; request interfaces if changing their shared HUD fields |
+| unity-editor | Installed editor, `Assets/Cellblock/Editor/`, generated settings, all builds | Codex | Sole runner; checks complete; leaving editor at normal Play menu |
+| justice | Existing Justice.cs, GameJusticeHud.cs, FacilityJusticeView.cs, Justice.uss, JusticeChecks.cs and justice notes | Codex integration | Reviewed; preserve presence/save/release fixes and physical interception |
+| opening-and-build-ui | Existing Core/Simulation.cs, Runtime/GameHud.cs, Runtime/GameController.cs, Runtime/ConstructionGuides.cs, Resources/Cellblock.uss; new mode/configuration/HUD files, matching scoped checks/metas/notes | Reserved for Claude; claim and acknowledge before editing | Concrete handoff from `a6d2afc`: jurisdiction + facility modes, opening preview, HUD and faster drag placement. See `docs/claude-modes-and-building-handoff.md` |
+| resident-lives | Only new Core/Lives.cs, Runtime/FacilityLivesView.cs, Runtime/GameLivesHud.cs, Resources/Lives.uss, Tools/CoreChecks/LivesChecks.cs, matching metas and docs/lives-notes.md | Reserved for Claude; user reports active, acknowledgement pending here | Prisoner animation, daily activities, memories/stories; see `docs/claude-lives-handoff.md` |
+| personnel | New Personnel.cs, GamePersonnelHud.cs, PortraitElement.cs, FacilityPersonnelView.cs, Personnel.uss, PersonnelChecks.cs, matching metas and personnel notes | Claude in separate clone (observed remote claim) | Latest core `89834a8` preserved, not integrated. Existing Justice changes need Codex review against modern base |
+| documentation | Shared README/status/coordination and validation evidence; Claude may edit its own log and scoped new notes | Codex | Checkpoint and handoff publication |
 
-Claude: your completed justice branch is under Codex integration. Your next reserved scope is `resident-lives`; the new handoff is published from integration base `9624674`. Read `docs/claude-lives-handoff.md`, claim it and acknowledge in your log. Create only the listed new Lives files and edit your own log. Codex owns all existing files, security/doors/power/upgrades and Unity runs.
+The explicit file rows above override the broad folder rows. Claude: the user's latest modes/HUD/placement request now has a concrete existing-file handoff at `a6d2afc`. Fetch the latest shared branch, preserve your own work, read `docs/claude-modes-and-building-handoff.md` and `docs/claude-coordination-update.md`, then claim opening-and-build-ui and/or resident-lives and acknowledge your current branch/SHA. Codex will not edit those handed-off files while you hold that scope. Other existing files, security/doors/utilities/operations/justice and Unity remain Codex-owned. Do not restore older Justice or input implementations during integration.
 
 ## Codex log
 
@@ -44,6 +45,21 @@ Claude: your completed justice branch is under Codex integration. Your next rese
 - Core workflow checkpoint `69e8ca8` committed locally.
 - Core workflow milestone: 46/46 checks pass, including the exact enhanced-housing/two-crews/shared-staff arrival scenario and completion with material trips; mid-carry save/load; slow bay docking; simultaneous gate queues; staff shuttles freeing bays; additive operations v2 migration preserving purchases/progress; persistent geometry generations preserving later-project carry after handover. The first articulated runtime review passed all twelve captures with no runtime errors. Final operations Play review passed all twelve captures, no runtime errors; general 16-frame regression is running.
 - Active next milestone (latest user steering): sequential material collection/carrying, articulated tool-specific builder actions, smooth marked-bay parking and disembark, plus critic fixes for pinch queues, alarm audio listener, luminaire emission and CCTV overlays. Codex retains existing scopes. Claude justice reservation and hooks remain available; justice integration is next.
+
+### 2026-10-16 — connected security and services implementation
+
+- Active Codex files: new Core/Security.cs and Connections.cs, FixtureCatalog/PrefabCatalog/Simulation/Operations/Justice; new FacilitySecurityView/GameSecurityHud; existing actor/worker/controller/HUD integration; new SecurityChecks and SecurityReview. Pending and installed assets remain separate; upgrades preserve identity. Existing company saves and unknown Unity recovery assets are preserved.
+- Core milestone: 84/84 checks pass (69 prior + 15 security/connections), including 72 prefab/package/rotation quotes. Actual Unity security review passed nine captures, no runtime errors, including real powered outdoor lighting, operational tower, JSON upgrades and repeat-placement purchase persistence. The final general 16-frame layout regression passed with no runtime errors.
+- Critic findings: unavailable-post assignments now reject before fees; draft connection must border the new unit across the full doorway. Existing doors survive as separately editable wall pieces. Interception now requires physical officer arrival/LOS; ETA describes a route, not an automatic timer.
+- Latest user steering: Claude owns richer resident lives and has also received opening jurisdiction/facility-mode and HUD direction. Codex continues security/services and construction flow. See docs/claude-coordination-update.md for current boundaries and integration advice.
+- Discovered a separately claimed personnel branch at origin/codex/claude-personnel (latest core 89834a8); preserved it. It is not integrated or claimed complete. Its older Justice changes will need deliberate integration. Do not overwrite Claude's unfinished clone or log.
+
+### 2026-10-16 — published security checkpoint and next file ownership
+
+- Implementation checkpoint `a6d2afc`: connected draft doors, 23 equipment types, room/outdoor service, upgrades with stable identity, real tower/K9/armed assignments, utilities/comfort/morale, physical interception and faster repeat placement. Critic reviewed construction/security twice; findings fixed and checked.
+- 84/84 core checks passed. Nine actual Unity security frames passed without runtime errors, with powered night lighting verified visually. Final general 16-frame review passed with no runtime errors. Evidence lives in ignored Builds/SecurityReview/2026-10-16 and Builds/PresentationReview/2026-10-16/security-regression, plus small committed reports/transcript in docs/reviews.
+- Existing-file handoff now reserved for Claude: Simulation.cs, GameHud.cs, GameController.cs, ConstructionGuides.cs, Cellblock.uss. Codex source edits to these are frozen at the checkpoint. New modes/lives work follows the explicit table; Claude must preserve security, custody and persistence APIs and report branch/SHA.
+- The observed personnel core `89834a8` remains separate; no unfinished personnel or Lives work has been merged. Preserve Claude's branch and request a completed integration handback.
 
 ## Claude log
 
@@ -108,3 +124,5 @@ Claude justice branch `49aff6e` is merged locally. Codex integration fixes: pres
 Next Claude handoff is ready at integration base `9624674`; `docs/claude-start.txt` is the short copy/paste prompt and `docs/claude-lives-handoff.md` is the exact scope/hook contract. Codex continues doors/security/services; no new overlapping file ownership.
 
 Codex integration update: fetched `origin/codex/claude-justice-custody` at `49aff6e` after the user reported completion. Preserve and merge Claude’s log and scoped files. User also requests richer prisoner animation/lives/stories for Claude’s next slice; Codex retains the new connected-door/security/power/upgrade mechanics.
+
+Codex handback: implementation `a6d2afc` is committed. Both final Unity reports passed (nine focused security frames and sixteen general frames), no runtime errors. Core transcript records 84 passed / 0 failed. Publishing this exact handoff and releasing local Codex scope locks. No source edit to the Claude-reserved files will follow without a new ownership update.

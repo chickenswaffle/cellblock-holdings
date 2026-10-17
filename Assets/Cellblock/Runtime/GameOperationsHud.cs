@@ -68,7 +68,7 @@ namespace Cellblock.Unity
             feed = new Image { scaleMode = ScaleMode.ScaleToFit }; feed.AddToClassList("cctv-feed"); controlPane.Add(feed);
             feedStatus = Text("", "body"); controlPane.Add(feedStatus);
             cctvRoster = Element("cctv-roster"); controlPane.Add(cctvRoster);
-            controlPane.Add(Text("Aim with rotation before placing. A camera covers a 120° cone up to 15 m; walls block its view. At night, lights-off range falls to 8 m. A technician maintains camera condition.", "muted"));
+            controlPane.Add(Text("Aim with rotation before placing. A camera covers a 120° cone; walls block its view. Upgrades improve range and night vision. Power and local lighting affect availability. A technician maintains camera condition.", "muted"));
             controlPane.Add(Text("HIRING / SHIFTS", "section-label"));
             foreach (string role in new[] { "Officer", "Caseworker", "Technician" })
             {
@@ -127,7 +127,7 @@ namespace Cellblock.Unity
             feedStatus.text = world.Data.Fixtures.Any(f => f.Kind == "CCTV") ? world.CameraCoverage() + " / " + world.Data.Residents.Count(world.IsPresent) + " residents on site currently observed.\n" +
                 (game.WatchedCamera == null ? "Select a camera to open its live feed." : world.CameraOnline(game.WatchedCamera) ? "LIVE · selected feed / 5 updates per second" : "OFFLINE · check network and condition") :
                 "No operational cameras. Place one indoors or outdoors, approve its installation, and let a crew complete the work.";
-            staffCost.text = "Additional staff wages: " + Money(world.Data.Staff.Sum(s => s.DailyCents)) + " / day. Day shift 08:00–20:00; night shift 20:00–08:00. Initial contract staff are included in operations.";
+            staffCost.text = "Additional staff wages: " + Money(world.Data.Staff.Sum(s => s.DailyCents + s.SecurityDailyCents)) + " / day. Day shift 08:00–20:00; night shift 20:00–08:00. Initial contract staff are included in operations.";
             var trips = world.Data.Trips.Where(t => t.Phase != "Gone").Reverse().Take(5).ToArray();
             arrivalStatus.text = trips.Length == 0 ? "No hired arrivals scheduled." : string.Join("\n", trips.Select(t => (t.Kind == "Crew" ? "PICKUP" : "SHUTTLE") + " · " + t.Phase + " · " + t.Passengers.Count + (t.Kind == "Crew" ? " crews" : " staff")));
             string crews = string.Join("|", world.Data.Crews.Select(c => c.Id));

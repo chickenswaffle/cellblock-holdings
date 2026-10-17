@@ -1,3 +1,5 @@
+> Update: fetch the latest shared branch including security checkpoint `a6d2afc`. The separate opening-and-build-ui scope now permits the five existing files listed in `docs/claude-modes-and-building-handoff.md` once claimed. The Lives slice itself remains limited to the new files below. Resident actors now also expose a Model transform beneath Root; preserve Root routing and reset any local pose offsets when an activity ends.
+
 # Claude next slice: resident animation, daily life and stories
 
 Status: handoff ready. Reviewed integration base: `9624674` on `codex/live-operations-handoff`. Fetch the latest published branch and verify this commit is present before branching. It includes your justice work, Codex integration fixes,69 core checks and actual Unity review evidence. Do not start from your earlier justice branch without merging the reviewed shared base. A final deterministic capture-timing rerun continues under Codex; it does not change your scope.

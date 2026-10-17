@@ -2,7 +2,7 @@
 
 A Unity reboot of a prison ownership and management simulation for iPhone, iPad, Mac, and potentially Windows/Steam. The player chooses a contract, takes over an editable starter facility, and connects building decisions to people, construction, and business results.
 
-**Current milestone: local Unity playable.** The project imports and runs in Unity 6000.3.24f1 on this Mac. The engine-independent core passes 69 executable checks. The presentation now includes detailed procedural architecture and people, a categorized furnishing catalog, individual resident/social dynamics, physical crew/staff arrivals, staged construction, prison controls, live CCTV, and packaged prefab units. Native builds and actual phone performance remain unverified; the [visual study](docs/concepts/visual-direction-study.png) remains an art direction reference.
+**Current milestone: local Unity playable.** The project imports and runs in Unity 6000.3.24f1 on this Mac. The engine-independent core passes 84 executable checks. The presentation now includes detailed procedural architecture and people, a categorized furnishing catalog, individual resident/social dynamics, physical crew/staff arrivals, staged construction, prison controls, live CCTV, and packaged prefab units. Native builds and actual phone performance remain unverified; the [visual study](docs/concepts/visual-direction-study.png) remains an art direction reference.
 
 ## Open on a Mac
 
@@ -53,11 +53,11 @@ The game clock is player controlled. Closing, suspending, or unfocusing the game
 
 ## Furnishings and people
 
-**Build** groups furnishings into Housing, Hygiene, Dining, Recreation, Administration, and Security. Fifteen items have distinct 3D models, dimensions, access sides, and material prices. Choose an item, optionally rotate it 90°, place it, and review the construction quote. New items become operational at handover. Beds add capacity and dining tables support meal service; the other items currently provide furnishing and route geometry, without a complete hygiene or recreation service simulation.
+**Build** groups furnishings into Housing, Hygiene, Dining, Recreation, Administration, Security, and Services. Twenty-three items have distinct 3D models, dimensions, access sides, and material prices. Choose an item, optionally rotate it 90°, place it, and review the construction quote. New items become operational at handover. Beds add capacity and dining tables support meal service; the other items currently provide furnishing and route geometry, without a complete hygiene or recreation service simulation.
 
 **People** lists residents and staff. Select a person in the scene or roster to see a persistent name, temperament, traits, needs, gang/clique affiliation, relationships, and recent events. Residents use individual speeds, staggered decisions, and distinct service destinations. Nearby social contact can change trust/tension and create friendships, beefs, and nemeses. Fictional gangs and cliques affect those interactions.
 
-Staff have integrity, workload pressure, favoritism, and misconduct risk. Incidents affect resident wellbeing and enter the history. A funded **Staff support** action reduces pressure/favoritism and improves integrity. New staff arrive by shared transport and walk to duty. Officers patrol and perform nearby welfare checks, caseworkers provide nearby consultations on shift, and technicians maintain operational cameras. Investigations, contraband inventory, and a full gang/security simulation remain future work.
+Staff have integrity, workload pressure, favoritism, and misconduct risk. Incidents affect resident wellbeing and enter the history. A funded **Staff support** action reduces pressure/favoritism and improves integrity. New staff arrive by shared transport and walk to duty. Officers patrol and perform nearby welfare checks, caseworkers provide nearby consultations on shift, and technicians maintain operational equipment. Investigations, contraband inventory, and a full gang/security simulation remain future work.
 
 ## Live operations and construction
 
@@ -65,9 +65,15 @@ Staff have integrity, workload pressure, favoritism, and misconduct risk. Incide
 
 **Build → Prefabs** offers six editable units and three fitout packages: Shell, Essential, and Enhanced. Walls and furnishings are quoted and built as one project. Foundations, framing, cladding and fitout appear during work; capacity and service geometry change only at handover. Builders carry supplies from their parked truck, use a saw bench, hammer, drill, and inspect; material trips consume game time. Seven marked staff/contractor bays are reserved per trip, with waiting hires sharing seats before departure. Staff shuttles return to their fleet after dropoff; crew pickups stay for supplies. Hiring is held when no bay or carpool seat is available.
 
+### Security and building services
+
+Select installed equipment to inspect condition, power, comfort, staff assignments and **Upgrade**. Improvements use the same crew/quote/handover process and retain the asset's identity. Build → Security adds exterior lighting, perimeter barriers, dog teams, towers and an armory. Build → Services adds room wiring, cooling and control terminals. Staff specializations retain each Officer's identity, shift and actual route. Power loss and maintenance affect availability; comfort changes morale and stress over game time. See [mechanics and boundaries](docs/security-and-services-status.md).
+
+In a prefab quote, **Add connecting door** lets you tap the shared existing wall and quote the connection with the unit. Existing straight-wall openings are retained. Essential kits include wiring; Enhanced kits include cooling. For repeated furnishings, use **Approve & place another** and **Z** to rotate.
+
 The native Mac magnify plugin is included for Intel and Apple silicon. Rebuild it with `bash Tools/build-mac-gestures.sh` only if its source changes, while holding the Unity runner lock.
 
-Read [the Claude handoff](docs/claude-handoff.md) and [shared coordination](COORDINATION.md) before parallel work. Claude's legal profiles, court transport and interactive escape gameplay are integrated. Its next reserved slice is resident animation, daily life and stories; see `docs/claude-lives-handoff.md`. Codex owns the upcoming security/services work described in `docs/security-and-services-plan.md`.
+Read [the Claude handoff](docs/claude-handoff.md) and [shared coordination](COORDINATION.md) before parallel work. Claude's legal profiles, court transport and interactive escape gameplay are integrated. Its next reserved slice is resident animation, daily life and stories; see `docs/claude-lives-handoff.md`. Codex owns connected doors, security equipment and building services; see `docs/security-and-services-status.md` and `docs/claude-coordination-update.md`. Claude has also received the new opening-mode/HUD direction.
 
 ## Verify the engine-independent core
 
@@ -93,7 +99,7 @@ It checks C# syntax only. It does not typecheck Unity APIs, validate asset impor
 
 - The supplied starter building and prefabs have one floor. Multistory building, terrain editing, and walk-through controls remain design decisions.
 - Curves are editable quadratic Béziers. Rooms, generated floor surfaces, wall rendering, and navigation share sampled geometry. Navigation uses a lattice and clearance checks, so small passages can be rejected; it is not a complete production navigation mesh.
-- Furniture has footprints and blocks routes. Bed replacements preserve assignments. Individual routines, basic needs, relationships, fictional affiliations, and staff conduct are implemented; the complete health, security, and rehabilitation simulation remains ahead. The perimeter and landscape are presentation, not a validated security system.
+- Furniture has footprints and blocks routes. Bed replacements preserve assignments. Individual routines, basic needs, relationships, fictional affiliations, and staff conduct are implemented; the complete health, security, and rehabilitation simulation remains ahead. Placed perimeter barriers have collision, local sensors and bounded risk effects; the decorative site fence does not have a complete climbing/breach simulation.
 - Crew travel, material carrying, tool actions and staged build visuals are implemented. Materials remain paid on approval; supplier inventories/deliveries, equipment scheduling, temporary facilities and full phased relocation remain future work. Existing geometry stays operational until atomic project handover; this abstracts real renovation stages.
 - Materials/disposal are paid on approval and crew labor accrues over game time. Approved-job cancellation, refunds, financing, insolvency recovery, stock markets, and IPOs are not implemented. An overdraft holds construction while operating obligations continue.
 - Construction quotes are estimates of work, not guaranteed calendar completion. All three opening offers use basic meal-service verification; specialist program/security obligations and distinct facility models still need implementation.

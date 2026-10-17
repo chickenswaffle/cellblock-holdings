@@ -19,7 +19,17 @@ namespace Cellblock.Core
             new PrefabDefinition("recreation", "Recreation unit", "10 × 8 m. Essential: benches, library and television. Enhanced adds exercise and CCTV."),
             new PrefabDefinition("administration", "Staff & control unit", "10 × 8 m. Essential: desks and records. Enhanced adds CCTV and staff seating.")
         });
-        public static Plan Create(string id, int package, Point origin, float rotation = 0)
+        static readonly Dictionary<string,Plan> templates=new Dictionary<string,Plan>();
+        public static Plan Create(string id,int package,Point origin,float rotation=0)
+        {
+            string key=id+"/"+package;Plan template;
+            if(!templates.TryGetValue(key,out template)){template=BuildTemplate(id,package);templates.Add(key,template);}
+            var plan=new Plan{Name=template.Name};
+            foreach(Wall original in template.Walls){Wall wall=original.Copy();wall.A=Transform(wall.A,origin,rotation);wall.B=Transform(wall.B,origin,rotation);wall.Control=Transform(wall.Control,origin,rotation);plan.Walls.Add(wall);}
+            foreach(Fixture original in template.Fixtures){Fixture fixture=original.Copy();fixture.Position=Transform(fixture.Position,origin,rotation);fixture.Rotation+=rotation;plan.Fixtures.Add(fixture);}
+            return plan;
+        }
+        static Plan BuildTemplate(string id, int package)
         {
             if (!All.Any(p => p.Id == id) || package < 0 || package > 2) throw new ArgumentException("Unknown prefab or furnishing package.");
             Plan plan = id == "wing" ? Facility.Wing(new Point(0, 0)) : Room();
@@ -53,9 +63,37 @@ namespace Cellblock.Core
                     if (package == 2) { Add(plan, "Bench", 7, 6.4f); Add(plan, "CCTV", 5, 6.6f, 180); }
                 }
             }
-            foreach (Wall wall in plan.Walls) { wall.A = Transform(wall.A, origin, rotation); wall.B = Transform(wall.B, origin, rotation); wall.Control = Transform(wall.Control, origin, rotation); }
-            foreach (Fixture fixture in plan.Fixtures) { fixture.Position = Transform(fixture.Position, origin, rotation); fixture.Rotation += rotation; }
+            if (package > 0)
+            {
+                AddService(plan,"ElectricalPanel",package-1);
+                if(package==2){AddService(plan,"ClimateUnit",1);if(id=="administration")AddService(plan,"ControlComputer",1);}
+            }
             return plan;
+        }
+        static void AddService(Plan plan,string kind,int level)
+        {
+            // Fit service equipment before rotating the whole kit. Every access point remains
+            // reachable from the common entry, including the existing fixtures' access sides.
+            for(float y=1.3f;y<7.0f;y+=0.5f)for(float x=1.3f;x<9.0f;x+=0.5f)
+            {
+                var candidate=new Fixture{Kind=kind,Position=new Point(x,y),UpgradeLevel=level};
+                var footprint=Geometry.Footprint(candidate);
+                if(plan.Fixtures.Any(f=>Geometry.Overlap(footprint,Geometry.Footprint(f))))continue;
+                var fixtures=plan.Fixtures.Concat(new[]{candidate}).ToList();
+                var routes=new Navigation(plan.Walls,fixtures);
+                if(fixtures.Any(f=>routes.Find(new Point(.6f,4),Geometry.AccessPoint(f))==null))continue;
+                bool allTurns=true;
+                foreach(int angle in new[]{90,180,270})
+                {
+                    var walls=plan.Walls.Select(w=>{var c=w.Copy();c.A=Transform(w.A,new Point(),angle);c.B=Transform(w.B,new Point(),angle);c.Control=Transform(w.Control,new Point(),angle);return c;}).ToList();
+                    var turned=fixtures.Select(f=>{var c=f.Copy();c.Position=Transform(f.Position,new Point(),angle);c.Rotation+=angle;return c;}).ToList();
+                    var turnRoutes=new Navigation(walls,turned);Point entry=Transform(new Point(.6f,4),new Point(),angle);
+                    if(turned.Any(f=>turnRoutes.Find(entry,Geometry.AccessPoint(f))==null)){allTurns=false;break;}
+                }
+                if(!allTurns)continue;
+                plan.Fixtures.Add(candidate);return;
+            }
+            throw new InvalidOperationException("No clear service location in prefab: "+kind);
         }
         static Plan Room()
         {

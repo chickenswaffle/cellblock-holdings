@@ -419,9 +419,10 @@ namespace Cellblock.Core
             if (FacilityMode.EscapeRiskOffset != 0) Factor(factors, ref total, FacilityMode.Security + " population", FacilityMode.EscapeRiskOffset);
             if (FacilityMode.PerimeterRisk != 0) Factor(factors, ref total, FacilityMode.Housing == "Dormitory" && FacilityMode.Security == "Minimum" ? "Open perimeter" : "Low perimeter", FacilityMode.PerimeterRisk);
             if (Data.Fixtures.Any(f => f.Kind == "CCTV" && CameraSees(f, resident.Home))) Factor(factors, ref total, "CCTV covers housing", -10);
+            Factor(factors, ref total, "Effective perimeter and staffed security", -SecurityDeterrenceAt(resident.Home));
             if (legal.CloseSupervision) Factor(factors, ref total, "Close supervision", -22);
             int minute = Data.Minute % 1440;
-            if ((minute < 360 || minute >= 1140) && !Data.Operations.Lights) Factor(factors, ref total, "Lights off at night", 6);
+            if ((minute < 360 || minute >= 1140) && !IsIlluminated(resident.Home)) Factor(factors, ref total, "Lights off at night", 6);
             if (Data.Operations.Lockdown) Factor(factors, ref total, "Lockdown", -15);
             if (factors != null) factors.Sort((a, b) => Math.Abs(b.Points).CompareTo(Math.Abs(a.Points)));
             return Geometry.Clamp(total, 0, 100);
@@ -949,13 +950,7 @@ namespace Cellblock.Core
         }
         StaffMember OfficerWithSight(List<StaffMember> officers, Point target, float range)
         {
-            return officers.FirstOrDefault(s => Geometry.Distance(s.Position, target) <= range && SightLines.Clear(s.Position, target));
-        }
-        int ResponseMinutes(int officers, bool camera)
-        {
-            if (officers == 0) return -1;
-            int minutes = (Data.Operations.Alarm ? 8 : 20) / officers - (camera ? 2 : 0) - (Data.Operations.Lockdown ? 1 : 0);
-            return Math.Max(3, minutes);
+            return officers.FirstOrDefault(s => s.SecurityRole != "Tower" && Geometry.Distance(s.Position, target) <= range && SightLines.Clear(s.Position, target));
         }
         void TickAttempt(EscapeAttempt attempt)
         {
@@ -984,25 +979,31 @@ namespace Cellblock.Core
             if (!attempt.Detected)
             {
                 bool night = Data.Minute % 1440 < 360 || Data.Minute % 1440 >= 1140;
-                float sight = night && !Data.Operations.Lights ? 5 : 8;
+                float sight = night && !IsIlluminated(resident.Position) ? 5 : 8;
                 // Cameras record continuously, but someone on CCTV monitoring duty catches it at once.
                 Fixture camera = Data.Fixtures.FirstOrDefault(f => f.Kind == "CCTV" && CameraSees(f, resident.Position));
                 if (camera != null && !CctvMonitored && JusticeRules.Unit(Data.Seed, resident.Id, "cctv", Data.Minute) >= 0.35f) camera = null;
                 StaffMember seen = OfficerWithSight(officers, resident.Position, sight);
+                string securitySight = SecurityDetectionAt(resident.Position);
                 if (camera != null) Detect(resident, attempt, "CCTV", officers.Count, true);
+                else if (securitySight != "") Detect(resident, attempt, securitySight, officers.Count, false);
                 else if (seen != null) { Credit(seen, false); Detect(resident, attempt, seen.Name, officers.Count, false); }
             }
             if (attempt.Detected)
             {
-                int response = ResponseMinutes(officers.Count, attempt.DetectedBy == "CCTV");
-                if (response >= 0 && attempt.DetectedBy == "CCTV" && CctvMonitored) response = Math.Max(3, response - 3);
-                if (response >= 0 && (attempt.ResponseDueMinute < 0 || Data.Minute + response < attempt.ResponseDueMinute)) attempt.ResponseDueMinute = Data.Minute + response;
-                if (officers.Count > 0 && attempt.ResponseDueMinute >= 0 && Data.Minute >= attempt.ResponseDueMinute)
+                // ETA is information about an actual reachable responder. Only the proximity
+                // check above can intercept; a clock expiring cannot teleport an officer.
+                int eta = -1;
+                foreach (StaffMember officer in officers.Where(s => s.SecurityRole != "Tower"))
                 {
-                    StaffMember responder = officers.OrderBy(s => Geometry.Distance(s.Position, resident.Position)).FirstOrDefault();
-                    Credit(responder, true);
-                    EndAttempt(resident, "intercepted", "Officers responding to the alert intercepted " + resident.Name + ".", responder); return;
+                    var route = Routes.Find(officer.Position, resident.Position);
+                    if (route == null) continue;
+                    float distance = 0; Point previous = officer.Position;
+                    foreach (Point step in route) { distance += Geometry.Distance(previous, step); previous = step; }
+                    int minutes = (int)Math.Ceiling(Math.Max(0, distance - 1.8f) / ResponseSpeed);
+                    if (eta < 0 || minutes < eta) eta = minutes;
                 }
+                attempt.ResponseDueMinute = eta < 0 ? -1 : Data.Minute + eta;
             }
             if (held && Data.Minute - attempt.HeldMinute >= 40) { EndAttempt(resident, "abandoned", resident.Name + " gave up at the closed vehicle gate and was returned to housing."); return; }
             if (Data.Minute - attempt.StartMinute >= 120) EndAttempt(resident, "abandoned", resident.Name + " abandoned the attempt and was returned to housing.");

@@ -54,3 +54,12 @@ The initial social model includes a friendship, a nemesis, and an officer with e
 - Place CCTV through **Build → Security** or the Control shortcut, rotate its view, then select it in Control for the live feed and coverage guide. Walls, lighting and camera condition affect coverage.
 - Shift reports are filed every eight game hours. **Company** includes extra staff and crew wages.
 - All seven staff/contractor bays reserved: wait for departing transport or release a crew. Nearby hires can still use a waiting vehicle with free seats.
+
+## Faster building and equipment
+
+- **Z** rotates a new furnishing or prefab 90°. The visible **Rotate 90°** button remains available for touch.
+- A single furnishing quote offers **Approve & place another** to retain its type/rotation; every new location is still reviewed and charged once.
+- Quotes fold the inspector to leave more of the facility visible. **Add connecting door** temporarily returns you to the world: tap the existing shared wall and review the unit plus connection together.
+- **Build → Services** contains electrical panels, ventilation/AC and control terminals. **Security** adds lights, barriers, dog kennels, towers and an armory.
+- Select installed equipment for its current status and upgrade quote. For a tower/kennel/armory, cycle the officer selector and assign the post. An armory needs an upgrade before armed duty. Training and added daily wages are shown before assignment.
+- **Control** includes grid demand/capacity and electricity isolation. Equipment shows why it is unavailable. Power, staff shifts, actual presence and maintenance matter.

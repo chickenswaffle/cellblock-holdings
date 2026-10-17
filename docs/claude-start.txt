@@ -1,10 +1,14 @@
+Read docs/claude-modes-and-building-handoff.md for the new concrete modes/HUD/placement file handoff, then claim opening-and-build-ui and resident-lives as appropriate.
+
+Current coordination update: the user reports you are working on prisoner lives and has also given you opening jurisdiction/facility modes and HUD design. Preserve your current branch and unfinished work. First read docs/claude-coordination-update.md on the latest codex/live-operations-handoff. Report your current branch/SHA and scope before editing shared existing files. Codex continues security, utilities, connected doors, construction flow and Unity. A separate claude-personnel branch is preserved but unintegrated; do not silently merge older Justice/input code over the shared base.
+
 Handoff ready: build richer resident lives and animation for Cellblock Holdings.
 
 Repository: https://github.com/chickenswaffle/cellblock-holdings
-Fetch base branch codex/live-operations-handoff and confirm commit9624674 is included. Your finished justice branch49aff6e is integrated and reviewed, with Codex save/presence/release fixes. Do not start from the old justice branch alone.
+Fetch codex/live-operations-handoff and confirm security checkpoint a6d2afc and integration commit9624674 are included. Your finished justice branch49aff6e is integrated and reviewed, with Codex save/presence/release fixes. Do not start from the old justice branch alone.
 
 Read AGENTS.md, CLAUDE.md, COORDINATION.md, docs/claude-lives-handoff.md and docs/implementation-status.md. Preserve all existing work. In your separate clone, create codex/claude-resident-lives from the updated shared base. Claim resident-lives and acknowledge your plan in your own coordination log.
 
-Implement better prisoner animation, distinct daily activities using real furnishings/routes, personal goals and bounded memories/story arcs involving named relationships, plus a compact People profile card. Preserve legal identities, court/meal/confinement obligations and absence rules. Use the new Lives partial hooks and only the new files listed in the handoff. Do not edit existing files, security, doors, staffing, utilities, upgrades, transport or justice algorithms; request any interface change in the log.
+Implement better prisoner animation, distinct daily activities using real furnishings/routes, personal goals and bounded memories/story arcs involving named relationships, plus a compact People profile card. Preserve legal identities, court/meal/confinement obligations and absence rules. Use the new Lives partial hooks and only the new files listed in the handoff. For existing-file permissions follow docs/claude-modes-and-building-handoff.md and the latest ownership table; it explicitly hands you the opening/menu/placement files for the user’s modes/HUD task. Other security, doors, staffing, utilities, transport and justice algorithms remain Codex-owned.
 
 Codex owns those systems and all Unity runs. Do not launch another editor/build. Commit scoped milestones, run core checks, push your resident-lives branch, and report SHA, evidence, remaining issues and a deterministic demo for the combined Unity review. Release the resident-lives lock when finished. Read/update the coordination file at every milestone.
