@@ -30,6 +30,10 @@ namespace Cellblock.Editor
         {
             Directory.CreateDirectory("Assets/Cellblock/Scenes"); Directory.CreateDirectory("Assets/Cellblock/Settings");
             AssetDatabase.Refresh();
+            AssetDatabase.ImportAsset("Assets/Cellblock/Resources/HomeNight.png", ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
+            var homeArt = AssetImporter.GetAtPath("Assets/Cellblock/Resources/HomeNight.png") as TextureImporter;
+            if (homeArt != null && (homeArt.textureType != TextureImporterType.Default || homeArt.mipmapEnabled || homeArt.maxTextureSize != 2048))
+            { homeArt.textureType = TextureImporterType.Default; homeArt.mipmapEnabled = false; homeArt.maxTextureSize = 2048; homeArt.wrapMode = TextureWrapMode.Clamp; homeArt.SaveAndReimport(); }
             var gestures = AssetImporter.GetAtPath("Assets/Plugins/macOS/CellblockGestures.bundle") as PluginImporter;
             if (gestures != null && (gestures.GetCompatibleWithAnyPlatform() || !gestures.GetCompatibleWithEditor()))
             {
@@ -160,6 +164,7 @@ namespace Cellblock.Editor
             foreach(string retained in new[]{"DetailedBuildingMaterial","LuminaireMaterial"})
                 if(Resources.Load<Material>(retained)==null)throw new InvalidOperationException("Missing retained material: "+retained);
             if(Resources.Load<Shader>("SearchlightBeam")==null)throw new InvalidOperationException("Missing retained searchlight shader.");
+            if (Resources.Load<Texture2D>("HomeNight") == null) throw new InvalidOperationException("The title artwork texture did not import.");
             Debug.Log("CELLBLOCK_PROJECT_VALIDATION_PASSED");
         }
     }

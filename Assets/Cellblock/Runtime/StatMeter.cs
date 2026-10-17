@@ -35,8 +35,8 @@ namespace Cellblock.Unity
         internal void SetScore(string label, float value, MeterMeaning meaning, string readout = null, string help = null, float scale = 100, float cautionAt = .35f, float dangerAt = .65f)
         {
             Signed = false; Value = Finite(value); Scale = Mathf.Max(.001f, Finite(scale));
-            float ratio = Mathf.Clamp01(Value / Scale);
-            float danger = meaning == MeterMeaning.HigherIsBetter ? 1 - ratio : ratio;
+            float rawRatio = Value / Scale, ratio = Mathf.Clamp01(rawRatio);
+            float danger = meaning == MeterMeaning.HigherIsBetter ? 1 - rawRatio : rawRatio;
             Tint = meaning == MeterMeaning.Neutral ? Blue : danger < cautionAt ? Green : danger >= dangerAt ? Red : Amber;
             EnableInClassList("metric-critical", Tint == Red);
             SetHead(label, meaning == MeterMeaning.Neutral ? "LIVE" : meaning == MeterMeaning.HigherIsBetter ? "↑ GOOD" : "↑ RISK");

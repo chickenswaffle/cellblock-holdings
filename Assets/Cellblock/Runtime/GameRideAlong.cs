@@ -33,6 +33,7 @@ namespace Cellblock.Unity
             if (!staff && !World.Data.Residents.Any(r => r.Id == id)) return false;
             Vector3 position;
             if (!view.TryGetPersonPosition(id, out position)) { Message("That person is not on site right now."); return false; }
+            if (World.ControlledId != "" && World.ControlledId != id) { World.ReleaseRole(); seenCards = World.Roles.NextId; }
             if (!RideAlongActive) { savedFocus = focus; savedDistance = distance; savedYaw = yaw; savedPitch = pitch; savedPlanView = planView; }
             // Orbit and zoom input moves the shared fields away from a mid-range reference, so a build camera parked at a
             // zoom or tilt limit cannot pin the boom.

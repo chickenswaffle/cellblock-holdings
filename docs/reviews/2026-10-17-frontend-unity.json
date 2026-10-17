@@ -1,0 +1,31 @@
+{
+    "passed": true,
+    "editor": "6000.3.24f1",
+    "message": "Actual Unity Play: cinematic home, Continue/library/settings, command HUD, phone/narrow/large-interface fit; real atomic files in an isolated Temp sandbox; stale/missing/malformed pointer fallback, newest ordering, pause on load, correct chosen slot, autosave, backup recovery and damaged-original preservation, failure/retry status, persisted applied audio/display/control settings; published Claude economy/intel/counsel/kitchen demos + Unity JSON, role switch release, one-level Back, empty first-use Home, actual charter acquisition creating one resumable slot, charter styling. Actual devices and sustained performance remain unmeasured.",
+    "errors": [],
+    "captures": [
+        "01-home-continue-desktop.png",
+        "02-save-library-desktop.png",
+        "03-command-hud-desktop.png",
+        "04-settings-general.png",
+        "05-settings-display.png",
+        "06-settings-controls.png",
+        "07-settings-audio.png",
+        "08-home-recovery.png",
+        "09-save-error-visible.png",
+        "10-home-phone.png",
+        "11-settings-phone.png",
+        "12-command-hud-phone.png",
+        "13-risk-phone.png",
+        "14-home-narrow.png",
+        "15-settings-large-interface.png",
+        "16-command-narrow.png",
+        "17-integrated-economy.png",
+        "18-integrated-intelligence.png",
+        "19-integrated-counsel.png",
+        "20-integrated-economy-phone.png",
+        "21-charter-theme-phone.png",
+        "22-first-use-home.png",
+        "23-new-holding-ready.png"
+    ]
+}

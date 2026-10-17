@@ -9,7 +9,7 @@ using UnityEngine;
 namespace Cellblock.Unity
 {
     public enum BuildTool { Inspect, Wall, Curve, Wing, Door, Bed, Table, Meals, MoveStart, MoveEnd, Bend, MoveFixture, Furnishing }
-    public sealed class CompanySave { public string FileName, Title; }
+    public sealed partial class CompanySave { public string FileName, Title; }
 
     public sealed partial class GameController : MonoBehaviour
     {
@@ -54,29 +54,12 @@ namespace Cellblock.Unity
         public string CameraModeLabel { get { return (planView ? "Plan" : "3D") + " · " + Mathf.RoundToInt(pitch) + "°"; } }
         public string HeightLabel { get { return view != null && view.FullHeight ? "Full walls" : "Cutaway"; } }
         string saveId = "";
-        string SaveDirectory { get { return Path.Combine(Application.persistentDataPath, "companies"); } }
+        string SaveDirectory { get { return CompanyDirectory; } }
         string PointerPath { get { return Path.Combine(SaveDirectory, "last-company.txt"); } }
-        public bool HasSave { get { return File.Exists(PointerPath); } }
+        public bool HasSave { get { return ContinueSave() != null; } }
         public IEnumerable<CompanySave> SavedCompanies()
         {
-            if (!Directory.Exists(SaveDirectory)) return new CompanySave[0];
-            var result = new List<CompanySave>();
-            foreach (string path in Directory.GetFiles(SaveDirectory, "company-*.json"))
-            {
-                string name = Path.GetFileName(path);
-                if (!Regex.IsMatch(name, "^company-[a-f0-9]{32}\\.json$")) continue;
-                string title = "Company " + name.Substring(8, 6);
-                try
-                {
-                    State state = JsonUtility.FromJson<State>(File.ReadAllText(path));
-                    ContractOffer offer = Cellblock.Core.World.Offers.FirstOrDefault(o => o.Id == state.ContractId);
-                    if(state.Mode!=null&&state.Mode.ExplicitTerms&&GameModes.TypeOf(state)!=null)offer=GameModes.Offer(GameModes.TypeOf(state),GameModes.LocationOf(state));
-                    if (offer != null) title = offer.Name + " · " + offer.City + " · Day " + (state.Minute / 1440 + 1) + " · " + GameHud.Money(state.CashCents) + " · " + name.Substring(8, 6);
-                }
-                catch { title += " · try backup recovery"; }
-                result.Add(new CompanySave { FileName = name, Title = title });
-            }
-            return result;
+            return FindCompanySaves();
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -86,7 +69,7 @@ namespace Cellblock.Unity
         }
         void Awake()
         {
-            Application.targetFrameRate = 60;
+            InitializePreferences();
             Screen.orientation = ScreenOrientation.LandscapeLeft;
             cameraRig = new GameObject("Management camera").AddComponent<Camera>();
             cameraRig.transform.SetParent(transform); cameraRig.tag = "MainCamera"; cameraRig.orthographic = false;
@@ -100,7 +83,7 @@ namespace Cellblock.Unity
             view = new GameObject("Facility presentation").AddComponent<FacilityView>(); view.transform.SetParent(transform); view.Initialize();
             pressureView = new GameObject("Population pressure presentation").AddComponent<FacilityPressureView>(); pressureView.transform.SetParent(transform); pressureView.Initialize();
             guides = new GameObject("Construction measurements").AddComponent<ConstructionGuides>(); guides.transform.SetParent(transform); guides.Initialize(cameraRig);
-            hud = new GameObject("Management interface").AddComponent<GameHud>(); hud.transform.SetParent(transform); hud.Initialize(this);
+            hud = new GameObject("Management interface").AddComponent<GameHud>(); hud.transform.SetParent(transform); hud.Initialize(this); ApplyPreferences();
             view.Refresh(Cellblock.Core.World.Start(Cellblock.Core.World.Offers[0].Id), true);
             SetTool(BuildTool.Inspect); CameraPosition(true); hud.ShowMenu();
         }
@@ -114,7 +97,7 @@ namespace Cellblock.Unity
 
             World.Data.Speed = 0; watchedCameraId = ""; nextFeed = 0; nativeInputWasBlocked = true;
             Draft = null; CurrentQuote=null; SelectedWall = null; SelectedFixture = null; SelectedResident = null; SelectedStaff = null; hasStart = hasEnd = false;
-            accumulator = 0; view.Refresh(World, true); view.Preview(null); SetTool(BuildTool.Inspect); Recenter(); Save();
+            accumulator = 0; savedJson = ""; RecoveredSave = false; SaveProblem = ""; LastSavedUtc = default(DateTime); autosave = 0; view.Refresh(World, true); view.Preview(null); SetTool(BuildTool.Inspect); Recenter(); Save();
             return true;
         }
         public void SetTool(BuildTool tool)
@@ -195,13 +178,12 @@ namespace Cellblock.Unity
             else accumulator = 0;
             if (SelectedFixture != null) SelectedFixture = World.Data.Fixtures.FirstOrDefault(f => f.Id == SelectedFixture.Id);
             InputUpdate(magnification); view.Refresh(World); view.SetWatchedCamera(WatchedCamera); pressureView.Refresh(World, Time.unscaledDeltaTime); UpdateRideAlong(); hud.Refresh();
-            autosave += Time.unscaledDeltaTime;
-            if (autosave >= 30) { autosave = 0; Save(false); }
+            TickAutosave();
         }
         void LateUpdate() { if (cameraRig != null) { if (RideAlongActive) RideAlongCamera(); else CameraPosition(); } RefreshCameraFeed(); RefreshBodyCam(); }
         void CameraPosition(bool immediate = false)
         {
-            float blend = immediate ? 1 : 1 - Mathf.Exp(-Time.unscaledDeltaTime * 14);
+            float blend = immediate || !Preferences.SmoothCamera || Preferences.ReducedMotion ? 1 : 1 - Mathf.Exp(-Time.unscaledDeltaTime * 14);
             displayedFocus = Vector3.Lerp(displayedFocus, focus, blend);
             displayedDistance = Mathf.Lerp(displayedDistance, distance, blend);
             displayedYaw = Mathf.LerpAngle(displayedYaw, yaw, blend); displayedPitch = Mathf.Lerp(displayedPitch, pitch, blend);
@@ -308,7 +290,7 @@ namespace Cellblock.Unity
             if (hud.BlocksWorldInput)
             {
                 pointerActive = false; pointerOwnedByUI = true; dragging = false; gesture = Input.touchCount > 0;
-                if (Input.GetKeyDown(KeyCode.Escape)) hud.CloseOverlays();
+                if (Input.GetKeyDown(KeyCode.Escape)) hud.NavigateBack();
                 return;
             }
             if (Input.touchCount > 0)
@@ -375,7 +357,7 @@ namespace Cellblock.Unity
             if (pointerActive && holding && dragging && !pointerOwnedByUI)
             {
                 Vector2 delta = cursor - lastPointer;
-                if (pointerOrbit) Orbit(delta.x * 0.22f, -delta.y * 0.16f);
+                if (pointerOrbit) Orbit(delta.x * 0.22f * Preferences.CameraSensitivity, -delta.y * 0.16f * Preferences.CameraSensitivity);
                 else if (Input.GetMouseButton(2) || (Input.GetMouseButton(0) && (Tool == BuildTool.Inspect || Draft!=null))) Pan(lastPointer, cursor);
             }
             if (Input.GetMouseButtonUp(0) && pointerActive && !pointerOwnedByUI && !pointerOrbit && !dragging && !hud.IsOverUI(cursor)) Tap(cursor);
@@ -394,11 +376,11 @@ namespace Cellblock.Unity
             if (Input.GetKeyDown(KeyCode.Z) && Draft == null && (Tool == BuildTool.Furnishing || Tool == BuildTool.Wing)) RotatePlacement();
             Vector2 movement = new Vector2((Input.GetKey(KeyCode.RightArrow) || Input.GetKey(KeyCode.D) ? 1 : 0) - (Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.A) ? 1 : 0),
                 (Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.W) ? 1 : 0) - (Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S) ? 1 : 0));
-            float speed = distance * 0.55f * Time.unscaledDeltaTime * (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) ? 2 : 1);
+            float speed = Preferences.CameraSensitivity * distance * 0.55f * Time.unscaledDeltaTime * (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) ? 2 : 1);
             if (movement.sqrMagnitude > 0) PanCamera(movement.normalized * speed);
             float orbit = (Input.GetKey(KeyCode.E) ? 1 : 0) - (Input.GetKey(KeyCode.Q) ? 1 : 0);
             float tilt = (Input.GetKey(KeyCode.R) ? 1 : 0) - (Input.GetKey(KeyCode.F) ? 1 : 0);
-            Orbit(orbit * Time.unscaledDeltaTime * 55, tilt * Time.unscaledDeltaTime * 35);
+            Orbit(orbit * Time.unscaledDeltaTime * 55 * Preferences.CameraSensitivity, tilt * Time.unscaledDeltaTime * 35 * Preferences.CameraSensitivity);
         }
         void PreviewAt(Vector2 screen)
         {
@@ -618,20 +600,7 @@ namespace Cellblock.Unity
         }
         public bool Save(bool feedback = true)
         {
-            if (World == null || presentationPreview) return true;
-            try
-            {
-                Directory.CreateDirectory(SaveDirectory);
-                if (!Regex.IsMatch(saveId, "^[a-f0-9]{32}$")) throw new InvalidDataException("Invalid company identifier.");
-                string name = "company-" + saveId + ".json", path = Path.Combine(SaveDirectory, name), temporary = path + ".tmp";
-                File.WriteAllText(temporary, JsonUtility.ToJson(World.Data, true));
-                if (File.Exists(path)) File.Replace(temporary, path, path + ".bak"); else File.Move(temporary, path);
-                string pointer = PointerPath + ".tmp"; File.WriteAllText(pointer, name);
-                if (File.Exists(PointerPath)) File.Replace(pointer, PointerPath, null); else File.Move(pointer, PointerPath);
-                if (feedback) Message("Company saved. Time pauses when the game is closed.");
-                return true;
-            }
-            catch (Exception e) { Message("Save failed: " + e.Message + ". Keep this session open."); if (hud != null) hud.ShowMenuError("Save failed: " + e.Message); Debug.LogError(e); return false; }
+            return SaveCompany(feedback);
         }
 #if UNITY_EDITOR
         public float PreviewCameraDistance { get { return distance; } }
@@ -683,20 +652,23 @@ namespace Cellblock.Unity
         {
             try
             {
+                string name = fileName ?? ContinueSave()?.FileName;
+                if (name == null) throw new InvalidDataException("No playable holding is available. Open the save library.");
                 if (World != null && !Save(false)) return false;
-                string name = fileName ?? File.ReadAllText(PointerPath).Trim();
                 if (!Regex.IsMatch(name, "^company-[a-f0-9]{32}\\.json$")) throw new InvalidDataException("Invalid company save name.");
                 string path = Path.Combine(SaveDirectory, name);
-                World restored;
+                World restored; bool recovered = false;
                 try { restored = new World(JsonUtility.FromJson<State>(File.ReadAllText(path))); }
                 catch
                 {
                     if (!File.Exists(path + ".bak")) throw;
                     restored = new World(JsonUtility.FromJson<State>(File.ReadAllText(path + ".bak")));
+                    recovered = true;
                     restored.Notice = "Recovered the previous successful save. Your original file is retained.";
                 }
+                WritePointer(name);
                 EndRideAlongSilently(); ResetDoorEditing(); PlacingConnection=false;
-                World = restored; watchedCameraId = ""; nextFeed = 0; nativeInputWasBlocked = true; presentationPreview = false; World.Data.Speed = 0; accumulator = 0; saveId = name.Substring(8, 32);
+                World = restored; RecoveredSave = recovered; savedJson = ""; SaveProblem = ""; LastSavedUtc = File.GetLastWriteTimeUtc(recovered ? path + ".bak" : path); autosave = 0; watchedCameraId = ""; nextFeed = 0; nativeInputWasBlocked = true; presentationPreview = false; World.Data.Speed = 0; accumulator = 0; saveId = name.Substring(8, 32);
                 Draft = null; CurrentQuote = null; SelectedWall = null; SelectedFixture = null; SelectedResident = null; SelectedStaff = null;
                 view.Refresh(World, true); SetTool(BuildTool.Inspect); Recenter();
                 if (World.Data.DraftPlan != null)
@@ -706,7 +678,7 @@ namespace Cellblock.Unity
                 }
                 return true;
             }
-            catch (Exception e) { Debug.LogError("Could not load company: " + e.Message); Message("Could not load company: " + e.Message); hud.ShowMenuError("Could not load company: " + e.Message); return false; }
+            catch (Exception e) { Debug.LogWarning("Could not load holding: " + e.Message); Message("That holding could not be opened. The saved files are preserved."); hud.ShowMenuError("That holding could not be opened. The saved files are preserved. Try another holding in Save Library."); return false; }
         }
         void OnApplicationPause(bool paused) { appPaused = paused; accumulator = 0; if (paused) Save(false); }
         void OnApplicationFocus(bool focused) { unfocused = !focused; accumulator = 0; nativeInputWasBlocked = true; if (trackpad != null) trackpad.Consume(); if (!focused) Save(false); }
