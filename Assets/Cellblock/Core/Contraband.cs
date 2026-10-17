@@ -127,7 +127,7 @@ namespace Cellblock.Core
             if (resident.Intake.Condition == "Withdrawal" || roll < 0.30f) return roll < 0.15f ? "Pills" : "Drugs";
             return roll < 0.48f ? "Tobacco" : roll < 0.62f ? "Phone" : roll < 0.74f ? "Cash" : roll < 0.84f ? "Weapon" : roll < 0.92f ? "Lighter" : "Tattoo";
         }
-        ContrabandItem Introduce(string kind, string source, Resident holder, Point? dropped = null)
+        internal ContrabandItem Introduce(string kind, string source, Resident holder, Point? dropped = null)
         {
             ContrabandState c = Contraband;
             if (c.Items.Count >= ContrabandRules.ItemLimit)
@@ -140,6 +140,7 @@ namespace Cellblock.Core
             if (dropped.HasValue) { item.Place = "Dropped"; item.Position = dropped.Value; }
             else { item.HolderId = holder.Id; item.Place = k.Id == "Weapon" || k.Id == "Tools" || k.Id == "Phone" ? "Stash" : "Held"; item.Position = holder.Home; }
             c.Items.Add(item);
+            if (!dropped.HasValue) NoteStash(item, holder);
             if (!dropped.HasValue) c.Introduced++;
             return item;
         }
@@ -191,21 +192,23 @@ namespace Cellblock.Core
             float chance = ContrabandRules.DroneRate(ModeTier) * ContrabandRules.PhoneDemand(PhonesWith(null)) * (SmugglingNight ? 2 : 0.6f) * (1 - 0.35f * Math.Min(1, UpgradeLevel("drone-defense")));
             int n = Data.Minute / 30;
             if (JusticeRules.Unit(Data.Seed, "drone", "launch", n) >= chance) return;
-            LaunchDrone(n);
+            // Drones are ordered hours ahead; the people who ordered one know where it will land.
+            Resident buyer; bool yard; Point target = DroneTarget(n, out yard, out buyer);
+            PlanDrop(n, target, yard, buyer);
         }
-        Drone LaunchDrone(int n)
+        Point DroneTarget(int n, out bool yard, out Resident buyer)
+        {
+            bool netting = UpgradeLevel("yard-netting") > 0;
+            yard = !netting || JusticeRules.Unit(Data.Seed, "drone", "target", n) < 0.25f; buyer = null;
+            if (yard) return Data.Yard + new Point(JusticeRules.Unit(Data.Seed, "drone", "tx", n) * 6 - 3, JusticeRules.Unit(Data.Seed, "drone", "ty", n) * 8 - 4);
+            // A window drop: just outside a housing room where someone is waiting for it.
+            buyer = Data.Residents.Where(r => IsPresent(r) && !InIntake(r)).OrderBy(r => JusticeRules.Hash(r.Id + ":drone:" + n, unchecked((uint)Data.Seed))).FirstOrDefault();
+            return buyer == null ? Data.Yard : NearbyClear(buyer.Home + new Point(0, 1.2f), Routes);
+        }
+        Drone LaunchDrone(int n) { Resident buyer; bool yard; Point target = DroneTarget(n, out yard, out buyer); return LaunchDrone(n, target, yard); }
+        Drone LaunchDrone(int n, Point target, bool yard)
         {
             ContrabandState c = Contraband;
-            bool netting = UpgradeLevel("yard-netting") > 0;
-            bool yard = !netting || JusticeRules.Unit(Data.Seed, "drone", "target", n) < 0.25f;
-            Point target;
-            if (yard) target = Data.Yard + new Point(JusticeRules.Unit(Data.Seed, "drone", "tx", n) * 6 - 3, JusticeRules.Unit(Data.Seed, "drone", "ty", n) * 8 - 4);
-            else
-            {
-                // A window drop: just outside a housing room where someone is waiting for it.
-                Resident buyer = Data.Residents.Where(r => IsPresent(r) && !InIntake(r)).OrderBy(r => JusticeRules.Hash(r.Id + ":drone:" + n, unchecked((uint)Data.Seed))).FirstOrDefault();
-                target = buyer == null ? Data.Yard : NearbyClear(buyer.Home + new Point(0, 1.2f), Routes);
-            }
             float side = JusticeRules.Unit(Data.Seed, "drone", "side", n) < 0.5f ? -1 : 1;
             var d = new Drone { Id = "drone-" + c.NextId++, Origin = new Point(side * 48, JusticeRules.Unit(Data.Seed, "drone", "oy", n) * 40 - 20), Target = target, TargetYard = yard, PhaseMinute = Data.Minute };
             d.Position = d.Origin;
@@ -300,7 +303,7 @@ namespace Cellblock.Core
             bool kitchen = Data.Fixtures.Any(f => f.Kind == "ServingCounter" || f.Kind == "Table");
             foreach (Resident r in Data.Residents.Where(x => IsPresent(x) && !InIntake(x)))
             {
-                if (Data.Minute % 1440 == 1285 && kitchen && r.Impulsivity > 62 && r.Discipline < 50 && JusticeRules.Unit(Data.Seed, r.Id, "hooch", Day) < 0.05f)
+                if (Data.Minute % 1440 == 1285 && kitchen && r.Impulsivity > 62 && r.Discipline < 50 && JusticeRules.Unit(Data.Seed, r.Id, "hooch", Day) < 0.05f * HoochFactor)
                     Introduce("Alcohol", "Made inside", r);
                 if (Data.Minute % 360 == 25 && r.Relationships.Any(x => x.Tension >= 58) && !ItemsOf(r).Any(i => i.Kind == "Weapon"))
                 {
@@ -316,6 +319,13 @@ namespace Cellblock.Core
             float corrupt = ModeTier.CorruptShare / 0.25f;
             foreach (StaffMember s in Data.Staff.Where(x => x.Arrived && x.ShiftStart == shiftStart && !IsSuspended(x)).ToList())
             {
+                // An officer the player is deciding for is sometimes offered the deal directly.
+                if (Controlled(s))
+                {
+                    Resident offerer = Data.Residents.Where(r => IsPresent(r) && !InIntake(r) && r.Gang != "Unaffiliated").OrderBy(r => JusticeRules.Hash(r.Id + s.Id + n, unchecked((uint)Data.Seed))).FirstOrDefault();
+                    if (offerer != null && JusticeRules.Unit(Data.Seed, s.Id, "offer", n) < 0.2f) AskBribe(s, offerer, JusticeRules.Unit(Data.Seed, s.Id, "offer-kind", n) < 0.5f ? "Phone" : "Drugs");
+                    continue;
+                }
                 float risk = PeopleDynamics.MisconductRisk(s);
                 if (risk < 40 || s.Integrity >= 55) continue;
                 bool bribed = Contraband.Items.Any(i => i.Kind == "Cash" && i.Place != "Dropped" && Find(i.HolderId) != null && Find(i.HolderId).Gang == s.FavoredGang && s.FavoredGang != "");
@@ -333,7 +343,7 @@ namespace Cellblock.Core
                     continue;
                 }
                 Resident buyer = Data.Residents.Where(r => IsPresent(r) && !InIntake(r) && (s.FavoredGang == "" || r.Gang == s.FavoredGang)).OrderBy(r => JusticeRules.Hash(r.Id + s.Id + n, unchecked((uint)Data.Seed))).FirstOrDefault();
-                if (buyer != null) Introduce(kind, "Staff", buyer);
+                if (buyer != null) { Introduce(kind, "Staff", buyer); NoteSmuggler(s, buyer); }
             }
         }
         void MailCall()
@@ -358,6 +368,7 @@ namespace Cellblock.Core
             {
                 if (JusticeRules.Unit(Data.Seed, r.Id, "visit", Day) >= 0.45f) continue;
                 r.Belonging = Math.Min(100, r.Belonging + belonging); r.Stress = Math.Max(0, r.Stress - stress);
+                TrustAccount account = AccountOf(r); if (account != null) account.Warmth = Math.Min(3, account.Warmth + 1);
                 if (JusticeRules.Unit(Data.Seed, r.Id, "handoff", Day) >= handoff * (r.Gang != "Unaffiliated" ? 1.5f : 1)) continue;
                 string kind = JusticeRules.Unit(Data.Seed, r.Id, "visit-kind", Day) < 0.5f ? "Drugs" : JusticeRules.Unit(Data.Seed, r.Id, "visit-kind2", Day) < 0.5f ? "Tobacco" : "Cash";
                 if (Contraband.SearchAfterVisits && JusticeRules.Unit(Data.Seed, r.Id, "visit-search", Day) < 0.55f)
@@ -414,7 +425,7 @@ namespace Cellblock.Core
                 bool watched = ResponseOfficers().Any(s => Geometry.Distance(s.Position, item.Position) <= 6 && SightLines.Clear(s.Position, item.Position));
                 if (watched || JusticeRules.Unit(Data.Seed, item.Id + taker.Id, "pickup", Data.Minute) >= 0.3f) continue;
                 item.Place = ContrabandRules.Kind(item.Kind).Metal ? "Stash" : "Held"; item.HolderId = taker.Id; item.Position = taker.Home; item.Detected = false; item.AssignedStaffId = "";
-                Contraband.Introduced++;
+                Contraband.Introduced++; NoteStash(item, taker);
             }
         }
         void UseContraband()
@@ -484,6 +495,8 @@ namespace Cellblock.Core
                 Resident buyer = Data.Residents.Where(r => r != seller && IsPresent(r) && !InIntake(r) && Geometry.Distance(r.Position, seller.Position) <= 2.6f && Wants(r, item.Kind))
                     .OrderBy(r => r.Gang == seller.Gang ? 0 : 1).ThenBy(r => r.Id, StringComparer.Ordinal).FirstOrDefault();
                 if (buyer == null || JusticeRules.Unit(Data.Seed, item.Id, "trade", n) >= 0.25f) continue;
+                // The deal is priced in soups; a buyer already deep in debt is turned away.
+                if (!PayForContraband(buyer, seller, item)) continue;
                 Fixture camera = Data.Fixtures.FirstOrDefault(f => f.Kind == "CCTV" && CameraSees(f, seller.Position));
                 if (camera != null && JusticeRules.Unit(Data.Seed, item.Id, "trade-seen", n) < (CctvMonitored ? 0.6f : 0.25f))
                 {
@@ -491,14 +504,7 @@ namespace Cellblock.Core
                     FileWriteUp(buyer.Id, "Resident", "Contraband exchange", 2, "CCTV caught " + buyer.Name + " receiving " + ContrabandRules.Label(item.Kind) + ".", null);
                     continue;
                 }
-                item.HolderId = buyer.Id; item.Position = buyer.Home;
-                // An unpaid debt across gang lines becomes a grudge.
-                if (buyer.Gang != seller.Gang && JusticeRules.Unit(Data.Seed, item.Id, "debt", n) < 0.4f)
-                {
-                    Relationship ab = buyer.Relationships.FirstOrDefault(x => x.OtherId == seller.Id), ba = seller.Relationships.FirstOrDefault(x => x.OtherId == buyer.Id);
-                    if (ab != null && ba != null) { ab.Tension = ba.Tension = Math.Min(100, ab.Tension + 8); }
-                    PeopleDynamics.Record(Data, "contraband", buyer.Id, buyer.Name + " owes " + seller.Name + " for " + ContrabandRules.Label(item.Kind) + ". The debt is souring things between them.", 2);
-                }
+                item.HolderId = buyer.Id; item.Position = buyer.Home; NoteStash(item, buyer);
             }
         }
         bool Wants(Resident r, string kind)

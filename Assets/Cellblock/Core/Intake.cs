@@ -391,6 +391,7 @@ namespace Cellblock.Core
         {
             IntakeState s = Data.Intake;
             resident.Intake.Processed = true; resident.Intake.CompletedMinute = Data.Minute;
+            PaperworkCheck(resident);
             resident.Legal.CooldownUntil = Data.Minute;
             s.Cases.Remove(c); s.Processed++;
             RemoveWorkerPath("intake/" + resident.Id); RemoveResidentPath(resident); resident.NextDecisionMinute = Data.Minute;

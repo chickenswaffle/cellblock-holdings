@@ -179,6 +179,8 @@ static partial class Program
             int Fights(World world)
             {
                 HoldOfficersFar(world);
+                // Jobs move people around and calm them; this compares only the type's fight scale.
+                world.SetAutoJobs(false); foreach (Resident r in world.Data.Residents) world.LeaveJob(r.Id);
                 // Beef-level tension keeps fights below the cooldown and separation limits, so the type's scale shows.
                 foreach (Resident r in world.Data.Residents) foreach (Relationship rel in r.Relationships) rel.Tension = 62;
                 world.SetTransferPolicy("Accept to capacity");

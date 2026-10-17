@@ -1,6 +1,12 @@
 # Economy, kitchen, informants, counsel and playable roles: design plan
 
-Status: design for review (2026-10-17). Nothing here is implemented yet. It builds on the systems that exist on `codex/claude-overload`: population pressure, intake, contraband, upgrades, personnel, justice and the ride-along. Owners and hooks are named per system.
+Status: **implemented** on `codex/claude-overload` (2026-10-17), all five phases, in the recommended order A → C → B → D → E. The implementation notes are in `docs/economy-notes.md` (A), `docs/intel-notes.md` (C) and `docs/kitchen-counsel-roles-notes.md` (B, D, E). Where the build differs from this plan, the notes are authoritative:
+
+- wages are hourly;
+- prices change every 3 days;
+- debt consequences were rebalanced after the first balance run;
+- counsel works around `Justice.Resolve` rather than through a hook;
+- "Take the role" covers prisoners, officers and the warden. It builds on the systems that exist on `codex/claude-overload`: population pressure, intake, contraband, upgrades, personnel, justice and the ride-along. Owners and hooks are named per system.
 
 The user asked for:
 

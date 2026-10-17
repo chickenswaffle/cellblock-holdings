@@ -24,11 +24,19 @@ Read this file before editing, before every Unity/build run, and before every co
 | resident-lives | Only new Core/Lives.cs, Runtime/FacilityLivesView.cs, Runtime/GameLivesHud.cs, Resources/Lives.uss, Tools/CoreChecks/LivesChecks.cs, matching metas and docs/lives-notes.md | Claude (acknowledged 2026-10-17, branch `codex/claude-overload`) | Appearance and poses integrated; activities and stories still to come |
 | personnel | New Personnel.cs, GamePersonnelHud.cs, PortraitElement.cs, FacilityPersonnelView.cs, Personnel.uss, PersonnelChecks.cs, matching metas and personnel notes | Claude (branch `codex/claude-overload`) | Published fixes through 650e3ce integrated; active follow-on remains Claude's |
 | population-pressure | Core/Population.cs, Intake.cs, Contraband.cs, Upgrades.cs, pressure/lives views and HUD, ride-along, matching checks/metas/notes | Claude (branch `codex/claude-overload`); Codex integrated 650e3ce | Nearest dining places, trays, stuck-resident load repair and balance fixes integrated; preserve active follow-on |
+| economy | New Core/Economy.cs, Informants.cs, Kitchen.cs, Counsel.cs, Roles.cs; Runtime/GameEconomyHud.cs, GameIntelHud.cs, GameKitchenHud.cs, GameCounselHud.cs; Resources/Economy.uss; Tools/CoreChecks/EconomyChecks.cs, IntelChecks.cs, KitchenChecks.cs, CounselChecks.cs, RoleChecks.cs; matching metas; docs/economy-notes.md, intel-notes.md, kitchen-counsel-roles-notes.md | Claude (claimed 2026-10-17, branch `codex/claude-overload`) | Ready for integration: prison economy, informants, kitchen, counsel, role cards (see Claude log) |
+| home-save-shell | Home/Continue/save/settings and main HUD shell; exact existing-file exceptions and new files listed in current log | Codex (latest user request) | Active; Claude retains charter, construction/catalog logic, lives and economy |
 | documentation | Shared README/status/coordination and validation evidence; Claude may edit its own log and scoped new notes | Codex | Checkpoint and handoff publication |
 
 The explicit file rows above override the broad folder rows. Claude: the user's latest modes/HUD/placement request now has a concrete existing-file handoff at `a6d2afc`. Fetch the latest shared branch, preserve your own work, read `docs/claude-modes-and-building-handoff.md` and `docs/claude-coordination-update.md`, then claim opening-and-build-ui and/or resident-lives and acknowledge your current branch/SHA. Codex will not edit those handed-off files while you hold that scope. Other existing files, security/doors/utilities/operations/justice and Unity remain Codex-owned. Do not restore older Justice or input implementations during integration.
 
 ## Codex log
+
+### 2026-10-17 — active home, save continuation and command HUD
+
+- Latest direct user request assigns Codex a visible home/menu/settings/HUD redesign and easier Continue/autosaves. Exact temporary exception to Claude's broad opening-and-build-ui reservation: Codex owns ShowMenu, save enumeration/Save/Load/autosave hooks, header/navigation/overview shell and additive menu/settings styling in GameHud.cs/GameController.cs for this pass. Core simulation, charter logic, construction tools/catalog logic and Claude's lives/economy/personnel sources stay with Claude. Asked the user asynchronously whether Claude is editing these exact screens; no answer yet. New files isolate most work: GameHomeHud.cs, GameSettingsHud.cs, GameCommandHud.cs, GameSaveFlow.cs, GamePreferences.cs, Frontend.uss, original HomeNight artwork, matching metas and Editor/FrontendReview.cs. No unfinished remote work is accessed.
+- Claimed home-save-shell, game-runtime/UI/core/documentation and sole unity-editor locks. Editor safely exited Play. Merged Claude's published economy/informants/kitchen/counsel/role-card snapshot 9c88d9e without conflicts; retain both agents' logs, Codex's 2f54ce4/e6e299d HUD work and all new economy hooks. Combined core/API/Play validation pending; no new passing claim yet.
+- Design: dominant Continue with actual save metadata and a sorted library; stale/missing-pointer fallback; visible autosave status and configurable interval; protect valid backups when recovering damaged primaries; real persisted settings for audio/display/controls/accessibility. Cinematic illustrated night home with one shared ink/brass theme. Larger command navigation, context/indicators and clear settings/save access make the in-game change visible. Preserve original slots, pause-on-load, explicit-clock behavior, draft persistence and preview isolation. Critic reviews flow, data safety and actual phone/desktop images before publication.
 
 ### 2026-10-17 — validated readable metrics and inspector navigation
 
@@ -228,6 +236,34 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
   - public defenders and paid counsel;
   - decision-card role play.
   - Proposed Codex hooks: `CounselOdds` in `Justice.Resolve`, kitchen fixtures, storage racks, an attorney room, and possibly `ValidRole` for kitchen staff. Nothing is implemented yet; the build waits on the user's go.
+
+### 2026-10-17 — economy, informants, kitchen, counsel and role cards (user request: "start with the items in order")
+
+- **Base.** Fast-forwarded to Codex `415c1d4` (searchlights; it includes Claude `650e3ce`). Claimed opening-and-build-ui, population-pressure, personnel, resident-lives and a new scope, `economy` (row above).
+- **Built**, in the plan's order (`docs/economy-and-roles-plan.md`, now marked implemented):
+  - A. Prison economy: trust fund with its own reconciled book, jobs from fixtures, payroll, family deposits and fees, a commissary with a seeded 3-day price index and markup, soups as currency, the store man, debts, black-market prices in soups. `docs/economy-notes.md`.
+  - C. Informants and snitches: intel and who knows it, notes, a tip line, recruited informants with hidden reliability and double agents, tip actions and exposure, snitch jackets, rumors, leaks, paperwork checks, protective custody, trust in staff. `docs/intel-notes.md`.
+  - B. Kitchen: catering stays the baseline; a kitchen upgrade plus a Cook post (role Technician) cooks from Budget–Premium menus, with diets, loaf, holiday meals, theft, knives, poisoning and fires.
+  - D. Counsel: public defender caseload from the transfer backlog, paid tiers in instalments, motions, bond, discovery, sentencing argument, a law library.
+  - E. Taking a role: decision cards on the ride-along for prisoners, officers and the warden, each running the same core methods as the AI, with a 60-minute default. B, D and E are in `docs/kitchen-counsel-roles-notes.md`.
+- **Edited Claude-owned existing files:** Simulation.cs (MealGain hook, service accounting), Population.cs, Contraband.cs, Personnel.cs (Intelligence duty, Cook post, fight hooks), Intake.cs, Upgrades.cs (24 → 29 upgrades: 23 available, 6 planned), GameHud.cs (3 hooks), GamePressureHud.cs, GameRideAlong.cs, Pressure.uss, GameModesChecks/PressureChecks/LivesChecks. No Codex files edited.
+- **Justice boundary (please review).** Counsel reads legal state and acts only before a hearing (motions, bond via Justice's own `Release`) or after it:
+  - `NextCourtMinute` moves earlier for private counsel, or later for an overloaded defender;
+  - `SentenceDays`/`ReleaseMinute` are cut at sentencing.
+  - If you prefer this inside `Resolve`, a `CounselOdds(resident, ref release, ref sentence, ref termDays)` hook would replace the after-the-fact adjustments.
+- **Evidence:**
+  - 286/286 core checks (78 new across five suites, with pinned literals).
+  - Offline Unity typecheck passes for editor/macOS and iOS.
+  - Fuzz, with every new action plus Unity-style round trips: 345,600 calm and 362,880 chaos minutes, 5,267 reloads, 0 failures after one fix (the intelligence demo could exceed the 12-knower cap).
+  - Builder balance on the final code: 9/9 survive 21 days (0 riots, 0 strikes); county and state 6/6 survive 35 days (0–1 strikes).
+  - An earlier run lost 2 county contracts: soups-only payment with no store turned every black-market deal into debt. Fixed with trust-transfer payment and proportional debt consequences, and documented.
+  - Mutation testing: 50 deliberate bugs across the five systems are running; results follow in the next entry.
+- **Unity check request (Codex as runner):** the lists in `docs/economy-notes.md`, `docs/intel-notes.md` and `docs/kitchen-counsel-roles-notes.md`: panel fit at 280–360 px and phone landscape, the demo buttons, the cook at the counter, protective custody staying home, and role cards pausing play.
+- **Interface requests (Codex's files):**
+  - fixtures: storage rack, washer/dryer, workbench, kitchen range/prep/cooler;
+  - `StaffEffect` text for the Cook post (it currently shows the technician description);
+  - an escape-plan hook for escape intel;
+  - optional note and meeting props.
 
 ## Codex handoff request (personnel + placement)
 

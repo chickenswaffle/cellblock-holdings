@@ -7,7 +7,7 @@ using Cellblock.Core;
 
 static partial class Program
 {
-    static string PressureJson(State s) { return JsonSerializer.Serialize(new object[] { s.Population, s.Intake, s.Contraband, s.Upgrades }, Json); }
+    static string PressureJson(State s) { return JsonSerializer.Serialize(new object[] { s.Population, s.Intake, s.Contraband, s.Upgrades, s.Economy }, Json); }
     // Brings a bus of transfers in and runs until they have all left the bus.
     static List<Resident> Transfer(World world, int people)
     {
@@ -719,15 +719,16 @@ static partial class Program
             World federal = Chartered("federal-camp", "halvern");
             Check(federal.UpgradeBlocker("intake-program") == "Fully upgraded." && federal.UpgradeDailyCents == 0, "The federal program is not included in a federal contract");
             Check(UpgradeRules.All.Where(u => u.Status == "Available").All(u => u.Tiers.Length > 0 && u.Tiers.All(t => t.PriceCents > 0 && t.DailyCents >= 0)), "An available upgrade has no priced levels");
-            Check(UpgradeRules.All.Count(u => u.Status == "Planned") >= 8, "The planned list is missing from the catalog");
+            Check(UpgradeRules.All.Count(u => u.Status == "Planned") == 6 && UpgradeRules.All.Count(u => u.Status == "Available") == 23, "The catalog changed: " + UpgradeRules.All.Count(u => u.Status == "Planned") + " planned, " + UpgradeRules.All.Count(u => u.Status == "Available") + " available");
         });
-        Test("commissary and resident phones lower unrest and earn per resident", () => {
-            World world = County(); Hold(world); world.EnsureLegalProfiles(); world.Data.CashCents += 5000000;
-            float before = world.UnrestTarget();
+        Test("commissary and resident phones calm the people who actually use them", () => {
+            World world = County(); Hold(world); world.EnsureLegalProfiles(); world.Data.CashCents += 5000000; world.AdvanceMinutes(10);
             foreach (Resident r in world.Data.Residents) r.Stress = 60;
             float stressed = world.UnrestTarget();
             world.BuyUpgrade("commissary"); world.BuyUpgrade("phones");
-            Check(world.UnrestTarget() <= stressed - 4, "Commissary and phones did not lower unrest");
+            Check(world.UnrestTarget() >= stressed - 1, "An unused store and phones calmed everyone anyway");
+            foreach (Resident r in world.Data.Residents) { world.AccountOf(r).LastStoreMinute = world.Data.Minute; world.AccountOf(r).LastCallMinute = world.Data.Minute; }
+            Check(world.UnrestTarget() <= stressed - 4, "Store and phone access did not lower unrest");
             Check(world.UpgradeDailyCents == 3000 + 2000, "Commissary/phone running costs wrong");
         });
         Test("two identical companies stay identical through a week of transfers, contraband and audits", () => {
