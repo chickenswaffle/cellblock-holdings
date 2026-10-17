@@ -369,6 +369,7 @@ namespace Cellblock.Core
                 if (JusticeRules.Unit(Data.Seed, r.Id, "visit", Day) >= 0.45f) continue;
                 r.Belonging = Math.Min(100, r.Belonging + belonging); r.Stress = Math.Max(0, r.Stress - stress);
                 TrustAccount account = AccountOf(r); if (account != null) account.Warmth = Math.Min(3, account.Warmth + 1);
+                Remember(r, "visit", "Had a visit from family.");
                 if (JusticeRules.Unit(Data.Seed, r.Id, "handoff", Day) >= handoff * (r.Gang != "Unaffiliated" ? 1.5f : 1)) continue;
                 string kind = JusticeRules.Unit(Data.Seed, r.Id, "visit-kind", Day) < 0.5f ? "Drugs" : JusticeRules.Unit(Data.Seed, r.Id, "visit-kind2", Day) < 0.5f ? "Tobacco" : "Cash";
                 if (Contraband.SearchAfterVisits && JusticeRules.Unit(Data.Seed, r.Id, "visit-search", Day) < 0.55f)

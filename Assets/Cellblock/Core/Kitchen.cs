@@ -203,6 +203,7 @@ namespace Cellblock.Core
         {
             string blocker = HolidayBlocker; if (blocker != "") { Notice = blocker; return false; }
             Kitchen.HolidayMinute = (Data.Minute / 1440) * 1440 + 1080;
+            foreach (Resident r in Data.Residents) if (IsPresent(r) && !InIntake(r)) Remember(r, "holiday", "A holiday dinner: " + KitchenRules.Menu("Premium").Dishes[2][2].ToLowerInvariant() + ".");
             Notice = "Holiday dinner tonight at 18:00: " + KitchenRules.Menu("Premium").Dishes[2][2].ToLowerInvariant() + ".";
             PeopleDynamics.Record(Data, "kitchen", "kitchen", Notice, 1);
             return true;

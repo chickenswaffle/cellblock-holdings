@@ -91,6 +91,7 @@ namespace Cellblock.Unity
             moneyDebts = Text("", "money-small"); moneyCard.Add(moneyDebts);
             moneyStore = Text("", "money-small"); moneyCard.Add(moneyStore);
             personCard.Insert(Mathf.Min(personCard.childCount, personCard.IndexOf(personEffects) + 1), moneyCard);
+            SeatLifeCard();
         }
 
         static string Cents(long cents) { return cents < 100 && cents >= 0 ? cents + "¢" : "$" + (cents / 100).ToString("N0") + "." + (System.Math.Abs(cents) % 100).ToString("00"); }

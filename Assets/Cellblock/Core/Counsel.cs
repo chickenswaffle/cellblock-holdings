@@ -112,7 +112,7 @@ namespace Cellblock.Core
             long retainer = RetainerFor(r, tier), down = retainer / 4;
             TrustAccount a = AccountOf(r); Debit(a, down);
             Counsel.Files.Add(new CounselFile { ResidentId = r.Id, Tier = tier, RetainerCents = retainer, PaidCents = down, HiredMinute = Data.Minute, NextPaymentMinute = Data.Minute + 7 * 1440 });
-            Counsel.Hired++;
+            Counsel.Hired++; Remember(r, "lawyer", "Hired " + CounselRules.Tier(tier).Name.ToLowerInvariant() + " for " + JusticeRules.Dollars(retainer) + ".");
             Notice = r.Name + " hired " + CounselRules.Tier(tier).Name.ToLowerInvariant() + " for " + JusticeRules.Dollars(retainer) + ", " + JusticeRules.Dollars(down) + " down.";
             PeopleDynamics.Record(Data, "court", r.Id, Notice, 1);
             return true;
@@ -156,14 +156,16 @@ namespace Cellblock.Core
                 {
                     // Argument at sentencing, and cooperation credit for an informant with a court letter.
                     Informant inf = InformantOf(r);
-                    float cut = (tier == null ? 0 : tier.Cut) + (inf != null && inf.CourtLetter ? 0.15f : 0);
+                    // Certificates earned inside count as program credit, with or without a lawyer.
+                    float cut = (tier == null ? 0 : tier.Cut) + (inf != null && inf.CourtLetter ? 0.15f : 0) + (r.Certificates > 0 ? 0.05f : 0);
                     int days = (int)Math.Round(legal.SentenceDays * cut);
                     int floor = Data.Minute + 1440;
                     days = Math.Min(days, Math.Max(0, (legal.ReleaseMinute - floor) / 1440));
                     if (days > 0)
                     {
                         legal.ReleaseMinute -= days * 1440; legal.SentenceDays = Math.Max(1, legal.SentenceDays - days); c.DaysCut += days;
-                        string who = tier != null ? CounselRules.Tier(f.Tier).Name.ToLowerInvariant() : "a cooperation letter";
+                        string who = tier != null ? CounselRules.Tier(f.Tier).Name.ToLowerInvariant() : inf != null && inf.CourtLetter ? "a cooperation letter" : "program certificates";
+                        Remember(r, "court", days + " days came off the sentence at sentencing (" + who + ").");
                         PeopleDynamics.Record(Data, "court", r.Id, r.Name + "'s sentence was reduced by " + days + " days at sentencing (" + who + "). Release " + JusticeRules.When(legal.ReleaseMinute) + ".", 2);
                     }
                 }

@@ -466,6 +466,7 @@ namespace Cellblock.Core
             PeopleDynamics.Hydrate(Data);
             JusticeRules.EnsureProfiles(Data);
             p.Received++;
+            Remember(r, "arrival", "Arrived on a transfer bus" + (bus.Source != "" ? " (" + bus.Source.ToLowerInvariant() + ")" : "") + ".");
             return r;
         }
 

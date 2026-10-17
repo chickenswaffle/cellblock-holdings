@@ -1121,6 +1121,7 @@ namespace Cellblock.Core
                     link.Tension = Math.Max(0, link.Tension - 3);
                     Relationship back = b.Relationships.FirstOrDefault(r => r.OtherId == a.Id); if (back != null) back.Tension = link.Tension;
                     string calm = officer.Name + " separated " + a.Name + " and " + b.Name + " before it escalated.";
+                    Remember(a, "fight-stopped", "An officer broke up a confrontation with " + b.Name + ".", b.Id); Remember(b, "fight-stopped", "An officer broke up a confrontation with " + a.Name + ".", a.Id);
                     FileWriteUp(a.Id, "Resident", "Threatening behavior", 1, calm, officer); FileWriteUp(b.Id, "Resident", "Threatening behavior", 1, calm, officer);
                     PeopleDynamics.Record(Data, "fight", a.Id, calm, 2); Notice = calm;
                     return;
@@ -1137,6 +1138,8 @@ namespace Cellblock.Core
                 link.Tension = Math.Min(100, link.Tension + 6);
                 Relationship reverse = b.Relationships.FirstOrDefault(r => r.OtherId == a.Id); if (reverse != null) reverse.Tension = link.Tension;
                 Personnel.Fights++;
+                Remember(a, "fight", (armed == b ? "Was attacked by " : armed == a ? "Attacked " : "Fought ") + b.Name + ".", b.Id);
+                Remember(b, "fight", (armed == a ? "Was attacked by " : armed == b ? "Attacked " : "Fought ") + a.Name + ".", a.Id);
                 string text = armed != null ? "ASSAULT · " + armed.Name + " attacked " + (armed == a ? b.Name : a.Name) + " with an improvised weapon. The victim is seriously hurt" + (Nurse == null ? " and there is no nurse on staff." : "; the nurse is on the way.") :
                     "FIGHT · " + a.Name + " and " + b.Name + " fought with no officer nearby. Both were hurt" + (Nurse == null ? " and there is no nurse on staff." : "; the nurse is on the way.");
                 StaffMember reporter = NearestOfficer(middle, 30);

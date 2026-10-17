@@ -370,6 +370,7 @@ namespace Cellblock.Core
             JobSlot slot = JobSlots().FirstOrDefault(s => s.Job == job && (a.JobSlot == s.Key || !Economy.Accounts.Any(x => x.JobSlot == s.Key)) && Routes.Find(resident.Home, WorkPoint(resident, s)) != null);
             if (slot == null) { Notice = "No open " + EconomyRules.Job(job).Name.ToLowerInvariant() + " position that " + resident.Name + " can reach. " + (job == "orderly" ? "" : "Install more " + JobFixtureHint(job) + "."); return false; }
             a.Job = job; a.JobSlot = slot.Key; a.JobSinceMinute = Data.Minute;
+            Remember(resident, "job", "Started work as " + Article(EconomyRules.Job(job).Name) + ".");
             Notice = resident.Name + " now works as " + Article(EconomyRules.Job(job).Name) + " for " + Money(HourlyCents(job)) + " an hour.";
             PeopleDynamics.Record(Data, "economy", resident.Id, Notice, 1);
             return true;
@@ -535,6 +536,7 @@ namespace Cellblock.Core
                 long fee = EconomyRules.DepositFlatFeeCents + amount * e.DepositFeePercent / 100;
                 if (amount <= fee) continue;
                 long net = amount - fee;
+                if (a.DepositsCents == 0) Remember(r, "family", "Family sent money for the first time: " + JusticeRules.Dollars(net) + ".");
                 Credit(a, net); a.DepositsCents += net; a.LastDepositMinute = Data.Minute;
                 Book(fee, "deposit-fees", "Family deposit fees");
                 long care = e.CostOfCarePercent > 0 ? Debit(a, net * e.CostOfCarePercent / 100) : 0;
@@ -623,7 +625,7 @@ namespace Cellblock.Core
                     case "coffee": r.Belonging = Math.Min(100, r.Belonging + 2 * units); r.Stress = Math.Max(0, r.Stress - 2 * units); break;
                     case "snacks": r.Stress = Math.Max(0, r.Stress - Math.Min(6, 1.5f * units)); break;
                     case "stationery": a.Warmth = Math.Min(3, a.Warmth + 1); r.Belonging = Math.Min(100, r.Belonging + 1); break;
-                    case "clothing": r.Belonging = Math.Min(100, r.Belonging + 5); r.Stress = Math.Max(0, r.Stress - 3); break;
+                    case "clothing": r.Belonging = Math.Min(100, r.Belonging + 5); r.Stress = Math.Max(0, r.Stress - 3); Remember(r, "clothes", "Bought new sneakers and sweats."); break;
                 }
             }
             if (!bought.Any(b => b.Contains("hygiene"))) r.Stress = Math.Min(100, r.Stress + 2);
@@ -801,6 +803,7 @@ namespace Cellblock.Core
                     if (ab != null && ba != null) ab.Tension = ba.Tension = Math.Max(ab.Tension, 70);
                     debtor.Safety = Math.Max(0, debtor.Safety - 10);
                     string text = debtor.Name + " defaulted on a " + d.Soups + "-soup debt to " + creditor.Name + ". Expect trouble between them.";
+                    Remember(debtor, "debt", "Could not pay " + creditor.Name + " back.", creditor.Id); Remember(creditor, "debt", debtor.Name + " never paid up.", debtor.Id);
                     PeopleDynamics.Record(Data, "economy", debtor.Id, text, 3); Notice = text;
                     if (creditor.Gang != "Unaffiliated") DebtDefaulted(debtor, creditor);
                 }

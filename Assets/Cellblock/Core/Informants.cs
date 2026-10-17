@@ -542,6 +542,7 @@ namespace Cellblock.Core
         void Label(Resident r, string why)
         {
             r.Jacket = true; r.JacketMinute = Data.Minute;
+            Remember(r, "jacket", "People started calling them a snitch.");
             Informant inf = InformantOf(r);
             if (inf != null && inf.Status == "Active") { inf.Status = "Burned"; IntelWork.Burned++; }
             string text = "The population now calls " + r.Name + " a snitch (" + why + ")." + (InGeneralPopulation(r) ? " Expect threats; protective custody is available." : "");
@@ -606,6 +607,7 @@ namespace Cellblock.Core
             if (r == null || r.ProtectiveCustody == on) return false;
             if (on && (!r.Legal.Ready || r.Legal.Custody != "In facility" || InIntake(r))) { Notice = r.Name + " is not in the facility."; return false; }
             r.ProtectiveCustody = on; r.CustodySince = on ? Data.Minute : -1;
+            Remember(r, "custody", on ? "Moved to protective custody." : "Returned to general population.");
             if (on) LeaveJob(r.Id, "moved to protective custody");
             RemoveResidentPath(r); r.NextDecisionMinute = Data.Minute;
             Notice = r.Name + (on ? " moved to protective custody" + (reason != "" ? " (" + reason + ")" : "") + ": kept in their cell, meals on trays, safe from the population." : " returned to general population.");
@@ -697,6 +699,7 @@ namespace Cellblock.Core
             var inf = new Informant { ResidentId = r.Id, Reward = reward, RecruitedMinute = Data.Minute, Reliability = 55 + (int)(JusticeRules.Unit(Data.Seed, r.Id, "reliable", 0) * 40),
                 DoubleAgent = loyal && JusticeRules.Unit(Data.Seed, r.Id, "double-agent", 0) < 0.5f };
             s.Informants.Add(inf);
+            Remember(r, "informant", "Agreed, quietly, to pass information to staff.");
             Notice = r.Name + " agreed to pass information for " + reward.ToLowerInvariant() + ". Their reliability will show over time.";
             PeopleDynamics.Record(Data, "intel", r.Id, "Recruited as a confidential informant (" + reward.ToLowerInvariant() + ").", 1);
             return true;

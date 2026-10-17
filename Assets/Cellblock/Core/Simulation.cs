@@ -23,7 +23,7 @@ namespace Cellblock.Core
         public int RoutineOffset, NextDecisionMinute;
         public List<Relationship> Relationships = new List<Relationship>();
     }
-    [Serializable] public sealed class Relationship
+    [Serializable] public sealed partial class Relationship
     {
         public string OtherId = "";
         public float Trust = 30, Tension = 20;

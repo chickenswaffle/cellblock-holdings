@@ -281,6 +281,27 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
 - **Final:** 293/293 core checks. Unity typecheck passes for editor/macOS and iOS. Builder balance on final code: 9/9 at 21 days, 9/9 at 35 days (federal rerun included).
 - **Handoff:** local locks released in Claude's clone. Rows stay Claude until you integrate `codex/claude-overload`.
 
+### 2026-10-17 — resident lives: activities, memories, story chapters, poses (acknowledging Codex `e6e299d`)
+
+- **Acknowledged.** Codex's HUD meters and night-watch publication `e6e299d` is merged into `codex/claude-overload` (`9a20549`; clean, 293/293). Scopes claimed: resident-lives, opening-and-build-ui, population-pressure, personnel, economy. Codex's `StatMeter`/metrics hooks are untouched.
+- **Built**, per `docs/claude-lives-handoff.md` (details in `docs/lives-notes.md`):
+  - **Activities at real furnishings**, in free time only:
+    - reading at shelves, exercise at benches, television (seats on nearby benches and chairs), study at table places, talking with friends at a common-room spot, quiet time on the bunk;
+    - capacity per furnishing, reachability, staggered personal replanning;
+    - `ChooseResidentActivity` stays a pure read of the stored plan, and replaces only a trip home.
+  - **Progress:** books, fitness, certificates (+5% sentencing credit through counsel), one-way mentoring.
+  - **Memories:** up to 12, with same-day dedupe. They come from relationships, fights, activities and every Claude system.
+  - **Story chapters:** derived from state.
+  - **Poses:** Read, Exercise, Watch, Study (bench-aligned table seat) and Rest (the verified sleep placement). The head pose runs after `MoveActor`'s idle glance, which takes the head back afterwards.
+  - **Life block** on the resident card.
+- **Files:** new `Core/Lives.cs`, `Runtime/GameLivesHud.cs`, `Resources/Lives.uss`, `docs/lives-notes.md`. Edited, all Claude-owned: `FacilityLivesView.cs`, `LivesChecks.cs`, `Simulation.cs` (`Relationship` partial), one-line memory calls in the Economy/Informants/Counsel/Personnel/Contraband/Population/Kitchen files, the `GameEconomyHud` card order, and `GameModesChecks` (the fight-scale comparison also holds activities off).
+- **Evidence:**
+  - 303/303 core checks (10 new lives checks, including the real hook's purity and priority, capacity, and a reload mid-activity).
+  - Unity typecheck passes for editor/macOS and iOS.
+  - Builder balance: 9/9 at 21 days (0 riots, 0 strikes) and 9/9 at 35 days across county, state and federal (at most 1 strike). County unrest 65–78, previously 65–84.
+  - Fuzz with the lives demo plus Unity-style reloads: 529,920 minutes, 3,931 round trips, 0 failures.
+- **Unity check request:** `docs/lives-notes.md` § Unity check request (five items: activity poses at real furnishings, meal and night priority, Life block fit, head release after reading, reload mid-activity). The disposable demo is the "Demo · free time" button on a resident card (09:00–10:00 or 20:00–21:40).
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:
