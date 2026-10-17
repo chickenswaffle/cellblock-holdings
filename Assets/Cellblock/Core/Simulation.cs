@@ -290,6 +290,10 @@ namespace Cellblock.Core
             Data = data;
             ValidateOperations();
             if (!Reconciles()) throw new ArgumentException("The saved ledger does not reconcile.");
+            // Someone standing where the route planner cannot start (reached in a straight line, beside a furnishing
+            // corner) goes back to their home on load instead of making the whole save unloadable.
+            foreach (Resident r in Data.Residents)
+                if (IsPresent(r) && Routes.Clear(r.Home, r.Home) && Geometry.Distance(r.Position, r.Home) > 0.01f && Routes.Find(r.Position, r.Home) == null) r.Position = r.Home;
             string blocked = CheckRoutes(Data.Walls);
             if (blocked != "") throw new ArgumentException("Invalid saved routes: " + blocked);
             var occupiedStations = new Navigation(Data.Walls, Data.Fixtures);
@@ -577,7 +581,7 @@ namespace Cellblock.Core
                 if (!routes.Clear(meal, meal) || !routes.Clear(yard, yard) ||
                     routes.Find(home, meal) == null || routes.Find(home, yard) == null)
                     return "This plan cuts off " + resident.Name + "'s route to meals or the yard. Add a doorway or another route.";
-                if (routes.Find(resident.Position, meal) == null)
+                if (routes.Find(resident.Position, meal) == null && routes.Find(resident.Position, home) == null)
                     return "A resident is inside the proposed wall or would lose access. Wait or change this stage.";
             }
             return "";

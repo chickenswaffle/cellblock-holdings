@@ -32,7 +32,7 @@ namespace Cellblock.Core
         public int NextMinute = -1, StartMinute = -1, AnnouncedMinute = -1, Waypoint;
         public Point Inspector = new Point(-2, -14);
         // Cumulative counters at the last audit, so each report covers only its own period.
-        public int Fights, Welfare, Escapes, MissedHearings, Lapsed, Seized, Skipped, Riots, Assaults, Refused, Overdoses, Crises;
+        public int Fights, Welfare, Escapes, MissedHearings, Lapsed, Seized, Skipped, Riots, Assaults, Refused, Overdoses, Crises, Trays, Minute;
     }
     [Serializable] public sealed class Disturbance
     {
@@ -61,6 +61,8 @@ namespace Cellblock.Core
         public bool Terminated;
         public double PerDiemRemainder, ResidentCostRemainder;
         public string LastSurge = "";
+        // Meals carried to housing for people who missed the dining room (no place, a long walk, lockdown).
+        public int TrayMeals, TrayDay = -1, TraysToday, TraysYesterday;
     }
     public sealed partial class State
     {
@@ -181,7 +183,7 @@ namespace Cellblock.Core
             if (p.Bus == null || p.Audit == null || p.Riot == null || p.Riot.Rioters == null || p.Reports == null || p.Strikes == null || Array.IndexOf(Policies, p.Policy) < 0)
                 throw Invalid("missing records or an unknown transfer policy");
             if (!Finite(p.Backlog) || p.Backlog < 0 || p.Backlog > 400 || !Finite(p.Unrest) || p.Unrest < 0 || p.Unrest > 100 ||
-                new[] { p.Serial, p.Received, p.Refused, p.Diverted, p.Riots, p.Assaults }.Any(n => n < 0) || p.CriticalSince > state.Minute || p.LastBusMinute > state.Minute ||
+                new[] { p.Serial, p.Received, p.Refused, p.Diverted, p.Riots, p.Assaults, p.TrayMeals, p.TraysToday, p.TraysYesterday }.Any(n => n < 0) || p.CriticalSince > state.Minute || p.LastBusMinute > state.Minute ||
                 p.MoratoriumUntil < -1 || p.LastMoratoriumMinute > state.Minute)
                 throw Invalid("counters out of range");
             if (double.IsNaN(p.PerDiemRemainder) || double.IsNaN(p.ResidentCostRemainder) || p.PerDiemRemainder < 0 || p.PerDiemRemainder >= 1 || p.ResidentCostRemainder < 0 || p.ResidentCostRemainder >= 1)
@@ -192,7 +194,7 @@ namespace Cellblock.Core
                 throw Invalid("transfer bus");
             AuditState a = p.Audit;
             if (Array.IndexOf(AuditPhases, a.Phase) < 0 || a.Reason == null || a.StartMinute > state.Minute || !Road(a.Inspector) || a.Waypoint < 0 ||
-                new[] { a.Fights, a.Welfare, a.Escapes, a.MissedHearings, a.Lapsed, a.Seized, a.Skipped, a.Riots, a.Assaults, a.Refused, a.Overdoses, a.Crises }.Any(n => n < 0))
+                new[] { a.Fights, a.Welfare, a.Escapes, a.MissedHearings, a.Lapsed, a.Seized, a.Skipped, a.Riots, a.Assaults, a.Refused, a.Overdoses, a.Crises, a.Trays }.Any(n => n < 0) || a.Minute > state.Minute)
                 throw Invalid("audit schedule");
             Disturbance riot = p.Riot;
             var ids = new HashSet<string>(state.Residents.Where(r => r != null).Select(r => r.Id));
@@ -259,6 +261,8 @@ namespace Cellblock.Core
             AdvanceContraband();
             if (Data.Minute % 30 == 10) AdvanceUnrest();
             AdvanceRiot();
+            int minuteOfDay = Data.Minute % 1440;
+            if (minuteOfDay == 10 * 60 + 5 || minuteOfDay == 15 * 60 + 5 || minuteOfDay == 21 * 60 + 5) ServeTrays();
             AdvanceAudit();
             AccruePopulationCosts();
             AccrueUpgradeCosts();
@@ -533,6 +537,27 @@ namespace Cellblock.Core
             }
         }
 
+        // ---- meal trays --------------------------------------------------------------------------
+        public const long TrayCents = 400;
+        // After each meal, anyone on site who is still hungry gets a tray in housing: nobody starves for lack of a
+        // seat, but trays cost money and staff time, are eaten alone, and inspectors count them.
+        void ServeTrays()
+        {
+            PopulationState p = Population;
+            if (p.TrayDay != Day) { p.TraysYesterday = p.TrayDay == Day - 1 ? p.TraysToday : 0; p.TraysToday = 0; p.TrayDay = Day; }
+            int served = 0;
+            foreach (Resident r in Data.Residents)
+            {
+                if (!IsPresent(r) || r.Food >= 55) continue;
+                r.Food = Math.Min(100, r.Food + 25); r.Stress = Math.Min(100, r.Stress + 2); served++;
+            }
+            if (served == 0) return;
+            p.TrayMeals += served; p.TraysToday += served;
+            Book(-(long)(served * TrayCents * ModeLocation.WageIndex), "meal-trays", "Meals carried to housing");
+            foreach (StaffMember s in ResponseOfficers()) s.Pressure = Math.Min(100, s.Pressure + Math.Min(2, served * 0.05f));
+        }
+        public float TraysPerResidentDay { get { int present = Math.Max(1, Data.Residents.Count(IsPresent)); return (Population.TraysToday + Population.TraysYesterday) / 2f / present; } }
+
         // ---- crowding, unrest and riots ------------------------------------------------------------
         public float UnrestTarget(List<RiskFactor> factors = null)
         {
@@ -546,6 +571,7 @@ namespace Cellblock.Core
             if (over > 0) Add("Crowding over rated capacity", Math.Min(30, over * 60));
             if (FloorSleepers > 0) Add("People sleeping on the floor", Math.Min(12, FloorSleepers * 1.5f));
             Add("Missed meals", present.Count(r => r.Food < 30) / (float)present.Count * 25);
+            Add("Meals eaten in housing on trays", Math.Min(10, TraysPerResidentDay * 15));
             Add("Drugs, alcohol and weapons inside", Math.Min(20, ContrabandPressure() * 4));
             int recent = Data.History.Count(e => e.Category == "fight" && Data.Minute - e.Minute < 1440 && e.Severity >= 3);
             Add("Fights in the last day", Math.Min(18, recent * 4));
@@ -711,6 +737,7 @@ namespace Cellblock.Core
             a.Fights = Personnel.Fights; a.Welfare = Personnel.WelfareViolations; a.Escapes = Data.Justice.Escapes; a.MissedHearings = Data.Justice.MissedHearings;
             a.Lapsed = Personnel.LapsedWriteUps; a.Seized = Data.Contraband.Seized; a.Skipped = Data.Intake.SkippedStages; a.Riots = Population.Riots;
             a.Assaults = Population.Assaults; a.Refused = Population.Refused; a.Overdoses = Data.Contraband.Overdoses; a.Crises = Data.Intake.Crises;
+            a.Trays = Population.TrayMeals; a.Minute = Data.Minute;
         }
         public bool StageAuditDemo() { AuditState a = Population.Audit; if (a.Phase == "In progress") return false; a.NextMinute = Data.Minute + 1; a.Reason = "Unannounced inspection"; a.Phase = "Announced"; return true; }
         void AdvanceAudit()
@@ -769,6 +796,8 @@ namespace Cellblock.Core
             if (welfare > 0) Find("Welfare", Math.Min(16, welfare * 4), welfare + " welfare violation" + (welfare == 1 ? "" : "s") + " for untreated injuries.");
             if (crises > 0) Find("Welfare", Math.Min(12, crises * 4), crises + " welfare crisis" + (crises == 1 ? "" : "es") + " among people not screened at intake.");
             if (overdoses > 0) Find("Welfare", Math.Min(15, overdoses * 5), overdoses + " overdose" + (overdoses == 1 ? "" : "s") + ".");
+            int trays = Population.TrayMeals - a.Trays; float days = Math.Max(1, (Data.Minute - a.Minute) / 1440f);
+            if (trays > 0) Find("Welfare", Math.Min(8, (int)Math.Ceiling(trays / days / Math.Max(10, present) * 12)), trays + " meal" + (trays == 1 ? " was" : "s were") + " carried to housing on trays: the dining rooms lack places or are too far.");
             int hungry = Data.Residents.Count(r => IsPresent(r) && !InIntake(r) && r.Food < 25);
             if (hungry > 0) Find("Welfare", Math.Min(10, hungry * 2), hungry + " " + (hungry == 1 ? "resident is" : "residents are") + " going hungry; meal service lacks places or shifts.");
             int lapsed = Personnel.LapsedWriteUps - a.Lapsed;

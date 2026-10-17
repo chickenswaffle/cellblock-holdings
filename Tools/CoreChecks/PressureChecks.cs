@@ -193,6 +193,30 @@ static partial class Program
             world.Data.GeometryGeneration++;
             Check(world.MealPlaceCount == before, "Without its serving counter the room still counted as dining");
         });
+        Test("people who miss the dining room get a tray instead of starving; trays cost money and are audited", () => {
+            World world = County(); Hold(world); world.EnsureLegalProfiles();
+            world.AdvanceMinutes((world.Data.Minute / 1440 + 1) * 1440 + 10 * 60 - world.Data.Minute);
+            foreach (Resident r in world.Data.Residents) r.Food = 20;
+            long cost = Ledger(world, "meal-trays");
+            world.AdvanceMinutes(10);
+            int present = world.Data.Residents.Count(world.IsPresent);
+            Check(world.Data.Residents.Where(world.IsPresent).All(r => r.Food >= 40) && world.Population.TrayMeals >= present && present > 0, "Hungry residents were not given trays: " + world.Population.TrayMeals + " for " + present);
+            Check(Ledger(world, "meal-trays") <= cost - (long)(present * 400 * world.ModeLocation.WageIndex) + 1 && world.Reconciles(), "Trays were not charged");
+            var factors = new List<RiskFactor>(); world.UnrestTarget(factors);
+            Check(factors.Any(f => f.Label.Contains("trays") && f.Points > 0), "Trays did not show up in unrest");
+            Check(world.Inspect(false).Findings.Any(f => f.Text.Contains("trays")), "The audit ignored tray meals");
+        });
+        Test("someone standing where routes cannot start is sent home on load instead of breaking the save", () => {
+            World world = County(); world.EnsureLegalProfiles();
+            Resident r = world.Data.Residents[0];
+            Point spot = default(Point); bool found = false;
+            for (float y = -7.8f; y < 7.8f && !found; y += 0.1f) for (float x = -13.9f; x < 1.9f && !found; x += 0.1f)
+            { var p = new Point(x, y); if (world.Routes.Clear(p, p) && world.Routes.Find(p, r.Home) == null) { spot = p; found = true; } }
+            Check(found, "Setup: no clear but unplannable spot in the starter");
+            r.Position = spot;
+            World loaded = new World(RoundTrip(world.Data));
+            Check(Geometry.Distance(loaded.Data.Residents[0].Position, r.Home) < 0.01f, "The stranded resident was not returned home on load");
+        });
         Test("unrest rises with crowding, missed meals and contraband, and falls with officer coverage", () => {
             World world = County(); world.EnsureLegalProfiles();
             float calm = world.UnrestTarget();
