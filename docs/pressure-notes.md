@@ -19,11 +19,14 @@ transfer demand ─▶ bus ─▶ intake (staged) ─▶ bed or floor mattress �
 
 - **Demand.** Transfers per day = base residents × tier rate × facility factor × growth multiplier. Tier rates per base resident per day: city 0.22, county 0.12, state 0.08, federal 0.06. Growth adds 4–5% a day, capped at ×3. A supermax receives half, a reentry campus 0.8, holding centers and camps 1.1. Demand starts on the first evening.
 - **Surges.** Every 6–10 days, 3–6 extra people arrive with a reason that fits the tier (e.g. "The county next door is over capacity").
-- **The bus.** A secure transfer coach on road coordinates carries up to 8. It runs 06:00–20:00, after 20 minutes plus the location's court drive. It waits at a closed vehicle gate and unloads one person every 2 minutes into intake holding.
+- **The bus.** A secure transfer coach on road coordinates carries up to 8 and is dispatched 06:00–18:00. It arrives after 20 minutes plus the location's court drive and unloads one person every 2 minutes into intake holding.
+- **The gate.** The bus waits at a closed vehicle gate. An officer on the Gate post duty admits it without opening the gate to everything else. After 2 hours waiting it turns back, and every seat counts as a fined refusal, so keeping the gate shut is not a free way to stop transfers.
 - **Policy.** *Accept all* (default) houses everyone, using floor mattresses when beds run out. *Only free beds* refuses the rest at $300 each (× penalty scale), and each refusal counts against the contract at audit.
 - **Moratorium.** A 2-day pause costs $2,500/day (scaled), once every 7 days. It also clears two days of backlog.
 - **Ceiling.** Committed population stops at 96 (performance guard); extra demand is diverted, without penalty.
 - **Money.** Each resident above the contract's base earns 85% of the base per-resident rate as per-diem. It is paid with the contract, into receivables. Each also costs $18/day × the location's wage index in food and supplies.
+- **Advance on revenue.** Draw half of the earned, unpaid receivable now, less a 3% fee. This is bridge financing for monthly-paid state and federal contracts; the rest arrives on payment day.
+- **Contract terms** follow the chartered facility type and location; the three original offers map to identical terms. New companies start from `World.StartCharter`, with the type's own capital and land price.
 
 ## Housing and crowding
 
@@ -34,7 +37,9 @@ transfer demand ─▶ bus ─▶ intake (staged) ─▶ bed or floor mattress �
 
 ## Meals (Simulation.cs, handed-off file)
 
-Meal places are 6 around each table in the dining room, plus one per dining chair there. When the roster exceeds the places, meals run in up to four shifts. Each person keeps one place and one shift, and sets off 45 minutes before their block. Anyone beyond four shifts of places has no seat and goes hungry. The service bonus measures people at their seat against those due now plus those with no seat. With one shift, behavior matches the original. Quotes validate the places the plan would leave.
+Meal places are 6 around each table in the dining room, plus one per dining chair there. When the roster exceeds the places, meals run in up to four shifts. Each person keeps one place and one shift, and sets off 45 minutes before their block. Someone still hungry keeps the place for an hour past the block, so a long walk still ends in a meal. Anyone beyond four shifts of places has no seat and goes hungry; malnutrition has its own welfare message pointing at dining places.
+
+The service bonus measures people at their seat, plus those already full, against those due now plus those with no seat. With one shift, behavior matches the original. Quotes validate the meal places, and the yard places beyond the first twelve, that the plan would leave. Extra yard places are clear outdoor cells, so building in the yard removes a spot instead of stranding someone.
 
 ## Intake (Core/Intake.cs)
 
@@ -47,7 +52,8 @@ Meal places are 6 around each table in the dining room, plus one per dining chai
 
 - **Included programs.** Federal contracts include the federal program; state contracts include Standard. City and county facilities start at Basic.
 - **Required by audit.** City Basic, county Basic, state *Enhanced*, federal Federal.
-- **Lanes.** The sally port counter, plus each administration desk within 12 m of the sally port (up to 4 lanes in all).
+- **Lanes.** The sally port counter, plus each administration desk within 12 m of the sally port (up to 4 lanes in all). State and federal charters start with a booking desk there. A case whose lane is removed returns to holding and resumes.
+- **Night staff.** Any line staff member, nurses included, can move to the night shift from the personnel file. Evening arrivals otherwise skip nurse and caseworker steps.
 - **Staffing.** Each step needs its role physically at the lane station. Each minute, free staff are matched to the nearest waiting case, with Intake-duty staff first. A step is skipped, and audited, only when nobody qualified is on shift for 60 minutes. Riots, escape responses and serious patients take priority.
 - **Hidden arrival conditions.**
   - *Injury* (10%): health 55–75.
@@ -111,7 +117,7 @@ Meal places are 6 around each table in the dining room, plus one per dining chai
   - **Crowding:** over the tier limit (125% / 115% / 110% / 100%), and floor sleepers.
   - **Staffing:** residents per on-shift officer against 14 / 12 / 10 / 8.
   - **Intake:** program below the requirement (−20, federal −30), skipped steps, waits over 12 h.
-  - **Violence:** fights, weapon assaults, riots.
+  - **Violence:** fights (1.2 points per fight per ten residents, cap 15), weapon assaults, riots.
   - **Welfare:** violations, crises, overdoses, hungry residents.
   - **Records:** lapsed write-ups, missed hearings.
   - **Contract:** refusals.
@@ -128,16 +134,21 @@ Meal places are 6 around each table in the dining room, plus one per dining chai
   | <50 | Fail | $10,000 fine and a strike |
 
   All money is scaled by the tier's penalty scale.
-- **Termination.** Three active strikes (30 days) end the contract. So does cash below the larger of $50,000 debt or a quarter of opening capital. After termination, contract revenue, transfers and Claude-owned fines stop; Justice's custody penalties are Codex's and still apply.
+- **Termination.** Three active strikes (30 days) end the contract. So does insolvency: cash plus money owed below the larger of $50,000 of debt or a quarter of opening capital. After termination, contract revenue, transfers, audits and Claude-owned fines stop; Justice's custody penalties are Codex's and still apply.
 
 ## Upgrades (Core/Upgrades.cs)
 
 There are 16 purchasable programs with one-time prices and daily running costs (see `docs/upgrade-roadmap.md`), plus 8 planned entries shown as coming later. Commissary and resident phones earn $1.50 and $1.00 per resident per day.
 
-## Balance probes (no player action, 21 days, county intake)
+## Balance (critic's harness, 21 days, 3 seeds each)
 
-- **Only free beds:** cash about $60–80k throughout, population 12, fights grow to about 40, one late failed audit.
-- **Accept all:** 150% capacity by day 7, then a collapse by day 10–14 (riots, failed audits, termination). About a week to build and hire before it bites.
+| Strategy | County intake | State medium | Federal camp |
+| --- | --- | --- | --- |
+| Idle, accept all | collapses by day 10–14: riots, all audits fail, terminated | collapses, terminated | collapses, terminated |
+| Refuse transfers, 2 officers and a nurse | survives at 12 residents; Conditional or Fail audits; most cash ($62–72k) | hard: violence and contraband audits; 2 strikes | survives at 12 residents |
+| Builder (wings when beds run short, officers to the standard, nurse and night staff, required intake, dining chairs, advances) | survives 3/3: 47–56 residents, 0 strikes, $44–48k | survives 3/3: about 50 residents, 1 strike, solvent with $59–90k owed | survives 3/3: 38–39 residents, 0–1 strikes |
+
+Before the post-critic fixes, the builder failed all 24 of its runs: starvation from long walks to meal shifts, monthly-payment insolvency, and absolute violence counts. Refusing everything is no longer the dominant strategy: refusals cost strikes, and the builder runs a facility four times the size on per-diem.
 
 ## Unity check request (Codex as runner)
 
@@ -155,13 +166,16 @@ Please run in Play, at iPhone landscape and 900×420 as well as desktop.
 10. **Ride along.** From a person card, the camera follows from behind and above, and drag or Q/E orbits. The body-cam monitor updates. Tab or Next cycles people, and Esc or Exit returns to the exact previous build camera. A resident boarding the court van ends the ride with a notice.
 11. **Saves.** Save and reload mid-bus, mid-intake, mid-drone and mid-riot, using Unity `JsonUtility` saves.
 12. **Console.** No runtime errors. Check that the `lamp-*` emission keyword survives a player build; if the variant is stripped, the markers just render unlit.
+13. **New-game menu.** It shows the "Charter a facility" card above the three classic offers. Choose → jurisdiction, institution and location → Charter facility starts that company: reserve equals the type's capital minus land, and state and federal starts have a second desk south of the dining table.
+14. **Personnel file.** The Duty tab shows Day 08:00 / Night 20:00 for every line staff member (not the warden), and the selection persists through save and reload.
+15. **Pressure tab.** "Advance on revenue" enables once $2,000 is owed. Pressing it moves half of the owed amount, less 3%, into cash. A transfer bus held at a closed gate turns back after two game hours with a refusal notice.
 
 ## Interface requests (Codex-owned files)
 
 1. **Walk cache.** `World.Walk` caches an empty route forever when the first `Routes.Find` fails, so a walker with a fixed target never retries. I wrap it as `WalkFresh` in my code; please consider dropping empty cached routes in `Walk` itself.
 2. **Escape-risk hook.** Escape tools have no escape-risk effect yet. Please add `partial void ExtraEscapeFactors(Resident resident, List<RiskFactor> factors, ref float total)` in `Justice.EscapeRisk`, and I will add +12 for escape tools and +4 for a phone.
 3. **New fixtures.** Please add body scanner, intake/booking desk, drone detector mast, yard netting and walk-through metal detector to `FixtureCatalog` and `FacilityView`, with exactly those kinds. Until then they are program upgrades.
-4. **Starter layouts.** Build them from `FacilityType.StarterRooms`; federal and state starts should include a booking desk near the sally port (a second intake lane).
+4. **Starter layouts.** Build them from `FacilityType.StarterRooms`. State and federal charters already get a booking desk near the sally port through `World.StartCharter` (Claude's `Simulation.cs`); distinct starter buildings per type would still help.
 5. **Penalties after termination.** Justice custody penalties continue after contract termination; suppress them via `PenaltiesApply`.
 6. **Staff look.** Faces and hair for staff actors need a hook equivalent to `PrepareResidentPose` (the pressure view only dresses residents).
 7. **Visitation.** It is abstract (no visitors on site). A visiting room and visitor actors would make the visit route physical.

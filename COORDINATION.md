@@ -119,6 +119,57 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
 - User request for this pass: (1) finish the open personnel critic findings and game-modes critic/mutation/docs; (2) continuous transfer arrivals from an overloaded system, overcrowding, riots, failed audits and violence as failure pressure that makes the player keep building; (3) contraband of many kinds with drone drops and other smuggling routes; (4) a thorough staged intake program, mandatory and complete for federal facilities and upgradeable elsewhere; (5) an upgrade catalog plus a roadmap of everything upgradeable; (6) graphics and character appeal; (7) a switchable first/third-person view of any character (critic run first).
 - Boundaries: security equipment (towers, dogs, CCTV, lighting, perimeter, power) stays Codex's; contraband detection only queries it (`CameraSees`, `SecurityDetectionAt`, `IsIlluminated`, handlers). New physical fixtures for intake, scanning and drone defense will be requested from Codex rather than added to `FixtureCatalog.cs`; until then they are program upgrades. Character appearance goes through `PrepareResidentPose`/`AnimateResidentLife`; staff actors and lighting stay Codex's.
 
+### 2026-10-16 — overload, intake, contraband, upgrades, appearance and ride-along (branch `codex/claude-overload`)
+
+- **Personnel critic findings fixed** (`e884dcc`):
+  - (2) off-shift rest recovery plus a daily burnout warning; a default county company keeps its staff for 14 days;
+  - (3) duty-target hysteresis, so watchers keep pace;
+  - (5) commendations once per 3 days;
+  - (6) paid checks survive a refresh;
+  - (7) exact raise reversal;
+  - (8) refused referral at the charge cap;
+  - (9) minor write-ups lapse without a warden and overflow drops the least serious.
+  - Security posts and escape responses keep sole ownership of an officer's destination. There is a no-duty control check for the gate post. 19/19 mutants killed.
+- **Game modes finished:** 24/24 mode mutants killed with new checks (`038f3bb`, see `docs/game-modes.md`). The tier `CorruptShare` now scales staff smuggling.
+- **New scope `population-pressure`** (`f7c1f9e` core, `2e7d6f4` runtime, `5dd2301` checks, `0313d08` docs). New files: `Core/Population.cs`, `Core/Intake.cs`, `Core/Contraband.cs`, `Core/Upgrades.cs`, `Tools/CoreChecks/PressureChecks.cs`, `Tools/CoreChecks/LivesChecks.cs` (implements your `RunLivesChecks` hook), `Runtime/FacilityPressureView.cs`, `Runtime/GamePressureHud.cs`, `Resources/Pressure.uss`, `docs/pressure-notes.md`, `docs/upgrade-roadmap.md`. Resident-lives scope: `Runtime/FacilityLivesView.cs`. Opening-and-build-ui scope: `Runtime/GameRideAlong.cs`; GameController is now `partial`. Metas are minimal with fresh GUIDs.
+- **Handed-off files edited:**
+  - `Simulation.cs`: pressure hooks (`HydratePressure`, `AdvancePressure` after `AdvanceJustice`, `PressureMovement`, `PressureTarget`).
+  - Meals in shifts at real table and chair places, with a 45-minute head start.
+  - Plan-aware meal places in `CheckRoutes`; floor mattresses and intake cases are exempt from route blocking.
+  - Revenue stops on termination.
+  - `GameHud.cs`: a Pressure workspace and tab, plus a `LayoutPressure` hook.
+  - `GameController.cs`: the pressure view, the ride-along camera and body cam, Esc/Tab, and `StartCharter`.
+  - New-game menu: a "Charter a facility" card opening `ShowModePicker`, plus `World.StartCharter`; `World.Contract` follows the chartered mode. This closes my earlier wiring request, except distinct starter buildings per type.
+  - `Personnel.cs` is Claude's.
+- **Codex check files edited** (behavior they test is now Claude's `Simulation.cs`), in `Program.cs`:
+  - Distinct meal destinations are now distinct (place, shift).
+  - The "leave initial positions" wait is 180 minutes, because a passed breakfast shift waits for the yard.
+  - The circulation-earnings window now runs through lunch.
+- **Evidence:**
+  - 172/172 core checks (SDK 8.0.426).
+  - Pressure mutation testing: 72 deliberate bugs, 71 caught, 1 was a redundant line (removed).
+  - Offline Unity typecheck passes for editor/macOS and iOS.
+  - Balance probes are in `docs/pressure-notes.md`.
+  - Independent critic (read-only, fuzz 1.8M game minutes with System.Text.Json and JsonUtility-style round trips) confirmed 7 bugs, all fixed (`b470a10`, `d28d8a0`):
+    - contraband held by a released resident made saves unloadable;
+    - yard places for a larger roster were never checked against obstacles;
+    - removing an intake desk stranded a case;
+    - audits fined after termination;
+    - non-officers were day-only (now a night shift option);
+    - drop assignments never released;
+    - the drone package spun.
+  - Its balance finding (building never saved the facility; refusing everything dominated) was fixed with meal grace, night staff, violence findings per ten residents, gate turn-back, revenue advances and net-position solvency. The charter flow (`08df2a1`) now gives each type its own capital and land. A sensible builder survives 9/9 21-day runs across county, state-medium and federal-camp (before: 0/24).
+- **Unity check request (Codex as runner):** the 12-item script in `docs/pressure-notes.md` § "Unity check request", covering the Pressure tab fit at 280–360 px, bus/gate/unloading, desk lanes, drone, riot, audit inspector, mattresses and sleeping, seated meals, faces and jumpsuits, ride-along and body cam, mid-event JsonUtility saves and the console.
+- **Interface requests (your files):** listed in `docs/pressure-notes.md` § "Interface requests":
+  - `Walk` caches empty routes forever;
+  - an `ExtraEscapeFactors` hook;
+  - fixtures for body scanner, booking desk, drone detector, yard netting and walk-through detector;
+  - starter layouts with a booking desk near the sally port for state and federal types;
+  - Justice penalties after termination;
+  - a staff-appearance hook;
+  - physical visitation.
+  - The ride-along control phase needs movement hooks listed in `docs/possession-plan.md`.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:

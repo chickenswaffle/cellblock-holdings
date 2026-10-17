@@ -74,8 +74,9 @@ Contraband pressure also follows the tier: drone runs per 30 minutes are 0.2% / 
 
 All 24 deliberate mode mutants are killed.
 
-## Codex wiring still requested
+## New-game flow (wired)
 
-- Host `ShowModePicker` as the new-game screen, and build `World.Offers` from `GameModes.Offer(type, location)`.
-- Build the starter layout from `FacilityType.StarterRooms`/`Housing`/`Beds`, including a booking desk near the sally port for state and federal types.
-- Call `ApplyMode` right after `World.Start`.
+- The new-game menu opens the charter screen (`ShowModePicker`), and the three classic offers stay as quick starts.
+- `World.StartCharter(typeId, locationId)` books the type's own capital and the location's land price and seeds the population per type and location. It adds a booking desk near the sally port for state and federal types, then applies the mode.
+- `World.Contract` derives its terms from the chartered type and location.
+- Still open (Codex): distinct starter buildings per type from `FacilityType.StarterRooms`/`Housing`/`Beds`.
