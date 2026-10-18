@@ -35,12 +35,13 @@ namespace Cellblock.Unity
         bool ActionKeys()
         {
             if (World == null || !CharacterDirect) { ActionRunToggle = false; return false; }
-            World.SetActionRunning(ActionRunToggle || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
+            World.SetActionRunning(ActionRunToggle || GamepadRunHeld || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
             // Standing still, the officer acts on whatever the camera faces; walking, the walking direction wins.
             Vector3 forward = cameraRig == null ? Vector3.forward : cameraRig.transform.forward;
             Vector2 flat = new Vector2(forward.x, forward.z);
             if (flat.sqrMagnitude > 0.0001f) World.SetActionFacing(new Point(flat.x, flat.y));
             if (Input.GetKeyDown(KeyCode.F)) { ActionAttack(); return true; }
+            if (Input.GetKeyDown(KeyCode.R)) { ToggleActionRun(); return true; }
             if (Input.GetKeyDown(KeyCode.G)) { ActionGrab(); return true; }
             if (Input.GetKeyDown(KeyCode.Q)) { ActionPickUp(); return true; }
             if (Input.GetKeyDown(KeyCode.E) && World.StaffActionHints().CanUse) { ClearCharacterInput(); ActionUse(); return true; }

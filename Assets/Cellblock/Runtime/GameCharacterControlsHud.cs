@@ -61,7 +61,8 @@ namespace Cellblock.Unity
             characterPhoneButton.SetEnabled(game.CharacterDirect); characterInteractButton.SetEnabled(game.CharacterDirect);
             characterViewButton.text = game.CharacterPerspectiveLabel == "First person" ? "3rd person · V" : "1st person · V";
             characterPauseButton.text = world.Data.Speed == 0 ? "Resume · Space" : "Pause · Space";
-            characterControlHelp.text = game.CharacterDirect ? (world.Data.Speed == 0 ? "PAUSED · Resume to walk or make a call" : "WASD / arrows move · drag the world to look · V view · P phone · E interact · Esc management") : "FOLLOWING · People continue their own routines · drag to look · Esc management";
+            characterControlHelp.text = game.CharacterControlsHelp(world); // Claude look pass: written for the device in use (exact exception, 2026-10-18)
+            CharacterBarKeys(); // Claude look pass: key hints on the top-bar buttons follow the device (exact exception, 2026-10-18)
             characterContext.text = world.CharacterControlBlocker != "" ? world.CharacterControlBlocker : game.CharacterCameraObstructed ? "Close quarters · camera moved to eye level to stay clear of walls. Step into an open area for the shoulder view." : game.CharacterInteractionHint;
         }
         void LayoutCharacterControls(float left, float right, float top, float bottom, bool menuOpen)
@@ -70,7 +71,8 @@ namespace Cellblock.Unity
             bool active = game.CharacterViewActive && !menuOpen && !guideOpen;
             characterControlBar.style.display = active ? DisplayStyle.Flex : DisplayStyle.None;
             characterContext.style.display = active && !CharacterPhoneOpen ? DisplayStyle.Flex : DisplayStyle.None;
-            bool pads = active && game.CharacterDirect && !CharacterPhoneOpen && !BlocksSimulation && (Application.isMobilePlatform || root.resolvedStyle.width < 1050);
+            bool pads = active && game.CharacterDirect && !CharacterPhoneOpen && !BlocksSimulation && (Application.isMobilePlatform || root.resolvedStyle.width < 1050) &&
+                game.ActiveControlDevice != ControlDevice.Gamepad && !game.MouseLookCaptured; // Claude look pass: no touch sticks while a controller or captured mouse is in use
             characterMovePad.style.display = characterLookPad.style.display = pads ? DisplayStyle.Flex : DisplayStyle.None;
             if (!pads) ResetCharacterSticks();
             characterControlBar.style.left = left; characterControlBar.style.right = right; characterControlBar.style.top = top;

@@ -604,6 +604,20 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
 - **Evidence:** 4 new checks, 411 combined; offline compile; Unity `YardCapture` passed (8 of 12 busy, no runtime errors).
 - **For your natural-motion pass:** your idle/gait code runs first; yard poses hold the body only when someone is at a non-walking activity and nearly still (`a.Speed` under 0.12). Laps and pacing use your gait. Tell me if your planted-feet constraints need yard poses to release the legs.
 
+### 2026-10-18 — easier looking around for mouse, controller and touch (user request; exact exceptions in character-experience)
+
+- **User request:** first person is good, but looking around should be easier and make more sense (Hard Time III as inspiration), and must suit computer, controller and phone players. Notes: `docs/look-controls.md`.
+- **New (Claude):** `Runtime/GameLookInput.cs` (+meta), `Editor/LookCapture.cs` (+meta), `docs/look-controls.md`.
+- **Project change (unity-editor scope, claimed locally in Claude's clone):** `com.unity.inputsystem` 1.20.0 (bundled with the editor) in `Packages/manifest.json` + lock; `activeInputHandler: 2` (Both). Legacy `UnityEngine.Input` code is untouched and still drives touch/mouse/keyboard. Both asmdefs reference `Unity.InputSystem`.
+- **Exact exceptions in Codex files:**
+  - `Editor/ProjectSetup.cs`: enforces `activeInputHandler` 2 instead of 0 (it was resetting the project to legacy-only, which compiled the controller code out).
+  - `Runtime/GameCharacterControl.cs` `CharacterInputUpdate`: Esc frees a captured cursor first; phone closes with Select/B; `C` recenters; `GamepadButtons()` after V; gamepad move folded into the armed keyboard vector; `LookStick`/`GamepadLook` replace the linear LOOK-stick term; touch look starts at 40% width, uses `TouchLook` (points) and `LookTap` (double-tap) in direct control; `MouseLook` before the drag-look branch; `CameraAssist(move, ref look)` before the yaw update (move computed earlier, same expression). `EndCharacterView` clears `mouseLookWanted`. `StartCharacterPlay` message per device. Chase defaults pitch 20 / boom 4.6 (were 29 / 5.6), third-person min pitch 4 (was 10).
+  - `Runtime/GameCharacterControlsHud.cs`: help line from `game.CharacterControlsHelp(world)`; `CharacterBarKeys()` after it; touch sticks hidden while a controller or the captured mouse is in use.
+  - `Runtime/GamePreferences.cs`: `CharacterLookSpeed`, `InvertLook`, `CharacterCamera` (+ normalisation). `Runtime/GameSettingsHud.cs`: a "Playing as staff" block on the Controls page.
+  - Claude files: `GameController.cs` calls `UpdateControlDevice()` every frame; `GameActionInput.cs` R toggles run and LT/L3 run; `GameActionPad.cs` per-device captions, aiming dot, round-button selector specificity.
+- **Checks:** 411/411 core. Unity `LookCapture` PASSED in Claude's clone (virtual Input System controller: right stick turns, left stick walked 2.96 m, X struck, LB faced the nearest prisoner to 1°, third-person follow swing; cursor captured on entry and released on exit; keyboard/controller/900×420 touch/settings frames reviewed). Not covered: a physical controller, touch on a real phone.
+- **Unity check request (your runner):** merge `main`, let Unity resolve the Input System package (offline, bundled), and confirm your frontend/character reviews still pass with Both input handlers. If your FrontendReview pins the Controls page length, the new block adds about 300 px of scrolling content.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:

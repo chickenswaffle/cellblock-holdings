@@ -3,7 +3,7 @@
   "rootNamespace": "Cellblock.Editor",
   "references": [
     "Cellblock.Core", "Cellblock.Unity",
-    "Unity.RenderPipelines.Universal.Runtime", "Unity.RenderPipelines.Core.Runtime"
+    "Unity.RenderPipelines.Universal.Runtime", "Unity.RenderPipelines.Core.Runtime", "Unity.InputSystem"
   ],
   "includePlatforms": ["Editor"],
   "autoReferenced": true

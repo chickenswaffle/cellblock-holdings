@@ -117,13 +117,14 @@ namespace Cellblock.Editor
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, "com.cellblockholdings.game");
             PlayerSettings.iOS.targetOSVersionString = "16.0";
             PlayerSettings.colorSpace = ColorSpace.Linear;
-            // The prototype uses Unity's built-in touch/mouse API, with no Input System package requirement.
+            // Touch, mouse and keyboard use Unity's built-in input API; game controllers use the Input System package, so both
+            // handlers stay on (Claude look pass, exact exception 2026-10-18; was legacy-only).
             UnityEngine.Object[] playerAssets = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset");
             if (playerAssets.Length > 0)
             {
                 var settings = new SerializedObject(playerAssets);
                 SerializedProperty handling = settings.FindProperty("activeInputHandler");
-                if (handling != null && handling.intValue != 0) { handling.intValue = 0; settings.ApplyModifiedPropertiesWithoutUndo(); }
+                if (handling != null && handling.intValue != 2) { handling.intValue = 2; settings.ApplyModifiedPropertiesWithoutUndo(); }
             }
             AssetDatabase.SaveAssets();
             Debug.Log("Cellblock project prepared. Open Assets/Cellblock/Scenes/Main.unity and press Play.");

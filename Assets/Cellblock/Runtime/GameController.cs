@@ -172,6 +172,7 @@ namespace Cellblock.Unity
             bool blocked = World == null || hud == null || hud.BlocksWorldInput || appPaused || unfocused;
             if (blocked || nativeInputWasBlocked) magnification = 0;
             nativeInputWasBlocked = blocked;
+            UpdateControlDevice();
             if (World == null) return;
             UpdateCharacterSession();
             if (!appPaused && (!unfocused || presentationPreview) && !hud.BlocksSimulation && World.Data.Speed > 0)

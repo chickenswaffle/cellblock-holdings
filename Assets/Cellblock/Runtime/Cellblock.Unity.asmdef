@@ -1,6 +1,6 @@
 {
   "name": "Cellblock.Unity",
   "rootNamespace": "Cellblock.Unity",
-  "references": ["Cellblock.Core", "Unity.RenderPipelines.Core.Runtime", "Unity.RenderPipelines.Universal.Runtime"],
+  "references": ["Cellblock.Core", "Unity.RenderPipelines.Core.Runtime", "Unity.RenderPipelines.Universal.Runtime", "Unity.InputSystem"],
   "autoReferenced": true
 }
