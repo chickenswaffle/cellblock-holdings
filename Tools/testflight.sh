@@ -17,12 +17,14 @@ mode="${1:-}"
 if [[ "$mode" != --upload-only ]]; then
 echo "Unity: exporting the Xcode project (build $CELLBLOCK_BUILD_NUMBER, $CELLBLOCK_BUNDLE_ID)"
 "$unity" -batchmode -nographics -quit -projectPath "$root" -buildTarget iOS \
-  -executeMethod Cellblock.Editor.IosBuild.Device -logFile "$out/unity-device.log"
+  -executeMethod Cellblock.Editor.IosBuild.Device -logFile "$out/unity-device.log" || true
+# Unity rewrites shared settings while importing; put this clone's tracked files back before anything can fail.
+git -C "$root" checkout -- ProjectSettings Assets/DefaultVolumeProfile.asset Assets/UniversalRenderPipelineGlobalSettings.asset 2>/dev/null || true
 grep -q CELLBLOCK_IOS_BUILD_PASSED "$out/unity-device.log" || { echo "Unity build failed; see $out/unity-device.log" >&2; exit 1; }
 # No custom encryption: answer export compliance in the build so every upload skips the question.
 /usr/libexec/PlistBuddy -c "Delete :ITSAppUsesNonExemptEncryption" "$out/Device/Info.plist" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" "$out/Device/Info.plist"
-# The app icon: one 1024 px opaque image (the guard tower from the Home artwork); Xcode derives every size from it.
+# The app icon: one 1024 px opaque image (a cell at night, rendered by the game); Xcode derives every size from it.
 icons="$out/Device/Unity-iPhone/Images.xcassets/AppIcon.appiconset"
 rm -rf "$icons"; mkdir -p "$icons"; cp "$root/Tools/ios/AppIcon.png" "$icons/AppIcon.png"
 cat > "$icons/Contents.json" <<'JSON'
@@ -34,8 +36,6 @@ echo "Xcode: archiving"
 xcodebuild archive -project "$out/Device/Unity-iPhone.xcodeproj" -scheme Unity-iPhone -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$out/Cellblock.xcarchive" -allowProvisioningUpdates \
   DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic > "$out/archive.log" 2>&1 || { tail -30 "$out/archive.log" >&2; exit 1; }
-# Unity rewrites shared settings while importing; keep this clone's tracked files as committed.
-git -C "$root" checkout -- ProjectSettings Assets/DefaultVolumeProfile.asset Assets/UniversalRenderPipelineGlobalSettings.asset 2>/dev/null || true
 fi
 [[ -d "$out/Cellblock.xcarchive" ]] || { echo "No archive at $out/Cellblock.xcarchive; run without --upload-only first." >&2; exit 1; }
 rm -rf "$out/export"
