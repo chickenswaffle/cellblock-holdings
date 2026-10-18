@@ -14,17 +14,22 @@ using UnityEngine.Rendering.Universal;
 
 namespace Cellblock.Editor
 {
-    // Claude's controller-in-management review, run only from Claude's own clone in batchmode with graphics:
-    //   Unity -batchmode -projectPath <clone> -executeMethod Cellblock.Editor.PadCapture.Run -logFile <log>
+    // Claude's controller-in-management review on the shared single-editor PresentationPreview runner ("pad" feature mode):
+    //   PadCapture.Run() files the request; from Claude's clone in batch, Cellblock.Editor.ClaudeBatch.Run -cellblockFeature pad.
+    // The global Input System focus settings are snapshotted on start and restored on finish or abort.
     // Drives a virtual controller through management: sticks move and zoom the view, the reticle snaps to a prisoner and
     // A selects them, Y plays as a selected officer, Select opens the work phone there and B closes it without grabbing
     // anyone, the D-pad steps into the buttons and A presses one, Select opens Holdings and B returns, and a placement's
-    // quote is reached with A. Output: Builds/PadReview/.
+    // quote is reached with A. Output: a unique Temp/CellblockFeatureReviews/pad folder.
     [InitializeOnLoad]
     public static class PadCapture
     {
         const string StageKey = "Cellblock.Pad.Stage", ActiveKey = "Cellblock.Pad.Active", WaitKey = "Cellblock.Pad.Wait";
-        const string Output = "Builds/PadReview";
+        static string Output = "";
+        internal static bool IsRunning { get { return SessionState.GetBool(ActiveKey, false); } }
+        static bool inputSaved;
+        static InputSettings.BackgroundBehavior savedBackground;
+        static InputSettings.EditorInputBehaviorInPlayMode savedEditorInput;
         static readonly List<string> errors = new List<string>(), notes = new List<string>();
         static RenderTexture hud;
         static Gamepad pad;
@@ -45,16 +50,30 @@ namespace Cellblock.Editor
                 if ((type == LogType.Error || type == LogType.Exception || type == LogType.Assert) && !condition.StartsWith("CELLBLOCK_PAD")) errors.Add(condition.Replace('\n', ' '));
             };
         }
-        public static void Run()
+        public static void Run() { PresentationPreview.RequestFeatureReview("pad"); }
+        internal static void BeginExisting()
         {
-            ProjectSetup.Validate();
-            EditorSceneManager.OpenScene("Assets/Cellblock/Scenes/Main.unity");
-            if (Directory.Exists(Output)) Directory.Delete(Output, true);
+            if (!EditorApplication.isPlaying) throw new InvalidOperationException("Feature review requires the shared Play runner.");
+            Output = Path.Combine("Temp/CellblockFeatureReviews", "pad", DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N").Substring(0, 6));
             Directory.CreateDirectory(Output);
             errors.Clear(); notes.Clear(); shot = 0;
             SessionState.SetBool(ActiveKey, true); SessionState.SetInt(StageKey, 0);
             SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + 4);
-            EditorApplication.EnterPlaymode();
+        }
+        internal static void Abort(string reason)
+        {
+            if (!IsRunning) return;
+            errors.Add(reason); Finish(UnityEngine.Object.FindFirstObjectByType<GameController>(), false);
+        }
+        static void SaveInputSettings()
+        {
+            if (inputSaved) return;
+            savedBackground = InputSystem.settings.backgroundBehavior; savedEditorInput = InputSystem.settings.editorInputBehaviorInPlayMode; inputSaved = true;
+        }
+        static void RestoreInputSettings()
+        {
+            if (!inputSaved) return;
+            InputSystem.settings.backgroundBehavior = savedBackground; InputSystem.settings.editorInputBehaviorInPlayMode = savedEditorInput; inputSaved = false;
         }
         static void Next(float seconds) { readyFrame = Time.frameCount + 6; SessionState.SetInt(StageKey, SessionState.GetInt(StageKey, 0) + 1); SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + seconds); }
         static void Check(bool ok, string message) { if (!ok) errors.Add(message); }
@@ -82,6 +101,7 @@ namespace Cellblock.Editor
                         Check(GameHud.PadScore(new Rect(0, 0, 10, 10), new Rect(20, 0, 10, 10), Vector2.right) < GameHud.PadScore(new Rect(0, 0, 10, 10), new Rect(20, 40, 10, 10), Vector2.right), "A button level with the highlight is not preferred over one off to the side.");
                         Check(GameHud.PadScore(new Rect(0, 0, 10, 10), new Rect(-20, 0, 10, 10), Vector2.right) == float.MaxValue, "Stepping right can land on a button to the left.");
                         w.Data.Speed = 0;
+                        SaveInputSettings();
                         InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
                         InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
                         pad = InputSystem.AddDevice<Gamepad>("Pad review"); padState = new GamepadState();
@@ -262,6 +282,31 @@ namespace Cellblock.Editor
                     {
                         Release();
                         Check(game.Draft == null && game.Tool == BuildTool.Inspect, "B in the world did not discard the plan.");
+                        // A person standing right behind a tall cabinet from the camera: the reticle must not lock onto them,
+                        // because A there would select the cabinet (the shared closest-hit pick).
+                        Vector3 f3 = game.ArtCamera.transform.forward; Point f = new Point(f3.x, f3.z); f = f * (1 / Mathf.Max(.001f, f.Length));
+                        Resident behind = w.Data.Residents.First(r => r.Id != residentId && w.IsPresent(r) && !w.InIntake(r));
+                        residentId = behind.Id; behind.Position = w.Data.Yard + new Point(0, 4);
+                        w.Data.Fixtures.Add(new Fixture { Id = "pad-review-cover", Kind = "Armory", Position = behind.Position - f * .55f, Rotation = Mathf.Atan2(f.X, f.Y) * Mathf.Rad2Deg });
+                        foreach (Resident r in w.Data.Residents) if (r != behind && Geometry.Distance(r.Position, behind.Position) < 4) r.Position = r.Position + new Point(8, 0);
+                        foreach (StaffMember s in w.Data.Staff) if (Geometry.Distance(s.Position, behind.Position) < 4) s.Position = s.Position + new Point(8, 0);
+                        game.PreviewAdvance(0); game.FocusPoint(behind.Position, 16);
+                        Next(1.5f); return;
+                    }
+                    case 27:
+                    {
+                        notice = game.PadTargetId;
+                        notes.Add("person behind a cabinet: reticle " + (notice == "" ? "did not lock" : "locked on " + notice) + " (they are " + residentId + ")");
+                        Composite(game, "reticle-behind-cabinet");
+                        Press(GamepadButton.South); Next(.25f); return;
+                    }
+                    case 28:
+                    {
+                        Release();
+                        string selected = game.SelectedResident != null ? game.SelectedResident.Id : game.SelectedStaff != null ? game.SelectedStaff.Id : "";
+                        notes.Add("A at the hidden person selected: " + (selected == "" ? (game.SelectedWall != null ? "the wall" : game.SelectedFixture != null ? "a fixture" : "nothing") : selected));
+                        Check(notice != residentId, "The reticle locked onto a person hidden behind the cabinet.");
+                        Check(notice == "" || selected == notice, "The reticle locked on " + notice + " but A selected " + (selected == "" ? "something else" : selected) + ".");
                         Finish(game, errors.Count == 0); return;
                     }
                 }
@@ -299,13 +344,14 @@ namespace Cellblock.Editor
         {
             SessionState.SetBool(ActiveKey, false);
             if (pad != null) { InputSystem.RemoveDevice(pad); pad = null; }
+            RestoreInputSettings();
+            if (game == null) game = UnityEngine.Object.FindFirstObjectByType<GameController>();
             if (game != null) game.PreviewUiTarget(null);
             if (hud != null) { hud.Release(); UnityEngine.Object.DestroyImmediate(hud); hud = null; }
             File.WriteAllText(Path.Combine(Output, "report.txt"), (passed ? "PASSED" : "FAILED") + "\n\nNotes:\n" + string.Join("\n", notes) + "\n\nErrors:\n" + string.Join("\n", errors));
             if (passed) Debug.Log("CELLBLOCK_PAD_CAPTURE_PASSED " + Path.GetFullPath(Output));
             else Debug.LogError("CELLBLOCK_PAD_CAPTURE_FAILED " + string.Join(" | ", errors.Take(5)));
-            EditorApplication.isPlaying = false;
-            if (Application.isBatchMode) EditorApplication.delayCall += () => EditorApplication.Exit(passed ? 0 : 1);
+            PresentationPreview.WriteFeatureEvidence(Output, passed, errors.ToArray(), notes.ToArray());
         }
     }
 }

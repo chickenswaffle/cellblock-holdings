@@ -12,16 +12,17 @@ using UnityEngine.Rendering.Universal;
 
 namespace Cellblock.Editor
 {
-    // Claude's prisoner-mode review, run only from Claude's own clone in batchmode with graphics:
-    //   Unity -batchmode -projectPath <clone> -executeMethod Cellblock.Editor.InmateCapture.Run -logFile <log>
+    // Claude's prisoner-mode review on the shared single-editor PresentationPreview runner ("inmate" feature mode):
+    //   InmateCapture.Run() files the request; from Claude's clone in batch, Cellblock.Editor.ClaudeBatch.Run -cellblockFeature inmate.
     // The charter's Do time row, then a 14-day run in a preview company (never a save slot): play as the prisoner,
     // punch someone in front of an officer, get cuffed, walked to the bunk and locked in, wait it out at 4x, open the
-    // menu, the phone-sized layout, and release. Output: Builds/InmateReview/.
+    // menu, the phone-sized layout, and release. Output: a unique Temp/CellblockFeatureReviews/inmate folder.
     [InitializeOnLoad]
     public static class InmateCapture
     {
         const string StageKey = "Cellblock.Inmate.Stage", ActiveKey = "Cellblock.Inmate.Active", WaitKey = "Cellblock.Inmate.Wait";
-        const string Output = "Builds/InmateReview";
+        static string Output = "";
+        internal static bool IsRunning { get { return SessionState.GetBool(ActiveKey, false); } }
         static readonly List<string> errors = new List<string>(), notes = new List<string>();
         static RenderTexture hud;
         static string youId = "", otherId = "";
@@ -36,16 +37,20 @@ namespace Cellblock.Editor
                 if ((type == LogType.Error || type == LogType.Exception || type == LogType.Assert) && !condition.StartsWith("CELLBLOCK_INMATE")) errors.Add(condition.Replace('\n', ' '));
             };
         }
-        public static void Run()
+        public static void Run() { PresentationPreview.RequestFeatureReview("inmate"); }
+        internal static void BeginExisting()
         {
-            ProjectSetup.Validate();
-            EditorSceneManager.OpenScene("Assets/Cellblock/Scenes/Main.unity");
-            if (Directory.Exists(Output)) Directory.Delete(Output, true);
+            if (!EditorApplication.isPlaying) throw new InvalidOperationException("Feature review requires the shared Play runner.");
+            Output = Path.Combine("Temp/CellblockFeatureReviews", "inmate", DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N").Substring(0, 6));
             Directory.CreateDirectory(Output);
             errors.Clear(); notes.Clear(); shot = 0;
             SessionState.SetBool(ActiveKey, true); SessionState.SetInt(StageKey, 0);
             SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + 4);
-            EditorApplication.EnterPlaymode();
+        }
+        internal static void Abort(string reason)
+        {
+            if (!IsRunning) return;
+            errors.Add(reason); Finish(UnityEngine.Object.FindFirstObjectByType<GameController>(), false);
         }
         static void Next(float seconds) { readyFrame = Time.frameCount + 6; polls = 0; SessionState.SetInt(StageKey, SessionState.GetInt(StageKey, 0) + 1); SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + seconds); }
         static void Again(float seconds) { readyFrame = Time.frameCount + 3; polls++; SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + seconds); }
@@ -211,13 +216,13 @@ namespace Cellblock.Editor
         static void Finish(GameController game, bool passed)
         {
             SessionState.SetBool(ActiveKey, false);
+            if (game == null) game = UnityEngine.Object.FindFirstObjectByType<GameController>();
             if (game != null) game.PreviewUiTarget(null);
             if (hud != null) { hud.Release(); UnityEngine.Object.DestroyImmediate(hud); hud = null; }
             File.WriteAllText(Path.Combine(Output, "report.txt"), (passed ? "PASSED" : "FAILED") + "\n\nNotes:\n" + string.Join("\n", notes) + "\n\nErrors:\n" + string.Join("\n", errors));
             if (passed) Debug.Log("CELLBLOCK_INMATE_CAPTURE_PASSED " + Path.GetFullPath(Output));
             else Debug.LogError("CELLBLOCK_INMATE_CAPTURE_FAILED " + string.Join(" | ", errors.Take(5)));
-            EditorApplication.isPlaying = false;
-            if (Application.isBatchMode) EditorApplication.delayCall += () => EditorApplication.Exit(passed ? 0 : 1);
+            PresentationPreview.WriteFeatureEvidence(Output, passed, errors.ToArray(), notes.ToArray());
         }
     }
 }

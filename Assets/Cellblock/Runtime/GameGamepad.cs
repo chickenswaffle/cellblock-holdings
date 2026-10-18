@@ -110,22 +110,30 @@ namespace Cellblock.Unity
             guides.Show(null); PlacementSummary = ""; view.Preview(null); view.SelectResident(null); hud.Refresh(true);
         }
 
-        // The person nearest the reticle, within a forgiving radius; their screen point becomes the aim.
+        // The person nearest the reticle, within a forgiving radius, whose screen point a tap would actually select
+        // (PickAt: a wall or fixture in front wins, exactly as A would). Their screen point becomes the aim.
         string PadAimTarget(Vector2 centre, out Vector2 aim)
         {
-            aim = centre; string best = ""; float radius = Mathf.Max(36, Screen.height * .075f), nearest = radius * radius;
-            foreach (Resident resident in World.Data.Residents) Consider(resident.Id, resident.Position, centre, ref best, ref nearest, ref aim);
-            foreach (StaffMember staff in World.Data.Staff) if (staff.Arrived) Consider(staff.Id, staff.Position, centre, ref best, ref nearest, ref aim);
-            return best;
+            aim = centre; float radius = Mathf.Max(36, Screen.height * .075f);
+            var near = new List<KeyValuePair<string, Vector2>>();
+            foreach (Resident resident in World.Data.Residents) Consider(resident.Id, centre, radius, near);
+            foreach (StaffMember staff in World.Data.Staff) if (staff.Arrived) Consider(staff.Id, centre, radius, near);
+            foreach (var candidate in near.OrderBy(c => (c.Value - centre).sqrMagnitude).Take(4))
+            {
+                Point ground; if (!Ground(candidate.Value, out ground)) continue;
+                PickHit pick = PickAt(candidate.Value, ground, false);
+                string hit = pick.Resident != null ? pick.Resident.Id : pick.Staff != null ? pick.Staff.Id : "";
+                if (hit == candidate.Key) { aim = candidate.Value; return hit; }
+            }
+            return "";
         }
-        void Consider(string id, Point fallback, Vector2 centre, ref string best, ref float nearest, ref Vector2 aim)
+        void Consider(string id, Vector2 centre, float radius, List<KeyValuePair<string, Vector2>> near)
         {
             Vector3 position;
             if (!view.TryGetPersonPosition(id, out position)) return;
             Vector3 screen = cameraRig.WorldToScreenPoint(position + Vector3.up * .9f);
-            if (screen.z <= 0) return;
-            float d = ((Vector2)screen - centre).sqrMagnitude;
-            if (d < nearest) { nearest = d; best = id; aim = screen; }
+            if (screen.z <= 0 || ((Vector2)screen - centre).sqrMagnitude > radius * radius) return;
+            near.Add(new KeyValuePair<string, Vector2>(id, screen));
         }
         string PadName(string id)
         {

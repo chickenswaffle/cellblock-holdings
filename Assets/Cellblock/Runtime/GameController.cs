@@ -613,24 +613,29 @@ namespace Cellblock.Unity
                     { selected = wall; distance = hit; Vector3 position = ray.GetPoint(hit); point = new Point(position.x, position.z); }
                 }
         }
-        void SelectComponent(Vector2 screen, Point ground)
+        // What a tap at this screen point lands on: the closest hit among walls, furnishings and people, else the
+        // renderer's person pick, else the nearest wall to the ground point. Selection and the controller reticle's
+        // person lock both use this, so the reticle never locks onto someone a wall or fixture in front would take.
+        struct PickHit { public Wall Wall; public Fixture Fixture; public Resident Resident; public StaffMember Staff; public string Crew; }
+        PickHit PickAt(Vector2 screen, Point ground, bool fallback = true)
         {
+            var pick = new PickHit { Crew = "" };
             Wall wall; float nearest; Point wallPoint; FindWall(screen, out wall, out nearest, out wallPoint);
-            selectedCrewCharacter = ""; SelectedWall = wall; SelectedFixture = null; SelectedResident = null; SelectedStaff = null; Ray ray = cameraRig.ScreenPointToRay(screen);
+            pick.Wall = wall; Ray ray = cameraRig.ScreenPointToRay(screen);
             foreach (Fixture fixture in World.Data.Fixtures)
             {
                 float hit;
                 FixtureDefinition definition = FixtureCatalog.Get(fixture.Kind);
                 Vector3 size = new Vector3(definition.Width, definition.Height, definition.Depth);
                 if (HitBox(ray, FacilityView.V(fixture.Position, size.y * 0.5f + 0.13f), Quaternion.Euler(0, fixture.Rotation, 0), size, out hit) && hit < nearest)
-                { SelectedFixture = fixture; SelectedWall = null; nearest = hit; }
+                { pick = new PickHit { Fixture = fixture, Crew = "" }; nearest = hit; }
             }
             foreach (Resident resident in World.Data.Residents)
             {
                 float hit; Vector3 position;
                 if (!view.TryGetPersonPosition(resident.Id, out position)) position = FacilityView.V(resident.Position, 0.14f);
                 if (HitBox(ray, position + Vector3.up * 0.88f, Quaternion.identity, new Vector3(0.58f, 1.85f, 0.58f), out hit) && hit < nearest)
-                { SelectedResident = resident; SelectedFixture = null; SelectedWall = null; nearest = hit; }
+                { pick = new PickHit { Resident = resident, Crew = "" }; nearest = hit; }
             }
             foreach (StaffMember staff in World.Data.Staff)
             {
@@ -638,7 +643,7 @@ namespace Cellblock.Unity
                 float hit; Vector3 position;
                 if (!view.TryGetPersonPosition(staff.Id, out position)) position = FacilityView.V(staff.Position, 0.14f);
                 if (HitBox(ray, position + Vector3.up * 0.88f, Quaternion.identity, new Vector3(0.58f, 1.85f, 0.58f), out hit) && hit < nearest)
-                { SelectedStaff = staff; SelectedResident = null; SelectedFixture = null; SelectedWall = null; nearest = hit; }
+                { pick = new PickHit { Staff = staff, Crew = "" }; nearest = hit; }
             }
             foreach (Crew crew in World.Data.Crews.Where(c => c.Arrived))
                 for (int builder = 0; builder < 2; builder++)
@@ -646,14 +651,20 @@ namespace Cellblock.Unity
                     string id = crew.Id + "/builder-" + builder; float hit; Vector3 position;
                     if (!view.TryGetPersonPosition(id, out position)) continue;
                     if (HitBox(ray, position + Vector3.up * .88f, Quaternion.identity, new Vector3(.58f, 1.85f, .58f), out hit) && hit < nearest)
-                    { selectedCrewCharacter = id; SelectedStaff = null; SelectedResident = null; SelectedFixture = null; SelectedWall = null; nearest = hit; }
+                    { pick = new PickHit { Crew = id }; nearest = hit; }
                 }
-            if (selectedCrewCharacter == "" && SelectedResident == null && SelectedStaff == null && SelectedFixture == null && SelectedWall == null)
+            if (fallback && pick.Crew == "" && pick.Resident == null && pick.Staff == null && pick.Fixture == null && pick.Wall == null)
             {
                 string person = view.PickResident(cameraRig, screen);
-                if (person != null) SelectedResident = World.Data.Residents.FirstOrDefault(r => r.Id == person);
-                else SelectedWall = NearestWall(ground);
+                if (person != null) pick.Resident = World.Data.Residents.FirstOrDefault(r => r.Id == person);
+                else pick.Wall = NearestWall(ground);
             }
+            return pick;
+        }
+        void SelectComponent(Vector2 screen, Point ground)
+        {
+            PickHit pick = PickAt(screen, ground);
+            selectedCrewCharacter = pick.Crew; SelectedWall = pick.Wall; SelectedFixture = pick.Fixture; SelectedResident = pick.Resident; SelectedStaff = pick.Staff;
         }
         void Replace(Wall old, Wall changed, string name)
         {
