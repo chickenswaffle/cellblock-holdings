@@ -243,7 +243,10 @@ namespace Cellblock.Unity
             if (s.Active && (id == s.Officer || id == s.Helper || id == s.Resident)) return true;
             if (Brawling(world, id)) return true;
             if (id == s.Staggered && s.StaggeredUntil > world.Data.Minute - 2) return true;
-            return world.Escape.Phase == "Held at gate" && world.Escape.ResidentId == id;
+            if (world.Escape.Phase == "Held at gate" && world.Escape.ResidentId == id) return true;
+            Actor actor; HeldPose pose;
+            return actors.TryGetValue(id, out actor) && heldPoses.TryGetValue(actor, out pose) &&
+                pose.Parts == Hold.Body && Time.frameCount - pose.Frame <= 1;
         }
 
         // Analytic two-bone leg in the sagittal plane: the hip-to-foot target (forward, down) gives the hip pitch and knee bend

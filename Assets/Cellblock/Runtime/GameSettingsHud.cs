@@ -66,6 +66,12 @@ namespace Cellblock.Unity
                 SettingChoices(settingsContent, "Camera easing", "Smooth the management camera between positions.", new[] { "Direct", "Smooth" }, p.SmoothCamera ? 1 : 0, i => p.SmoothCamera = i == 1);
                 settingsContent.Add(Text("DRAG / ARROWS / WASD  ·  Move\nRIGHT DRAG / Q E  ·  Orbit\nPINCH / SCROLL  ·  Zoom\nR F  ·  Tilt   |   HOME  ·  Center   |   SPACE  ·  Pause\nTouch: drag to pan; two fingers to pan, pinch and twist.", "controls-reference"));
                 settingsContent.Add(Action("Center the camera", () => game.Recenter(), "quiet"));
+                // Playing as a staff member (Claude look pass, exact exception 2026-10-18).
+                var staffTitle = Text("Playing as staff", "settings-page-title"); staffTitle.style.marginTop = 22; settingsContent.Add(staffTitle);
+                SettingChoices(settingsContent, "Look speed", "How fast the mouse, controller right stick, LOOK stick and swipes turn the view.", new[] { "Gentle", "Standard", "Fast" }, p.CharacterLookSpeed < .9f ? 0 : p.CharacterLookSpeed > 1.15f ? 2 : 1, i => p.CharacterLookSpeed = new[] { .65f, 1f, 1.4f }[i]);
+                SettingChoices(settingsContent, "Vertical look", "Invert flips up and down for every device.", new[] { "Normal", "Inverted" }, p.InvertLook ? 1 : 0, i => p.InvertLook = i == 1);
+                SettingChoices(settingsContent, "Third-person camera", "Follow swings the camera behind you as you walk with a stick or touch. Free stays where you point it.", new[] { "Follow", "Free" }, p.CharacterCamera, i => p.CharacterCamera = i);
+                settingsContent.Add(Text("MOUSE & KEYBOARD  ·  WASD move · mouse looks · click strike · right-click grab · E use · Q pick up · Shift run · C behind you · V view · Esc frees the cursor\nCONTROLLER  ·  sticks move/look · X strike · B grab · Y pick up · A use · LB face nearest · R3 behind you · RB view · Select phone · Start pause · D-pad ← management\nTOUCH  ·  left stick moves · swipe or LOOK stick looks · double-tap to look ahead · round buttons act", "controls-reference"));
             }
             if (settingsPage == "Audio")
             {

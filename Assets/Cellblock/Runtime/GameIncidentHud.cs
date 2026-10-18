@@ -114,9 +114,13 @@ namespace Cellblock.Unity
             // Check feet and head against both the screen and the actual card rectangle.
             foreach (Vector3 point in new[] { actor, actor + Vector3.up * 1.9f })
             {
-                Vector3 screen = game.ArtCamera.WorldToScreenPoint(point);
-                Vector2 panel = RuntimePanelUtils.ScreenToPanel(root.panel, new Vector2(screen.x, Screen.height - screen.y));
-                if (screen.z <= 0 || !root.worldBound.Contains(panel) || incidentCard.worldBound.Contains(panel)) return false;
+                // EditorApplication.update can expose the editor window's Screen size
+                // between fixed-resolution Game-view renders. Both actor and HUD use
+                // the same normalized rendered viewport, independent of that size.
+                Vector3 viewport = game.ArtCamera.WorldToViewportPoint(point);
+                Rect bounds = root.worldBound;
+                Vector2 panel = new Vector2(bounds.xMin + viewport.x * bounds.width, bounds.yMin + (1 - viewport.y) * bounds.height);
+                if (viewport.z <= 0 || !bounds.Contains(panel) || incidentCard.worldBound.Contains(panel)) return false;
             }
             return true;
         }

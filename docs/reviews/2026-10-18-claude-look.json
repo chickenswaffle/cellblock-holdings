@@ -1,0 +1,25 @@
+{
+    "passed": true,
+    "editor": "6000.3.24f1",
+    "errors": [],
+    "notes": [
+        "keyboard 3P: crosshair=0 sticks=0 strikeKey=F help=WASD move · mouse looks · click strike · right-click grab · E use · Q pick up · Shift run · V view · Esc frees the cursor",
+        "keyboard 1P: crosshair=1 sticks=0 strikeKey=F help=WASD move · mouse looks · click strike · right-click grab · E use · Q pick up · Shift run · V view · Esc frees the cursor",
+        "right stick full tilt: 287°/s, device Gamepad",
+        "left stick forward 1.5 s: walked 2.96 m",
+        "controller 1P: crosshair=1 sticks=0 strikeKey=X help=L stick move · R stick look · X strike · B grab · Y pick up · A use · LB face nearest · R3 behind you · RB view · Start pause",
+        "X: Excessive force: Officer Dana Cross struck Amari Price without cause. A write-up was filed and residents trust staff less.",
+        "LB face nearest: 0° off Rafael Washington",
+        "third person, walking right: camera swung 49°/s",
+        "touch 900x420: crosshair=0 sticks=1 strikeKey=- help=Left stick moves · swipe right side or LOOK stick to look · double-tap to look ahead · buttons act"
+    ],
+    "captures": [
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/look/20261018-204219-914-6325ff/01-keyboard-third-person.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/look/20261018-204219-914-6325ff/02-keyboard-first-person.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/look/20261018-204219-914-6325ff/03-controller-first-person.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/look/20261018-204219-914-6325ff/04-controller-third-person.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/look/20261018-204219-914-6325ff/05-touch-third-person.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/look/20261018-204219-914-6325ff/06-touch-first-person.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/look/20261018-204219-914-6325ff/07-settings-controls.png"
+    ]
+}

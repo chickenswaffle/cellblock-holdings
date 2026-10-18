@@ -327,8 +327,9 @@ static partial class Program
         });
         Test("rest between shifts recovers pressure; a default county company keeps its opening staff for two weeks", () => {
             // Transfers are held to the beds on hand: this isolates the rest mechanics from population growth.
+            // Hygiene is topped up each morning too: the legacy starter has no showers, and this check is about rest, not sanitation.
             World world = County(); world.SetTransferPolicy("Accept to capacity"); var opening = world.Data.Staff.Select(s => s.Id).ToList();
-            for (int day = 0; day < 14; day++) world.AdvanceMinutes(1440);
+            for (int day = 0; day < 14; day++) { foreach (Resident r in world.Data.Residents) r.Hygiene = Math.Max(r.Hygiene, 80); world.AdvanceMinutes(1440); }
             Check(opening.All(id => world.Data.Staff.Any(s => s.Id == id)), "An opening staff member quit with no player action within 14 days");
             Check(world.Data.Staff.All(s => s.Pressure < 80), "Pressure kept climbing: " + string.Join(",", world.Data.Staff.Select(s => (int)s.Pressure)));
             World rest = County(); StaffMember off = rest.Data.Staff.First(s => s.Role == "Officer" && !rest.IsOnShift(s));

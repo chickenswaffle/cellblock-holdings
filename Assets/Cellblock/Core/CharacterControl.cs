@@ -196,6 +196,8 @@ namespace Cellblock.Core
             float speed = character.Resident != null ? 0.32f * character.Resident.WalkSpeed : character.Staff != null ?
                 (IsOnShift(character.Staff) ? 0.37f : 0.34f) : character.Crew.WorkPhase == "Carrying" ?
                 (character.Helper ? 0.32f : 0.30f) : character.Helper ? 0.40f : 0.38f;
+            StaffActionSpeed(ref speed); // Claude's staff actions: run, escort and stagger (exact exception, 2026-10-18).
+            if (speed <= 0) return;
             Point from = CharacterPositionOf(character), delta = character.Intent * speed;
             string blocker;
             if (CharacterStepAllowed(character, from, from + delta, out blocker))

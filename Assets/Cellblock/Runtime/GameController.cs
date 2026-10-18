@@ -26,6 +26,7 @@ namespace Cellblock.Unity
         public BuildTool Tool { get; private set; }
         public string Instruction { get; private set; }
         FacilityView view;
+        FacilitySanitationView sanitationView;
         MacTrackpad trackpad;
         Camera cctvCamera;
         RenderTexture cctvTexture;
@@ -84,6 +85,7 @@ namespace Cellblock.Unity
             PresentationLighting.Configure(cameraRig, transform);
             view = new GameObject("Facility presentation").AddComponent<FacilityView>(); view.transform.SetParent(transform); view.Initialize();
             pressureView = new GameObject("Population pressure presentation").AddComponent<FacilityPressureView>(); pressureView.transform.SetParent(transform); pressureView.Initialize();
+            sanitationView = new GameObject("Sanitation presentation").AddComponent<FacilitySanitationView>(); sanitationView.transform.SetParent(transform); sanitationView.Initialize();
             guides = new GameObject("Construction measurements").AddComponent<ConstructionGuides>(); guides.transform.SetParent(transform); guides.Initialize(cameraRig);
             hud = new GameObject("Management interface").AddComponent<GameHud>(); hud.transform.SetParent(transform); hud.Initialize(this); ApplyPreferences();
             view.Refresh(Cellblock.Core.World.Start(Cellblock.Core.World.Offers[0].Id), true);
@@ -170,6 +172,7 @@ namespace Cellblock.Unity
             bool blocked = World == null || hud == null || hud.BlocksWorldInput || appPaused || unfocused;
             if (blocked || nativeInputWasBlocked) magnification = 0;
             nativeInputWasBlocked = blocked;
+            UpdateControlDevice();
             if (World == null) return;
             UpdateCharacterSession();
             if (!appPaused && (!unfocused || presentationPreview) && !hud.BlocksSimulation && World.Data.Speed > 0)
@@ -183,7 +186,7 @@ namespace Cellblock.Unity
 #if UNITY_EDITOR
             view.PreviewFixedFrameDelta = presentationPreview && Time.captureDeltaTime > 0 ? Time.captureDeltaTime : 0;
 #endif
-            if (!CharacterInputUpdate(magnification)) InputUpdate(magnification); view.ReducedMotion = Preferences.ReducedMotion; view.Refresh(World); view.RefreshCharacterPhones(World, hud.CharacterPhoneOpen ? CharacterPhoneSubjectId : ""); view.SetWatchedCamera(WatchedCamera); pressureView.Refresh(World, Time.unscaledDeltaTime); UpdateRideAlong(); if (!CharacterViewActive) UpdateIncidentCamera(); hud.Refresh();
+            if (!CharacterInputUpdate(magnification)) InputUpdate(magnification); view.ReducedMotion = Preferences.ReducedMotion; view.Refresh(World); view.RefreshCharacterPhones(World, hud.CharacterPhoneOpen ? CharacterPhoneSubjectId : ""); view.SetWatchedCamera(WatchedCamera); pressureView.Refresh(World, Time.unscaledDeltaTime); sanitationView.Refresh(World, Time.unscaledDeltaTime); UpdateRideAlong(); if (!CharacterViewActive) UpdateIncidentCamera(); hud.Refresh();
             TickAutosave();
         }
         void LateUpdate() { if (cameraRig != null) { if (CharacterViewActive) CharacterCamera(); else if (RideAlongActive) RideAlongCamera(); else CameraPosition(); } RefreshCameraFeed(); RefreshBodyCam(); }
@@ -739,6 +742,12 @@ namespace Cellblock.Unity
             World.Data.Speed = 1; World.AdvanceMinutes(target - World.Data.Minute); World.Data.Speed = 0; view.Refresh(World, true);
         }
         public Camera ArtCamera { get { return cameraRig; } }
+        // Editor reviews from Claude's clone (batchmode, no Game view): the HUD target, the Pressure workspace, the clock.
+        public void PreviewUiTarget(RenderTexture target) { hud.PreviewUiTarget(target); }
+        public void PreviewRelayout() { hud.PreviewRelayout(); }
+        public void PreviewHygieneCard() { hud.PreviewHygieneCard(); }
+        public void PreviewPressureSection(string heading) { hud.PreviewPressure(); hud.Refresh(true); hud.PreviewScrollToSection(heading); }
+        public void PreviewAdvance(int minutes) { int speed = World.Data.Speed; World.Data.Speed = 1; World.AdvanceMinutes(minutes); World.Data.Speed = speed; view.Refresh(World, true); }
         // Places the camera like the management rig does (focus, distance, yaw, pitch) without the interface offset.
         public void FrameArt(Vector3 artFocus, float artDistance, float artYaw, float artPitch)
         {

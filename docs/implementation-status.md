@@ -2,6 +2,28 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
+## October 18 reviewed Claude services and staff input
+
+Final source fingerprint **`cff62f41`** combines natural motion`42c1796` with Claude's published **`bb9d3f6`** sanitation, yard life, staff actions and device look controls. **420 core checks pass /0 failures.** All final Unity reports have empty error arrays.
+
+| Review | Final evidence |
+| --- | --- |
+| Yard, staff actions, keyboard/touch/virtual-controller look and sanitation | 34 renderer/composed world/HUD captures |
+| Staff-only control, phone, profiles and Home | 27 Game-view captures |
+| Daily routines and complete interactions | 17 Game-view captures |
+| Physical incidents, radio, pursuit and phone layout | 16 Game-view captures |
+| Home, recovery, settings, saves and placement | 25 Game-view captures |
+| Natural locomotion/contact/people gallery | 945 fixed-step frames /112 renderer captures |
+| Escape choreography, unforced outcomes and night effects | 24 sequences /982 frames /6 scenarios |
+
+Corrections: saved lap-corner continuity; distinct chat rings and real eligibility; riot/escape ownership; independent quarantine separation deadlines; attendance-aware washing; actual dining-seat gains; pause-aware action presentation; foot-contact release for body poses; safe single-editor review adapters. The facility multiplier check now measures identical encounters and matched seeded opportunities, retaining real long-run fight occurrence coverage. No balance constants changed. Read [the integration review](claude-integration-review.md).
+
+[Core](reviews/2026-10-18-claude-core.txt) · [source](reviews/2026-10-18-claude-source.json) · [yard](reviews/2026-10-18-claude-yard.json) · [actions](reviews/2026-10-18-claude-actions.json) · [look/input](reviews/2026-10-18-claude-look.json) · [sanitation](reviews/2026-10-18-claude-sanitation.json) · [motion](reviews/2026-10-18-claude-motion.json) · [characters](reviews/2026-10-18-claude-characters.json) · [routines](reviews/2026-10-18-claude-routines.json) · [incidents](reviews/2026-10-18-claude-incidents.json) · [frontend](reviews/2026-10-18-claude-frontend.json) · [escapes](reviews/2026-10-18-claude-escape.json) · [Home audit](reviews/2026-10-18-claude-editor-audit.json). Full local evidence: `Builds/ClaudeIntegrationReview/2026-10-18/final-cff62f41`.
+
+The critic approved the corrected source and staged chat/workout/side-angle action poses. Side-angle staging is distinct from actual follow-camera visibility; close restraint can still occlude one person in the follow view. Push-up toe contact has minor polish remaining. Earlier failed/partial candidates are excluded from these totals. The editor-only incident projection check was corrected for fixed Game-view dimensions without relaxing actor/card visibility constraints.
+
+Unity's native input backend is enabled with Both handlers. Sole editorPID49998 returned to ordinary Home; holdings/preferences are preserved. Physical controller/touch feel, native device performance, stripped builds and production skinned/authored character assets remain open. Claude's newer**`60aad23`** controller-navigation publication was inspected read-only and remains **unmerged**; its reticle occlusion and capture-harness/settings fixes are in the handoff.
+
 ## October 18 natural movement and human detail
 
 Implementation **`42c1796`**, source fingerprint **`5636201c`**, improves planted feet, independent ankles, starts/stops, turns, weight transfer and gaze. Brief blinks, continuous trouser knees, fitted hats and more detailed faces/clothing improve the existing procedural people. Staff use explicit quiet work gestures; pursuit no longer receives the generic raised-arm loop. Read the [research and design notes](natural-character-motion.md).

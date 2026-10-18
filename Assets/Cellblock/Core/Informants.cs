@@ -468,7 +468,7 @@ namespace Cellblock.Core
         {
             Resident target = Find(t.SubjectId), actor = Find(t.ActorId);
             if (target == null || actor == null) { Finish(t, false, "The people in the tip are gone."); return; }
-            actor.SeparatedUntil = Data.Minute + 720;
+            ExtendSeparation(actor, Data.Minute + 720);
             if (!actor.Intake.KeepSeparate.Contains(target.Id) && actor.Intake.KeepSeparate.Count < 8) actor.Intake.KeepSeparate.Add(target.Id);
             if (!target.Intake.KeepSeparate.Contains(actor.Id) && target.Intake.KeepSeparate.Count < 8) target.Intake.KeepSeparate.Add(actor.Id);
             RemoveResidentPath(actor); actor.NextDecisionMinute = Data.Minute;

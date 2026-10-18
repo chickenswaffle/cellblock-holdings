@@ -158,7 +158,7 @@ static partial class Program
             supermax.EscapeRisk(supermax.Data.Residents[0], factors);
             Check(factors.Any(f => f.Label.EndsWith(" population") && f.Points == 14), "The supermax population's +14 escape offset is missing");
         });
-        Test("good-time credit, release at court and fights scale with the facility type on an identical population", () => {
+        Test("good-time credit, court release and encounter fight risk follow the facility rules", () => {
             // The same company under two facility types of one tier and location; only the type's rules differ.
             World Swap(World source, string typeId) { State copy = RoundTrip(source.Data); copy.Mode.TypeId = typeId; return new World(copy); }
             World baseWorld = WithWarden(85); baseWorld.Data.Justice.NextAttemptMinute = int.MaxValue / 2; State shaped = RoundTrip(baseWorld.Data); shaped.Mode.LocationId = "lakewood"; baseWorld = new World(shaped);
@@ -170,6 +170,9 @@ static partial class Program
                 RunUntil(world, () => r.Legal.PendingReview == "", 4320, "The good-time hearing");
                 return (int)((before - r.Legal.ReleaseMinute) / 1440);
             }
+            // Eligibility needs a clean week: keep tensions low while the population settles, so stopped confrontations in the
+            // yard (each writes both people up) do not decide who can be recommended. This check is about the type's credit.
+            foreach (Resident r in baseWorld.Data.Residents) foreach (Relationship rel in r.Relationships) rel.Tension = Math.Min(rel.Tension, 20);
             baseWorld.AdvanceMinutes(6 * 1440); State settled = RoundTrip(baseWorld.Data); baseWorld = new World(settled);
             // The grant roll is seeded per resident, so find one the court grants, then compare the same person under both types.
             string granted = baseWorld.GoodTimeEligible().Select(r => r.Id).FirstOrDefault(id => Credit(Swap(baseWorld, "county-intake"), id) > 0);
@@ -186,8 +189,26 @@ static partial class Program
                 world.SetTransferPolicy("Accept to capacity");
                 world.AdvanceMinutes(5 * 1440); return world.Personnel.Fights;
             }
-            int calm = Fights(Swap(baseWorld, "county-intake")), rough = Fights(Swap(baseWorld, "county-maximum"));
-            Check(rough > calm, "County maximum (fights ×" + GameModes.Type("county-maximum").FightScale + ") did not see more fights: " + calm + " vs " + rough);
+            World calmWorld = Swap(baseWorld, "county-intake"), roughWorld = Swap(baseWorld, "county-maximum");
+            Resident ca = calmWorld.Data.Residents[0], cb = calmWorld.Data.Residents[1];
+            Resident ra = roughWorld.Data.Residents[0], rb = roughWorld.Data.Residents[1];
+            Relationship cl = ca.Relationships.First(x => x.OtherId == cb.Id), rl = ra.Relationships.First(x => x.OtherId == rb.Id);
+            cl.Tension = rl.Tension = 62; ca.Stress = cb.Stress = ra.Stress = rb.Stress = 50;
+            ca.Impulsivity = cb.Impulsivity = ra.Impulsivity = rb.Impulsivity = 60;
+            float calmRisk = calmWorld.EncounterFightChance(ca, cb, cl), roughRisk = roughWorld.EncounterFightChance(ra, rb, rl);
+            float expected = roughWorld.FacilityMode.FightScale / calmWorld.FacilityMode.FightScale;
+            Check(calmRisk > 0 && Math.Abs(roughRisk / calmRisk - expected) < .0001f, "Identical encounter risk ignored the facility multiplier");
+            int calmRolls = 0, roughRolls = 0;
+            for (int roll = 0; roll < 4096; roll++)
+            {
+                float u = JusticeRules.Unit(baseWorld.Data.Seed, ca.Id + cb.Id, "fight", roll);
+                if (u < calmRisk) calmRolls++;
+                if (u < roughRisk) roughRolls++;
+            }
+            Check(roughRolls > calmRolls, "Higher encounter risk did not trigger more identical seeded opportunities");
+            // Long-run incidence remains covered, without assuming divergent schedules
+            // and cooldown histories preserve a monotone aggregate fight count.
+            Check(Fights(calmWorld) > 0 && Fights(roughWorld) > 0, "Encounter risk never produced real fights");
             int Releases(World world) { world.AdvanceMinutes(4 * 1440); world.AdvanceMinutes(4 * 1440); return world.Data.Justice.Releases; }
             World holding = Chartered("city-holding", "northbridge"); State copy2 = RoundTrip(holding.Data); copy2.Mode.TypeId = "city-downtown";
             int quick = Releases(holding), slow = Releases(new World(copy2));

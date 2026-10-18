@@ -85,6 +85,8 @@ namespace Cellblock.Core
         public string Oversight = "", MinimumIntake = "Basic";
         public float TransfersPerResident, Growth, MaxCrowding, CarryShare;
         public int AuditDays, ResidentsPerOfficer;
+        // Sanitation standard: residents per working shower.
+        public int ResidentsPerShower = 12;
     }
 
     public static class PopulationRules
@@ -115,11 +117,11 @@ namespace Cellblock.Core
         {
             switch (tier == null ? "county" : tier.Id)
             {
-                case "city": return new PressureStandard { Oversight = "City inspector", MinimumIntake = "Basic", TransfersPerResident = 0.22f, Growth = 0.04f, MaxCrowding = 1.25f, CarryShare = 0.18f, AuditDays = 10, ResidentsPerOfficer = 14 };
+                case "city": return new PressureStandard { Oversight = "City inspector", MinimumIntake = "Basic", TransfersPerResident = 0.22f, Growth = 0.04f, MaxCrowding = 1.25f, CarryShare = 0.18f, AuditDays = 10, ResidentsPerOfficer = 14, ResidentsPerShower = 16 };
                 // State monitors expect more than the standard program a state contract includes: upgrading is the way to pass.
-                case "state": return new PressureStandard { Oversight = "State corrections monitor", MinimumIntake = "Enhanced", TransfersPerResident = 0.08f, Growth = 0.05f, MaxCrowding = 1.10f, CarryShare = 0.12f, AuditDays = 5, ResidentsPerOfficer = 10 };
-                case "federal": return new PressureStandard { Oversight = "Federal compliance review team", MinimumIntake = "Federal", TransfersPerResident = 0.06f, Growth = 0.05f, MaxCrowding = 1.00f, CarryShare = 0.08f, AuditDays = 4, ResidentsPerOfficer = 8 };
-                default: return new PressureStandard { Oversight = "County jail auditor", MinimumIntake = "Basic", TransfersPerResident = 0.12f, Growth = 0.04f, MaxCrowding = 1.15f, CarryShare = 0.15f, AuditDays = 7, ResidentsPerOfficer = 12 };
+                case "state": return new PressureStandard { Oversight = "State corrections monitor", MinimumIntake = "Enhanced", TransfersPerResident = 0.08f, Growth = 0.05f, MaxCrowding = 1.10f, CarryShare = 0.12f, AuditDays = 5, ResidentsPerOfficer = 10, ResidentsPerShower = 12 };
+                case "federal": return new PressureStandard { Oversight = "Federal compliance review team", MinimumIntake = "Federal", TransfersPerResident = 0.06f, Growth = 0.05f, MaxCrowding = 1.00f, CarryShare = 0.08f, AuditDays = 4, ResidentsPerOfficer = 8, ResidentsPerShower = 10 };
+                default: return new PressureStandard { Oversight = "County jail auditor", MinimumIntake = "Basic", TransfersPerResident = 0.12f, Growth = 0.04f, MaxCrowding = 1.15f, CarryShare = 0.15f, AuditDays = 7, ResidentsPerOfficer = 12, ResidentsPerShower = 14 };
             }
         }
         // Facility types adjust the jurisdiction's flow: a supermax receives few, a campus or holding center more.
@@ -254,6 +256,8 @@ namespace Cellblock.Core
             CounselRules.Hydrate(state);
             RoleRules.Hydrate(state);
             CharacterPhoneRules.Hydrate(state);
+            SanitationRules.Hydrate(state);
+            StaffActionRules.Hydrate(state);
         }
 
         partial void AdvancePressure()
@@ -276,6 +280,7 @@ namespace Cellblock.Core
             AdvanceEconomy();
             AdvanceIntel();
             AdvanceKitchen();
+            AdvanceSanitation();
             AdvanceCounsel();
             AdvanceRoles();
             AdvanceCharacterPhones();
@@ -284,13 +289,15 @@ namespace Cellblock.Core
         partial void PressureMovement(Resident resident, ref bool skip)
         {
             if (InIntake(resident)) { skip = true; return; }
+            StaffActionMovement(resident, ref skip);
         }
         partial void PressureTarget(Resident resident, ref Point target)
         {
             Disturbance riot = Population.Riot;
             if (riot.Phase != "None" && riot.Rioters.Contains(resident.Id)) target = NearbyClear(riot.Center + RallyOffset(resident), Routes);
             else if (resident.SeparatedUntil > Data.Minute || resident.ProtectiveCustody) target = resident.Home;
-            else JobTarget(resident, ref target);
+            // A wash during the person's own yard window comes before the job; meal travel already ruled it out.
+            else if (!WashTarget(resident, ref target)) JobTarget(resident, ref target);
         }
         Point RallyOffset(Resident resident)
         {
@@ -587,6 +594,8 @@ namespace Cellblock.Core
             if (FloorSleepers > 0) Add("People sleeping on the floor", Math.Min(12, FloorSleepers * 1.5f));
             Add("Missed meals", present.Count(r => r.Food < 30) / (float)present.Count * 25);
             Add("Meals eaten in housing on trays", Math.Min(10, TraysPerResidentDay * 15));
+            Add("Residents who cannot wash", present.Count(r => r.Hygiene < 30) / (float)present.Count * 10);
+            Add("Illness in housing", Math.Min(8, present.Count(r => r.Illness != "") / (float)present.Count * 20));
             Add("Drugs, alcohol and weapons inside", Math.Min(20, ContrabandPressure() * 4));
             int recent = Data.History.Count(e => e.Category == "fight" && Data.Minute - e.Minute < 1440 && e.Severity >= 3);
             Add("Fights in the last day", Math.Min(18, recent * 4));
@@ -757,6 +766,8 @@ namespace Cellblock.Core
             a.Trays = Population.TrayMeals; a.Minute = Data.Minute;
             if (Data.IntelWork != null) { a.SnitchAssaults = IntelWork.SnitchAssaults; a.IgnoredWarnings = IntelWork.IgnoredWarnings; a.TipsFalse = IntelWork.TipsFalse; a.TipsConfirmed = IntelWork.TipsConfirmed; }
             if (Data.Kitchen != null) a.Poisonings = Kitchen.Poisonings;
+            SnapshotSanitation();
+            SnapshotStaffActions();
         }
         public bool StageAuditDemo() { AuditState a = Population.Audit; if (a.Phase == "In progress") return false; a.NextMinute = Data.Minute + 1; a.Reason = "Unannounced inspection"; a.Phase = "Announced"; return true; }
         void AdvanceAudit()
@@ -829,6 +840,8 @@ namespace Cellblock.Core
             EconomyFindings(Find);
             IntelFindings(Find, a);
             KitchenFindings(Find, a);
+            SanitationFindings(Find);
+            StaffActionFindings(Find);
             if (sample)
             {
                 int found = AuditContrabandSweep();

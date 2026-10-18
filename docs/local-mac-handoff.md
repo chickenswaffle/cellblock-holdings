@@ -17,7 +17,7 @@ Read `README.md`, `CLAUDE.md`, `docs/reboot-vision.md`, and `docs/implementation
 3. Run `bash Tools/open-unity-mac.sh`, open the generated main scene, and enter Play mode. Inspect the output and controls; fix observed problems. Continue through a working local playable milestone.
 4. Use an independent critic subagent for focused design and implementation reviews, as requested by the user. Start from the existing implementation instead of restarting brainstorming. Ask only questions that materially block progress.
 
-The initial cloud milestone passed 27 core checks. The continued local milestone now passes 373 combined core checks and runs in the installed Unity 6000.3.24f1 editor on this Intel Mac. Project setup and Play mode have run locally. See `docs/implementation-status.md` for current evidence and limits. Native builds and actual phone/tablet performance remain unverified. Use **Cellblock → Open game and Play**, then select the prominent **Continue your holding** or first-use **Begin your story** card; **Guide** and **Settings → Controls** explain camera input and **People** opens individual profiles; **Control** manages arrivals, staff, lighting, alarm, gates and live CCTV. Six prefab units have optional fitout packages. Builders physically collect/carry materials and use task-specific tools. One agent owns all Unity runs.
+The initial cloud milestone passed 27 core checks. The continued local milestone now passes 420 combined core checks and runs in the installed Unity 6000.3.24f1 editor on this Intel Mac. Project setup and Play mode have run locally. See `docs/implementation-status.md` for current evidence and limits. Native builds and actual phone/tablet performance remain unverified. Use **Cellblock → Open game and Play**, then select the prominent **Continue your holding** or first-use **Begin your story** card; **Guide** and **Settings → Controls** explain camera input and **People** opens individual profiles; **Control** manages arrivals, staff, lighting, alarm, gates and live CCTV. Six prefab units have optional fitout packages. Builders physically collect/carry materials and use task-specific tools. One agent owns all Unity runs.
 
 ## Product direction
 
@@ -55,3 +55,12 @@ Staff-only field control, compact dossiers, useful work phone and Claude's publi
 ## October 18 natural-motion checkpoint
 
 Validated implementation42c1796 adds planted-foot contacts/ankles, smoother starts/stops/turns, quiet staff gestures, blinks and refined people. Read docs/natural-character-motion.md. Same-source proof:373 core checks,945 prescribed motion frames/112 renderer captures,60 Game-view captures and24 escape sequences/982 frames. The sole editor returned to ordinary Home. Codex is continuing the user-requested review of newly published Claude sanitation/yard/actions/look controls; re-read the active coordination log before touching those integration files or running Unity.
+
+
+## October 18 published Claude services/input integration
+
+Codex reviewed and merged Claude through `bb9d3f6`, preserving the natural-motion implementation `42c1796`. All420 core checks pass. Read [the integration review](claude-integration-review.md) for lap/crowd eligibility, quarantine provenance, actual services, pause and pose ownership corrections. Final evidence source is `cff62f41`; final proof is420 core checks,85 Game-view captures,34 feature captures,945 motion frames/112 captures and24 escape sequences/982 frames. Ordinary Home is restored; read implementation-status and the current coordination log.
+
+The native Input System backend was enabled and the existing editor restarted intoPID49998. Both input handlers are configured. Continue to reuse the single editor after claiming its scope. The four feature capture entry points request the shared runner; `yard`, `actions`, `look` and `sanitation` requests write unique folders under `Temp/CellblockFeatureReviews`. Keep prior evidence. No physical controller or Apple-device performance claim is made.
+
+Claude's later`60aad23` controller-navigation publication was inspected separately and remains unmerged. The handoff lists its reticle occlusion and review-harness/settings-restoration fixes. Read the current `docs/claude-start.txt` before continuing it.

@@ -13,6 +13,7 @@ namespace Cellblock.Unity
 #if UNITY_EDITOR
             naturalMotionProbes.Remove(actor);
 #endif
+            if (actor.Motion != null) fellAt.Remove(actor.Motion.Id);
             strides.Remove(actor); heldPoses.Remove(actor); heldThisFrame.Remove(actor);
             ShadowSlot shadow;
             if (shadowSlots.TryGetValue(actor, out shadow))
@@ -27,6 +28,7 @@ namespace Cellblock.Unity
         }
         void ResetMotionPresentation()
         {
+            ResetActionPresentation();
             foreach (ShadowSlot shadow in shadowSlots.Values)
                 if (shadow.Root != null) { shadow.Root.gameObject.SetActive(false); Destroy(shadow.Root.gameObject); }
             shadowSlots.Clear(); shadowRetired.Clear(); shadowsDrawn = 0;
@@ -45,6 +47,7 @@ namespace Cellblock.Unity
         void DisposeMotionResources()
         {
             ResetMotionPresentation();
+            if (actionRingMaterial != null) { Destroy(actionRingMaterial); actionRingMaterial = null; }
             for (int i = 0; i < shadowQuads.Length; i++) if (shadowQuads[i] != null) { Destroy(shadowQuads[i]); shadowQuads[i] = null; }
             if (shadowMaterial != null) { Destroy(shadowMaterial); shadowMaterial = null; }
             if (alarmProfile != null)

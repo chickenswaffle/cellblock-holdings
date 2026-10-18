@@ -894,7 +894,9 @@ namespace Cellblock.Core
                 AdvancePressure();
                 AdvanceLives();
                 AdvanceCharacterControl();
+                AdvanceStaffActions();
                 MoveResidents();
+                AdvanceYardLife();
                 if (Data.Minute % 30 == 0) PeopleDynamics.Advance(this);
                 Data.OperatingRemainder += Contract.DailyOperatingCents / 1440.0;
                 Data.CrewRemainder += Data.Crews.Sum(c => c.DailyCents) / 1440.0;
@@ -1007,7 +1009,7 @@ namespace Cellblock.Core
                         SetResidentPath(resident,path,destination);
                     }
                 }
-                float gain = meals && Geometry.Distance(resident.Position, target) < 0.8f ? 0.6f : -0.025f;
+                float gain = meals && Geometry.Distance(target, mealSeat) < .1f && Geometry.Distance(resident.Position, mealSeat) < 0.8f ? 0.6f : -0.025f;
                 MealGain(resident, index, meals, ref gain);
                 resident.Food = Geometry.Clamp(resident.Food + gain, 0, 100);
             }

@@ -23,7 +23,7 @@ namespace Cellblock.Unity
         World characterViewWorld;
         string characterViewId = "", selectedCrewCharacter = "";
         CharacterPerspective characterPerspective = CharacterPerspective.ThirdPerson;
-        const float CharacterThirdPitch = 29, CharacterThirdBoom = 5.6f;
+        const float CharacterThirdPitch = 20, CharacterThirdBoom = 4.6f; // Claude look pass: a lower, closer chase view that shows what is ahead
         float characterYaw, characterPitch = CharacterThirdPitch, characterBoom = CharacterThirdBoom;
         float characterFirstPitch = 4, characterThirdPitch = CharacterThirdPitch;
         bool characterInputArmed, characterMoveStickArmed, characterMouseLook, characterInputSuppressed;
@@ -132,7 +132,7 @@ namespace Cellblock.Unity
             World.ReleaseRole();
             if (role == "Prisoner" || role == "Officer" || role == "Warden" || role == "Cook") World.TakeRole(canonical);
             SelectCharacterForView(canonical); ApplyCharacterHeight(); ClearCharacterInput(); accumulator = 0;
-            Message("Playing as " + label + ". WASD/arrows move · drag to look · V changes view · E interacts · P opens the phone · Esc returns." + (World.Data.Speed == 0 ? " Paused: press Space or Resume to walk." : ""));
+            Message("Playing as " + label + ". " + (controlDevice == ControlDevice.Gamepad ? "Sticks move and look · face buttons act · RB view · Select phone · D-pad ← returns." : controlDevice == ControlDevice.Touch ? "Left stick moves · swipe to look · buttons act." : "WASD moves · the mouse looks · click strikes · E uses · V view · P phone · Esc frees the cursor.") + (World.Data.Speed == 0 ? " Paused: press Space or Resume to walk." : ""));
             hud.Refresh(true); return true;
         }
 
@@ -173,6 +173,7 @@ namespace Cellblock.Unity
             if (!CharacterViewActive && characterSnapshot == null) return;
             ClearCharacterInput();
             if (characterViewWorld != null) characterViewWorld.EndCharacterControl();
+            mouseLookWanted = false; // Claude look pass: never leave the cursor captured in management
             RestoreCharacterDecisionOwner(); characterViewId = ""; characterViewWorld = null; characterCameraReady = false; CharacterCameraObstructed = false;
             view.SetCharacterPresentation(null, "", false, cameraRig);
             CharacterCameraSnapshot saved = characterSnapshot; characterSnapshot = null;
@@ -205,7 +206,7 @@ namespace Cellblock.Unity
             if (characterPerspective == CharacterPerspective.FirstPerson) characterFirstPitch = characterPitch;
             else if (characterPerspective == CharacterPerspective.ThirdPerson) characterThirdPitch = characterPitch;
             characterPerspective = firstPerson ? CharacterPerspective.FirstPerson : CharacterPerspective.ThirdPerson;
-            characterPitch = firstPerson ? Mathf.Clamp(characterFirstPitch, -70, 72) : Mathf.Clamp(characterThirdPitch, 10, 65);
+            characterPitch = firstPerson ? Mathf.Clamp(characterFirstPitch, -70, 72) : Mathf.Clamp(characterThirdPitch, 4, 65);
             characterCameraReady = false; ApplyCharacterHeight(); ClearCharacterInput(); hud.Refresh(true);
         }
         void ApplyCharacterHeight()
@@ -277,24 +278,29 @@ namespace Cellblock.Unity
             if (!CharacterViewActive) return false;
             if (Input.GetKeyDown(KeyCode.Escape))
             {
+                if (!hud.CharacterPhoneOpen && !hud.BlocksWorldInput && ReleaseMouseLook()) { ClearCharacterInput(); return true; } // Claude look pass: Esc frees a captured cursor first
                 if (hud.CharacterPhoneOpen) hud.ToggleCharacterPhone();
                 else if (hud.BlocksWorldInput) hud.NavigateBack();
                 else EndCharacterView();
                 ClearCharacterInput(); return true;
             }
             if (hud.CharacterPhoneOpen)
-            { if (Input.GetKeyDown(KeyCode.P)) hud.ToggleCharacterPhone(); ClearCharacterInput(); return true; }
+            { if (Input.GetKeyDown(KeyCode.P) || GamepadClosesPhone()) hud.ToggleCharacterPhone(); ClearCharacterInput(); return true; }
             if (appPaused || (unfocused && !presentationPreview) || hud.BlocksWorldInput) { ClearCharacterInput(); return true; }
             if (Input.GetKeyDown(KeyCode.P)) { hud.ToggleCharacterPhone(); ClearCharacterInput(); return true; }
             if (Input.GetKeyDown(KeyCode.Space)) { World.Data.Speed = World.Data.Speed == 0 ? 1 : 0; accumulator = 0; ClearCharacterInput(); return true; }
             if (Input.GetKeyDown(KeyCode.V)) { ToggleCharacterPerspective(); return true; }
+            if (Input.GetKeyDown(KeyCode.C)) { RecenterCharacterCamera(); return true; } // Claude look pass (exact exception, 2026-10-18)
+            if (GamepadButtons()) return true;
+            if (CharacterDirect && ActionKeys()) return true; // Claude's staff actions: F, G, Q, E, Shift (exact exception, 2026-10-18)
             if (CharacterDirect && Input.GetKeyDown(KeyCode.E)) { ClearCharacterInput(); InteractWithCharacter(); return true; }
-            Vector2 keyboard = CharacterKeyboardMove(), stick = Vector2.ClampMagnitude(hud.CharacterMoveInput, 1);
+            Vector2 keyboard = Vector2.ClampMagnitude(CharacterKeyboardMove() + GamepadMove(), 1), stick = Vector2.ClampMagnitude(hud.CharacterMoveInput, 1);
             bool neutral = keyboard.sqrMagnitude < .0001f && stick.sqrMagnitude < .0001f && Input.touchCount == 0 &&
                 !Input.GetMouseButton(0) && !Input.GetMouseButton(1) && !Input.GetMouseButton(2);
             if (!characterInputArmed && neutral && World.Data.Speed > 0) characterInputArmed = true;
             float sensitivity = Preferences.CameraSensitivity;
-            Vector2 look = hud.CharacterLookInput * (100 * sensitivity * Time.unscaledDeltaTime);
+            // Claude look pass: the LOOK stick and right stick use a dead zone and curve; swipes are measured in points.
+            Vector2 look = LookStick(hud.CharacterLookInput) + GamepadLook();
             if (Input.touchCount > 0)
             {
                 characterMouseLook = false;
@@ -302,9 +308,10 @@ namespace Cellblock.Unity
                     for (int i = 0; i < Input.touchCount; i++)
                     {
                         Touch touch = Input.GetTouch(i);
-                        if (touch.phase == TouchPhase.Began && characterLookFinger < 0 && touch.position.x > Screen.width * .45f && !CharacterPointOwned(touch.position)) characterLookFinger = touch.fingerId;
+                        if (touch.phase == TouchPhase.Began && characterLookFinger < 0 && touch.position.x > Screen.width * .4f && !CharacterPointOwned(touch.position)) characterLookFinger = touch.fingerId;
                         if (touch.fingerId != characterLookFinger) continue;
-                        if (touch.phase == TouchPhase.Moved) look += new Vector2(touch.deltaPosition.x, -touch.deltaPosition.y) * (.16f * sensitivity);
+                        LookTap(touch);
+                        if (touch.phase == TouchPhase.Moved) look += CharacterDirect ? TouchLook(touch.deltaPosition) : new Vector2(touch.deltaPosition.x, -touch.deltaPosition.y) * (.16f * sensitivity);
                         if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled) characterLookFinger = -1;
                     }
             }
@@ -312,21 +319,23 @@ namespace Cellblock.Unity
             {
                 characterLookFinger = -1; characterPinchA = characterPinchB = -1;
                 Vector2 cursor = Input.mousePosition;
-                if ((Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)) && !CharacterPointOwned(cursor)) { characterMouseLook = true; characterLastMouse = cursor; }
+                if (MouseLook(cursor, ref look)) characterMouseLook = false; // Claude look pass: captured mouse look and clicks
+                else if ((Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)) && !CharacterPointOwned(cursor)) { characterMouseLook = true; characterLastMouse = cursor; }
                 if (characterMouseLook && (Input.GetMouseButton(0) || Input.GetMouseButton(1)))
                 { Vector2 delta = cursor - characterLastMouse; look += new Vector2(delta.x, -delta.y) * (.18f * sensitivity); }
                 if (!Input.GetMouseButton(0) && !Input.GetMouseButton(1)) characterMouseLook = false;
                 characterLastMouse = cursor;
-                if (!CharacterPointOwned(cursor)) ZoomCharacter(Mathf.Abs(magnification) > .00001f ? magnification * 8 : Input.mouseScrollDelta.y);
+                if (MouseLookCaptured || !CharacterPointOwned(cursor)) ZoomCharacter(Mathf.Abs(magnification) > .00001f ? magnification * 8 : Input.mouseScrollDelta.y);
             }
+            Vector2 move = CharacterDirect && World.Data.Speed > 0 ? Vector2.ClampMagnitude((characterInputArmed ? keyboard : Vector2.zero) +
+                (characterMoveStickArmed ? stick : Vector2.zero), 1) : Vector2.zero;
+            CameraAssist(move, ref look); // Claude look pass: recenter, face nearest, third-person follow
             characterYaw = Mathf.Repeat(characterYaw + look.x, 360);
             characterPitch = Mathf.Clamp(characterPitch + look.y,
-                characterPerspective == CharacterPerspective.Follow ? 24 : characterPerspective == CharacterPerspective.ThirdPerson ? 10 : -70,
+                characterPerspective == CharacterPerspective.Follow ? 24 : characterPerspective == CharacterPerspective.ThirdPerson ? 4 : -70,
                 characterPerspective == CharacterPerspective.ThirdPerson ? 65 : 72);
             if (CharacterDirect)
             {
-                Vector2 move = World.Data.Speed > 0 ? Vector2.ClampMagnitude((characterInputArmed ? keyboard : Vector2.zero) +
-                    (characterMoveStickArmed ? stick : Vector2.zero), 1) : Vector2.zero;
                 Vector3 worldMove = Quaternion.Euler(0, characterYaw, 0) * new Vector3(move.x, 0, move.y);
                 World.SetCharacterMoveIntent(new Point(worldMove.x, worldMove.z));
             }

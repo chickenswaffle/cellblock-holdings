@@ -723,7 +723,7 @@ static partial class Program
             World federal = Chartered("federal-camp", "halvern");
             Check(federal.UpgradeBlocker("intake-program") == "Fully upgraded." && federal.UpgradeDailyCents == 0, "The federal program is not included in a federal contract");
             Check(UpgradeRules.All.Where(u => u.Status == "Available").All(u => u.Tiers.Length > 0 && u.Tiers.All(t => t.PriceCents > 0 && t.DailyCents >= 0)), "An available upgrade has no priced levels");
-            Check(UpgradeRules.All.Count(u => u.Status == "Planned") == 6 && UpgradeRules.All.Count(u => u.Status == "Available") == 23, "The catalog changed: " + UpgradeRules.All.Count(u => u.Status == "Planned") + " planned, " + UpgradeRules.All.Count(u => u.Status == "Available") + " available");
+            Check(UpgradeRules.All.Count(u => u.Status == "Planned") == 6 && UpgradeRules.All.Count(u => u.Status == "Available") == 24, "The catalog changed: " + UpgradeRules.All.Count(u => u.Status == "Planned") + " planned, " + UpgradeRules.All.Count(u => u.Status == "Available") + " available");
         });
         Test("commissary and resident phones calm the people who actually use them", () => {
             World world = County(); Hold(world); world.EnsureLegalProfiles(); world.Data.CashCents += 5000000; world.AdvanceMinutes(10);

@@ -1009,13 +1009,15 @@ namespace Cellblock.Core
         }
         void SickCall(StaffMember nurse, PersonnelFile file)
         {
-            Resident patient = Data.Residents.Where(r => IsPresent(r) && r.Health < 85).OrderBy(r => r.Health).ThenBy(r => r.Id, StringComparer.Ordinal).FirstOrDefault();
+            // Serious injuries first, then anyone contagious (a visit ends contagion), then the rest by health.
+            Resident patient = Data.Residents.Where(r => IsPresent(r) && (r.Health < 85 || Contagious(r))).OrderBy(r => r.Health < 40 ? 0 : Contagious(r) ? 1 : 2).ThenBy(r => r.Health).ThenBy(r => r.Id, StringComparer.Ordinal).FirstOrDefault();
             if (patient == null) { Direct(nurse, nurse.Station, "Sick call · clinic"); return; }
             Direct(nurse, patient.Position + new Point(0.7f, 0.5f), "Treating " + patient.Name);
             if (Geometry.Distance(nurse.Position, patient.Position) <= 1.6f)
             {
                 patient.Health = Math.Min(100, patient.Health + 0.8f * (0.6f + nurse.Integrity / 250f)); patient.Stress = Math.Max(0, patient.Stress - 0.05f);
                 file.Treated++;
+                TreatIllness(patient);
                 if (patient.Health >= 25) patient.NeglectSince = -1;
             }
         }
@@ -1026,7 +1028,8 @@ namespace Cellblock.Core
                 if (!IsPresent(resident)) continue;
                 if (resident.Food < 20) resident.Health = Math.Max(0, resident.Health - 0.02f);
                 // Bruises and minor cuts heal on their own within a day or two; a serious injury (under 50) needs the nurse.
-                else if (resident.Health < 92 && resident.Food > 50) resident.Health = Math.Min(92, resident.Health + (resident.Health >= 50 ? 0.012f : 0.004f));
+                // Illness stops natural healing until it passes or a nurse treats it.
+                else if (resident.Health < 92 && resident.Food > 50 && resident.Illness == "") resident.Health = Math.Min(92, resident.Health + (resident.Health >= 50 ? 0.012f : 0.004f));
                 if (resident.Health < 50) resident.Stress = Math.Min(100, resident.Stress + 0.02f);
                 if (Personnel.Regime == "Rehabilitative") resident.Stress = Math.Max(0, resident.Stress - 0.004f);
                 else if (Personnel.Regime == "Strict") resident.Stress = Math.Min(100, resident.Stress + 0.006f);
@@ -1037,11 +1040,14 @@ namespace Cellblock.Core
                     {
                         // After 12 untreated hours the person is taken to an outside hospital: one penalty, and they return stabilized.
                         // The cause decides the advice: missed meals need meal places, injuries need a nurse.
-                        bool hunger = resident.Food < 25;
-                        if (PenaltiesApply) Book(-Scaled(PersonnelRules.WelfarePenaltyCents), "welfare-penalty", (hunger ? "Malnutrition / " : "Untreated injury / ") + resident.Name);
+                        bool hunger = resident.Food < 25, ill = !hunger && resident.Illness != "";
+                        string illness = ill ? SanitationRules.Illness(resident.Illness).Short : "";
+                        if (PenaltiesApply) Book(-Scaled(PersonnelRules.WelfarePenaltyCents), "welfare-penalty", (hunger ? "Malnutrition / " : ill ? "Untreated illness / " : "Untreated injury / ") + resident.Name);
                         Personnel.WelfareViolations++; resident.NeglectSince = -1; resident.Health = Math.Max(resident.Health, 60); if (hunger) resident.Food = Math.Max(resident.Food, 60);
+                        if (ill) CureIllness(resident);
                         string text = hunger
                             ? "Welfare violation: " + resident.Name + " became seriously ill from missed meals and was taken to an outside hospital. The contract charged " + JusticeRules.Dollars(Scaled(PersonnelRules.WelfarePenaltyCents)) + ". Add dining places, or homes closer to the dining room."
+                            : ill ? "Welfare violation: " + resident.Name + " went 12 hours seriously ill with a " + illness + " and was taken to an outside hospital. The contract charged " + JusticeRules.Dollars(Scaled(PersonnelRules.WelfarePenaltyCents)) + ". A nurse treats illness; showers, basins and toilets near beds prevent it."
                             : "Welfare violation: " + resident.Name + " went 12 hours with a serious untreated injury and was taken to an outside hospital. The contract charged " + JusticeRules.Dollars(Scaled(PersonnelRules.WelfarePenaltyCents)) + ". A nurse prevents this.";
                         PeopleDynamics.Record(Data, "welfare", resident.Id, text, 4); Notice = text;
                     }
@@ -1081,15 +1087,22 @@ namespace Cellblock.Core
                 if (Data.Minute - a.LastFightMinute < 720 || Data.Minute - b.LastFightMinute < 720) continue;
                 Relationship link = a.Relationships.FirstOrDefault(r => r.OtherId == b.Id);
                 if (link == null || link.Tension < 58 || Geometry.Distance(a.Position, b.Position) > 2.6f || !SightLines.Clear(a.Position, b.Position)) continue;
-                float chance = (link.Tension >= 82 ? 0.16f : 0.05f) * ((a.Impulsivity + b.Impulsivity) / 120f) * ((a.Stress + b.Stress) / 2 + 20) / 60f;
-                chance *= (Personnel.Regime == "Strict" ? 0.7f : Personnel.Regime == "Rehabilitative" ? 1.1f : 1f) * FacilityMode.FightScale;
-                if (a.DrunkUntil > Data.Minute || b.DrunkUntil > Data.Minute) chance *= 1.6f;
-                if ((a.Dependency > 30 && a.HighUntil <= Data.Minute) || (b.Dependency > 30 && b.HighUntil <= Data.Minute)) chance *= 1.25f;
-                // A planned attack, or a known snitch facing a gang member.
-                chance *= IntelFightFactor(a, b);
+                float chance = EncounterFightChance(a, b, link);
                 if (JusticeRules.Unit(Data.Seed, a.Id + b.Id, "fight", Data.Minute / 30) >= chance) continue;
                 Confront(a, b, link, present);
             }
+        }
+        // Conditional risk for this encounter. Actual five-day totals also depend
+        // on who meets, cooldowns, separation, health and earlier incidents.
+        internal float EncounterFightChance(Resident a, Resident b, Relationship link)
+        {
+            float chance = (link.Tension >= 82 ? 0.16f : 0.05f) * ((a.Impulsivity + b.Impulsivity) / 120f) * ((a.Stress + b.Stress) / 2 + 20) / 60f;
+            chance *= (Personnel.Regime == "Strict" ? 0.7f : Personnel.Regime == "Rehabilitative" ? 1.1f : 1f) * FacilityMode.FightScale;
+            if (a.DrunkUntil > Data.Minute || b.DrunkUntil > Data.Minute) chance *= 1.6f;
+            if ((a.Dependency > 30 && a.HighUntil <= Data.Minute) || (b.Dependency > 30 && b.HighUntil <= Data.Minute)) chance *= 1.25f;
+            // A planned attack, or a known snitch facing a gang member.
+            chance *= IntelFightFactor(a, b);
+            return chance;
         }
         // Deterministic demonstration: the tensest present pair meets in the yard and the same rules decide it.
         public bool StageFightDemo()
@@ -1157,7 +1170,7 @@ namespace Cellblock.Core
         void SeparateAfterFight(Resident a, Resident b)
         {
             if (ResponseOfficers().Count == 0) return;
-            a.SeparatedUntil = b.SeparatedUntil = Data.Minute + 360;
+            ExtendSeparation(a, Data.Minute + 360); ExtendSeparation(b, Data.Minute + 360);
             if (!a.Intake.KeepSeparate.Contains(b.Id) && a.Intake.KeepSeparate.Count < 8) a.Intake.KeepSeparate.Add(b.Id);
             if (!b.Intake.KeepSeparate.Contains(a.Id) && b.Intake.KeepSeparate.Count < 8) b.Intake.KeepSeparate.Add(a.Id);
             List<Point> room = RoomOf(a.Home);
