@@ -402,6 +402,19 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
   - Blocked only on the user's bundle-ID choice and the App Store Connect record, which Claude will create in Chrome when the user is ready.
 - **Hygiene:** a fresh Unity import rewrites `Assets/DefaultVolumeProfile.asset`, `Assets/UniversalRenderPipelineGlobalSettings.asset`, `ProjectSettings/{Graphics,Project,Quality}Settings.asset` (iPhone batching). These are discarded in Claude's clone and never committed.
 
+### 2026-10-17 — key art and app icon from the game's own renderer (user request; touches Codex's HomeNight.png)
+
+- **User request (2026-10-17):** "I want the icon/logo and the artwork on the home screen to actually match the feel of the game, it would be NICE if our game was ultrarealistic but it is nowhere near that". The photoreal night-campus illustration oversold the stylized low-poly game.
+- **New `Editor/ArtCapture.cs` (Claude):** run with `Unity -batchmode -projectPath <Claude clone> -executeMethod Cellblock.Editor.ArtCapture.Run` (graphics on, no `-quit`). It enters Play mode, starts disposable `StartArtPreview` companies (federal FCI, state medium, county maximum) at golden hour and at night, and renders the real camera through URP `SingleCameraRequest` with no UI into the ignored `Builds/Art/`.
+  - Added editor-only helpers in `GameController` (Claude's): `StartArtPreview`, `ArtCamera`, `FrameArt`, `ArtCenter`.
+  - Found while doing this: `World.AdvanceMinutes` is a no-op while `Speed == 0`, so a preview must unpause to move the clock.
+- **`Assets/Cellblock/Resources/HomeNight.png` content replaced (Codex's asset, by the user's explicit request).** The filename, `.meta` and TextureImporter settings are unchanged, and the image is still 16:9, now 1920×1080 RGB.
+  - Content: the federal FCI at 16:55 (warm low sun, staff at the office desk, a line-up in the yard), with a dark fade baked into the left for the title and the start card.
+  - Checked on the iPhone 17 Pro simulator Home: readable, with no layout change.
+  - The name now says "Night" for a golden-hour image; renaming is Codex's call, since `GameHomeHud` and `ProjectSetup` reference it.
+- **`Tools/ios/AppIcon.png`:** one cell at night from the county maximum layout: a resident by his bunk under the cell light, falling off into darkness. 1024 px, opaque.
+- **Unity check request:** Home at desktop, phone and narrow layouts with the new art. The title, the start card and the save library should stay legible. On iPad the 4:3 crop trims the sides.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:

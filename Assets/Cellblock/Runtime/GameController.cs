@@ -695,6 +695,34 @@ namespace Cellblock.Unity
             view.Refresh(World, true); view.Preview(CurrentQuote!=null&&CurrentQuote.Valid?CurrentQuote.Plan:Draft); hud.Refresh(true);
         }
         public void PreviewDraft(Plan plan) { SetDraft(plan); }
+        // Key art and the app icon come from the game's own renderer: a disposable company of a real facility type at a
+        // chosen time of day, framed by this rig. Saves stay isolated like every other preview.
+        public void StartArtPreview(string typeId, string locationId, int minuteOfDay)
+        {
+            if (!CreateCompany(null, true, typeId, locationId)) throw new InvalidOperationException("Could not start the art preview.");
+            hud.CloseOverlays();
+            int target = (World.Data.Minute / 1440) * 1440 + minuteOfDay; if (target <= World.Data.Minute) target += 1440;
+            // The clock only runs unpaused; advance to the hour, then hold it there for the camera.
+            World.Data.Speed = 1; World.AdvanceMinutes(target - World.Data.Minute); World.Data.Speed = 0; view.Refresh(World, true);
+        }
+        public Camera ArtCamera { get { return cameraRig; } }
+        // Places the camera like the management rig does (focus, distance, yaw, pitch) without the interface offset.
+        public void FrameArt(Vector3 artFocus, float artDistance, float artYaw, float artPitch)
+        {
+            planView = false; cameraRig.orthographic = false;
+            Quaternion rotation = Quaternion.Euler(artPitch, artYaw, 0);
+            cameraRig.transform.position = artFocus + rotation * new Vector3(0, 0, -artDistance * 1.55f); cameraRig.transform.rotation = rotation;
+        }
+        public Vector3 ArtCenter
+        {
+            get
+            {
+                if (World == null || World.Data.Walls.Count == 0) return Vector3.zero;
+                var bounds = new Bounds(FacilityView.V(World.Data.Walls[0].A), Vector3.zero);
+                foreach (Wall wall in World.Data.Walls) foreach (Point point in Geometry.Sample(wall)) bounds.Encapsulate(FacilityView.V(point));
+                return new Vector3(bounds.center.x, 0, bounds.center.z);
+            }
+        }
         public void PreviewInspectFixture(string id)
         {
             SelectedWall=null;SelectedResident=null;SelectedStaff=null;SelectedFixture=World.Data.Fixtures.FirstOrDefault(f=>f.Id==id);
