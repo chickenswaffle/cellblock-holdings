@@ -87,7 +87,6 @@ namespace Cellblock.Unity
             WorldViewCenter = new Vector2((worldLeft + Mathf.Max(0, worldRight - worldLeft) * .5f) / width,
                 (bottom + 80 + Mathf.Max(0, height - top - bottom - 168) * .5f) / height);
             LayoutPressure(left, right, top + 88, menuOpen);
-            LayoutIncidentHud(left, right, top, menuOpen || InteractionModalOpen || guideOpen);
         }
         sealed class CommandIcon : VisualElement
         {

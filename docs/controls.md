@@ -38,14 +38,27 @@ The compact interface keeps side panels closed until needed. Close a panel to gi
 
 Every holding uses a separate save. Home has a prominent **Continue** card and a sorted **Save Library**. Autosave defaults to 30 seconds; change it in **Settings → General**. The header shows saved time or **Retry save**. Closing, suspending, or unfocusing the game holds simulation time; returning does not apply elapsed real time. **Settings → Display** changes interface size, frame cap, shadows and reduced motion; **Controls** changes keyboard/orbit speed and easing; **Audio** controls volume.
 
-## Meet the residents
+## People and compact profiles
 
-1. Open **People** and choose a resident from the roster, or click a person in the facility. The camera centers on that person; **Roster ↓** returns to the name list.
-2. Read their temperament, four traits, current needs, gang/clique affiliations, and named relationships. Relationship buttons switch directly to the other person's profile. Friendships and conflicts can develop through nearby contact.
-3. Choose **1×** to watch individual routines. Residents decide at different times, walk at different speeds, and use separate destination positions. **Home** restores the facility view.
-4. Switch the roster to **Staff**. Integrity, pressure, favoritism, and risk explain conduct. **Staff support** costs $2,500 and makes the displayed changes before the next incident check; read its effect and the event history.
+1. Open **People**, then Residents / Staff / Crew, or click a person in the facility. **Now** shows one purpose and three numbered condition bars. **Why / what happens next** reveals the explanation.
+2. Use **Life** for traits and relationships, **Record** for legal/employment details, and **Items** for possessions. **‹ People** returns to the roster; **Close** restores the facility space.
+3. **Follow** watches anyone on site. For assignments, legal choices, personnel actions and activity suggestions, open **Record → Open full file** (or **Management options** on desktop).
+4. Choose **1×** to watch individual routines, travel and complete interactions. Staff still need to reach their actual duty station or resident to perform services.
 
-The initial social model includes a friendship, a nemesis, and an officer with elevated conduct risk so there are visible stories to inspect. Gangs and cliques are fictional. Hired staff arrive in shared transport, park, disembark and walk to duty. Officers patrol/check welfare, caseworkers consult nearby residents on shift, and technicians service cameras. A complete investigation/contraband system remains future work.
+Hired staff arrive by shared transport, park, disembark and walk to duty. Named relationships, fictional gangs/cliques, contraband, conduct and incidents remain part of the management simulation.
+
+## Staff first and third person
+
+**People → Staff → Play as** takes direct movement control. Residents and construction crews have Follow only; a separate prisoner mode is planned.
+
+- **WASD / arrows:** walk. The game must be running; **Space** resumes or pauses.
+- **Drag the world:** look. **V** switches eye view / wider shoulder view. Wheel or pinch zooms third person.
+- **P:** work phone with Messages, Contacts, Tasks and issued equipment. Calls use game minutes; the phone holds movement.
+- **E:** current duty brief. Services still require physical proximity; the phone cannot complete work or trigger an instant alarm.
+- **Escape / Management:** restore the prior management view and speed.
+- Touch uses separate **MOVE / LOOK** pads, view/phone/interact buttons and world pinch. Resume after a pause, then provide fresh movement input.
+
+First person has full room walls/ceilings. Third person uses cutaway walls and a geometry-checked shoulder camera. Restraints, recovery, arrest escorts, suspension and transport can take movement authority back. [Character guide](character-experience.md).
 
 ## Prison Control and visible work
 

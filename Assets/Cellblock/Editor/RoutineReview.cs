@@ -61,58 +61,72 @@ namespace Cellblock.Editor
                 case 2: if (!FreezeAtRoutine(game, "Reading")) return false; break;
                 case 3:
                     if (!view.PreviewRoutinePose(routineResident, "Read") || view.PreviewRoutinePropsVisible < 1) return false;
-                    Require(RoutineActor(w).ReadingMinutes > 0, "No real reading effect."); Shot(game, "02-reading-book.png");
-                    hud.ShowPeople(); hud.PreviewRoutineScroll(); break;
-                case 4: Require(hud.PreviewRoutineTextReady, "Missing purpose explanation."); Shot(game, "03-purpose-card-desktop.png"); break;
-                case 5: PrepareRoutine(game, "Exercise"); break;
-                case 6: if (!FreezeAtRoutine(game, "Exercise")) return false; break;
-                case 7:
+                    Require(RoutineActor(w).ReadingMinutes > 0, "No real reading effect."); Shot(game, "02-reading-book.png"); break;
+                case 4: hud.ShowPeople(); hud.PreviewRoutineCompact(); break;
+                case 5: Require(hud.PreviewRoutineOverviewReady, "Missing compact purpose overview: " + hud.PreviewCompactCharacterLayout); Shot(game, "03-purpose-card-desktop.png"); break;
+                case 6: PrepareRoutine(game, "Exercise"); break;
+                case 7: if (!FreezeAtRoutine(game, "Exercise")) return false; break;
+                case 8:
                     if (!view.PreviewRoutinePose(routineResident, "Exercise") || view.PreviewRoutinePropsVisible < 2) return false;
                     Require(RoutineActor(w).ExerciseMinutes > 0, "No exercise effect."); Shot(game, "04-working-with-weights.png"); break;
-                case 8: PrepareRoutine(game, "Study"); break;
-                case 9: if (!FreezeAtRoutine(game, "Study")) return false; break;
-                case 10:
+                case 9: PrepareRoutine(game, "Study"); break;
+                case 10: if (!FreezeAtRoutine(game, "Study")) return false; break;
+                case 11:
                     if (!view.PreviewRoutinePose(routineResident, "Study") || view.PreviewRoutinePropsVisible < 2) return false;
                     Require(RoutineActor(w).StudyMinutes > 0, "No study effect."); Shot(game, "05-course-notebook.png"); break;
-                case 11: PrepareRoutine(game, "Talk"); break;
-                case 12: if (!FreezeAtRoutine(game, "Talk")) return false; break;
-                case 13:
+                case 12: PrepareRoutine(game, "Talk"); break;
+                case 13: if (!FreezeAtRoutine(game, "Talk")) return false; break;
+                case 14:
                     if (!view.PreviewRoutinePose(routineResident, "Talk") || !view.PreviewRoutinePose(routinePartner, "Talk")) return false;
                     Require(RoutineActor(w).TalkMinutes == w.Data.Residents.First(p => p.Id == routinePartner).TalkMinutes && RoutineActor(w).TalkMinutes > 0, "Conversation effects differ.");
                     Shot(game, "06-two-person-conversation.png"); break;
-                case 14: PrepareRoutine(game, "Television"); break;
-                case 15: if (!FreezeAtRoutine(game, "Television")) return false; break;
-                case 16:
-                    if (!view.PreviewRoutinePose(routineResident, "Watch")) return false; Shot(game, "07-watching-screen.png"); break;
+                case 15: PrepareRoutine(game, "Television"); break;
+                case 16: if (!FreezeAtRoutine(game, "Television")) return false; break;
                 case 17:
+                    if (!view.PreviewRoutinePose(routineResident, "Watch")) return false; Shot(game, "07-watching-screen.png"); break;
+                case 18:
                     r = RoutineActor(w); r.ActivityRemaining = 1; w.Data.Speed = 1; w.AdvanceMinutes(1); w.Data.Speed = 0;
                     Require(r.ActivityPhase == "Leaving", "Completion skipped leaving."); break;
-                case 18: Require(view.PreviewRoutinePropsVisible == 0, "Finished activity retained held props."); Shot(game, "08-finish-and-stand.png"); break;
-                case 19: PrepareRoutine(game, "Reading"); break;
-                case 20: if (!FreezeAtRoutine(game, "Reading")) return false; break;
-                case 21:
+                case 19: Require(view.PreviewRoutinePropsVisible == 0, "Finished activity retained held props."); Shot(game, "08-finish-and-stand.png"); break;
+                case 20: PrepareRoutine(game, "Reading"); break;
+                case 21: if (!FreezeAtRoutine(game, "Reading")) return false; break;
+                case 22:
                     r = RoutineActor(w); routineEffort = r.ActivityRemaining; r.Legal.RestrictedUntil = w.Data.Minute + 12; w.Data.Speed = 1; w.AdvanceMinutes(1); w.Data.Speed = 0;
                     Require(r.ActivityPhase == "Suspended" && r.ActivityRemaining == routineEffort, "Confinement consumed routine effort.");
-                    hud.ShowPeople(); hud.PreviewRoutineScroll(); break;
-                case 22: Require(view.PreviewRoutinePropsVisible == 0, "Priority task retained a book pose."); Shot(game, "09-priority-and-blocker.png"); game.ReloadPresentationPreview(); break;
-                case 23: Require(RoutineActor(w).ActivityPhase == "Suspended" && RoutineActor(w).ActivityRemaining == routineEffort, "Unity JSON lost suspended intent."); Shot(game, "10-paused-plan-reloaded.png");
-                    hud.CloseOverlays(); w.Data.Speed = 1; break;
-                case 24: if (!FreezeAtRoutine(game, "Reading")) return false; break;
-                case 25: if (!view.PreviewRoutinePose(routineResident, "Read")) return false; Shot(game, "11-resumed-interaction.png");
-                    r = RoutineActor(w); w.Data.Fixtures.RemoveAll(f => f.Id == r.ActivityFixture); w.Data.Speed = 1; w.AdvanceMinutes(1); w.Data.Speed = 0; game.ReloadPresentationPreview(); hud.ShowPeople(); hud.PreviewRoutineScroll(); break;
-                case 26: Require(RoutineActor(w).Activity == "" && RoutineActor(w).ActivityBlocker.Contains("object"), "Removed object did not explain fallback."); Shot(game, "12-unavailable-place.png");
-                    r = RoutineActor(w); r.Stress = 85; r.Discipline = 10; r.Impulsivity = 95; hud.PreviewRoutineSubmit("Study"); break;
-                case 27: Require(w.Notice.Contains("declined"), "The actual suggestion button did not issue the command."); Shot(game, "13-personal-refusal.png"); SetGameSize(900, 420); hud.PreviewRoutineScroll(); break;
-                case 28: hud.ShowPeople(); hud.PreviewRoutineScroll(); break;
-                case 29: Shot(game, "14-phone-purpose.png"); break;
-                case 30: Require(hud.PreviewRoutineTextReady, "Phone lacks purpose information: " + hud.PreviewRoutineLayout); hud.PreviewRoutineScroll(true); break;
-                case 31: Shot(game, "15-phone-suggestions.png"); break;
-                case 32: Require(hud.PreviewRoutineSuggestionsFit, "Phone suggestion actions are clipped or under44px: " + hud.PreviewRoutineLayout); hud.ShowMenu(); SetGameSize(1600, 900); break;
-                case 33: Shot(game, "16-home-retained.png"); break;
+                    hud.ShowPeople(); hud.PreviewRoutineCompact(); break;
+                case 23: Require(view.PreviewRoutinePropsVisible == 0, "Priority task retained a book pose."); Shot(game, "09-priority-and-blocker.png"); break;
+                case 24: game.ReloadPresentationPreview(); break;
+                case 25: Require(RoutineActor(w).ActivityPhase == "Suspended" && RoutineActor(w).ActivityRemaining == routineEffort, "Unity JSON lost suspended intent."); Shot(game, "10-paused-plan-reloaded.png"); break;
+                case 26: hud.CloseOverlays(); w.Data.Speed = 1; break;
+                case 27: if (!FreezeAtRoutine(game, "Reading")) return false; break;
+                case 28: if (!view.PreviewRoutinePose(routineResident, "Read")) return false; Shot(game, "11-resumed-interaction.png"); break;
+                case 29:
+                    r = RoutineActor(w); w.Data.Fixtures.RemoveAll(f => f.Id == r.ActivityFixture); w.Data.Speed = 1; w.AdvanceMinutes(1); w.Data.Speed = 0;
+                    game.ReloadPresentationPreview(); hud.ShowPeople(); hud.PreviewRoutineCompact(); break;
+                case 30: Require(RoutineActor(w).Activity == "" && RoutineActor(w).ActivityBlocker.Contains("object"), "Removed object did not explain fallback."); Shot(game, "12-unavailable-place.png"); break;
+                case 31:
+                    r = RoutineActor(w); r.Stress = 85; r.Discipline = 10; r.Impulsivity = 95; hud.PreviewRoutinePrepareManagement(); break;
+                case 32: hud.PreviewRoutineEnterManagement(); break;
+                case 33:
+                    Require(hud.PreviewRoutineSuggestionsFit, "Desktop suggestion actions are clipped or under44px: " + hud.PreviewRoutineLayout);
+                    hud.PreviewRoutineSubmit("Study"); break;
+                case 34: Require(w.Notice.Contains("declined"), "The actual suggestion button did not issue the command."); Shot(game, "13-personal-refusal.png"); break;
+                case 35: SetGameSize(900, 420); break;
+                case 36: hud.ShowPeople(); hud.PreviewRoutineCompact(); break;
+                case 37: Require(hud.PreviewRoutineOverviewReady, "Phone lacks the compact purpose overview: " + hud.PreviewCompactCharacterLayout); Shot(game, "14-phone-purpose.png"); break;
+                case 38: hud.PreviewRoutinePrepareWhy(); break;
+                case 39: hud.PreviewRoutineDisclose(); break;
+                case 40: Require(hud.PreviewRoutineDisclosureReady, "Phone lacks reachable Why / next information: " + hud.PreviewCompactCharacterLayout); Shot(game, "15-phone-why-next.png"); break;
+                case 41: hud.PreviewRoutinePrepareManagement(); break;
+                case 42: hud.PreviewRoutineEnterManagement(); break;
+                case 43: hud.PreviewRoutineScroll(true); break; // The full-file layout has now completed.
+                case 44: Require(hud.PreviewRoutineSuggestionsFit, "Phone suggestion actions are clipped or under44px: " + hud.PreviewRoutineLayout); Shot(game, "16-phone-suggestions.png"); break;
+                case 45: hud.ShowMenu(); SetGameSize(1600, 900); break;
+                case 46: Shot(game, "17-home-retained.png"); break;
                 default:
-                    string errors = SessionState.GetString(ErrorKey, ""); Require(Directory.GetFiles(Output, "*.png").Length == 16, "Missing routine frames.");
+                    string errors = SessionState.GetString(ErrorKey, ""); Require(Directory.GetFiles(Output, "*.png").Length == 17, "Missing routine frames.");
                     var report = new Report { passed = errors == "", editor = Application.unityVersion,
-                        message = "Actual Unity Play: normal movement from suggestion through arrival/settling/reading, weights, seated study, reciprocal conversation, television, completion, priority suspension/Unity JSON/resume/removal fallback, actual suggestion button/refusal, desktop and phone purpose/44px actions, Home retained. Disposable companies; no player slots overwritten. Current procedural characters; device/performance and a full morning remain future work.",
+                        message = "Actual Unity Play: normal movement from suggestion through arrival/settling/reading, weights, seated study, reciprocal conversation, television, completion, priority suspension/Unity JSON/resume/removal fallback, compact desktop/phone Now overview, explicit44px Why/next disclosure, explicit Record/full-file entry and actual44px management suggestions/refusal, Home retained. Captures complete before the next UI/world mutation. Disposable companies; no player slots overwritten. Current procedural characters; device/performance and a full morning remain future work.",
                         errors = errors.Split('\n').Where(e => e != "").ToArray(), captures = Directory.GetFiles(Output, "*.png").Select(Path.GetFileName).ToArray() };
                     File.WriteAllText(Path.Combine(Output, "report.json"), JsonUtility.ToJson(report, true)); Debug.Log(report.passed ? "CELLBLOCK_ROUTINES_REVIEW_PASSED" : "CELLBLOCK_ROUTINES_REVIEW_FAILED");
                     ReleaseRefresh(); SessionState.SetString(ModeKey, "stopping"); EditorApplication.isPlaying = false; return false;

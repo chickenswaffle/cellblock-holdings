@@ -1057,7 +1057,7 @@ namespace Cellblock.Unity
 #endif
         void OnDestroy()
         {
-            ResetMotionPresentation();
+            DisposeMotionResources();
             DisposeCharacterPresentation();
             if (sirenClip != null) Destroy(sirenClip);
             // Include baked scenery and resident parts so leaving Play does not leak generated meshes.

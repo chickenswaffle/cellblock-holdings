@@ -42,7 +42,7 @@ namespace Cellblock.Unity
         // The controller advances one game minute every 0.2 s per unit of speed: this is how far into the current minute we are.
         void AdvanceSceneClock(World world)
         {
-            float dt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
+            float dt = Mathf.Min(SceneFrameDelta, 0.1f);
             if (world.Data.Minute != sceneMinute) { sceneMinute = world.Data.Minute; sceneFraction = 0; }
             else if (Time.unscaledTime >= hitStopUntil) sceneFraction = Mathf.Min(0.999f, sceneFraction + dt * 5 * world.Data.Speed);
             CameraImpulse = Mathf.MoveTowards(CameraImpulse, 0, dt * 1.4f);
@@ -71,6 +71,8 @@ namespace Cellblock.Unity
             if (escort != null && prisoner != null && escort != down) { Take(escort, Hold.Upper); Take(prisoner, Hold.Upper); EscortScene(escort, prisoner); }
             foreach (Actor actor in heldThisFrame) Keep(actor);
             UpdatePuffs();
+            RefreshAlarmMood(world);
+            RefreshContactShadows();
         }
         Actor Live(string id)
         {
@@ -140,7 +142,9 @@ namespace Cellblock.Unity
             if (axis.sqrMagnitude < 0.0001f) axis = e.Root.forward;
             Vector3 along = axis.normalized;
             float axisYaw = Yaw(axis);
+#if UNITY_EDITOR
             cast.Beat = s.Phase + "/" + s.Move;
+#endif
             bool prone = s.Prone && (s.Phase == "Down" || s.Phase == "Cuffing" || s.Phase == "Rising");
             if (s.Phase == "Grappling" && s.Move == "Tackle")
             {
@@ -166,8 +170,14 @@ namespace Cellblock.Unity
                 if (t < start)
                 {
                     float step = Mathf.Sin(tempo * 4.4f) * (s.Move == "Hold" ? 0.07f : 0.04f);
-                    Clinch(o, e, 18, true, step, blend); Clinch(e, o, 13, false, -step, blend);
-                    Effort(e, tempo, 4); Effort(o, tempo + 1.7f, 3);
+                    // Some holds are not quiet: the resident rips an arm free and swings, the officer ducks and grabs again.
+                    bool swing = s.Move == "Hold" && (s.MoveMinute + s.Exchanges) % 2 == 1;
+                    float duck = swing ? Window(t, 0.5f, 0.58f) * (1 - Window(t, 0.66f, 0.8f)) : 0;
+                    Vector2 shakeE = Tremor(tempo, 4), shakeO = Tremor(tempo + 1.7f, 3);
+                    Clinch(o, e, 18 + 14 * duck + shakeO.x, true, step, blend, -1, shakeO.y);
+                    Clinch(e, o, 13 + shakeE.x, false, -step, blend, swing ? 1 : -1, (swing ? SwingTwist(t) : 0) + shakeE.y);
+                    if (swing) WildSwing(e, o, t, blend, s);
+                    if (o.Head != null && duck > 0) Joint(o.Head, new Vector3(24 * duck, -10 * duck, 0), blend);
                 }
                 else if (s.Move == "Shove") ShoveBeat(e, o, t, blend, s);
                 else if (s.Move == "Strike") shiftE = StrikeBeat(e, o, t, blend, s);
@@ -241,17 +251,34 @@ namespace Cellblock.Unity
         static readonly Color Fugitive = new Color(.98f, .62f, .40f), Lawman = new Color(.58f, .80f, .92f), Hurt = new Color(.95f, .55f, .45f);
 
         // Grip the partner: an officer takes the upper arms, a resident braces on the officer's chest and shoulders.
-        void Clinch(Actor a, Actor partner, float lean, bool officer, float step, float blend)
+        void Clinch(Actor a, Actor partner, float lean, bool officer, float step, float blend, int freeArm = -1, float twist = 0)
         {
             Stance(a, 0.82f + Mathf.Abs(step) * 0.2f, (officer ? 0.18f : -0.18f) + step, (officer ? -0.16f : 0.16f) - step, blend);
-            Torso(a, lean, 0, 0, blend);
+            Torso(a, lean, twist, 0, blend);
             for (int arm = 0; arm < 2; arm++)
             {
+                if (arm == freeArm) continue;
                 // Facing each other, my left meets their right.
                 Vector3 grip = officer ? partner.Forearms[1 - arm].position + Vector3.up * 0.12f
                     : partner.Body.position + Vector3.up * 0.42f + partner.Root.right * (arm == 0 ? 0.13f : -0.13f);
                 ArmPose(a, arm, a.Model.InverseTransformPoint(grip), blend);
             }
+        }
+        // Inside a hold: rip the right arm free, swing a wide hook at the officer's head, miss as the officer ducks, grab back on.
+        void WildSwing(Actor e, Actor o, float t, float blend, EscapeStruggle s)
+        {
+            float rip = Window(t, 0.3f, 0.42f), cock = Window(t, 0.42f, 0.5f), hook = Window(t, 0.5f, 0.6f), back = Window(t, 0.68f, 0.85f);
+            float fast = 1 - Mathf.Exp(-Time.unscaledDeltaTime * 26);
+            Vector3 grip = e.Model.InverseTransformPoint(o.Body.position + Vector3.up * 0.42f + o.Root.right * -0.13f);
+            Vector3 wide = new Vector3(0.42f, 1.45f, 0.02f);
+            Vector3 head = e.Model.InverseTransformPoint((o.Head != null ? o.Head.position : o.Body.position + Vector3.up * 0.7f) + Vector3.up * 0.12f);
+            Vector3 hand = Vector3.Lerp(Vector3.Lerp(Vector3.Lerp(grip, wide, Mathf.Max(rip, cock)), head + new Vector3(-0.2f, 0, 0), hook), grip, back);
+            ArmPose(e, 1, hand, hook > 0 && back < 1 ? fast : blend);
+        }
+        static float SwingTwist(float t)
+        {
+            float cock = Window(t, 0.42f, 0.5f), hook = Window(t, 0.5f, 0.6f), back = Window(t, 0.68f, 0.85f);
+            return -22 * cock * (1 - hook) + 30 * hook * (1 - back);
         }
         void ShoveBeat(Actor e, Actor o, float t, float blend, EscapeStruggle s)
         {
@@ -670,10 +697,10 @@ namespace Cellblock.Unity
                 Joint(hip, new Vector3(-4 * amount, 0, (leg == 0 ? -1 : 1) * 5), blend); Joint(a.Knees[leg], new Vector3(98 * amount, 0, 0), blend);
             }
         }
-        void Effort(Actor a, float tempo, float amount)
+        // Strain shaking through a torso (about 7 Hz): added to the torso's target angles, so it never accumulates.
+        static Vector2 Tremor(float tempo, float amount)
         {
-            float x = (Mathf.PerlinNoise(tempo * 7f, 0.7f) - 0.5f) * 2 * amount, y = (Mathf.PerlinNoise(0.3f, tempo * 6.3f) - 0.5f) * 3.2f * amount;
-            a.Body.localRotation *= Quaternion.Euler(x, y, 0);
+            return new Vector2((Mathf.PerlinNoise(tempo * 7f, 0.7f) - 0.5f) * 2 * amount, (Mathf.PerlinNoise(0.3f, tempo * 6.3f) - 0.5f) * 3.2f * amount);
         }
 
         // ---- impact feedback -----------------------------------------------------------------------------------------------

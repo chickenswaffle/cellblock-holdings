@@ -64,7 +64,9 @@ User request, after demoing an escape: "it started good but kinda sucked, I mean
 
 The mean struggle is about 20 game minutes (4 s at 1×).
 
-**Checks.** `Tools/CoreChecks/EscapeChecks.cs` holds 13 checks, including tackles only from behind and responders sprinting to close. All 20 mutants of the first pass were caught. Two existing checks that assumed instant interception now expect a struggle: the closed-gate response check and the radio-during-capture check.
+**Checks.** `Tools/CoreChecks/EscapeChecks.cs` holds 15 checks, including tackles only from behind, responders sprinting to close, a hot chase outlasting the attempt clock, and a sprint keeping its pace through turning corridors. The last of these measured 0.88 × walk speed with carry-over and 0.56 without it.
+
+**Mutation.** All 20 mutants of the first pass were caught. Of 26 mutants of the second pass, 24 were caught at first. The two survivors (the hot-chase rule and the waypoint carry-over) exposed test gaps; the two new checks above close them, and each was verified against its mutant. Two existing checks that assumed instant interception now expect a struggle: the closed-gate response check and the radio-during-capture check.
 
 ## Presentation
 
@@ -106,6 +108,12 @@ The brawl view handles resident fights:
 - exchanges on a fixed per-scene script: cross, hook, haymaker, shove and collar grab, answered by a hit, a block or a slip
 - held apart by the separating officer while the fighters strain at each other
 
+**Graphics from the research brief:**
+- **`Runtime/FacilityAlarmMood.cs`.** While the alarm sounds, a second global volume at priority 11 eases in over the presentation grade: a faint red filter, −17 saturation, +14 contrast, a little darker at night, and a red-edged vignette that breathes at 0.7 Hz. It is a slow breath, never a strobe, and holds still with Reduced Motion.
+- **`Runtime/FacilityContactShadows.cs`** with **`Resources/ContactShadow.shader`.** A soft dark ellipse under every visible person: one pooled quad each, repositioned every frame, with four pre-built alpha levels. The ellipses stretch along a lying body, fade while someone is off their feet, and sit just above the escape alert disc. The shader is SRP-batcher compatible.
+  - **Gotcha:** a single combined dynamic mesh (rewritten every frame) never drew in this pipeline, even with Unity's own Unlit material, while finished per-person quads draw reliably. `EscapeCapture.RunNight` keeps an on/off top-down diagnostic for this.
+- **Wild swings.** Inside a hold, the resident sometimes rips an arm free and swings a hook that the officer ducks, even when the exchange doesn't break the hold.
+
 **Pose ownership.** Scene-held bodies keep the scene's own copy of every joint they own (full body, upper body or head). Other animators writing the same joints earlier in the frame can't water the poses down, and nothing pops when a scene lets go.
 
 **Falls.** Falls pivot about the centre of mass (`Lay`), not the feet, so bodies drop rather than topple like trees.
@@ -118,13 +126,17 @@ The brawl view handles resident fights:
 
 ## Verification
 
-- `Editor/EscapeCapture.cs` renders real Play-mode sequences with the game's own camera, lights and people into `Builds/EscapeCapture/<shot>/`, with `timeline.csv` recording the phase, move, beat, stamina, active puffs and camera impulse for each frame.
-- It covers four scenarios and 20 shots, with scripted checks on each phase:
-  - sprint, clinch, strike, knocked down, a tackle from behind, pinned, cuffing, rising and escort
-  - the gate, shove, flight, a frontal takedown and its pin
-  - exhausted, surrender and standing cuffs
-  - squaring up, brawl and separating
-- Run it the same way as `ArtCapture`: batchmode with graphics, no `-quit`, from Claude's clone only.
+The integrated Mac review uses the **existing sole Unity editor** through `PresentationPreview`. Choose **Cellblock → Capture staged escape review**, or write `escape` to `Temp/CellblockPresentation.request` while holding the runner scope. `RunNight()` uses the same safe full review. Do not start another editor/build against this checkout.
+
+The runner preserves the current company, refuses unsaved editor scenes, uses disposable companies and writes each run to a unique `Temp/CellblockEscape/<runstamp>` directory. Completion, cancellation and failure release auto-refresh and restore preferences. PNG encoding uses a preview-only fixed game/scene step; normal gameplay is unchanged.
+
+Final combined evidence: **373 core checks**, **24 sequences / 982 frames / 6 scenarios**, errors empty. Twenty-two sequences stage day/night poses; two exercise unforced contact through cuffing, exactly one interception and a moving escort after initial fixture placement. Other checks cover Shadows OFF, static reduced-motion vignette, immediate same-world actor-shadow retirement and fresh-world reset. These are not balance or device performance measurements. Some staged angles include fence/label obstruction; the separate16-frame incident Game-view review checks player camera/response.
+
+[Final animation report](reviews/2026-10-18-staff-graphics-escapes.json), [core transcript](reviews/2026-10-18-staff-graphics-core.txt), [complete validation](implementation-status.md).
+
+## Research
+
+The full brief is `docs/research-escape-motion.md`: biomechanics, springs, fight timing, juice, pursuit, camera, mobile URP and a pose library verified on this rig. The forward-kinematics model of the rig that its pose tables came from is in `Tools/RigModel/`.
 
 ## Hooks into Codex's files
 

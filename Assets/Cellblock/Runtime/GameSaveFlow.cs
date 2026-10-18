@@ -42,6 +42,7 @@ namespace Cellblock.Unity
             Preferences.Normalize(); AudioListener.volume = Preferences.MasterVolume;
             QualitySettings.vSyncCount = 0; Application.targetFrameRate = Preferences.FrameRate;
             if (cameraRig != null) cameraRig.GetUniversalAdditionalCameraData().renderShadows = Preferences.Shadows;
+            if (view != null) { view.ReducedMotion = Preferences.ReducedMotion; view.ContactShadowsEnabled = Preferences.Shadows; }
             if (hud != null) hud.ApplyInterfacePreferences();
         }
         public bool SavePreferences()

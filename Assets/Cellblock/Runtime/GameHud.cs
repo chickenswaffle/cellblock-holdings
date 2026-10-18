@@ -600,6 +600,7 @@ namespace Cellblock.Unity
             LayoutFrontend(left, right, top, bottom, menuOpen);
             LayoutCharacterInspector(left, right, top, bottom, menuOpen);
             LayoutCharacterPhone(left, right, top, bottom);
+            LayoutIncidentHud(left, right, top, bottom, menuOpen || InteractionModalOpen || guideOpen || game.CharacterViewActive || game.RideAlongActive || game.Draft != null || (compact && inspectorOpen));
         }
 
         public bool IsOverUI(Vector2 screen)

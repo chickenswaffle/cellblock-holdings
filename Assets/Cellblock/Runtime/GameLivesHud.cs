@@ -89,11 +89,14 @@ namespace Cellblock.Unity
 #if UNITY_EDITOR
         public void PreviewRoutineScroll(bool suggestions = false)
         {
-            characterAdvanced = true; inspectorOpen = true; Layout();
-            VisualElement target = suggestions ? routineCard.Q<VisualElement>(className: "life-suggestions") : routineCard;
-            inspector.schedule.Execute(() => { var scroll = (ScrollView)inspector; scroll.scrollOffset = new Vector2(0, Mathf.Max(0, target.ChangeCoordinatesTo(scroll.contentContainer, Vector2.zero).y - 8)); }).StartingIn(50);
+            if (!suggestions) { PreviewRoutineCompact(); return; }
+            if (!characterAdvanced) throw new System.InvalidOperationException("Open the resident's full file before reviewing management suggestions.");
+            // Align the first actual action with the viewport; the old decorative8px inset clipped the
+            // second row on short screens even when both44px rows fit the available97px viewport.
+            VisualElement target = routineCard.Q<VisualElement>(className: "life-suggestions").Query<Button>().ToList().First();
+            RoutineReviewScrollTo((ScrollView)inspector, target);
         }
-        public string PreviewRoutineLayout { get { return "port=" + ((ScrollView)inspector).contentViewport.worldBound + "; goal=" + lifeNow.worldBound + "; next=" + routineNext.worldBound + "; card=" + routineCard.worldBound; } }
+        public string PreviewRoutineLayout { get { return "offset=" + ((ScrollView)inspector).scrollOffset + "; buttons=" + string.Join(" | ", routineCard.Q<VisualElement>(className: "life-suggestions").Query<Button>().ToList().Select(b => b.text + ":" + b.worldBound)) + "; port=" + ((ScrollView)inspector).contentViewport.worldBound + "; goal=" + lifeNow.worldBound + "; next=" + routineNext.worldBound + "; card=" + routineCard.worldBound; } }
         public bool PreviewRoutineTextReady { get { Rect port = ((ScrollView)inspector).contentViewport.worldBound;
             return lifeNow.text != "" && routineReason.text.StartsWith("WHY /") && routineNext.text.StartsWith("NEXT /") &&
                 lifeNow.worldBound.yMin >= port.yMin - 1 && routineNext.worldBound.yMax <= port.yMax + 1; } }
@@ -109,6 +112,8 @@ namespace Cellblock.Unity
         public void PreviewRoutineSubmit(string text)
         {
             Button button = routineCard.Q<VisualElement>(className: "life-suggestions").Query<Button>().ToList().First(b => b.text == text);
+            if (!characterAdvanced || !RoutineReviewVisible(button, (ScrollView)inspector, 43))
+                throw new System.InvalidOperationException("The real suggestion action is clipped or under44px: " + PreviewRoutineLayout);
             var click = typeof(Clickable).GetMethod("SimulateSingleClick", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
             if (click == null) throw new System.InvalidOperationException("Unity button simulation is unavailable.");
             click.Invoke(button.clickable, new object[] { null, 0 });

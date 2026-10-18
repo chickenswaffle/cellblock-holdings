@@ -198,6 +198,26 @@ static partial class Program
             w.AdvanceMinutes(1);
             Check(guard.Duty == "Responding to escape" && Geometry.Distance(start, guard.Position) > w.ResponseSpeed * 1.1f, "The officer did not sprint to close: moved " + Geometry.Distance(start, guard.Position));
         });
+        Test("a chase someone has just fought their way back into is not quietly abandoned by the attempt clock", () => {
+            Resident r; StaffMember guard; World w = Grappling(out r, out guard, false);
+            Land(w, "Strike");
+            Check(!w.Struggle.Active && w.Struggle.BreakFrees == 1, "Test setup: the strike did not break free");
+            // Long past the two-hour limit, but only minutes after breaking free: the run goes on.
+            w.Escape.StartMinute = w.Data.Minute - 200; w.Struggle.AttemptStart = w.Escape.StartMinute;
+            w.AdvanceMinutes(2);
+            Check(w.Escape.Phase != "None", "The attempt clock abandoned a hot chase");
+            // Once the chase has gone cold, the ordinary limit applies again.
+            w.Struggle.LastMoveMinute = w.Data.Minute - 100;
+            w.AdvanceMinutes(1);
+            Check(w.Escape.Phase == "None" && w.IncidentReport.Outcome == "Attempt abandoned", "A cold chase outlived the attempt clock: " + w.Escape.Phase);
+        });
+        Test("a sprint out of the building keeps its pace through every turn of the corridors", () => {
+            // Walk stops at each lattice waypoint; without carrying distance across them, a turning route lost a third of the sprint.
+            Resident r; StaffMember guard; World w = StruggleWorld(out r, out guard); guard.Position = guard.Station = guard.Destination = new Point(24, 20);
+            r.Position = r.Home; float covered = 0;
+            for (int i = 0; i < 6; i++) { Point before = r.Position; w.AdvanceMinutes(1); covered += Geometry.Distance(before, r.Position); }
+            Check(covered / 6 > 0.8f * r.WalkSpeed, "The sprint lost pace at the turns: " + covered / 6 + " m a minute");
+        });
         Test("nobody gives up mid-struggle: the attempt clock waits for the hold to end", () => {
             Resident r; StaffMember guard; World w = Grappling(out r, out guard);
             w.Escape.StartMinute = w.Data.Minute - 119; w.Struggle.AttemptStart = w.Escape.StartMinute; w.Struggle.MoveEnd = w.Data.Minute + 4;
