@@ -288,6 +288,7 @@ namespace Cellblock.Unity
             if (Input.GetKeyDown(KeyCode.P)) { hud.ToggleCharacterPhone(); ClearCharacterInput(); return true; }
             if (Input.GetKeyDown(KeyCode.Space)) { World.Data.Speed = World.Data.Speed == 0 ? 1 : 0; accumulator = 0; ClearCharacterInput(); return true; }
             if (Input.GetKeyDown(KeyCode.V)) { ToggleCharacterPerspective(); return true; }
+            if (CharacterDirect && ActionKeys()) return true; // Claude's staff actions: F, G, Q, E, Shift (exact exception, 2026-10-18)
             if (CharacterDirect && Input.GetKeyDown(KeyCode.E)) { ClearCharacterInput(); InteractWithCharacter(); return true; }
             Vector2 keyboard = CharacterKeyboardMove(), stick = Vector2.ClampMagnitude(hud.CharacterMoveInput, 1);
             bool neutral = keyboard.sqrMagnitude < .0001f && stick.sqrMagnitude < .0001f && Input.touchCount == 0 &&

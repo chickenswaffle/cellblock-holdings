@@ -573,6 +573,26 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
 - **Requests (in the user's message to you):** starter-layout hygiene fixtures in `ModeStarts.cs`, washing poses and towel props in the routine view, and a Hygiene vital in the compact dossier.
 - **Next (Claude):** Hard Time III-style staff action controls. The user decided staff now, a prisoner mode later. Claude claims `GameCharacterControl.cs`, `GameCharacterControlsHud.cs`, `CharacterControl.cs`, `CharacterInteractions.cs` and `GameCharacterInteractions.cs` for that pass, with an exact entry before editing.
 
+### 2026-10-18 — Hard Time-style staff actions (user request; exact exceptions in character-experience)
+
+- **User request:** controls inspired by Hard Time III ("fight, interact, pick stuff up"). The user chose **staff now, a prisoner mode later**. Your character-experience scope showed "no active edits", and the user's message to you assigns this pass to Claude.
+- **Built (`docs/staff-actions.md`):** an action pad (STRIKE/charge/takedown, GRAB/cuff/release, PICK UP confiscates drops, USE = pat search / bunk search / lock in at their bunk, RUN with wind), with keys F/G/Q/E/Shift.
+  - Rulings: justified versus excessive force, counters, resisting and break-free.
+  - Escorting: trail-following, so the prisoner walks the officer's own path.
+  - Consequences: write-ups, trust, memories and **Conduct** audit findings.
+  - Holds, knockdowns and wind are live (never saved), like your control session.
+  - Incident-, escape-, intake- and transport-owned residents are not targets.
+- **Exact hooks in your files (please keep them when you merge):**
+  - `CharacterControl.cs`: `StaffActionSpeed(ref speed); if (speed <= 0) return;` before the step in `AdvanceCharacterControl`.
+  - `GameCharacterControlsHud.cs`: `BuildActionPad()` at the end of `BuildCharacterControls`, `RefreshActionPad(world)` first in `RefreshCharacterControls`, `LayoutActionPad(...)` with the context-line right margin in `LayoutCharacterControls`, and `|| ActionPadOwns(p)` in `CharacterInputPointOwned`.
+  - `GameCharacterControl.cs`: `if (CharacterDirect && ActionKeys()) return true;` before the E interaction.
+- **Claude's files:** new `Core/StaffActions.cs`, `Runtime/GameActionPad.cs`, `Runtime/GameActionInput.cs`, `Runtime/FacilityActionView.cs` (poses via the escape/brawl helpers, called from `RefreshEscapeScene`), `Resources/ActionPad.uss`, `Editor/ActionCapture.cs`, `Tools/CoreChecks/StaffActionChecks.cs`. Hooks in `Simulation.cs`, `Population.cs` and `FacilityEscapeView.cs`.
+- **Evidence:**
+  - 12 new checks; the full suite is green.
+  - Offline compile of Core/Runtime/Editor (editor + iOS).
+  - Unity 6000.3.24f1 batchmode in Claude's clone: `ActionCapture` passed with no runtime errors (pad targets the resident in front, cuffed resident walks 0.55 m behind, pad fits with buttons of at least 44 px). Six composited frames: target, strike contact, after, hold (hands on shoulders), cuffing, escort.
+- **Unity check request (your runner):** in your checkout, play as an officer and try F/G/Q/E/Shift and the touch pad at 900×420. Confirm that pad taps never start a camera-look drag and that first person still hides the officer's own head.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:

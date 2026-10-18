@@ -69,6 +69,7 @@ namespace Cellblock.Unity
             }
             Actor escort = Live(s.Escort), prisoner = Live(s.Escorted);
             if (escort != null && prisoner != null && escort != down) { Take(escort, Hold.Upper); Take(prisoner, Hold.Upper); EscortScene(escort, prisoner); }
+            RefreshStaffActionScene(world);
             foreach (Actor actor in heldThisFrame) Keep(actor);
             UpdatePuffs();
             RefreshAlarmMood(world);

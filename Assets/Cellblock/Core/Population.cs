@@ -257,6 +257,7 @@ namespace Cellblock.Core
             RoleRules.Hydrate(state);
             CharacterPhoneRules.Hydrate(state);
             SanitationRules.Hydrate(state);
+            StaffActionRules.Hydrate(state);
         }
 
         partial void AdvancePressure()
@@ -288,6 +289,7 @@ namespace Cellblock.Core
         partial void PressureMovement(Resident resident, ref bool skip)
         {
             if (InIntake(resident)) { skip = true; return; }
+            StaffActionMovement(resident, ref skip);
         }
         partial void PressureTarget(Resident resident, ref Point target)
         {
@@ -765,6 +767,7 @@ namespace Cellblock.Core
             if (Data.IntelWork != null) { a.SnitchAssaults = IntelWork.SnitchAssaults; a.IgnoredWarnings = IntelWork.IgnoredWarnings; a.TipsFalse = IntelWork.TipsFalse; a.TipsConfirmed = IntelWork.TipsConfirmed; }
             if (Data.Kitchen != null) a.Poisonings = Kitchen.Poisonings;
             SnapshotSanitation();
+            SnapshotStaffActions();
         }
         public bool StageAuditDemo() { AuditState a = Population.Audit; if (a.Phase == "In progress") return false; a.NextMinute = Data.Minute + 1; a.Reason = "Unannounced inspection"; a.Phase = "Announced"; return true; }
         void AdvanceAudit()
@@ -838,6 +841,7 @@ namespace Cellblock.Core
             IntelFindings(Find, a);
             KitchenFindings(Find, a);
             SanitationFindings(Find);
+            StaffActionFindings(Find);
             if (sample)
             {
                 int found = AuditContrabandSweep();

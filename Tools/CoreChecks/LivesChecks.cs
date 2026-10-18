@@ -19,6 +19,7 @@ static partial class Program
         RunPlacementChecks();
         RunResidentLivesChecks();
         RunSanitationChecks();
+        RunStaffActionChecks();
     }
 
     // A held-still company with a library shelf, an exercise bench and a television with a bench in the office room.

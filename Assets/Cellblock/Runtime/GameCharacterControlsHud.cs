@@ -17,7 +17,8 @@ namespace Cellblock.Unity
             if (root == null || root.panel == null) return false;
             Vector2 p = RuntimePanelUtils.ScreenToPanel(root.panel, new Vector2(screen.x, Screen.height - screen.y));
             return characterMovePad != null && characterMovePad.resolvedStyle.display != DisplayStyle.None && characterMovePad.worldBound.Contains(p) ||
-                characterLookPad != null && characterLookPad.resolvedStyle.display != DisplayStyle.None && characterLookPad.worldBound.Contains(p);
+                characterLookPad != null && characterLookPad.resolvedStyle.display != DisplayStyle.None && characterLookPad.worldBound.Contains(p) ||
+                ActionPadOwns(p); // Claude's staff action pad (exact exception, 2026-10-18)
         }
         public void ResetCharacterSticks() { characterMoveStick = characterLookStick = Vector2.zero; }
         void BuildCharacterControls()
@@ -35,6 +36,7 @@ namespace Cellblock.Unity
             characterContext = Text("", "character-context"); root.Add(characterContext);
             characterMovePad = BuildCharacterStick("MOVE", value => characterMoveStick = value); root.Add(characterMovePad);
             characterLookPad = BuildCharacterStick("LOOK", value => characterLookStick = value); root.Add(characterLookPad);
+            BuildActionPad();
         }
         VisualElement BuildCharacterStick(string caption, System.Action<Vector2> set)
         {
@@ -52,6 +54,7 @@ namespace Cellblock.Unity
         }
         void RefreshCharacterControls(World world)
         {
+            RefreshActionPad(world);
             if (characterControlBar == null || !game.CharacterViewActive) return;
             characterControlName.text = game.CharacterLabel;
             characterViewButton.style.display = characterPhoneButton.style.display = characterInteractButton.style.display = game.CharacterCanPlay ? DisplayStyle.Flex : DisplayStyle.None;
@@ -75,6 +78,8 @@ namespace Cellblock.Unity
             characterMovePad.style.left = left + 14; characterMovePad.style.bottom = bottom + 14;
             characterLookPad.style.right = right + 14; characterLookPad.style.bottom = bottom + 14;
             characterContext.style.left = left + (pads ? 144 : 12); characterContext.style.right = right + (pads ? 144 : 12); characterContext.style.bottom = bottom + 18;
+            float padClear = LayoutActionPad(right, bottom, active, pads);
+            if (padClear > 0) characterContext.style.right = padClear + 8;
             if (active)
             {
                 header.style.display = navigation.style.display = inspector.style.display = cameraPanel.style.display = tools.style.display = status.style.display = DisplayStyle.None;
