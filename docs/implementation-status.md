@@ -4,7 +4,7 @@ This records a working local development milestone, with the broader game still 
 
 ## October 18 staff field view, compact profiles and combined motion
 
-The latest integration combines the staff checkpoint with Claude's published **f201d81** graphics/motion snapshot. **373 core checks pass, 0 failures.** The final unchanged-source Unity matrix passes **85 actual Game-view captures**, plus **24 animation sequences / 982 rendered frames across 6 disposable scenarios**. Every final report has an empty errors array. Earlier failed/cancelled review candidates are superseded, not added to these totals.
+Implementation merge **`9d1aaef`** combines the staff checkpoint with Claude's published **f201d81** graphics/motion snapshot. **373 core checks pass, 0 failures.** The final unchanged-source Unity matrix passes **85 actual Game-view captures**, plus **24 animation sequences / 982 rendered frames across 6 disposable scenarios**. Every final report has an empty errors array. Earlier failed/cancelled review candidates are superseded, not added to these totals.
 
 - **Readable People cards:** Now / Life / Record / Items; one purpose and three numbered bars first, with Why/next disclosed deliberately. The full file remains reachable and gets the phone's safe height. All six activity suggestions retain 44px targets.
 - **Staff-only direct play:** real main-camera eye view and a wider shoulder view, WASD/arrows or MOVE/LOOK pads, useful work phone, and return to the previous management camera. Residents/crews remain inspectable and followable; a separate prisoner mode is planned.
@@ -21,7 +21,7 @@ The latest integration combines the staff checkpoint with Claude's published **f
 | Home, saves/recovery/autosave/settings and placement regression | 25 | [Frontend report](reviews/2026-10-18-staff-graphics-frontend.json) |
 | Staged day/night animation plus unforced contact/cuffs/arrest/escort | 24 sequences | [Animation report](reviews/2026-10-18-staff-graphics-escapes.json) |
 
-[Core transcript](reviews/2026-10-18-staff-graphics-core.txt) · [captured source fingerprint](reviews/2026-10-18-staff-graphics-source.json). Full local frames are in `Builds/{Character,Routine,Incident,Frontend,Escape}Review/2026-10-18/staff-graphics-final-27011080`. The staged animation camera can include foreground fence bars/reversed labels; these captures establish pose/phase checks, while the separate incident Game-view review checks the player camera. Fixed preview time excludes PNG encoding latency from its game/scene clock; ordinary gameplay retains its existing clock.
+[Core transcript](reviews/2026-10-18-staff-graphics-core.txt) · [captured source fingerprint](reviews/2026-10-18-staff-graphics-source.json) · [editor cleanup/Play audit](reviews/2026-10-18-staff-graphics-editor-audit.json). Full local frames are in `Builds/{Character,Routine,Incident,Frontend,Escape}Review/2026-10-18/staff-graphics-final-27011080`. The staged animation camera can include foreground fence bars/reversed labels; these captures establish pose/phase checks, while the separate incident Game-view review checks the player camera. Fixed preview time excludes PNG encoding latency from its game/scene clock; ordinary gameplay retains its existing clock.
 
 Independent critics reviewed source and representative actual frames. Native touch comfort/performance, native stripped builds and production character art remain unverified. This is a playable development milestone, not a finished game. [Controls](character-experience.md) · [planned prisoner mode](prisoner-mode-plan.md).
 

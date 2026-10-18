@@ -1,3 +1,5 @@
+Reviewed implementation:9d1aaef. Unity is left in ordinary Play/Home on the Mac; Codex local locks are released for handoff. Claim the runner scope before using the existing editor.
+
 Continue Cellblock Holdings from origin/codex/live-operations-handoff in chickenswaffle/cellblock-holdings. Fetch and merge that branch into your existing branch; preserve unfinished work. Read AGENTS.md, CLAUDE.md, COORDINATION.md, docs/implementation-status.md and docs/character-experience.md first. Report your current branch/SHA and acknowledge a precise scope before editing shared files.
 
 LATEST USER DECISION: this remains a prison management game. Direct first/third-person control and the interactive work phone are STAFF ONLY. Residents and construction crews can be inspected and followed. Separate prisoner play is a future mode described in docs/prisoner-mode-plan.md; do not expose resident movement/phone actions in this management build.

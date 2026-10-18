@@ -1,6 +1,6 @@
 {
   "passed": true,
-  "scope": "Editor log tail from the clean character retry through frontend completion/Play teardown; final matrix reports independently capture errors during each review.",
+  "scope": "Editor log tail from the clean character retry through frontend completion, Play teardown and ordinary Play/Home restoration; final matrix reports independently capture errors during each review.",
   "sourceSha256": "27011080ebc1f21ceb665325f89ea63379ff69789c9b027139248a5f3ad55bdf",
   "errorPatterns": {
     "NullReferenceException:": [],
@@ -10,5 +10,7 @@
     "IndexOutOfRangeException:": [],
     "Assertion failed": [],
     "Cellblock presentation review:": []
-  }
+  },
+  "ordinaryPlayHomeRestored": true,
+  "implementationCommit": "9d1aaef"
 }
