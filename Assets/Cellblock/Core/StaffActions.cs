@@ -111,7 +111,7 @@ namespace Cellblock.Core
         {
             if (r == null || !IsPresent(r) || InIntake(r) || IncidentOwnsResident(r)) return false;
             if (Escape.Phase != "None" && Escape.ResidentId == r.Id) return false;
-            if (EscapeStruggleHolds(r)) return false;
+            if (EscapeStruggleHolds(r) || RiotActive && Population.Riot.Rioters.Contains(r.Id)) return false;
             return r.Legal.Custody == "In facility";
         }
         bool EscapeStruggleHolds(Resident r) { return Struggle.Active && Struggle.Resident == r.Id || Struggle.Escorted == r.Id; }
@@ -330,7 +330,7 @@ namespace Cellblock.Core
             if (held != null)
             {
                 if (holdPhase != "Cuffed" || Geometry.Distance(officer.Position, held.Home) > 1.6f) { Notice = holdPhase == "Cuffed" ? "Walk " + held.Name + " to their bunk first." : "Cuff them first."; return false; }
-                held.SeparatedUntil = Math.Max(held.SeparatedUntil, Data.Minute + StaffActionRules.ConfineMinutes); held.Position = held.Home;
+                ExtendSeparation(held, Data.Minute + StaffActionRules.ConfineMinutes); held.Position = held.Home;
                 StaffActions.Confined++;
                 bool cause = ConfinementJustified(held);
                 if (cause) { LogForce(officer, held, "Confined", "Justified"); Notice = held.Name + " is locked in for six hours."; }

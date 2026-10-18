@@ -37,7 +37,7 @@ namespace Cellblock.Unity
                 }
                 else
                 {
-                    Cylinder(badge, "Medical cap", new Vector3(0, 1.79f, -0.01f), new Vector3(0.24f, 0.035f, 0.24f), "badge-white", new Color(0.94f, 0.95f, 0.94f));
+                    Cylinder(badge, "Medical cap", new Vector3(0, 1.755f, -0.01f), new Vector3(0.24f, 0.035f, 0.24f), "badge-white", new Color(0.94f, 0.95f, 0.94f));
                     Box(badge, "Armband", new Vector3(0.235f, 1.27f, 0), new Vector3(0.012f, 0.07f, 0.13f), "badge-white", new Color(0.94f, 0.95f, 0.94f));
                     Box(badge, "Armband cross", new Vector3(0.242f, 1.27f, 0), new Vector3(0.006f, 0.045f, 0.016f), "badge-red", new Color(0.82f, 0.16f, 0.15f));
                     Box(badge, "Armband cross", new Vector3(0.242f, 1.27f, 0), new Vector3(0.006f, 0.016f, 0.045f), "badge-red", new Color(0.82f, 0.16f, 0.15f));

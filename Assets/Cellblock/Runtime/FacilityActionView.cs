@@ -17,12 +17,24 @@ namespace Cellblock.Unity
         readonly HashSet<ActionBeat> seenBeats = new HashSet<ActionBeat>();
         readonly Dictionary<string, float> fellAt = new Dictionary<string, float>();
         Transform actionRing; Material actionRingMaterial; World actionWorld;
+        float actionClock;
+#if UNITY_EDITOR
+        public float PreviewActionClock { get { return actionClock; } }
+#endif
+        void ResetActionPresentation()
+        {
+            actionWorld = null; actionClock = 0;
+            liveBeats.Clear(); seenBeats.Clear(); fellAt.Clear();
+            if (actionRing != null) actionRing.gameObject.SetActive(false);
+        }
         const float StrikeSeconds = 0.5f, BeatSeconds = 0.7f;
 
         void RefreshStaffActionScene(World world)
         {
-            if (!ReferenceEquals(world, actionWorld)) { actionWorld = world; liveBeats.Clear(); seenBeats.Clear(); fellAt.Clear(); }
-            float now = Time.unscaledTime, dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f), blend = 1 - Mathf.Exp(-dt * 16);
+            if (!ReferenceEquals(world, actionWorld)) { actionWorld = world; actionClock = 0; liveBeats.Clear(); seenBeats.Clear(); fellAt.Clear(); }
+            float dt = Mathf.Min(SceneFrameDelta, .05f) * Mathf.Max(0, world.Data.Speed);
+            actionClock += dt;
+            float now = actionClock, blend = 1 - Mathf.Exp(-dt * 16);
             foreach (ActionBeat beat in world.ActionBeats)
                 if (seenBeats.Add(beat)) liveBeats.Add(new LiveBeat { Beat = beat, Start = now });
             liveBeats.RemoveAll(b => now - b.Start > BeatSeconds);
@@ -225,7 +237,7 @@ namespace Cellblock.Unity
             }
             actionRing.gameObject.SetActive(true);
             Vector3 at = target.Root.position; actionRing.position = new Vector3(at.x, at.y + 0.03f, at.z);
-            actionRing.rotation = Quaternion.Euler(0, Time.unscaledTime * 40, 0);
+            actionRing.rotation = Quaternion.Euler(0, actionClock * 40, 0);
             actionRingMaterial.color = world.HeldResidentId != "" ? new Color(0.45f, 0.78f, 0.98f) : new Color(0.98f, 0.74f, 0.25f);
         }
     }

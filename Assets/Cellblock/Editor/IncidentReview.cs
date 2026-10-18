@@ -71,7 +71,17 @@ namespace Cellblock.Editor
                     w.Data.Speed = 0; Require(!w.Data.Operations.Alarm && !w.Data.Operations.Lockdown, "Detection raised restrictions before the radio."); break;
                 case 17: Require(view.PreviewRadioPropVisible, "No physical radio/arm pose."); Shot(game, "08-guard-radioing.png"); break;
                 case 18: game.ReloadPresentationPreview(); Require(game.World.IncidentReport.Phase == "Radioing control" && !game.World.Data.Operations.Alarm, "Unity JSON skipped the radio phase."); SetGameSize(900, 420); break;
-                case 19: Require(hud.PreviewIncidentPanelFits && view.PreviewRadioPropVisible && hud.PreviewIncidentActorVisible(w.Escape.ResidentId) && hud.PreviewIncidentActorVisible(incidentGuard) && !hud.PreviewIncidentDockVisible, "Phone radio actors/card/actions are obscured or clipped."); Shot(game, "09-phone-radio-scene.png"); break;
+                case 19:
+                    bool phoneFits = hud.PreviewIncidentPanelFits, radioVisible = view.PreviewRadioPropVisible,
+                        runnerVisible = hud.PreviewIncidentActorVisible(w.Escape.ResidentId), guardVisible = hud.PreviewIncidentActorVisible(incidentGuard), dockVisible = hud.PreviewIncidentDockVisible;
+                    if (!phoneFits || !radioVisible || !runnerVisible || !guardVisible || dockVisible)
+                    {
+                        string diagnosis = "Phone incident visibility: card=" + phoneFits + ", radio=" + radioVisible + ", runner=" + runnerVisible + ", guard=" + guardVisible + ", dock=" + dockVisible +
+                            ", following=" + game.FollowingIncident + ", center=" + hud.WorldViewCenter + ", screen=" + Screen.width + "x" + Screen.height + ", camera=" + game.ArtCamera.transform.position;
+                        IncidentShot(game, "diagnostic-phone-radio.png", () => { throw new InvalidOperationException(diagnosis); });
+                        break;
+                    }
+                    Shot(game, "09-phone-radio-scene.png"); break;
                 case 20: SetGameSize(1600, 900); w.Data.Speed = 1; break;
                 case 21: if (w.IncidentReport.Phase != "Broadcast") return false; w.Data.Speed = 0; Require(w.Data.Operations.Alarm && w.Data.Operations.Lockdown && !w.Data.Operations.GateOpen, "Radio did not trigger coordinated control."); break;
                 case 22: IncidentShot(game, "10-radio-received-lockdown.png", () => w.Data.Speed = 1); break;

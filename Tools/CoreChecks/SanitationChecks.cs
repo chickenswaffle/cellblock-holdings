@@ -263,6 +263,53 @@ static partial class Program
             Check(sick.Skip(1).All(r => r.SeparatedUntil == w.Data.Minute && !w.Quarantined(r)) && fought.SeparatedUntil == w.Data.Minute + 2 * 1440, "Lifting quarantine touched a fight separation or kept a stay");
             new World(RoundTrip(w.Data));
         });
+        Test("sanitation · quarantine reasserts its hold and preserves an independent separation through reload", () => {
+            World w = SanitationWorld(0); Healthy(w); w.StageOutbreakDemo(); w.AdvanceMinutes(1);
+            Resident r = w.Data.Residents.First(x => w.Quarantined(x));
+            int quarantine = r.QuarantineUntil;
+            // Simulate an older shared writer, then verify the active health hold recovers.
+            r.SeparatedUntil = w.Data.Minute + 30;
+            w.AdvanceMinutes(1);
+            Check(r.SeparatedUntil >= quarantine, "Short separation released a contagious resident");
+            r.SeparationBeforeQuarantine = w.Data.Minute + 360;
+            World loaded = new World(RoundTrip(w.Data)); Resident saved = loaded.Data.Residents.First(x => x.Id == r.Id);
+            loaded.SetQuarantine(false);
+            Check(saved.SeparatedUntil == r.SeparationBeforeQuarantine && !loaded.Quarantined(saved), "Quarantine release erased a saved independent separation");
+        });
+        Test("sanitation · meals in housing require trays instead of dining gains at a quarantine destination", () => {
+            World w = SanitationWorld(0); Healthy(w);
+            foreach (Resident person in w.Data.Residents) person.RoutineOffset = 0;
+            RunTo(w, 12 * 60 + 10);
+            Resident r = w.Data.Residents.First(x => w.MealDue(w.Data.Residents.IndexOf(x), x));
+            r.Illness = "Stomach bug"; r.IllSince = w.Data.Minute;
+            r.IllUntil = w.Data.Minute + 2880; r.ContagiousUntil = w.Data.Minute + 1440;
+            r.Legal.RestrictedUntil = -1; w.SetQuarantine(true);
+            r.Position = r.Home; r.Food = 70;
+            float food = r.Food;
+            int diningMinutes = 0;
+            for (int minute = 0; minute < 20; minute++)
+            {
+                if (w.MealDue(w.Data.Residents.IndexOf(r), r)) diningMinutes++;
+                w.AdvanceMinutes(1);
+            }
+            Check(diningMinutes > 0 && r.Food < food, "Housing meal probe: " + diningMinutes + " dining minutes, food " + food + " -> " + r.Food);
+            RunTo(w, 15 * 60 + 4); int trays = w.Population.TrayMeals; r.Food = 20; w.AdvanceMinutes(2);
+            Check(w.Population.TrayMeals > trays && r.Food > 20, "Housing meal tray was not served or accounted");
+        });
+        Test("sanitation · malformed independent quarantine separation deadlines are refused", () => {
+            World w = SanitationWorld(0); State bad = RoundTrip(w.Data);
+            bad.Residents[0].SeparationBeforeQuarantine = int.MaxValue;
+            bool refused = false; try { new World(bad); } catch (ArgumentException) { refused = true; }
+            Check(refused, "Unbounded saved quarantine separation was accepted");
+        });
+        Test("sanitation · off-site residents do not reserve wash slots and returning residents regain them", () => {
+            World w = SanitationWorld(1); Resident r = w.Data.Residents[0];
+            Check(w.WashAssignmentOf(r) != null, "Missing initial wash assignment");
+            r.Legal.Custody = "At court"; w.AdvanceMinutes(1);
+            Check(w.WashAssignmentOf(r) == null, "Off-site resident kept a wash reservation");
+            r.Legal.Custody = "In facility"; w.AdvanceMinutes(1);
+            Check(w.WashAssignmentOf(r) != null, "Returning resident has no wash reservation");
+        });
         Test("sanitation · a nurse's visit ends contagion within the hour; a seriously ill person left untreated goes to hospital", () => {
             World w = SanitationWorld(0); Healthy(w); w.StageOutbreakDemo();
             Resident r = w.Data.Residents.First(x => x.Illness != "");

@@ -18,6 +18,9 @@ namespace Cellblock.Unity
             public GaitStyle Style;
             public float Pace, Run, Sprint, Ground, Crouch, Lean, LeanVelocity, Bank, BankVelocity, LastYaw, LastIntent, PelvisBase = HipHeight;
             public Vector3 LastTarget; public float LastTargetTime = -1, TargetPace;
+            public readonly FootContact[] Feet = { new FootContact(), new FootContact() };
+            public int ContactRevision = -1;
+            public float IdleTime, SpeedVelocity, HeadingVelocity, Clock, Step, Duty, HeadYaw, HeadYawVelocity;
             public Point StandAt; public float StandY = RoomStand; public int StandRevision = -1;
         }
         readonly Dictionary<Actor, Stride> strides = new Dictionary<Actor, Stride>();
@@ -124,6 +127,8 @@ namespace Cellblock.Unity
             Vector3 movement = actor.Root.position - previous; movement.y = 0;
             float distance = movement.magnitude, speed = dt > 0 ? distance / dt : 0, rate = Mathf.Max(1, world.Data.Speed);
             bool moving = speed > 0.035f;
+            if (world.Data.Speed > 0 || moving) stride.Clock += dt * Mathf.Sqrt(rate);
+            AnimateFaceMotion(actor, stride);
             // Speed as the person would cover it at 1x: the game clock raises cadence, it does not change the kind of gait.
             float intent = speed / rate;
             stride.Pace = Mathf.Lerp(stride.Pace, intent, 1 - Mathf.Exp(-dt * 6));
@@ -140,20 +145,32 @@ namespace Cellblock.Unity
             float g = stride.Ground;
 
             // The escape scene poses the whole body of anyone it holds this frame (FacilityEscapeView.cs).
-            if (SceneHoldsBody(stride, world)) { stride.LastYaw = actor.Root.eulerAngles.y; stride.PelvisBase = actor.Body.localPosition.y; return; }
+            if (SceneHoldsBody(stride, world))
+            {
+                ResetFootContacts(actor);
+                foreach (Transform ankle in actor.Feet) ankle.localRotation = Quaternion.identity;
+                stride.LastYaw = actor.Root.eulerAngles.y; stride.PelvisBase = actor.Body.localPosition.y; return;
+            }
             // Heading: runners commit to turns faster; the yaw rate feeds the bank.
             if (moving)
             {
-                float turn = actor.TurnRate * (1 + run * 0.8f);
-                actor.Root.rotation = Quaternion.Slerp(actor.Root.rotation, Quaternion.LookRotation(movement), 1 - Mathf.Exp(-turn * dt));
+                float desiredYaw = Mathf.Atan2(movement.x, movement.z) * Mathf.Rad2Deg;
+                float heading = Mathf.SmoothDampAngle(actor.Root.eulerAngles.y, desiredYaw, ref stride.HeadingVelocity,
+                    Mathf.Lerp(.16f, .10f, run) / rate, Mathf.Lerp(200, 420, run) * rate, dt);
+                actor.Root.rotation = Quaternion.Euler(0, heading, 0);
             }
             float yaw = actor.Root.eulerAngles.y, yawRate = dt > 0 ? Mathf.DeltaAngle(stride.LastYaw, yaw) / dt : 0; stride.LastYaw = yaw;
 
-            // One step is the distance covered in half a cycle; the cycle advances with distance, so feet never skate.
+            // Distance drives stride phase; world contact anchors below enforce stance through turns.
             float walkStep = Mathf.Lerp(0.56f, 0.70f, Mathf.Clamp01((stride.Pace - 0.9f) / 1.1f)), runStep = Mathf.Lerp(0.95f, 1.30f, sprint);
-            float step = Mathf.Lerp(walkStep, runStep, run) * (style == GaitStyle.Sneak ? 0.85f : style == GaitStyle.Cuffed ? 0.8f : 1);
+            float step = Mathf.Lerp(walkStep, runStep, run) * (.95f + IdentitySeed(stride.Id) % 7 * .016f) * (style == GaitStyle.Sneak ? 0.85f : style == GaitStyle.Cuffed ? 0.8f : 1);
+            float duty = Mathf.Lerp(.60f, .36f, run);
+            // A contact must fit the rig's front/back reach. Long sprint strides with a
+            // capped reach otherwise demand a second recovery step before every toe-off.
+            step = Mathf.Min(step, Mathf.Lerp(.31f, .36f, run) / duty);
+            float reach = duty * step * g;
             if (moving) actor.Gait += distance / step * Mathf.PI;
-            float duty = Mathf.Lerp(0.58f, 0.36f, run), reach = Mathf.Min(duty * step, Mathf.Lerp(0.30f, 0.36f, run)) * g;
+            stride.Step = step; stride.Duty = duty;
             float lift = Mathf.Lerp(0.075f, Mathf.Lerp(0.20f, 0.32f, sprint), run) * g;
             float cycle = actor.Gait / (2 * Mathf.PI); cycle -= Mathf.Floor(cycle);
             // The pelvis rides the stride: highest over the planted foot when walking, lowest there (compressed) when running.
@@ -164,30 +181,28 @@ namespace Cellblock.Unity
             // Rise smoothly back to a standing pelvis after a kneel or a fall that some scene held; the stride bob rides on top.
             stride.PelvisBase = Mathf.Lerp(stride.PelvisBase, HipHeight - stride.Crouch, 1 - Mathf.Exp(-dt * 6));
             float pelvis = stride.PelvisBase + bob;
-            actor.Body.localPosition = new Vector3(0, pelvis, 0);
+            bool contacts = !RoutineOwnsFeet(actor);
+            if (contacts) pelvis = PlanFootContacts(actor, stride, world, cycle, duty, reach, lift, movement / Mathf.Max(.001f, dt), pelvis, moving, dt);
+            else ResetFootContacts(actor);
+            // A little side-to-side transfer over the supporting leg adds weight without root jitter.
+            float transfer = Mathf.Sin(cycle * Mathf.PI * 2) * .012f * g * (1 - run * .6f);
+            actor.Body.localPosition = new Vector3(transfer, pelvis, 0);
             float blend = 1 - Mathf.Exp(-dt * 20);
             float[] swing = legSwing;
             for (int leg = 0; leg < 2; leg++)
             {
-                float u = cycle + leg * 0.5f; u -= Mathf.Floor(u);
-                float x, y = 0;
-                if (u < duty) x = reach * (1 - 2 * u / duty);
+                float u = Mathf.Repeat(cycle + leg * .5f, 1);
+                float x = u < duty ? reach * (1 - 2 * u / duty) : Mathf.Lerp(-reach, reach, ContactEase((u - duty) / (1 - duty)));
+                swing[leg] = reach > .001f ? x / reach : 0;
+                if (contacts) SolveContactLeg(actor, stride, leg, pelvis);
                 else
                 {
-                    float s = (u - duty) / (1 - duty), e = s * s * (3 - 2 * s);
-                    x = -reach + 2 * reach * e;
-                    // A runner's heel kicks up behind before the knee drives through.
-                    y = lift * Mathf.Sin(Mathf.PI * s) * (1 + run * 0.35f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(s * 1.6f)));
+                    Transform hip = actor.Limbs[2 + leg]; hip.localPosition = new Vector3(hip.localPosition.x, pelvis, 0);
+                    float hipPitch, kneeBend; LegReach(0, -(pelvis - SoleRest), out hipPitch, out kneeBend);
+                    hip.localRotation = Quaternion.Slerp(hip.localRotation, Quaternion.Euler(hipPitch, 0, 0), blend);
+                    actor.Knees[leg].localRotation = Quaternion.Slerp(actor.Knees[leg].localRotation, Quaternion.Euler(kneeBend, 0, 0), blend);
+                    actor.Feet[leg].localRotation = Quaternion.identity;
                 }
-                swing[leg] = reach > 0.001f ? x / reach : 0;
-                Transform hip = actor.Limbs[2 + leg];
-                hip.localPosition = new Vector3(hip.localPosition.x, pelvis, 0);
-                float hipPitch, kneeBend;
-                // The rig's soles rest just above the model origin, so a straight leg exactly spans pelvis to sole at the rest height.
-                LegReach(x, -(pelvis - (HipHeight - Thigh - Shin) - y), out hipPitch, out kneeBend);
-                float splay = (leg == 0 ? -1 : 1) * run * 2.5f;
-                hip.localRotation = Quaternion.Slerp(hip.localRotation, Quaternion.Euler(hipPitch, 0, splay), blend);
-                actor.Knees[leg].localRotation = Quaternion.Slerp(actor.Knees[leg].localRotation, Quaternion.Euler(kneeBend, 0, 0), blend);
             }
 
             // Lean into speed and acceleration (a spring, so starts tip forward and stops rock back), bank into turns.
@@ -195,12 +210,12 @@ namespace Cellblock.Unity
             float leanTarget = Mathf.Lerp(2, Mathf.Lerp(9, 17, sprint), run) * g + Mathf.Clamp(accel * 1.6f, -6, 7) +
                 (style == GaitStyle.Sneak ? 10 : style == GaitStyle.Winded ? 20 : style == GaitStyle.Cuffed ? 8 : 0);
             stride.Lean = Spring(stride.Lean, ref stride.LeanVelocity, leanTarget, 2.2f, dt);
-            float bankTarget = Mathf.Clamp(-yawRate * Mathf.Min(speed, 6) * 0.012f, -11, 11) * (moving ? 1 : 0);
+            float bankTarget = Mathf.Clamp(-(yawRate / rate) * Mathf.Min(speed / rate, 6) * 0.012f, -11, 11) * (moving ? 1 : 0);
             stride.Bank = Spring(stride.Bank, ref stride.BankVelocity, bankTarget, 1.8f, dt);
             float twist = -swing[0] * Mathf.Lerp(4, 9, run) * g;
             if (!actor.PoseArms && style != GaitStyle.Escort)
             {
-                float breathe = moving ? 0 : Mathf.Sin(Time.unscaledTime * 1.6f + actor.Gait) * 0.8f;
+                float breathe = moving ? 0 : Mathf.Sin(stride.Clock * 1.6f + IdentitySeed(stride.Id) % 19) * 0.6f;
                 actor.Body.localRotation = Quaternion.Slerp(actor.Body.localRotation, Quaternion.Euler(stride.Lean + breathe, twist, stride.Bank), blend);
                 float armAmplitude = Mathf.Lerp(17, Mathf.Lerp(36, 55, sprint), run) * g * (style == GaitStyle.Winded ? 0.6f : 1);
                 float armBase = -Mathf.Lerp(0, Mathf.Lerp(8, 14, sprint), run);
@@ -217,13 +232,8 @@ namespace Cellblock.Unity
                     actor.Forearms[arm].localRotation = Quaternion.Slerp(actor.Forearms[arm].localRotation, Quaternion.Euler(elbow, 0, 0), blend);
                 }
             }
-            AnimateCharacterDetail(actor, resident, world, moving, dt);
-            if (moving && actor.Head != null)
-            {
-                // The head steadies itself: it counters the lean and the shoulder twist so the eyes stay on the path.
-                Quaternion steady = Quaternion.Euler(-stride.Lean * 0.6f + (style == GaitStyle.Cuffed ? 14 : 0), -twist * 0.8f, -stride.Bank * 0.5f);
-                actor.Head.localRotation = Quaternion.Slerp(actor.Head.localRotation, steady, 1 - Mathf.Exp(-dt * 8));
-            }
+            AnimateNaturalGaze(actor, resident, world, stride, moving, dt);
+
         }
         readonly float[] legSwing = new float[2];
         bool SceneHoldsBody(Stride stride, World world)
@@ -233,7 +243,10 @@ namespace Cellblock.Unity
             if (s.Active && (id == s.Officer || id == s.Helper || id == s.Resident)) return true;
             if (Brawling(world, id)) return true;
             if (id == s.Staggered && s.StaggeredUntil > world.Data.Minute - 2) return true;
-            return world.Escape.Phase == "Held at gate" && world.Escape.ResidentId == id;
+            if (world.Escape.Phase == "Held at gate" && world.Escape.ResidentId == id) return true;
+            Actor actor; HeldPose pose;
+            return actors.TryGetValue(id, out actor) && heldPoses.TryGetValue(actor, out pose) &&
+                pose.Parts == Hold.Body && Time.frameCount - pose.Frame <= 1;
         }
 
         // Analytic two-bone leg in the sagittal plane: the hip-to-foot target (forward, down) gives the hip pitch and knee bend

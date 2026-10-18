@@ -1087,15 +1087,22 @@ namespace Cellblock.Core
                 if (Data.Minute - a.LastFightMinute < 720 || Data.Minute - b.LastFightMinute < 720) continue;
                 Relationship link = a.Relationships.FirstOrDefault(r => r.OtherId == b.Id);
                 if (link == null || link.Tension < 58 || Geometry.Distance(a.Position, b.Position) > 2.6f || !SightLines.Clear(a.Position, b.Position)) continue;
-                float chance = (link.Tension >= 82 ? 0.16f : 0.05f) * ((a.Impulsivity + b.Impulsivity) / 120f) * ((a.Stress + b.Stress) / 2 + 20) / 60f;
-                chance *= (Personnel.Regime == "Strict" ? 0.7f : Personnel.Regime == "Rehabilitative" ? 1.1f : 1f) * FacilityMode.FightScale;
-                if (a.DrunkUntil > Data.Minute || b.DrunkUntil > Data.Minute) chance *= 1.6f;
-                if ((a.Dependency > 30 && a.HighUntil <= Data.Minute) || (b.Dependency > 30 && b.HighUntil <= Data.Minute)) chance *= 1.25f;
-                // A planned attack, or a known snitch facing a gang member.
-                chance *= IntelFightFactor(a, b);
+                float chance = EncounterFightChance(a, b, link);
                 if (JusticeRules.Unit(Data.Seed, a.Id + b.Id, "fight", Data.Minute / 30) >= chance) continue;
                 Confront(a, b, link, present);
             }
+        }
+        // Conditional risk for this encounter. Actual five-day totals also depend
+        // on who meets, cooldowns, separation, health and earlier incidents.
+        internal float EncounterFightChance(Resident a, Resident b, Relationship link)
+        {
+            float chance = (link.Tension >= 82 ? 0.16f : 0.05f) * ((a.Impulsivity + b.Impulsivity) / 120f) * ((a.Stress + b.Stress) / 2 + 20) / 60f;
+            chance *= (Personnel.Regime == "Strict" ? 0.7f : Personnel.Regime == "Rehabilitative" ? 1.1f : 1f) * FacilityMode.FightScale;
+            if (a.DrunkUntil > Data.Minute || b.DrunkUntil > Data.Minute) chance *= 1.6f;
+            if ((a.Dependency > 30 && a.HighUntil <= Data.Minute) || (b.Dependency > 30 && b.HighUntil <= Data.Minute)) chance *= 1.25f;
+            // A planned attack, or a known snitch facing a gang member.
+            chance *= IntelFightFactor(a, b);
+            return chance;
         }
         // Deterministic demonstration: the tensest present pair meets in the yard and the same rules decide it.
         public bool StageFightDemo()
@@ -1163,7 +1170,7 @@ namespace Cellblock.Core
         void SeparateAfterFight(Resident a, Resident b)
         {
             if (ResponseOfficers().Count == 0) return;
-            a.SeparatedUntil = b.SeparatedUntil = Data.Minute + 360;
+            ExtendSeparation(a, Data.Minute + 360); ExtendSeparation(b, Data.Minute + 360);
             if (!a.Intake.KeepSeparate.Contains(b.Id) && a.Intake.KeepSeparate.Count < 8) a.Intake.KeepSeparate.Add(b.Id);
             if (!b.Intake.KeepSeparate.Contains(a.Id) && b.Intake.KeepSeparate.Count < 8) b.Intake.KeepSeparate.Add(a.Id);
             List<Point> room = RoomOf(a.Home);

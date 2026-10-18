@@ -1,0 +1,21 @@
+{
+  "sourceImplementation": "42c1796",
+  "sourceFingerprint": "5636201ca7722dcc4719806e619d0251cb1198ed7266d19a635c806894960dbd",
+  "scope": "Final natural-motion review begin through character/routine/incident/escape regressions and ordinary Home restoration. Earlier aborted/failed diagnostic candidates excluded.",
+  "patterns": {
+    "error CS": 0,
+    "Shader error": 0,
+    "NullReferenceException": 0,
+    "MissingReferenceException": 0,
+    "InvalidOperationException": 0,
+    "Cellblock presentation review:": 0,
+    "Cellblock motion review:": 0,
+    "Cellblock escape review:": 0
+  },
+  "ordinaryHomeRestored": true,
+  "gameViewCaptures": 60,
+  "motionProbeFrames": 945,
+  "motionRendererCaptures": 112,
+  "escapeSequences": 24,
+  "escapeFrames": 982
+}

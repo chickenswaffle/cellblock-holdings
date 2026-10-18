@@ -75,7 +75,7 @@ namespace Cellblock.Unity
 
         static void AddCharacterRenderer(List<CharacterRendererState> list, Renderer renderer)
         {
-            if (renderer == null || !renderer.gameObject.activeSelf) return;
+            if (renderer == null) return;
             list.Add(new CharacterRendererState { Renderer = renderer, Shadow = renderer.shadowCastingMode, ForceOff = renderer.forceRenderingOff });
         }
         void BeginCharacterCameraRender(ScriptableRenderContext context, Camera camera)

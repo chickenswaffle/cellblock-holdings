@@ -151,6 +151,15 @@ static partial class Program
             w.Data.Justice.Attempt.Phase = "Running"; w.Data.Justice.Attempt.ResidentId = t.Id;
             Check(w.StaffActionHints().TargetId == "" && !w.ActGrab(), "An escapee was grabbable");
         });
+        Test("staff actions · riot ownership excludes manual attacks, restraint and searches", () => {
+            StaffMember o; Resident t; World w = ActionWorld(out o, out t);
+            w.Population.Riot.Phase = "Riot"; w.Population.Riot.Rioters.Add(t.Id);
+            float health = t.Health;
+            Check(w.StaffActionHints().TargetId != t.Id, "Riot participant offered as a manual target");
+            Check(!w.ActGrab() && w.HeldResidentId == "", "Manual hold stole riot ownership");
+            w.ActAttack(); w.ActUse();
+            Check(t.Health == health && t.SeparatedUntil < w.Data.Minute && w.Population.Riot.Rioters.Contains(t.Id), "Manual action changed riot custody");
+        });
         Test("staff actions · a wound-up resident can swing back: the officer staggers and force becomes justified", () => {
             StaffMember o; Resident t; World w = ActionWorld(out o, out t);
             bool countered = false;

@@ -1,0 +1,27 @@
+{
+    "passed": true,
+    "editor": "6000.3.24f1",
+    "errors": [],
+    "notes": [
+        "yard at 10:52 · 6 of 12 busy · Laps 3, Workout:Shadow boxing 1, Lean 1, Pace 1",
+        "02-workout.png: Casey Brooks · Workout (Shadow boxing)",
+        "03-chat-circle.png: nobody doing that right now",
+        "04-fence.png: Jamie Ellis · Lean",
+        "Staged chat arrival: 7 real eligible members; explicit positions, no path/balance claim.",
+        "Eight explicitly staged workout renderer frames use live pose methods; these do not establish activity selection or performance."
+    ],
+    "captures": [
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/yard/20261018-204122-015-b74e4e/01-yard-wide.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/yard/20261018-204122-015-b74e4e/02-workout.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/yard/20261018-204122-015-b74e4e/04-fence.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/yard/20261018-204122-015-b74e4e/05-chat-arrived.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/yard/20261018-204122-015-b74e4e/pose-jumping-jacks-0.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/yard/20261018-204122-015-b74e4e/pose-jumping-jacks-1.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/yard/20261018-204122-015-b74e4e/pose-push-ups-0.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/yard/20261018-204122-015-b74e4e/pose-push-ups-1.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/yard/20261018-204122-015-b74e4e/pose-shadow-boxing-0.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/yard/20261018-204122-015-b74e4e/pose-shadow-boxing-1.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/yard/20261018-204122-015-b74e4e/pose-sit-ups-0.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/yard/20261018-204122-015-b74e4e/pose-sit-ups-1.png"
+    ]
+}

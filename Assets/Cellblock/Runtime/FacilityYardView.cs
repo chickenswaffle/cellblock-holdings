@@ -37,6 +37,21 @@ namespace Cellblock.Unity
                 }
             }
         }
+#if UNITY_EDITOR
+        // Deliberately staged renderer evidence; it neither assigns an activity nor
+        // advances the simulation. Uses the same pose functions as the live yard.
+        public bool PreviewYardWorkout(string id, string detail, float phase)
+        {
+            Actor actor = Live(id); if (actor == null) return false;
+            Take(actor, Hold.Body); actor.PoseArms = true;
+            if (detail == "Push-ups") PushUp(actor, phase, 1);
+            else if (detail == "Sit-ups") SitUp(actor, phase, 1);
+            else if (detail == "Jumping jacks") JumpingJack(actor, phase, 1);
+            else if (detail == "Shadow boxing") ShadowBox(actor, phase, 1);
+            else return false;
+            Keep(actor); return true;
+        }
+#endif
         // Face down on straight arms, the body rising and lowering about twice a second at full speed.
         void PushUp(Actor a, float phase, float blend)
         {

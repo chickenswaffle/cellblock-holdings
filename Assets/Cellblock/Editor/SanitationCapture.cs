@@ -17,12 +17,13 @@ namespace Cellblock.Editor
     // A disposable county company gets two showers built through a real quote and crews, washes during the yard
     // window, then a staged outbreak. Frames: the shower with running water (camera), the Pressure workspace's
     // Sanitation section and a resident's hygiene card (HUD rendered into a texture, composited over the camera).
-    // Every runtime error or exception fails the review. Output: Builds/SanitationReview/.
+    // Every runtime error or exception fails the review. Output: unique Temp/CellblockFeatureReviews folders.
     [InitializeOnLoad]
     public static class SanitationCapture
     {
         const string StageKey = "Cellblock.Sanitation.Stage", ActiveKey = "Cellblock.Sanitation.Active", WaitKey = "Cellblock.Sanitation.Wait";
-        const string Output = "Builds/SanitationReview";
+        static string Output = "";
+        internal static bool IsRunning { get { return SessionState.GetBool(ActiveKey, false); } }
         const int Width = 1600, Height = 900;
         static readonly List<string> errors = new List<string>(), notes = new List<string>();
         static string showerId = "";
@@ -38,16 +39,20 @@ namespace Cellblock.Editor
             };
         }
 
-        public static void Run()
+        public static void Run() { PresentationPreview.RequestFeatureReview("sanitation"); }
+        internal static void BeginExisting()
         {
-            ProjectSetup.Validate();
-            EditorSceneManager.OpenScene("Assets/Cellblock/Scenes/Main.unity");
-            if (Directory.Exists(Output)) Directory.Delete(Output, true);
+            if (!EditorApplication.isPlaying) throw new InvalidOperationException("Feature review requires the shared Play runner.");
+            Output = Path.Combine("Temp/CellblockFeatureReviews", "sanitation", DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N").Substring(0, 6));
             Directory.CreateDirectory(Output);
             errors.Clear(); notes.Clear();
             SessionState.SetBool(ActiveKey, true); SessionState.SetInt(StageKey, 0);
             SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + 4);
-            EditorApplication.EnterPlaymode();
+        }
+        internal static void Abort(string reason)
+        {
+            if (!IsRunning) return;
+            errors.Add(reason); Finish(UnityEngine.Object.FindFirstObjectByType<GameController>(), false);
         }
 
         static void Wait(float seconds) { SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + seconds); }
@@ -189,13 +194,13 @@ namespace Cellblock.Editor
         static void Finish(GameController game, bool passed)
         {
             SessionState.SetBool(ActiveKey, false);
+            if (game == null) game = UnityEngine.Object.FindFirstObjectByType<GameController>();
             if (game != null) game.PreviewUiTarget(null);
             if (hudTarget != null) { hudTarget.Release(); UnityEngine.Object.DestroyImmediate(hudTarget); hudTarget = null; }
             File.WriteAllText(Path.Combine(Output, "report.txt"), (passed ? "PASSED" : "FAILED") + "\n\nNotes:\n" + string.Join("\n", notes) + "\n\nErrors:\n" + string.Join("\n", errors));
             if (passed) Debug.Log("CELLBLOCK_SANITATION_CAPTURE_PASSED " + Path.GetFullPath(Output));
             else Debug.LogError("CELLBLOCK_SANITATION_CAPTURE_FAILED " + string.Join(" | ", errors.Take(5)));
-            EditorApplication.isPlaying = false;
-            if (Application.isBatchMode) EditorApplication.delayCall += () => EditorApplication.Exit(passed ? 0 : 1);
+            PresentationPreview.WriteFeatureEvidence(Output, passed, errors.ToArray(), notes.ToArray());
         }
     }
 }

@@ -14,6 +14,7 @@ namespace Cellblock.Core
         public int LastWashMinute = -1, WashStartMinute = -1, KitUntil = -1;
         public string Illness = "";
         public int IllSince = -1, IllUntil = -1, ContagiousUntil = -1, QuarantineUntil = -1;
+        public int SeparationBeforeQuarantine = -1;
     }
     public sealed partial class State
     {
@@ -110,7 +111,7 @@ namespace Cellblock.Core
             {
                 if (r == null) continue;
                 if (float.IsNaN(r.Hygiene) || float.IsInfinity(r.Hygiene) || r.Hygiene < 0 || r.Hygiene > 100 || r.Illness == null ||
-                    r.LastWashMinute > state.Minute || r.LastWashMinute < -1 || r.WashStartMinute > state.Minute || r.WashStartMinute < -1 || r.QuarantineUntil < -1 || r.QuarantineUntil > state.Minute + 2 * 1440 ||
+                    r.LastWashMinute > state.Minute || r.LastWashMinute < -1 || r.WashStartMinute > state.Minute || r.WashStartMinute < -1 || r.SeparationBeforeQuarantine < -1 || r.SeparationBeforeQuarantine > state.Minute + 2 * 1440 || r.QuarantineUntil < -1 || r.QuarantineUntil > state.Minute + 2 * 1440 ||
                     (r.Illness == "" ? r.IllSince != -1 || r.IllUntil != -1 || r.ContagiousUntil != -1
                         : Illness(r.Illness) == null || r.IllSince < 0 || r.IllSince > state.Minute || r.IllUntil < r.IllSince || r.ContagiousUntil < r.IllSince || r.ContagiousUntil > r.IllUntil))
                     throw new ArgumentException("Invalid hygiene record for " + r.Name + ".");
@@ -150,13 +151,22 @@ namespace Cellblock.Core
         WashPlan CurrentWashPlan()
         {
             if (washPlan != null && washPlanMinute == Data.Minute) return washPlan;
-            int broken = BrokenHygieneCount(), signature = RosterSignature();
+            int broken = BrokenHygieneCount(), signature = SanitationAttendanceSignature();
             if (washPlan != null && washPlanRevision == GeometryRevision && washPlanFixtures == Data.Fixtures.Count && washPlanBroken == broken &&
                 washPlanSignature == signature && washPlanPolicy == Sanitation.ShowerPolicy) { washPlanMinute = Data.Minute; return washPlan; }
             washPlan = BuildWashPlan();
             washPlanRevision = GeometryRevision; washPlanFixtures = Data.Fixtures.Count; washPlanBroken = broken; washPlanSignature = signature;
             washPlanPolicy = Sanitation.ShowerPolicy; washPlanMinute = Data.Minute;
             return washPlan;
+        }
+        int SanitationAttendanceSignature()
+        {
+            unchecked
+            {
+                int signature = RosterSignature();
+                foreach (Resident r in Data.Residents) signature = signature * 31 + (IsPresent(r) && !InIntake(r) ? 1 : 0);
+                return signature;
+            }
         }
         // Greedy, in roster order: the cheapest free session, where cost is the walk plus 3 m for each person already
         // in that line (a wash is about ten minutes of walking), so stations and windows share the load. People in the
@@ -178,6 +188,7 @@ namespace Cellblock.Core
             for (int i = 0; i < Data.Residents.Count; i++)
             {
                 Resident r = Data.Residents[i];
+                if (!IsPresent(r) || InIntake(r)) continue;
                 bool lunchFirst = earlyLunch && MealShift(i) == 0;
                 if (!Assign(r, showers, lunchFirst) && !Assign(r, basins, lunchFirst)) plan.Unplaced++;
             }
@@ -380,23 +391,33 @@ namespace Cellblock.Core
         public bool Contagious(Resident r) { return r != null && r.Illness != "" && r.ContagiousUntil > Data.Minute; }
         public bool Quarantined(Resident r) { return r != null && r.QuarantineUntil > Data.Minute; }
         // Quarantine is a stay in housing (SeparatedUntil) for as long as the person is contagious, at most two days at a time.
+        // Separation sources extend their own deadline even while quarantine owns
+        // the visible housing hold. Lifting quarantine restores that deadline.
+        void ExtendSeparation(Resident r, int until)
+        {
+            if (r.QuarantineUntil > Data.Minute)
+                r.SeparationBeforeQuarantine = Math.Max(r.SeparationBeforeQuarantine, until);
+            r.SeparatedUntil = Math.Max(r.SeparatedUntil, until);
+        }
         void KeepQuarantine(Resident r)
         {
             bool should = Sanitation.Quarantine && Contagious(r) && IsPresent(r);
             int until = should ? Math.Min(r.ContagiousUntil, Data.Minute + 2 * 1440) : -1;
-            if (r.QuarantineUntil > Data.Minute && until < r.QuarantineUntil)
+            int previous = r.QuarantineUntil;
+            if (previous >= 0 && until < previous && r.SeparatedUntil == previous)
+                r.SeparatedUntil = Math.Max(Data.Minute, Math.Max(until, r.SeparationBeforeQuarantine));
+            if (!should)
             {
-                // Treated, recovered or released from quarantine: end the stay this quarantine added, not a fight separation.
-                if (r.SeparatedUntil == r.QuarantineUntil) r.SeparatedUntil = Math.Max(Data.Minute, until);
-                r.QuarantineUntil = until;
+                r.QuarantineUntil = r.SeparationBeforeQuarantine = -1;
+                return;
             }
-            if (!should) { if (r.QuarantineUntil <= Data.Minute) r.QuarantineUntil = -1; return; }
-            if (r.QuarantineUntil < until)
+            if (previous <= Data.Minute)
             {
-                if (r.QuarantineUntil <= Data.Minute) Remember(r, "quarantine", "Kept in the unit while the " + SanitationRules.Illness(r.Illness).Short + " ran its course.");
-                if (r.SeparatedUntil < until) r.SeparatedUntil = until;
-                r.QuarantineUntil = until;
+                r.SeparationBeforeQuarantine = r.SeparatedUntil;
+                Remember(r, "quarantine", "Kept in the unit while the " + SanitationRules.Illness(r.Illness).Short + " ran its course.");
             }
+            r.QuarantineUntil = until;
+            r.SeparatedUntil = Math.Max(r.SeparatedUntil, until);
         }
         public int SickCount { get { return Data.Residents.Count(r => r.Illness != "" && IsPresent(r)); } }
         public bool OutbreakActive { get { return Sanitation.OutbreakStart >= 0; } }

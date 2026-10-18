@@ -1,0 +1,20 @@
+{
+    "passed": true,
+    "editor": "6000.3.24f1",
+    "errors": [],
+    "notes": [
+        "quote True Materials and disposal are paid on approval. Hired crews are billed separately by game time.",
+        "built showers: 2 · wash places 20 for 10",
+        "washed by 10:18: 0 · washing now 1 · status Shower · afternoon yard · 64 min walk. | Shower · morning yard · 52 min walk · first in line. | Shower · afternoon yard · 75 min walk. | No wash place: every station within walking time is full. Build showers near the beds.",
+        "03-pressure-sanitation.png: HUD pixels 554396",
+        "04-resident-compact.png: HUD pixels 560128",
+        "05-resident-hygiene.png: HUD pixels 547316"
+    ],
+    "captures": [
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/sanitation/20261018-204250-846-ca736d/01-shower-running.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/sanitation/20261018-204250-846-ca736d/02-shower-queue.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/sanitation/20261018-204250-846-ca736d/03-pressure-sanitation.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/sanitation/20261018-204250-846-ca736d/04-resident-compact.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/sanitation/20261018-204250-846-ca736d/05-resident-hygiene.png"
+    ]
+}

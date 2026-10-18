@@ -14,16 +14,17 @@ using UnityEngine.Rendering.Universal;
 
 namespace Cellblock.Editor
 {
-    // Claude's look-and-control review, run only from Claude's own clone in batchmode with graphics:
+    // Claude's look-and-control review, adapted to the single-editor PresentationPreview runner:
     //   Unity -batchmode -projectPath <clone> -executeMethod Cellblock.Editor.LookCapture.Run -logFile <log>
     // Plays as an officer and drives a virtual controller through the Input System: right stick looks, left stick walks,
     // X strikes, LB faces the nearest prisoner, and in third person a sideways walk swings the camera behind. Also frames
-    // the keyboard, controller and 900x420 touch layouts and the Controls settings page. Output: Builds/LookReview/.
+    // the keyboard, controller and 900x420 touch layouts and the Controls settings page. Output: unique Temp/CellblockFeatureReviews folders.
     [InitializeOnLoad]
     public static class LookCapture
     {
         const string StageKey = "Cellblock.Look.Stage", ActiveKey = "Cellblock.Look.Active", WaitKey = "Cellblock.Look.Wait";
-        const string Output = "Builds/LookReview";
+        static string Output = "";
+        internal static bool IsRunning { get { return SessionState.GetBool(ActiveKey, false); } }
         static readonly List<string> errors = new List<string>(), notes = new List<string>();
         static RenderTexture hud;
         static Gamepad pad;
@@ -42,17 +43,22 @@ namespace Cellblock.Editor
                 if ((type == LogType.Error || type == LogType.Exception || type == LogType.Assert) && !condition.StartsWith("CELLBLOCK_LOOK")) errors.Add(condition.Replace('\n', ' '));
             };
         }
-        public static void Run()
+        public static void Run() { PresentationPreview.RequestFeatureReview("look"); }
+        internal static void BeginExisting()
         {
-            ProjectSetup.Validate();
-            EditorSceneManager.OpenScene("Assets/Cellblock/Scenes/Main.unity");
-            if (Directory.Exists(Output)) Directory.Delete(Output, true);
+            if (!EditorApplication.isPlaying) throw new InvalidOperationException("Feature review requires the shared Play runner.");
+            Output = Path.Combine("Temp/CellblockFeatureReviews", "look", DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N").Substring(0, 6));
             Directory.CreateDirectory(Output);
             errors.Clear(); notes.Clear(); shot = 0;
             SessionState.SetBool(ActiveKey, true); SessionState.SetInt(StageKey, 0);
             SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + 4);
-            EditorApplication.EnterPlaymode();
         }
+        internal static void Abort(string reason)
+        {
+            if (!IsRunning) return;
+            errors.Add(reason); Finish(UnityEngine.Object.FindFirstObjectByType<GameController>(), false);
+        }
+
         static void Next(float seconds) { SessionState.SetInt(StageKey, SessionState.GetInt(StageKey, 0) + 1); SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + seconds); }
         static void Check(bool ok, string message) { if (!ok) errors.Add(message); }
         static void Send() { if (pad != null) InputSystem.QueueStateEvent(pad, padState); }
@@ -256,13 +262,13 @@ namespace Cellblock.Editor
         {
             SessionState.SetBool(ActiveKey, false);
             if (pad != null) { InputSystem.RemoveDevice(pad); pad = null; }
+            if (game == null) game = UnityEngine.Object.FindFirstObjectByType<GameController>();
             if (game != null) game.PreviewUiTarget(null);
             if (hud != null) { hud.Release(); UnityEngine.Object.DestroyImmediate(hud); hud = null; }
             File.WriteAllText(Path.Combine(Output, "report.txt"), (passed ? "PASSED" : "FAILED") + "\n\nNotes:\n" + string.Join("\n", notes) + "\n\nErrors:\n" + string.Join("\n", errors));
             if (passed) Debug.Log("CELLBLOCK_LOOK_CAPTURE_PASSED " + Path.GetFullPath(Output));
             else Debug.LogError("CELLBLOCK_LOOK_CAPTURE_FAILED " + string.Join(" | ", errors.Take(5)));
-            EditorApplication.isPlaying = false;
-            if (Application.isBatchMode) EditorApplication.delayCall += () => EditorApplication.Exit(passed ? 0 : 1);
+            PresentationPreview.WriteFeatureEvidence(Output, passed, errors.ToArray(), notes.ToArray());
         }
     }
 }

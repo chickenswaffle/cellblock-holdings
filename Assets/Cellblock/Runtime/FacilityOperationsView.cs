@@ -115,8 +115,10 @@ namespace Cellblock.Unity
                 if (!member.Arrived) continue;
                 Actor actor; bool created = !actors.TryGetValue(member.Id, out actor);
                 if (created) actor = Person(member.Id, true, member.Role);
-                actor.PoseArms = member.Duty == "Climbing tower";
-                AnimateWorker(actor, member.Position, world, force || created, !member.Duty.StartsWith("Walking") && member.Duty != "Patrolling" && member.Duty != "Responding to alarm" && member.Duty != "Responding to escape" && world.IsOnShift(member), member.Role);
+                bool working = world.IsOnShift(member) && (member.Duty == "Welfare check" || member.Duty == "Alarm welfare check" ||
+                    member.Duty == "Casework" || member.Duty == "Counseling" || member.Duty == "Maintaining equipment" || member.Duty == "Inspecting utilities");
+                actor.PoseArms = member.Duty == "Climbing tower" || (working && actor.Speed < .15f && !world.IsCharacterControlled(member.Id));
+                AnimateWorker(actor, member.Position, world, force || created, working, member.Role, member.Duty);
                 AnimateSecurityOfficer(actor, member, world, force || created);
                 actor.Marker.gameObject.SetActive(member.Id == selectedResidentId);
                 UpdateCharacterNameTag(actor,world.StaffTitle(member)+" "+member.Name,member.Id==selectedResidentId);
@@ -131,18 +133,35 @@ namespace Cellblock.Unity
                 }
             }
         }
-        void AnimateWorker(Actor actor, Point position, World world, bool snap, bool working, string role)
+        void AnimateWorker(Actor actor, Point position, World world, bool snap, bool working, string role, string duty = "")
         {
             actor.Seen = true; actor.Root.gameObject.SetActive(true);
             actor.Motion.Position = position; actor.Motion.WalkSpeed = 1.15f;
             MoveActor(actor, actor.Motion, world, snap);
             if (actor.WorkTool != null) actor.WorkTool.gameObject.SetActive(working);
-            if (!working || world.Data.Speed == 0 || Geometry.Distance(new Point(actor.Root.position.x, actor.Root.position.z), position) > 0.2f) return;
-            float phase = Time.unscaledTime * Mathf.Max(1, world.Data.Speed) * (role == "Builder" ? 5.8f : 1.6f) + actor.Gait;
-            float blend = 1 - Mathf.Exp(-Time.unscaledDeltaTime * 12);
-            actor.Limbs[0].localRotation = Quaternion.Slerp(actor.Limbs[0].localRotation, Quaternion.Euler(role == "Builder" ? -45 : -65, 0, -8), blend);
-            actor.Limbs[1].localRotation = Quaternion.Slerp(actor.Limbs[1].localRotation, Quaternion.Euler(role == "Builder" ? -65 + Mathf.Sin(phase) * 40 : role == "Officer" ? -105 : -55 + Mathf.Sin(phase) * 5, 0, 8), blend);
-            actor.Body.localRotation = Quaternion.Slerp(actor.Body.localRotation, Quaternion.Euler(role == "Builder" ? 5 : 0, Mathf.Sin(phase * 0.4f) * 3, 0), blend);
+            Stride stride = StrideFor(actor);
+            if (!working || world.Data.Speed == 0 || actor.Speed > .15f || SceneHoldsBody(stride, world) ||
+                world.IsCharacterControlled(stride.Id) || Geometry.Distance(new Point(actor.Root.position.x, actor.Root.position.z), position) > .2f) return;
+            float phase = stride.Clock + IdentitySeed(stride.Id) % 13;
+            float blend = 1 - Mathf.Exp(-Mathf.Min(SceneFrameDelta, .05f) * 10);
+            if (role == "Technician")
+            {
+                float turn = Mathf.Sin(phase * 2.5f) * 5;
+                actor.Limbs[0].localRotation = Quaternion.Slerp(actor.Limbs[0].localRotation, Quaternion.Euler(-25, 0, -5), blend);
+                actor.Forearms[0].localRotation = Quaternion.Slerp(actor.Forearms[0].localRotation, Quaternion.Euler(-70, 0, 0), blend);
+                actor.Limbs[1].localRotation = Quaternion.Slerp(actor.Limbs[1].localRotation, Quaternion.Euler(-35 + turn, 0, 5), blend);
+                actor.Forearms[1].localRotation = Quaternion.Slerp(actor.Forearms[1].localRotation, Quaternion.Euler(-65 - turn, 0, 0), blend);
+                return;
+            }
+            // Conversation is a small phrase, pause and listening hold; responders and
+            // passive watch duties keep their locomotion/alert poses instead of this loop.
+            float phrase = Mathf.Repeat(phase, 7.5f);
+            float gesture = Smooth01(phrase / .7f) * (1 - Smooth01((phrase - 1.5f) / .8f));
+            actor.Limbs[0].localRotation = Quaternion.Slerp(actor.Limbs[0].localRotation, Quaternion.Euler(-8 - gesture * 20, 0, -5), blend);
+            actor.Forearms[0].localRotation = Quaternion.Slerp(actor.Forearms[0].localRotation, Quaternion.Euler(-18 - gesture * 32, 0, 0), blend);
+            actor.Limbs[1].localRotation = Quaternion.Slerp(actor.Limbs[1].localRotation, Quaternion.Euler(-4, 0, 5), blend);
+            actor.Forearms[1].localRotation = Quaternion.Slerp(actor.Forearms[1].localRotation, Quaternion.Euler(-14, 0, 0), blend);
+
         }
         TruckView Truck(Transform parent, string kind)
         {

@@ -12,15 +12,16 @@ using UnityEngine.Rendering.Universal;
 
 namespace Cellblock.Editor
 {
-    // Claude's yard-life review, run only from Claude's own clone in batchmode with graphics:
+    // Claude's yard-life review, adapted to the single-editor PresentationPreview runner:
     //   Unity -batchmode -projectPath <clone> -executeMethod Cellblock.Editor.YardCapture.Run -logFile <log>
     // A disposable state company in the morning yard window: a wide shot and close-ups of a workout, a chat circle and
-    // the fence. Fails on any runtime error or if fewer than four yard activities are under way. Output: Builds/YardReview/.
+    // the fence. Fails on any runtime error or if fewer than four yard activities are under way. Output: unique Temp/CellblockFeatureReviews folders.
     [InitializeOnLoad]
     public static class YardCapture
     {
         const string StageKey = "Cellblock.Yard.Stage", ActiveKey = "Cellblock.Yard.Active", WaitKey = "Cellblock.Yard.Wait";
-        const string Output = "Builds/YardReview";
+        static string Output = "";
+        internal static bool IsRunning { get { return SessionState.GetBool(ActiveKey, false); } }
         static readonly List<string> errors = new List<string>(), notes = new List<string>();
 
         static YardCapture()
@@ -32,17 +33,22 @@ namespace Cellblock.Editor
                 if ((type == LogType.Error || type == LogType.Exception || type == LogType.Assert) && !condition.StartsWith("CELLBLOCK_YARD")) errors.Add(condition.Replace('\n', ' '));
             };
         }
-        public static void Run()
+        public static void Run() { PresentationPreview.RequestFeatureReview("yard"); }
+        internal static void BeginExisting()
         {
-            ProjectSetup.Validate();
-            EditorSceneManager.OpenScene("Assets/Cellblock/Scenes/Main.unity");
-            if (Directory.Exists(Output)) Directory.Delete(Output, true);
+            if (!EditorApplication.isPlaying) throw new InvalidOperationException("Feature review requires the shared Play runner.");
+            Output = Path.Combine("Temp/CellblockFeatureReviews", "yard", DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N").Substring(0, 6));
             Directory.CreateDirectory(Output);
             errors.Clear(); notes.Clear();
             SessionState.SetBool(ActiveKey, true); SessionState.SetInt(StageKey, 0);
             SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + 4);
-            EditorApplication.EnterPlaymode();
         }
+        internal static void Abort(string reason)
+        {
+            if (!IsRunning) return;
+            errors.Add(reason); Finish(false);
+        }
+
         static void Next(float seconds) { SessionState.SetInt(StageKey, SessionState.GetInt(StageKey, 0) + 1); SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + seconds); }
 
         static void Tick()
@@ -69,6 +75,45 @@ namespace Cellblock.Editor
                         Shot(game, w, plans.Select(x => x.r).FirstOrDefault(r => w.YardActivity(r).Activity == "Workout"), "02-workout.png");
                         Shot(game, w, plans.Select(x => x.r).FirstOrDefault(r => w.YardActivity(r).Activity == "Hang out"), "03-chat-circle.png");
                         Shot(game, w, plans.Select(x => x.r).FirstOrDefault(r => w.YardActivity(r).Activity == "Lean" || w.YardActivity(r).Activity == "Sit"), "04-fence.png");
+                        Next(.3f); return;
+                    }
+                    case 3:
+                        game.StartPresentationPreview("county"); w = game.World; w.Data.Minute = 10 * 60 + 30; w.Data.Speed = 0;
+                        w.SetAutoJobs(false);
+                        foreach (Resident r in w.Data.Residents)
+                        {
+                            r.Gang = "Eastside"; r.Sociability = 100; r.Discipline = r.Impulsivity = r.Stress = 0;
+                            r.RoutineOffset = 0; r.Legal.RestrictedUntil = -1; r.Activity = r.ActivityPartner = r.ActivityFixture = "";
+                            r.NextPlanMinute = int.MaxValue / 2;
+                            foreach (Relationship rel in r.Relationships) rel.Tension = 0;
+                        }
+                        foreach (Resident r in w.Data.Residents)
+                        {
+                            YardPlan plan = w.YardPlanFor(r, w.Data.Residents.IndexOf(r));
+                            r.Position = plan.Activity == "Hang out" ? plan.Spot : r.Home;
+                        }
+                        game.ReloadPresentationPreview(); Next(2); return;
+                    case 4:
+                    {
+                        var chatting = w.Data.Residents.Where(r => w.YardActivity(r)?.Activity == "Hang out").ToList();
+                        if (chatting.Count < 2) throw new InvalidOperationException("Staged chat fixture has no available conversation partners.");
+                        Point centre = w.YardActivity(chatting[0]).Focus;
+                        notes.Add("Staged chat arrival: " + chatting.Count + " real eligible members; explicit positions, no path/balance claim.");
+                        game.FrameArt(FacilityView.V(centre, .8f), 3.0f, 210, 25);
+                        Render(game.ArtCamera, "05-chat-arrived.png");
+                        string id = chatting[0].Id;
+                        foreach (Resident r in w.Data.Residents) r.Position = r.Home;
+                        w.Data.Residents.First(r => r.Id == id).Position = w.Data.Yard;
+                        foreach (string detail in new[] { "Push-ups", "Sit-ups", "Jumping jacks", "Shadow boxing" })
+                        for (int phase = 0; phase < 2; phase++)
+                        {
+                            game.ReloadPresentationPreview(); w = game.World;
+                            FacilityView view = game.GetComponentInChildren<FacilityView>();
+                            if (!view.PreviewYardWorkout(id, detail, phase == 0 ? 0 : detail == "Jumping jacks" ? 6.98f : 3.14f)) throw new InvalidOperationException("Workout actor missing.");
+                            game.FrameArt(FacilityView.V(w.Data.Yard, .7f), 2.25f, 240, 18);
+                            Render(game.ArtCamera, "pose-" + detail.ToLowerInvariant().Replace(' ', '-') + "-" + phase + ".png");
+                        }
+                        notes.Add("Eight explicitly staged workout renderer frames use live pose methods; these do not establish activity selection or performance.");
                         Finish(errors.Count == 0); return;
                     }
                 }
@@ -107,8 +152,7 @@ namespace Cellblock.Editor
             File.WriteAllText(Path.Combine(Output, "report.txt"), (passed ? "PASSED" : "FAILED") + "\n\nNotes:\n" + string.Join("\n", notes) + "\n\nErrors:\n" + string.Join("\n", errors));
             if (passed) Debug.Log("CELLBLOCK_YARD_CAPTURE_PASSED " + Path.GetFullPath(Output));
             else Debug.LogError("CELLBLOCK_YARD_CAPTURE_FAILED " + string.Join(" | ", errors.Take(5)));
-            EditorApplication.isPlaying = false;
-            if (Application.isBatchMode) EditorApplication.delayCall += () => EditorApplication.Exit(passed ? 0 : 1);
+            PresentationPreview.WriteFeatureEvidence(Output, passed, errors.ToArray(), notes.ToArray());
         }
     }
 }

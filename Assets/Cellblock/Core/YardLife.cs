@@ -51,7 +51,8 @@ namespace Cellblock.Core
         // What this resident does in the yard during the current block, and where. The standing spot is the fallback.
         readonly Dictionary<string, YardPlan> yardPlans = new Dictionary<string, YardPlan>();
         readonly Dictionary<string, List<string>> yardCrowds = new Dictionary<string, List<string>>();
-        int yardPlanMinute = -1, yardCrowdBlock = -1, yardCrowdSignature;
+        readonly Dictionary<string, int> yardCrowdCircles = new Dictionary<string, int>();
+        int yardPlanMinute = -1, yardCrowdBlock = -1, yardCrowdMinute = -1, yardCrowdSignature;
         public YardPlan YardPlanFor(Resident r, int index)
         {
             if (yardPlanMinute != Data.Minute) { yardPlans.Clear(); yardPlanMinute = Data.Minute; }
@@ -59,19 +60,27 @@ namespace Cellblock.Core
             if (yardPlans.TryGetValue(r.Id, out cached)) return cached;
             cached = BuildYardPlan(r, index); yardPlans[r.Id] = cached; return cached;
         }
-        // Who picks each chat circle this block, in a stable order: computed once per block (and per roster change).
+        // Who picks each chat circle this block, in a stable order: computed once per minute so attendance and changing needs stay current.
         List<string> YardCrowd(string crowd, int block)
         {
             int signature = RosterSignature();
-            if (yardCrowdBlock != block || yardCrowdSignature != signature)
+            if (yardCrowdMinute != Data.Minute || yardCrowdBlock != block || yardCrowdSignature != signature)
             {
-                yardCrowds.Clear(); yardCrowdBlock = block; yardCrowdSignature = signature;
+                yardCrowds.Clear(); yardCrowdCircles.Clear(); yardCrowdMinute = Data.Minute; yardCrowdBlock = block; yardCrowdSignature = signature;
                 foreach (Resident o in Data.Residents.OrderBy(o => o.Id, StringComparer.Ordinal))
                 {
-                    if (!YardChoosesHangout(o, block)) continue;
+                    if (!YardAvailable(o, Data.Residents.IndexOf(o)) || !YardChoosesHangout(o, block)) continue;
                     string key = YardHangoutCrowd(o);
                     List<string> list; if (!yardCrowds.TryGetValue(key, out list)) yardCrowds[key] = list = new List<string>();
                     list.Add(o.Id);
+                }
+                var occupied = new HashSet<int>();
+                foreach (string key in yardCrowds.Keys.OrderBy(k => k, StringComparer.Ordinal))
+                {
+                    if (yardCircles.Count == 0) break;
+                    int slot = (int)(JusticeRules.Hash(key + ":" + block, unchecked((uint)Data.Seed)) % (uint)yardCircles.Count);
+                    for (int probe = 0; probe < yardCircles.Count && occupied.Contains(slot); probe++) slot = (slot + 1) % yardCircles.Count;
+                    yardCrowdCircles[key] = slot; occupied.Add(slot);
                 }
             }
             List<string> members; return yardCrowds.TryGetValue(crowd, out members) ? members : new List<string>();
@@ -89,11 +98,17 @@ namespace Cellblock.Core
             var plan = new YardPlan { Spot = home, Focus = home + new Point(0, 1) };
             if ((roll -= laps) < 0)
             {
-                // The next corner after the nearest one, in this person's direction: a continuous loop with rounded corners.
-                int nearest = 0; for (int i = 1; i < yardCorners.Count; i++) if (Geometry.Distance(r.Position, yardCorners[i]) < Geometry.Distance(r.Position, yardCorners[nearest])) nearest = i;
-                bool clockwise = YardUnit(r, "direction", 0) < 0.5f;
-                Point next = yardCorners[(nearest + (clockwise ? 1 : 3)) % 4];
-                if (Geometry.Distance(r.Position, yardCorners[nearest]) > 1.6f) next = yardCorners[nearest];
+                // Retain the saved corner destination until arrival. Re-selecting the
+                // nearest corner mid-edge makes walkers turn back after leaving it.
+                int nearest = 0;
+                for (int i = 1; i < yardCorners.Count; i++)
+                    if (Geometry.Distance(r.Position, yardCorners[i]) < Geometry.Distance(r.Position, yardCorners[nearest])) nearest = i;
+                Point saved;
+                int cursor = destinations.TryGetValue(r, out saved) ? yardCorners.FindIndex(p => Geometry.Distance(p, saved) < .1f) : -1;
+                int cornerGoal = cursor >= 0 ? cursor : nearest;
+                if (Geometry.Distance(r.Position, yardCorners[cornerGoal]) < .4f)
+                    cornerGoal = (cornerGoal + (YardUnit(r, "direction", 0) < .5f ? 1 : 3)) % yardCorners.Count;
+                Point next = yardCorners[cornerGoal];
                 plan.Activity = "Laps"; plan.Spot = next; plan.Focus = next; plan.Walking = true;
                 return plan;
             }
@@ -103,13 +118,15 @@ namespace Cellblock.Core
             if ((roll -= hang) < 0 && YardCrowd(crowd, block).Count < 2) roll = 0;
             if (roll < 0)
             {
-                int circle = (int)(JusticeRules.Hash(crowd + ":" + block, unchecked((uint)Data.Seed)) % (uint)yardCircles.Count);
+                int circle;
+                if (!yardCrowdCircles.TryGetValue(crowd, out circle)) return plan;
                 Point centre = yardCircles[circle];
                 List<string> members = YardCrowd(crowd, block);
                 int seat = Math.Max(0, members.IndexOf(r.Id)), seats = Math.Max(2, Math.Min(6, members.Count));
                 double angle = (seat % seats) * Math.PI * 2 / seats + (circle * 0.7);
-                Point spot = centre + new Point((float)Math.Cos(angle) * 0.8f, (float)Math.Sin(angle) * 0.8f);
-                plan.Activity = "Hang out"; plan.Spot = YardGround(spot) ? spot : centre; plan.Focus = centre;
+                float radius = .8f + .65f * (seat / seats);
+                Point spot = centre + new Point((float)Math.Cos(angle) * radius, (float)Math.Sin(angle) * radius);
+                plan.Activity = "Hang out"; plan.Spot = YardGround(spot) ? spot : home; plan.Focus = centre;
                 return plan;
             }
             bool leaning = (roll -= lean) < 0, sitting = !leaning && (roll -= sit) < 0;
@@ -157,11 +174,19 @@ namespace Cellblock.Core
                 resident.NextDecisionMinute = Math.Min(resident.NextDecisionMinute, Data.Minute);
         }
         // For the renderer and the resident card: the activity once the person is actually at it (walking ones while moving).
+        bool YardAvailable(Resident r, int index)
+        {
+            if (r == null || index < 0 || Data.Mode == null || !Data.Mode.Applied || Data.Operations.Lockdown || !IsPresent(r) || !PeopleDynamics.IsYardWindow(Data.Minute + r.RoutineOffset)) return false;
+            if (!r.Legal.Ready || r.Legal.Custody != "In facility" || r.Legal.RestrictedUntil > Data.Minute) return false;
+            if (RiotActive && Population.Riot.Rioters.Contains(r.Id) || Escape.Phase != "None" && Escape.ResidentId == r.Id) return false;
+            if (MealTravelDue(index, r) || WashDue(r) || HeldByStaff(r) || Downed(r) || IncidentOwnsResident(r) || r.SeparatedUntil > Data.Minute || r.ProtectiveCustody || InIntake(r)) return false;
+            Point work = r.Position;
+            return !JobTarget(r, ref work);
+        }
         public YardPlan YardActivity(Resident r)
         {
-            if (r == null || Data.Mode == null || !Data.Mode.Applied || !IsPresent(r) || !PeopleDynamics.IsYardWindow(Data.Minute + r.RoutineOffset)) return null;
-            int index = Data.Residents.IndexOf(r);
-            if (index < 0 || MealTravelDue(index, r) || WashDue(r) || HeldByStaff(r) || Downed(r) || IncidentOwnsResident(r) || r.SeparatedUntil > Data.Minute || r.ProtectiveCustody || InIntake(r)) return null;
+            int index = r == null ? -1 : Data.Residents.IndexOf(r);
+            if (!YardAvailable(r, index)) return null;
             YardPlan plan = YardPlanFor(r, index);
             if (!plan.Walking && Geometry.Distance(r.Position, plan.Spot) > 0.45f) return null;
             return plan;

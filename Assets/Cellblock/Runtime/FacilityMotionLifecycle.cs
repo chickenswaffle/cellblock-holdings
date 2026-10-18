@@ -10,6 +10,10 @@ namespace Cellblock.Unity
         // temporary; roster removal and replacement of the displayed world release the bindings.
         void ForgetActorMotion(Actor actor)
         {
+#if UNITY_EDITOR
+            naturalMotionProbes.Remove(actor);
+#endif
+            if (actor.Motion != null) fellAt.Remove(actor.Motion.Id);
             strides.Remove(actor); heldPoses.Remove(actor); heldThisFrame.Remove(actor);
             ShadowSlot shadow;
             if (shadowSlots.TryGetValue(actor, out shadow))
@@ -24,11 +28,15 @@ namespace Cellblock.Unity
         }
         void ResetMotionPresentation()
         {
+            ResetActionPresentation();
             foreach (ShadowSlot shadow in shadowSlots.Values)
                 if (shadow.Root != null) { shadow.Root.gameObject.SetActive(false); Destroy(shadow.Root.gameObject); }
             shadowSlots.Clear(); shadowRetired.Clear(); shadowsDrawn = 0;
             alarmWeight = alarmVelocity = 0;
             if (alarmVolume != null) { alarmVolume.weight = 0; alarmVolume.gameObject.SetActive(false); }
+#if UNITY_EDITOR
+            naturalMotionProbes.Clear();
+#endif
             strides.Clear(); strideStaff.Clear(); strideStaffFrame = -1;
             heldPoses.Clear(); heldThisFrame.Clear();
             cast.ProneYaw = 0; cast.ProneKey = cast.ImpactKey = cast.LandingKey = cast.StaggerKey = cast.StaggerLanding = int.MinValue;
@@ -39,6 +47,7 @@ namespace Cellblock.Unity
         void DisposeMotionResources()
         {
             ResetMotionPresentation();
+            if (actionRingMaterial != null) { Destroy(actionRingMaterial); actionRingMaterial = null; }
             for (int i = 0; i < shadowQuads.Length; i++) if (shadowQuads[i] != null) { Destroy(shadowQuads[i]); shadowQuads[i] = null; }
             if (shadowMaterial != null) { Destroy(shadowMaterial); shadowMaterial = null; }
             if (alarmProfile != null)
