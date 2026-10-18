@@ -16,7 +16,7 @@ Read this file before editing, before every Unity/build run, and before every co
 | Scope | Files/resources | Owner | State |
 | --- | --- | --- | --- |
 | game-core | `Assets/Cellblock/Core/`, `Tools/CoreChecks/`, excluding Simulation.cs and the exact new scopes below | Codex contract; no active edits | Reviewed integration through Claude f201d81; 373 combined core checks pass; explicit clock, geometry, routes and restraint ownership preserved  Local lock released for handoff; exact shared-hook changes need an entry. |
-| game-runtime | Existing runtime renderers/operations/native plugin, excluding GameController.cs, GameHud.cs and ConstructionGuides.cs | Codex contract; no active edits | Source fingerprint 27011080; shared gait/leg IK, physical struggles, contact shadows/alarm grade with immediate actor/world cleanup  Local lock released for handoff; exact shared-hook changes need an entry. |
+| game-runtime | Existing runtime renderers/operations/native plugin, excluding GameController.cs, GameHud.cs and ConstructionGuides.cs | Codex active natural-movement pass | Source fingerprint 27011080; shared gait/leg IK, physical struggles, contact shadows/alarm grade with immediate actor/world cleanup  Local lock released for handoff; exact shared-hook changes need an entry. |
 | game-ui | GameOperationsHud.cs / GameSecurityHud.cs integration; new metrics, Home/settings/command shell and incident partials/resources | Codex contract; no active edits | Source fingerprint 27011080; compact profiles/full-file disclosure, work phone, Home and unobstructed landscape incident Follow  Local lock released for handoff; exact shared-hook changes need an entry. |
 | unity-editor | Installed editor, `Assets/Cellblock/Editor/`, generated settings, all builds | Unclaimed after handoff | Existing sole editor PID66995 in ordinary Play/Home. Final85 Game-view captures +24 sequences/982 frames/6 scenarios pass. Claim runner scope and reuse this editor; no second editor/batch. |
 | justice | Existing Justice.cs, GameJusticeHud.cs, FacilityJusticeView.cs, Justice.uss, JusticeChecks.cs and justice notes | Codex integration | Reviewed; preserve presence/save/release fixes and physical interception |
@@ -33,6 +33,16 @@ Read this file before editing, before every Unity/build run, and before every co
 The explicit file rows above override the broad folder rows. Claude: the user's latest modes/HUD/placement request now has a concrete existing-file handoff at `a6d2afc`. Fetch the latest shared branch, preserve your own work, read `docs/claude-modes-and-building-handoff.md` and `docs/claude-coordination-update.md`, then claim opening-and-build-ui and/or resident-lives and acknowledge your current branch/SHA. The latest direct Home/save/settings/command-shell exception below overrides only those named parts of GameHud/GameController; all remaining handed-off logic stays reserved. Other existing files, security/doors/utilities/operations/justice and Unity remain Codex-owned. Do not restore older Justice or input implementations during integration.
 
 ## Codex log
+
+### 2026-10-18 — active natural movement and human detail pass
+
+- User assigns this pass to natural character movement, deeper primary-source animation research and more detailed people. Starting from `2e3352f`; fast-forwarded published Claude `c54d106` (only a no-op yard target hook and its sanitation reservation). Claude sanitation/yard routines and all core simulation remain untouched.
+- Codex claims `game-runtime`, `unity-editor`, `documentation`. Exact edited runtime scope: `FacilityMotion.cs`, new contact/locomotion helpers; `FacilityView.cs` Actor/Person/MoveActor presentation only; `FacilityCharacterDetail.cs` and new detail helpers. Preserve authoritative paths, positions, routine/struggle priority, save schema and staff-only control. The existing sole Unity editor is reused; edit mode confirmed before source edits.
+- Delegated `codex-human-detail` owns only `FacilityCharacterDetail.cs` (excluding AnimateCharacterDetail) and new `FacilityHumanDetails.cs`/meta if needed, for face/clothing geometry. Root owns motion, gaze, rig integration and all existing-file hooks. Independent critic read-only. New editor-only natural-motion review may use separate runtime probe and editor files with root owning `PresentationPreview.cs` integration.
+- Exact staff-pose extension: `FacilityOperationsView.cs` RefreshWorkers/AnimateWorker only. Remove generic raised-arm duty loop; presentation-only explicit duty gestures, measured-motion gating, game-clock gesture phase; preserve builder/security/radio/struggle owners.
+- First Unity import/API compilation passed. The first new motion fixture aborted before animation because its newly inserted staff had no personnel file; corrected fixture setup to use PersonnelRules.EnsureFiles. No passing evidence claimed for that aborted candidate. Exact lifecycle extension clears editor-only probe bindings on retirement/world replacement.
+- First complete natural-motion candidate rendered945 frames/112 captures with exact measured planted contacts but failed accelerated contact exposure. Actual source/visual review exposed recovery targets behind continuing motion, permanent split-stance crouch and unfilled capsule knees. Correcting predictive recovery, alternating idle settle steps, continuous trouser knee coverage and fabric response. Candidate is diagnostic evidence only. Root adds narrowly scoped FaceMotion/Actor.Blink presentation hooks, with delegated new helper; game mechanics unchanged.
+- Research/application plan: contact constraints and independent ankles, bounded stride/reach and turn foot placement, smooth acceleration/deceleration, pelvis weight transfer and direction-aware gaze. Avoid random whole-body jitter; do not promise motion capture or native-device performance. Evidence and review follow implementation.
 
 ### 2026-10-18 — final staff/motion integration ready for publication
 
@@ -622,3 +632,24 @@ Codex handback: implementation `a6d2afc` is committed. Both final Unity reports 
 
 
 - Published implementation merge **e3349b8** to origin/codex/live-operations-handoff (parents a393197 and Claude b470a10). Unity reports CELLBLOCK_PLAY_MODE_READY in the ordinary game/menu. Codex released game-core, game-runtime, justice and unity-editor locks; documentation lock will be released after this publication note. Only the unrelated pre-existing recovery folder/meta and duplicate ShaderGraph asset remain untracked. The copy/paste handoff is ready; Claude should fetch/merge the latest shared branch and acknowledge its new branch/SHA before resuming scoped work.
+
+
+## Codex human detail subagent log
+
+### 2026-10-18 — face and clothing geometry scope claimed
+
+- Read CLAUDE.md and current ownership/coordination notes. Claimed atomic scope `codex-human-detail` as agent `codex-human-detail`; root explicitly subdivides FacilityCharacterDetail.cs except AnimateCharacterDetail, plus optional new FacilityHumanDetails.cs/meta.
+- Intent: improve human facial proportions, connected jaw/cheek/hair contours and restrained eyes; add coherent collar/placket/pocket/fabric and role details. Keep the existing head gaze pivot and all geometry beneath it for first-person hiding. Combine static parts by shared materials; no Core, Lives, personnel, UI, rig or locomotion edits.
+- Root remains sole Unity runner and owns AnimateCharacterDetail. No editor/build/test/commit will be run by this subagent. Request integrated compile, face closeups, clothing/dressing and first-person hiding review from root after delivery.
+
+### 2026-10-18 — human geometry source delivered; lock released
+
+- Implemented only `Runtime/FacilityCharacterDetail.cs` DetailedHead/DressCharacter and new `Runtime/FacilityHumanDetails.cs`/meta. Connected head/jaw/cheek loft, narrower adult head/eye spacing, face-following small eyes with skin lids, fitted nose/ear helix/concha, cap-style hairlines, beard contour and thin glasses replace overlapping high-resolution spheres. All face geometry remains beneath the unchanged gaze pivot.
+- Clothing now has folded collar polygons, placket/buttons, pocket stitching/flap, subtle mesh folds/back yoke, hem/belt loops and restrained role details (officer radio/cable/keys/epaulets, technician tools, builder reflective strips, staff pass). Fabric geometry uses the existing uniform material so resident recoloring remains authoritative; existing shared hardware/skin/hair materials are reused.
+- Own static review: `git diff --check` clean. The original AnimateCharacterDetail and script meta are unchanged. Custom meshes use the existing Generated prefix and are baked/retired by Combine, with far fewer head vertices than the old sphere stack. No Unity launch, tests, build or commit was run. Root must compile/import and visually inspect face front/profile, back hair, clothing, resident recoloring, first-person head hiding and existing staff hats in the sole editor.
+- Scope `codex-human-detail` is handed back to root; no further source edits until explicitly reassigned.
+
+### 2026-10-18 — blink overlay subtask claimed
+
+- Root explicitly delegates only new Runtime/FacilityFaceMotion.cs/meta; claimed `codex-face-motion` as agent `codex-face-motion`. Root owns Actor.Blink, Person factory and Locomote hooks. No other source edits authorized.
+- Add a combined skin-material eyelid overlay under the head, centred on its existing eye line, and a brief deterministic blink driven only by Stride.Clock/identity. It must freeze when the supplied clock freezes and remain covered by first-person head hiding. No Unity/tests/build/commit; root remains the sole runner.
