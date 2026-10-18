@@ -39,6 +39,8 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 - Codex reserves character-experience. Exact temporary existing-file exceptions: GameHud person-card visibility/hierarchy and final refresh hook; GameMetricsHud People navigation only; GameController character input/Update/LateUpdate/world-change hooks before the existing management/placement path; GameRideAlong/GamePressureHud character entry/exit/follow UI; FacilityView actor pose/visibility and first-person ceiling/camera hooks. Core Simulation/Operations/Personnel/Justice get narrow controlled-movement guards that retain physical needs/service/accounting and priority ownership. Roles gets only generic person entry/integration; Economy gets one shared phone-charge helper; Contraband inventory stays authoritative. FixtureCatalog/new rendering case may add Payphone. New isolated CharacterControl/CharacterPhone/CharacterInspector/camera/UI sources, styles, editor checks and scoped tests are Codex's. Claude retains drag/build/catalog behavior, unrelated stories/personnel/economy mechanics and iOS/TestFlight. No second editor/build against this checkout.
 - Read-only audits confirm current ride-along is watch-only, bodycam is a384x2168Hz inset, and character pages are an accumulating long document. New plan: compact overview, genuine disclosure pages, stable Back to roster, distinct Follow/Play as/1P/3P, runtime-only movement session validated by core geometry/game clock, preserved management camera, full-size eye camera, safe two-thumb controls and context interactions. Character phone uses real cards/contacts/tasks/possessions, actual held contraband handsets or issued work equipment, and a physical Payphone for monitored calls; no unexplained free prisoner smartphone or instant radio-to-lockdown shortcut.
 - While the routine Play review freezes checkout sources, delegated implementation is staged only under /tmp/cellblock-character-draft and /tmp/cellblock-phone-draft. Root owns existing-file hooks and the sole Unity runner. Focused critic remains read-only. The scope reservation is being published ahead of source implementation so Claude can see it.
+- Routine source checkpoint1693e2e is committed/pushed; critic approved its six final interaction/phone frames. Merging published bcc1b5a now: resolve duplicate incident eligibility/pose hooks by retaining the stronger saved-lifecycle implementation, preserve Claude’s Roles asking guards and all build/iOS/art changes. Reciprocal cancellation ends both partners except two already-Leaving completions, so each retains its own completion history. Claude’s old clear-on-interrupt check now asserts suspended/no-effects plus bounded expiry. Combined checks and actual import will precede publication of this merge.
+- Resolved published merge passes **332/332 combined core checks and25/25 actual Unity frontend captures, errors empty**. This preserves latest Claude role/incident guards, drag-to-place, new game-rendered Home art, iOS entry points and TestFlight scripts. Phone/narrow art is readable in actual frames. Evidence: docs/reviews/2026-10-17-routines-merged-{core.txt,frontend.json}; frames Builds/FrontendReview/2026-10-17/routines-merged. The routine checkpoint’s16 earlier frames remain specifically for1693e2e, not added to the merged regression total. New character-experience implementation follows this reviewed merge.
 
 ### 2026-10-17 — active purposeful daily life / user interview
 
@@ -373,6 +375,67 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
 - **User request (2026-10-17):** asked why the work wasn't on GitHub. Both agents had been pushing only to side branches, so `main` had stayed at `f4266ca` while those branches were 50+ commits ahead. The user then chose to "update main now + always".
 - **Done:** fast-forwarded `main` to `7d15617`. That commit contains all of Codex's work through `358b028` and all of Claude's through `06df24e`, with no rewrite.
 - **For both agents from now on:** after each validated milestone, merge the latest `origin/main` into your branch, rerun the checks, then push the branch and fast-forward `main`. If `main` has moved, merge it first; never force-push `main`. Feature branches stay as they are for in-progress work. This overrides "no remote pushes without user instruction" (Rules 5) and the matching line in CLAUDE.md for `main` publication.
+
+### 2026-10-17 — lives, role cards and life poses defer to incident ownership
+
+- **Why:** this follows the `docs/claude-start.txt` contract. Before the change, a resident walking to a fight could keep reading, keep earning progress and keep a seated pose. A card could also pause play on a controlled prisoner mid-fight.
+- **Core changes, all in Claude's files:**
+  - `Lives.FreeTime` is false while `IncidentOwnsResident`, so the activity ends and nothing accrues or replans until the scene resolves. Escapees were already excluded by custody "Escaping".
+  - Ending a Talk now ends it for the partner too.
+  - `Roles`: the new `Asking(r)` / `Asking(s)` checks skip cards for a person whose incident owns them, and the ordinary rules decide instead. This covers store, job, counsel, card game, bribe, tip search and prisoner moments.
+- **Runtime change:** `FacilityLivesView.PrepareResidentPose` drops any everyday pose immediately for fight participants and the escapee. Codex's `RefreshIncidentVisuals` still runs last and owns the body.
+- **Checks:** 317/317 core, including 2 new checks. All 3 targeted mutants were caught. Unity typecheck passes for editor/macOS and iOS.
+- **Unity check request:** stage the fight demo while one participant is reading at a shelf or sitting at the TV. They should stand and walk without a seated or reading carry-over, and the Life card should show no activity until the scene resolves.
+
+### 2026-10-17 — user assignment: iOS / TestFlight builds go to Claude, from Claude's own clone
+
+- **User request (2026-10-17):** "a playable version I can put on TestFlight so I can play it a bit on my phone". When asked who builds, the user chose Claude, from Claude's own clone.
+- **What this means:** native iOS player builds and TestFlight uploads are Claude's, run against `ClaudeWorkspace/cellblock-holdings` only. Codex's checkout and its open editor are never touched. Codex keeps the unity-editor scope for its checkout: Play reviews, captures and `ProjectSetup`. Claude does not edit `ProjectSetup.cs` or any other existing Editor file.
+- **New file (Claude):** `Assets/Cellblock/Editor/IosBuild.cs` (+ meta). `IosBuild.Simulator` / `IosBuild.Device` call `ProjectSetup.Validate()`, build the Xcode project into the ignored `Builds/iOS/<Simulator|Device>`, and restore the iOS player settings afterwards.
+- **Open decision (user):** the bundle ID is undecided ("later"). Codex's `ProjectSetup` still writes `com.cellblockholdings.game`. No App Store Connect record will be created until the user picks; if the choice differs, Claude will ask Codex for that one-line change.
+- **First step:** an iOS Simulator build, which needs no signing, to find native-player problems (stripped shaders, Resources, safe areas) before a device build.
+
+### 2026-10-17 — build flow: drag to place, and drag from a catalog card (Codex handoff request item 1)
+
+- **Files (Claude's opening-and-build-ui):** `GameController.cs` input and `GameHud.cs` catalog cards only. No frontend, shell, incident or settings code was touched.
+- **Drag to place:** with a furnishing, bed, table or prefab tool active, a one-finger or left-mouse drag that starts on the map now shows the fitted ghost and opens the quote when you let go. Before, letting go did nothing and a separate exact tap was needed.
+  - On touch the ghost sits about 0.42 in above the finger, so the finger doesn't hide it. A plain tap still places at the exact point.
+  - Moving an already-selected furnishing keeps its exact, unlifted position.
+- **Drag from the catalog:** a furnishing card arms on press (`PressedCatalogKind`, via a TrickleDown `PointerDownEvent`). If the pointer leaves the panel before letting go, the controller selects that furnishing, closes the compact inspector and lets the ghost follow the pointer. Letting go over the map opens the quote. Letting go over the interface cancels the placement and keeps the tool selected.
+  - A pinch, a blocked-input overlay, a touch cancel, a ride-along and an open quote all cancel or refuse the drag.
+- **Checks:** no core change (317/317). Unity typecheck passes for editor/macOS and iOS.
+- **Unity check request:**
+  - (1) Choose a bunk card and drag across the floor: the ghost follows, and letting go opens the quote.
+  - (2) Press a bunk card in the catalog, drag onto the map and let go: the quote opens.
+  - (3) Drag a card off the panel, then back over the panel, and let go: no quote, and the bunk tool stays selected.
+  - (4) On a phone layout, the compact inspector closes when the drag leaves it.
+  - (5) A two-finger pinch during a placement drag places nothing.
+  - (6) Inspect-mode pan, drag-to-move of a selected item, and two-finger orbit and zoom are unchanged.
+  - Suggested `docs/controls.md` line for Codex: "Furnishing tools: drag on the map or drag a catalog card onto it; let go to review the quote."
+
+### 2026-10-17 — first native iOS player: Simulator boot passes; TestFlight script ready
+
+- **Simulator result:** Unity 6000.3.24f1 `IosBuild.Simulator` and then Xcode 26.5 (`iphonesimulator`, x86_64, Release) both succeeded. The app boots on an iPhone 17 Pro simulator (iOS 26.5) to the Home screen in landscape: night artwork, Begin your story, Save library and Settings. The text clears the Dynamic Island, and there are no exceptions or missing-shader logs.
+  - Unity ships the Simulator player only as a Development variant (`Variations/Development_simx64_managed`), so the debug console and "Build type Development" are simulator-only. The device build uses `Releasearm64`.
+  - The simulator GPU lacks float MSAA, which accounts for the "Attachment 0 ... 1 samples but 2 requested" and RenderPass messages. A real iPhone has float MSAA.
+- **Shaders in the player:** URP Lit (normal-map and emission variants kept by the Resources materials), Cellblock/SearchlightBeam, Skybox/Procedural, UI/Sprites and URP internals. All three runtime `Resources.Load` lookups are present.
+- **Not verified:** the in-world facility render and touch on the player. The Simulator can't be driven without accessibility permission, so those wait for the first TestFlight run on the user's phone.
+- **New `Tools/testflight.sh`** (Claude). It runs the Unity `IosBuild.Device` export, sets `ITSAppUsesNonExemptEncryption=false`, then archives and exports-and-uploads with xcodebuild, automatic signing and team FX4R73M22M (`--no-upload` exports only). Afterwards it restores the shared settings Unity rewrites. `IosBuild` now honours `CELLBLOCK_BUNDLE_ID` and restores it.
+  - Blocked only on the user's bundle-ID choice and the App Store Connect record, which Claude will create in Chrome when the user is ready.
+- **Hygiene:** a fresh Unity import rewrites `Assets/DefaultVolumeProfile.asset`, `Assets/UniversalRenderPipelineGlobalSettings.asset`, `ProjectSettings/{Graphics,Project,Quality}Settings.asset` (iPhone batching). These are discarded in Claude's clone and never committed.
+
+### 2026-10-17 — key art and app icon from the game's own renderer (user request; touches Codex's HomeNight.png)
+
+- **User request (2026-10-17):** "I want the icon/logo and the artwork on the home screen to actually match the feel of the game, it would be NICE if our game was ultrarealistic but it is nowhere near that". The photoreal night-campus illustration oversold the stylized low-poly game.
+- **New `Editor/ArtCapture.cs` (Claude):** run with `Unity -batchmode -projectPath <Claude clone> -executeMethod Cellblock.Editor.ArtCapture.Run` (graphics on, no `-quit`). It enters Play mode, starts disposable `StartArtPreview` companies (federal FCI, state medium, county maximum) at golden hour and at night, and renders the real camera through URP `SingleCameraRequest` with no UI into the ignored `Builds/Art/`.
+  - Added editor-only helpers in `GameController` (Claude's): `StartArtPreview`, `ArtCamera`, `FrameArt`, `ArtCenter`.
+  - Found while doing this: `World.AdvanceMinutes` is a no-op while `Speed == 0`, so a preview must unpause to move the clock.
+- **`Assets/Cellblock/Resources/HomeNight.png` content replaced (Codex's asset, by the user's explicit request).** The filename, `.meta` and TextureImporter settings are unchanged, and the image is still 16:9, now 1920×1080 RGB.
+  - Content: the federal FCI at 16:55 (warm low sun, staff at the office desk, a line-up in the yard), with a dark fade baked into the left for the title and the start card.
+  - Checked on the iPhone 17 Pro simulator Home: readable, with no layout change.
+  - The name now says "Night" for a golden-hour image; renaming is Codex's call, since `GameHomeHud` and `ProjectSetup` reference it.
+- **`Tools/ios/AppIcon.png`:** one cell at night from the county maximum layout: a resident by his bunk under the cell light, falling off into darkness. 1024 px, opaque.
+- **Unity check request:** Home at desktop, phone and narrow layouts with the new art. The title, the start card and the save library should stay legible. On iPad the 4:3 crop trims the sides.
 
 ## Codex handoff request (personnel + placement)
 

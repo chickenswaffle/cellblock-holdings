@@ -55,6 +55,9 @@ namespace Cellblock.Core
         public bool Controlled(string id) { return id != null && id != "" && id == ControlledId; }
         public bool Controlled(Resident r) { return r != null && Controlled(r.Id); }
         public bool Controlled(StaffMember s) { return s != null && Controlled(s.Id); }
+        // Nobody is asked anything in the middle of a fight, a radio call or a pursuit; the ordinary rules decide.
+        bool Asking(Resident r) { return Controlled(r) && !IncidentOwnsResident(r); }
+        bool Asking(StaffMember s) { return Controlled(s) && !IncidentOwnsStaff(s); }
         public string RoleOf(string id) { if (Data.Residents.Any(r => r.Id == id)) return "Prisoner"; StaffMember s = Data.Staff.FirstOrDefault(x => x.Id == id); return s == null ? "" : IsWarden(s) ? "Warden" : IsCook(s) ? "Cook" : s.Role == "Officer" ? "Officer" : s.Role; }
         public bool TakeRole(string id)
         {
@@ -186,7 +189,7 @@ namespace Cellblock.Core
         // Moments a prisoner faces that no other system schedules: a note to drop, a snitch nearby, a need for protection.
         void PrisonerMoments()
         {
-            Resident r = Find(ControlledId); if (r == null || !InGeneralPopulation(r)) return;
+            Resident r = Find(ControlledId); if (r == null || !InGeneralPopulation(r) || !Asking(r)) return;
             Intel known = IntelWork.Intel.FirstOrDefault(i => i.Knowers.Contains(r.Id) && i.SubjectId != r.Id && i.Kind != "Drop" && !Roles.Cards.Any(c => c.Context == i.Id) && !IntelWork.Tips.Any(t => t.IntelId == i.Id));
             if (known != null && JusticeRules.Unit(Data.Seed, r.Id + known.Id, "note-moment", 0) < 0.5f)
                 PostCard(r.Id, "note", known.Id, "You know something", TipText(known) + " A note to staff would stay anonymous, unless few people knew.", 1, known.SubjectId, "Drop a note", "Keep quiet");
@@ -219,19 +222,19 @@ namespace Cellblock.Core
         // Returns true when the controlled person's card was posted, so the caller does not decide for them.
         bool AskStore(Resident r)
         {
-            if (!Controlled(r)) return false;
+            if (!Asking(r)) return false;
             PostCard(r.Id, "store", "day:" + Day, "Store day", "You have " + JusticeRules.Dollars(AccountOf(r).BalanceCents) + " and " + AccountOf(r).Soups + " soups.", 0, "", "Shop as usual", "Only necessities", "Save everything");
             return true;
         }
         bool AskJob(Resident r, string job)
         {
-            if (!Controlled(r)) return false;
+            if (!Asking(r)) return false;
             PostCard(r.Id, "job", job, "A job offer", "The caseworker offers you work as " + EconomyRules.Job(job).Name.ToLowerInvariant() + " for " + Money(HourlyCents(job)) + " an hour, instead of yard time.", 0, "", "Take the job", "Turn it down");
             return true;
         }
         bool AskCounsel(Resident r, CounselTier best)
         {
-            if (!Controlled(r)) return false;
+            if (!Asking(r)) return false;
             var options = CounselRules.Tiers.Where(t => CounselBlocker(r, t.Id) == "").Select(t => "Hire " + t.Id + " (" + JusticeRules.Dollars(RetainerFor(r, t.Id)) + ")").Take(3).ToList();
             options.Insert(0, "Stay with the public defender");
             if (options.Count < 2) return false;
@@ -240,20 +243,20 @@ namespace Cellblock.Core
         }
         bool AskCards(Resident r, Resident other)
         {
-            if (!Controlled(r) && !Controlled(other)) return false;
-            Resident me = Controlled(r) ? r : other, them = me == r ? other : r;
+            if (!Asking(r) && !Asking(other)) return false;
+            Resident me = Asking(r) ? r : other, them = me == r ? other : r;
             PostCard(me.Id, "cards", "night:" + Day, "Cards after dinner", them.Name + " wants a game for soups. You have " + AccountOf(me).Soups + ".", 0, them.Id, "Play", "Sit out");
             return true;
         }
         bool AskBribe(StaffMember s, Resident buyer, string kind)
         {
-            if (!Controlled(s) || buyer == null) return false;
+            if (!Asking(s) || buyer == null) return false;
             PostCard(s.Id, "bribe", kind, "An offer", buyer.Name + (buyer.Gang != "Unaffiliated" ? " (" + buyer.Gang + ")" : "") + " wants you to bring in " + ContrabandRules.Label(kind) + ". The money is good.", 1, buyer.Id, "Take it", "Refuse", "Report it");
             return true;
         }
         bool AskSearch(StaffMember s, Tip t)
         {
-            if (!Controlled(s)) return false;
+            if (!Asking(s)) return false;
             Resident subject = Find(t.SubjectId);
             PostCard(s.Id, "search", t.Id, "A search on a tip", "You are at " + (subject == null ? "the cell" : subject.Name + "'s cell") + ". " + t.Text, 0, t.SubjectId, "Search it properly", "Quick look", "Look away");
             return true;

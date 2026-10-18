@@ -156,11 +156,14 @@ namespace Cellblock.Core
         }
         void EndActivity(Resident r)
         {
+            // A conversation ends for both people: nobody is left waiting at the meeting spot.
+            Resident partner = r.Activity == "Talk" ? Find(r.ActivityPartner) : null;
             r.Activity = ""; r.ActivityFixture = ""; r.ActivityPartner = ""; r.ActivityUntil = -1;
             r.ActivityTarget = r.Position; r.ActivityPhase = ""; r.ActivityRemaining = r.ActivityDuration = 0; r.ActivityBlocker = "";
             ChangeRoutineRoute(r);
             // Staggered: each person reconsiders on their own clock, never the whole room at once.
             r.NextPlanMinute = Data.Minute + 10 + (int)(JusticeRules.Hash(r.Id + ":replan", unchecked((uint)Data.Seed)) % 20u);
+            if (partner != null && partner.Activity == "Talk" && partner.ActivityPartner == r.Id && partner.ActivityPhase != "Leaving") EndActivity(partner);
         }
         Dictionary<string, bool> reachCache = new Dictionary<string, bool>(); int reachRevision = -1;
         bool Reachable(Resident r, Point target)

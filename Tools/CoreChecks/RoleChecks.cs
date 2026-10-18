@@ -30,6 +30,16 @@ static partial class Program
             v.AdvanceMinutes(RoleRules.CardMinutes + 1);
             Check(!v.Roles.Cards.Contains(waiting) && v.AccountOf(p).LastStoreMinute >= 0 && v.Roles.Defaulted == 1 && v.Roles.Log.Last().Contains("(default)"), "The default was not applied");
         });
+        Test("nobody is asked anything mid-fight: store day runs by the ordinary rules", () => {
+            World w = IntelWorld(); Capital(w, 5000000); w.BuyUpgrade("commissary"); HoldOfficersFar(w);
+            Resident me = w.Data.Residents[0], other = w.Data.Residents[1];
+            Fund(w, me, 3000); Fund(w, other, 3000); Pair(me, other, 95, 5);
+            foreach (Resident r in new[] { me, other }) w.AccountOf(r).StoreDay = (w.Day + (w.Data.Minute % 1440 < 870 ? 0 : 1)) % 7;
+            Check(w.TakeRole(me.Id), w.Notice);
+            RunTo(w, 862); Check(w.StageFightDemo() && w.IncidentOwnsResident(me), "The fight did not take the controlled prisoner: " + w.Notice);
+            RunTo(w, 871);
+            Check(w.Fight.Active && CardOf(w, "store") == null && w.AccountOf(me).LastStoreMinute >= 0, "A card waited on a prisoner mid-fight, or they never shopped");
+        });
         Test("a job offer, a lawyer and a card game come to the prisoner as choices", () => {
             World w = IntelWorld(); Resident me = w.Data.Residents[0]; me.Discipline = 60;
             w.TakeRole(me.Id); w.SetAutoJobs(true); RunTo(w, 500);

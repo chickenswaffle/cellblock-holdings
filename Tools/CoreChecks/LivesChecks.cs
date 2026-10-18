@@ -164,5 +164,26 @@ static partial class Program
             try { new World(bad); } catch (ArgumentException) { rejected = true; }
             Check(rejected, "An unknown activity was accepted");
         });
+        Test("a confrontation takes both people out of free time until it resolves, and a conversation ends for both", () => {
+            World w = LivesWorld(); HoldOfficersFar(w); FreeHour(w);
+            Resident a = w.Data.Residents[0], b = w.Data.Residents[1];
+            Pair(a, b, 95, 5);
+            foreach (Resident x in new[] { a, b }) { x.Activity = "Reading"; x.ActivityFixture = "life-shelf"; x.ActivityTarget = x.Position; x.ActivityUntil = w.Data.Minute + 200; }
+            int read = a.ReadingMinutes + b.ReadingMinutes;
+            Check(w.StageFightDemo() && w.IncidentOwnsResident(a) && w.IncidentOwnsResident(b), "The fight did not take this pair: " + w.Notice);
+            w.AdvanceMinutes(1);
+            Check(a.ActivityPhase == "Suspended" && b.ActivityPhase == "Suspended" && a.ReadingMinutes + b.ReadingMinutes == read, "Reading went on during the fight: " + a.Activity + "/" + b.Activity + ", " + (a.ReadingMinutes + b.ReadingMinutes - read) + " minutes");
+            for (int i = 0; i < 60 && w.Fight.Active; i++)
+            {
+                w.AdvanceMinutes(1);
+                Check(!w.DoingActivity(a) && !w.DoingActivity(b) && !w.FreeTime(a) && w.DestinationFor(a, a.Home).Equals(a.Home), "A fighter planned free time mid-scene: " + a.Activity + "/" + b.Activity);
+            }
+            // Partners: when one person's free time ends, the other is not left waiting at the meeting spot.
+            World v = LivesWorld(); FreeHour(v); Resident c = v.Data.Residents[2], d = v.Data.Residents[3];
+            foreach (Resident x in new[] { c, d }) { x.Activity = "Talk"; x.ActivityPartner = x == c ? d.Id : c.Id; x.ActivityTarget = x.Position; x.ActivityUntil = v.Data.Minute + 200; }
+            c.SeparatedUntil = v.Data.Minute + 300; v.AdvanceMinutes(1);
+            Check(c.ActivityPhase == "Suspended" && d.ActivityPhase == "Suspended" && !v.DoingActivity(d), "The partner was left talking alone: " + d.Activity);
+            v.AdvanceMinutes(240); Check(c.Activity == "" && d.Activity == "" && d.ActivityPartner == "", "The bounded paired intention never expired");
+        });
     }
 }
