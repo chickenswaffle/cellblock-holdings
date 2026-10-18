@@ -49,7 +49,7 @@ namespace Cellblock.Core
                 s.PhaseMinute > state.Minute || s.MoveMinute > state.Minute || s.LastMoveMinute > state.Minute || s.StaggeredMinute > state.Minute)
                 throw new ArgumentException("Invalid escape struggle.");
             EscapeAttempt attempt = state.Justice == null ? null : state.Justice.Attempt;
-            bool running = attempt != null && attempt.Phase != "None" && attempt.ResidentId == s.Resident;
+            bool running = attempt != null && attempt.Phase != "None" && attempt.ResidentId == s.Resident && attempt.StartMinute == s.AttemptStart;
             // A hold belongs to the attempt in progress and to an officer still on the roster; anything else is cancelled, never invented.
             if (s.Active && (!running || !state.Staff.Any(x => x.Id == s.Officer) || s.MoveEnd < s.MoveMinute || s.MoveEnd - s.MoveMinute > StruggleExchangeMinutes + 5))
                 ReleaseHold(s);

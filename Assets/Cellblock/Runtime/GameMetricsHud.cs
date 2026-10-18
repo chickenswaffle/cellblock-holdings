@@ -166,6 +166,7 @@ namespace Cellblock.Unity
         void RefreshMetricNavigation()
         {
             if (metricNav == null) return;
+            if (workspace == Workspace.People && !characterAdvanced) { metricNav.style.display = DisplayStyle.None; return; }
             bool people = workspace == Workspace.People, control = workspace == Workspace.Control;
             metricNav.style.display = people || control ? DisplayStyle.Flex : DisplayStyle.None;
             if (!people && !control) { metricJumpSequence++; metricJumpPending = false; metricWorkspace = workspace; return; }
@@ -231,7 +232,7 @@ namespace Cellblock.Unity
         }
 #if UNITY_EDITOR
         public void PreviewMetricScrollTo(int slot) { var scroll = (ScrollView)inspector; scroll.scrollOffset = new Vector2(0, Mathf.Max(0, metricTargets[slot].ChangeCoordinatesTo(scroll.contentContainer, Vector2.zero).y - 8)); }
-        public void PreviewMetricJump(int slot) { JumpMetricSection(slot); }
+        public void PreviewMetricJump(int slot) { if (workspace == Workspace.People) { characterAdvanced = true; Layout(); } JumpMetricSection(slot); }
         public string PreviewMetricLayout { get { return "nav=" + metricNav.worldBound + "; viewport=" + ((ScrollView)inspector).contentViewport.worldBound + "; offset=" + ((ScrollView)inspector).scrollOffset + "; profile=" + personCard.worldBound + "; name=" + personName.worldBound + "; active0=" + PreviewMetricActive(0); } }
         public bool PreviewMetricNavigationFits()
         {

@@ -19,6 +19,7 @@ namespace Cellblock.Unity
             public LifePose Pose;
             public float Weight, NextScan, Phase;
             public Vector3 SeatOffset; public float SeatYaw; public bool HasSeat;
+            public string Activity = "", ActivityPhase = "";
         }
         readonly Dictionary<Actor, Look> looks = new Dictionary<Actor, Look>();
         readonly List<Actor> lostLooks = new List<Actor>();
@@ -29,10 +30,12 @@ namespace Cellblock.Unity
             if (!looks.TryGetValue(actor, out look)) { look = Dress(actor, resident); looks.Add(actor, look); PruneLooks(); }
             string palette = Palette(world, resident);
             if (palette != look.Palette) Recolor(look, palette);
-            // A fight or an escape owns the body: drop any everyday pose at once, without waiting for the next scan.
+            if (world.IsCharacterControlled(resident.Id) && world.CharacterIsMoving)
+            { look.Pose = LifePose.None; look.Weight = 0; look.HasSeat = false; actor.PoseArms = false; HideRoutineProps(actor); return; }
             if (world.IncidentOwnsResident(resident) || (world.Escape.Phase != "None" && world.Escape.ResidentId == resident.Id))
-            { if (look.Pose != LifePose.None) { look.Pose = LifePose.None; look.HasSeat = false; } look.NextScan = 0; }
-            else if (Time.unscaledTime >= look.NextScan) { look.NextScan = Time.unscaledTime + 0.4f + (actor.Gait % 0.2f); ChoosePose(actor, look, resident, world); }
+            { look.Pose = LifePose.None; look.Weight = 0; look.HasSeat = false; HideRoutineProps(actor); return; }
+            if (Time.unscaledTime >= look.NextScan || look.Activity != resident.Activity || look.ActivityPhase != resident.ActivityPhase)
+            { look.NextScan = Time.unscaledTime + 0.2f + (actor.Gait % 0.1f); ChoosePose(actor, look, resident, world); look.Activity = resident.Activity; look.ActivityPhase = resident.ActivityPhase; }
             actor.PoseArms = look.Pose != LifePose.None && look.Pose != LifePose.Sway;
         }
 
@@ -41,6 +44,7 @@ namespace Cellblock.Unity
             Look look; if (!looks.TryGetValue(actor, out look)) return;
             float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
             if(world.Data.Speed>0)actor.PoseClock+=dt*Mathf.Sqrt(world.Data.Speed);
+            if (world.IncidentOwnsResident(resident) || (world.Escape.Phase != "None" && world.Escape.ResidentId == resident.Id)) return;
             float t=actor.PoseClock+actor.Gait*.37f;
             look.Weight = Mathf.MoveTowards(look.Weight, look.Pose == LifePose.None ? 0 : 1, dt * 2.5f);
             // MoveActor has already posed every joint for walking this frame; blend from it by the pose weight.
@@ -50,12 +54,16 @@ namespace Cellblock.Unity
             {
                 case LifePose.Talk:
                 {
-                    float wave = Mathf.Sin(t * 2.4f + look.Phase);
+                    Resident partner = world.Data.Residents.Find(r => r.Id == resident.ActivityPartner);
+                    if (partner != null) FaceRoutine(actor, V(partner.Position));
+                    bool speaker = ((world.Data.Minute / 10) % 2 == 0) == (string.CompareOrdinal(resident.Id, resident.ActivityPartner) < 0);
+                    float wave = Mathf.Sin(t * 1.7f + look.Phase) * (speaker ? 1 : .15f);
                     actor.Limbs[0].localRotation = Quaternion.Slerp(actor.Limbs[0].localRotation, Quaternion.Euler(-32 - wave * 14, 0, 6), w);
                     actor.Forearms[0].localRotation = Quaternion.Slerp(actor.Forearms[0].localRotation, Quaternion.Euler(-48 + wave * 10, 0, 0), w);
                     actor.Limbs[1].localRotation = Quaternion.Slerp(actor.Limbs[1].localRotation, Quaternion.Euler(-6, 0, -4), w);
                     actor.Forearms[1].localRotation = Quaternion.Slerp(actor.Forearms[1].localRotation, Quaternion.Euler(-14, 0, 0), w);
-                    actor.Body.localRotation = Quaternion.Slerp(actor.Body.localRotation, Quaternion.Euler(2, Mathf.Sin(t * 0.7f) * 6, 0), w);
+                    actor.Body.localRotation = Quaternion.Slerp(actor.Body.localRotation, Quaternion.Euler(2, Mathf.Sin(t * 0.7f) * (speaker ? 4 : 1), 0), w);
+                    if (actor.Head != null) actor.Head.localRotation = Quaternion.Slerp(actor.Head.localRotation, Quaternion.Euler(speaker ? 0 : 3 + Mathf.Sin(t * 1.1f) * 3, 0, 0), w * .35f);
                     break;
                 }
                 case LifePose.Eat:
@@ -116,6 +124,7 @@ namespace Cellblock.Unity
                     break;
                 case LifePose.Read:
                 {
+                    FaceRoutineObject(actor, resident, world);
                     // Both hands up in front holding a book, head bowed; an occasional page turn.
                     float page = Mathf.Max(0, Mathf.Sin(t * 0.35f + look.Phase) - 0.92f) * 12;
                     for (int arm = 0; arm < 2; arm++)
@@ -129,6 +138,7 @@ namespace Cellblock.Unity
                 }
                 case LifePose.Exercise:
                 {
+                    FaceRoutineObject(actor, resident, world);
                     // Curls and squats in a steady rhythm.
                     float rep = Mathf.Sin(t * 2.6f + look.Phase), lift = rep * 0.5f + 0.5f;
                     for (int arm = 0; arm < 2; arm++)
@@ -146,6 +156,12 @@ namespace Cellblock.Unity
                 }
                 case LifePose.Watch:
                 {
+                    FaceRoutineObject(actor, resident, world);
+                    if (look.HasSeat)
+                    {
+                        modelPosition = look.SeatOffset * w + Vector3.down * .42f * w;
+                        for (int leg = 0; leg < 2; leg++) { actor.Limbs[2 + leg].localRotation = Quaternion.Euler(-86 * w, 0, 0); actor.Knees[leg].localRotation = Quaternion.Euler(86 * w, 0, 0); }
+                    }
                     // Arms folded, weight on one leg; a laugh now and then.
                     float laugh = Mathf.Max(0, Mathf.Sin(t * 0.5f + look.Phase) - 0.9f) * 10;
                     actor.Limbs[0].localRotation = Quaternion.Slerp(actor.Limbs[0].localRotation, Quaternion.Euler(-28, 0, 22), w);
@@ -200,12 +216,13 @@ namespace Cellblock.Unity
             if (look.HasSeat) modelPosition += Vector3.up * (RoomStand - actor.Root.position.y) * w;
             actor.Model.localPosition = Vector3.Lerp(actor.Model.localPosition, modelPosition, ease);
             actor.Model.localRotation = Quaternion.Slerp(actor.Model.localRotation, modelRotation, ease);
+            RefreshRoutineProps(actor, look.Pose, look.Weight, world);
         }
 
         void ChoosePose(Actor actor, Look look, Resident resident, World world)
         {
             LifePose pose = LifePose.None;
-            bool still = actor.Speed < 0.06f;
+            bool still = actor.Speed < 0.06f && Vector3.Distance(actor.Root.position, V(resident.Position, .14f)) < .25f;
             Disturbance riot = world.Population.Riot;
             int minute = world.Data.Minute % 1440;
             if (riot.Phase != "None" && riot.Rioters.Contains(resident.Id)) pose = LifePose.Riot;
@@ -224,23 +241,27 @@ namespace Cellblock.Unity
                         case "Exercise": pose = LifePose.Exercise; break;
                         case "Television": pose = LifePose.Watch; break;
                         case "Study": pose = LifePose.Study; break;
-                        case "Talk": pose = LifePose.Talk; break;
+                        case "Talk": pose = RoutinePartnerReady(resident, world) ? LifePose.Talk : LifePose.None; break;
                         case "Quiet": pose = Geometry.Distance(resident.Position, resident.Home) < 0.3f && !resident.FloorBed ? LifePose.Rest : LifePose.None; break;
                     }
                 }
-                else if (minute >= 7 * 60 && minute < 21 * 60)
-                    for (int i = 0; i < world.Data.Residents.Count; i++)
-                    {
-                        Resident other = world.Data.Residents[i];
-                        if (other != resident && Geometry.Distance(other.Position, resident.Position) < 1.5f && world.IsPresent(other)) { pose = LifePose.Talk; break; }
-                    }
             }
-            if (pose != look.Pose) { look.Phase = (actor.Gait * 1.7f) % 6.28f; look.HasSeat = false; Seat(look, pose, resident, world); }
+            if (pose != look.Pose || look.Activity != resident.Activity) { look.Phase = (actor.Gait * 1.7f) % 6.28f; look.HasSeat = false; Seat(look, pose, resident, world); }
             look.Pose = pose;
         }
         // Where the body goes for eating and sleeping, relative to the person's standing point.
         void Seat(Look look, LifePose pose, Resident resident, World world)
         {
+            if (pose == LifePose.Watch)
+            {
+                Fixture seat = world.Data.Fixtures.Find(f => (f.Kind == "Bench" || f.Kind == "Chair") && Geometry.Distance(Geometry.AccessPoint(f), resident.ActivityTarget) < .25f);
+                Fixture screen = world.Data.Fixtures.Find(f => f.Id == resident.ActivityFixture);
+                if (seat != null && screen != null)
+                {
+                    Point direction = screen.Position - resident.Position; look.SeatYaw = Mathf.Atan2(direction.X, direction.Y) * Mathf.Rad2Deg;
+                    look.SeatOffset = Quaternion.Inverse(Quaternion.Euler(0, look.SeatYaw, 0)) * (V(seat.Position) - V(resident.Position)); look.HasSeat = true;
+                }
+            }
             if (pose == LifePose.Eat || pose == LifePose.Study)
             {
                 Fixture table = null; float best = 3;

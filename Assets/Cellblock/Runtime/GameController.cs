@@ -94,7 +94,7 @@ namespace Cellblock.Unity
         {
             if (World != null && !Save()) return false;
             presentationPreview = preview;
-            EndRideAlongSilently(); ResetDoorEditing(); PlacingConnection=false;
+            EndCharacterView(false); if (hud != null) hud.CloseCharacterPhone(); selectedCrewCharacter = ""; EndRideAlongSilently(); ResetDoorEditing(); PlacingConnection=false;
             World = modeType==null?Cellblock.Core.World.Start(contract):Cellblock.Core.World.StartMode(modeType,modeLocation); saveId = Guid.NewGuid().ToString("N");
 
             World.Data.Speed = 0; watchedCameraId = ""; nextFeed = 0; nativeInputWasBlocked = true;
@@ -109,7 +109,7 @@ namespace Cellblock.Unity
             { Message("Select a wall first."); return; }
             if (tool == BuildTool.MoveFixture && SelectedFixture == null) { Message("Select a furnishing first."); return; }
             Tool = tool; hasStart = hasEnd = false;
-            if (tool != BuildTool.Inspect) { SelectedResident = null; SelectedStaff = null; }
+            if (tool != BuildTool.Inspect) { SelectedResident = null; SelectedStaff = null; selectedCrewCharacter = ""; }
             if (tool == BuildTool.Wall || tool == BuildTool.Curve || tool == BuildTool.Wing || tool == BuildTool.Door || tool == BuildTool.Bed || tool == BuildTool.Table || tool == BuildTool.Furnishing || tool == BuildTool.Meals)
             { SelectedWall = null; SelectedFixture = null; }
             if (tool == BuildTool.Bed) PlacementFixtureKind = "Bed";
@@ -131,7 +131,7 @@ namespace Cellblock.Unity
             PlacementSummary = "";
             if (guides != null) { if (SelectedFixture != null) guides.ShowFixture(SelectedFixture); else guides.Show(SelectedWall); }
             if (view != null) view.Preview(null, SelectedWall, SelectedFixture);
-            if (view != null) view.SelectResident(SelectedResident != null ? SelectedResident.Id : SelectedStaff != null ? SelectedStaff.Id : null);
+            if (view != null) view.SelectResident(SelectedCharacterId == "" ? null : SelectedCharacterId);
             if (hud != null) hud.Refresh(true);
         }
         public void SetFixtureTool(string kind)
@@ -149,7 +149,7 @@ namespace Cellblock.Unity
         public void InspectResident(string id)
         {
             if (World == null || Draft != null) return;
-            SelectedResident = World.Data.Residents.FirstOrDefault(r => r.Id == id); SelectedStaff = null;
+            selectedCrewCharacter = ""; SelectedResident = World.Data.Residents.FirstOrDefault(r => r.Id == id); SelectedStaff = null;
             SelectedWall = null; SelectedFixture = null; Tool = BuildTool.Inspect; guides.Show(null);
             if (SelectedResident != null) { focus = FacilityView.V(SelectedResident.Position); distance = Mathf.Min(distance, 24); }
             view.Preview(null); view.SelectResident(SelectedResident == null ? null : SelectedResident.Id); hud.RevealSelection(); hud.Refresh(true);
@@ -157,7 +157,7 @@ namespace Cellblock.Unity
         public void InspectStaff(string id)
         {
             if (World == null || Draft != null) return;
-            SelectedStaff = World.Data.Staff.FirstOrDefault(s => s.Id == id); SelectedResident = null;
+            selectedCrewCharacter = ""; SelectedStaff = World.Data.Staff.FirstOrDefault(s => s.Id == id); SelectedResident = null;
             SelectedWall = null; SelectedFixture = null; Tool = BuildTool.Inspect; guides.Show(null);
             if (SelectedStaff != null) { focus = FacilityView.V(SelectedStaff.Position); distance = Mathf.Min(distance, 24); }
             view.Preview(null); view.SelectResident(SelectedStaff == null ? null : SelectedStaff.Id); hud.RevealSelection(); hud.Refresh(true);
@@ -171,18 +171,19 @@ namespace Cellblock.Unity
             if (blocked || nativeInputWasBlocked) magnification = 0;
             nativeInputWasBlocked = blocked;
             if (World == null) return;
-            if (!appPaused && (!unfocused || presentationPreview) && !hud.BlocksWorldInput && World.Data.Speed > 0)
+            UpdateCharacterSession();
+            if (!appPaused && (!unfocused || presentationPreview) && !hud.BlocksSimulation && World.Data.Speed > 0)
             {
-                accumulator += Mathf.Min(Time.unscaledDeltaTime, 0.1f) * World.Data.Speed;
+                accumulator += Mathf.Min(SimulationFrameDelta, 0.1f) * World.Data.Speed;
                 int steps = 0;
                 while (accumulator >= 0.2f && steps++ < 8) { World.AdvanceMinutes(1); accumulator -= 0.2f; }
             }
             else accumulator = 0;
             if (SelectedFixture != null) SelectedFixture = World.Data.Fixtures.FirstOrDefault(f => f.Id == SelectedFixture.Id);
-            InputUpdate(magnification); view.Refresh(World); view.SetWatchedCamera(WatchedCamera); pressureView.Refresh(World, Time.unscaledDeltaTime); UpdateRideAlong(); UpdateIncidentCamera(); hud.Refresh();
+            if (!CharacterInputUpdate(magnification)) InputUpdate(magnification); view.ReducedMotion = Preferences.ReducedMotion; view.Refresh(World); view.RefreshCharacterPhones(World, hud.CharacterPhoneOpen ? CharacterPhoneSubjectId : ""); view.SetWatchedCamera(WatchedCamera); pressureView.Refresh(World, Time.unscaledDeltaTime); UpdateRideAlong(); if (!CharacterViewActive) UpdateIncidentCamera(); hud.Refresh();
             TickAutosave();
         }
-        void LateUpdate() { if (view != null) view.ReducedMotion = Preferences.ReducedMotion; if (cameraRig != null) { if (RideAlongActive) RideAlongCamera(); else CameraPosition(); } RefreshCameraFeed(); RefreshBodyCam(); }
+        void LateUpdate() { if (cameraRig != null) { if (CharacterViewActive) CharacterCamera(); else if (RideAlongActive) RideAlongCamera(); else CameraPosition(); } RefreshCameraFeed(); RefreshBodyCam(); }
         void CameraPosition(bool immediate = false)
         {
             // Following an incident, the camera eases more gently so a chase does not jerk it around.
@@ -265,7 +266,7 @@ namespace Cellblock.Unity
             var request = new UnityEngine.Rendering.Universal.UniversalRenderPipeline.SingleCameraRequest { destination = cctvTexture };
             UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(cctvCamera, request);
         }
-        void OnDestroy() { DisposeDoorPreview();if (cctvTexture != null) { cctvTexture.Release(); Destroy(cctvTexture); } ReleaseBodyCam(); }
+        void OnDestroy() { EndCharacterView(false); DisposeDoorPreview();if (cctvTexture != null) { cctvTexture.Release(); Destroy(cctvTexture); } ReleaseBodyCam(); }
         public void Orbit(float horizontalDegrees, float verticalDegrees)
         { yaw += horizontalDegrees; pitch = Mathf.Clamp(pitch + verticalDegrees, 28, 78); }
         public void Zoom(float amount) { distance = Mathf.Clamp(distance * Mathf.Exp(-amount * 0.12f), 11, 85); }
@@ -549,7 +550,7 @@ namespace Cellblock.Unity
                 else if (SelectedStaff != null) { guides.Show(null); PlacementSummary = SelectedStaff.Name + " · " + SelectedStaff.Role; }
                 else { guides.Show(null); PlacementSummary = ""; }
                 view.Preview(null, SelectedWall, SelectedFixture);
-                view.SelectResident(SelectedResident != null ? SelectedResident.Id : SelectedStaff != null ? SelectedStaff.Id : null);
+                view.SelectResident(SelectedCharacterId == "" ? null : SelectedCharacterId);
                 hud.RevealSelection(); hud.Refresh(true); return;
             }
             if (Tool == BuildTool.Wall || Tool == BuildTool.Curve)
@@ -608,7 +609,7 @@ namespace Cellblock.Unity
         void SelectComponent(Vector2 screen, Point ground)
         {
             Wall wall; float nearest; Point wallPoint; FindWall(screen, out wall, out nearest, out wallPoint);
-            SelectedWall = wall; SelectedFixture = null; SelectedResident = null; SelectedStaff = null; Ray ray = cameraRig.ScreenPointToRay(screen);
+            selectedCrewCharacter = ""; SelectedWall = wall; SelectedFixture = null; SelectedResident = null; SelectedStaff = null; Ray ray = cameraRig.ScreenPointToRay(screen);
             foreach (Fixture fixture in World.Data.Fixtures)
             {
                 float hit;
@@ -632,7 +633,15 @@ namespace Cellblock.Unity
                 if (HitBox(ray, position + Vector3.up * 0.88f, Quaternion.identity, new Vector3(0.58f, 1.85f, 0.58f), out hit) && hit < nearest)
                 { SelectedStaff = staff; SelectedResident = null; SelectedFixture = null; SelectedWall = null; nearest = hit; }
             }
-            if (SelectedResident == null && SelectedStaff == null && SelectedFixture == null && SelectedWall == null)
+            foreach (Crew crew in World.Data.Crews.Where(c => c.Arrived))
+                for (int builder = 0; builder < 2; builder++)
+                {
+                    string id = crew.Id + "/builder-" + builder; float hit; Vector3 position;
+                    if (!view.TryGetPersonPosition(id, out position)) continue;
+                    if (HitBox(ray, position + Vector3.up * .88f, Quaternion.identity, new Vector3(.58f, 1.85f, .58f), out hit) && hit < nearest)
+                    { selectedCrewCharacter = id; SelectedStaff = null; SelectedResident = null; SelectedFixture = null; SelectedWall = null; nearest = hit; }
+                }
+            if (selectedCrewCharacter == "" && SelectedResident == null && SelectedStaff == null && SelectedFixture == null && SelectedWall == null)
             {
                 string person = view.PickResident(cameraRig, screen);
                 if (person != null) SelectedResident = World.Data.Residents.FirstOrDefault(r => r.Id == person);
@@ -708,7 +717,7 @@ namespace Cellblock.Unity
         {
             if (!presentationPreview) throw new InvalidOperationException("Only disposable previews can use this review helper.");
             string residentId = SelectedResident == null ? "" : SelectedResident.Id;
-            EndRideAlongSilently(); ResetDoorEditing(); PlacingConnection=false;
+            EndCharacterView(false); if (hud != null) hud.CloseCharacterPhone(); selectedCrewCharacter = ""; EndRideAlongSilently(); ResetDoorEditing(); PlacingConnection=false;
             World = new World(JsonUtility.FromJson<State>(JsonUtility.ToJson(World.Data)));
             SelectedResident = World.Data.Residents.FirstOrDefault(r => r.Id == residentId); SelectedStaff = null;
             SelectedWall = null; SelectedFixture = null; accumulator = 0; nextFeed = 0;
@@ -790,7 +799,7 @@ namespace Cellblock.Unity
                     restored.Notice = "Recovered the previous successful save. Your original file is retained.";
                 }
                 WritePointer(name);
-                EndRideAlongSilently(); ResetDoorEditing(); PlacingConnection=false;
+                EndCharacterView(false); if (hud != null) hud.CloseCharacterPhone(); selectedCrewCharacter = ""; EndRideAlongSilently(); ResetDoorEditing(); PlacingConnection=false;
                 ResetIncidentCamera(); World = restored; RecoveredSave = recovered; savedJson = ""; SaveProblem = ""; LastSavedUtc = File.GetLastWriteTimeUtc(recovered ? path + ".bak" : path); autosave = 0; watchedCameraId = ""; nextFeed = 0; nativeInputWasBlocked = true; presentationPreview = false; World.Data.Speed = 0; accumulator = 0; saveId = name.Substring(8, 32);
                 Draft = null; CurrentQuote = null; SelectedWall = null; SelectedFixture = null; SelectedResident = null; SelectedStaff = null;
                 view.Refresh(World, true); SetTool(BuildTool.Inspect); Recenter();
@@ -803,8 +812,8 @@ namespace Cellblock.Unity
             }
             catch (Exception e) { Debug.LogWarning("Could not load holding: " + e.Message); Message("That holding could not be opened. The saved files are preserved."); hud.ShowMenuError("That holding could not be opened. The saved files are preserved. Try another holding in Save Library."); return false; }
         }
-        void OnApplicationPause(bool paused) { appPaused = paused; accumulator = 0; if (paused) Save(false); }
-        void OnApplicationFocus(bool focused) { unfocused = !focused; accumulator = 0; nativeInputWasBlocked = true; if (trackpad != null) trackpad.Consume(); if (!focused) Save(false); }
+        void OnApplicationPause(bool paused) { appPaused = paused; accumulator = 0; if (paused) { ClearCharacterInput(); if (hud != null) hud.ResetCharacterSticks(); Save(false); } }
+        void OnApplicationFocus(bool focused) { unfocused = !focused; accumulator = 0; nativeInputWasBlocked = true; if (trackpad != null) trackpad.Consume(); if (!focused) { ClearCharacterInput(); if (hud != null) hud.ResetCharacterSticks(); Save(false); } }
         void OnApplicationQuit() { Save(false); }
     }
 }

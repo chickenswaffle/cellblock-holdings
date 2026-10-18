@@ -253,6 +253,7 @@ namespace Cellblock.Core
             KitchenRules.Hydrate(state);
             CounselRules.Hydrate(state);
             RoleRules.Hydrate(state);
+            CharacterPhoneRules.Hydrate(state);
         }
 
         partial void AdvancePressure()
@@ -277,6 +278,7 @@ namespace Cellblock.Core
             AdvanceKitchen();
             AdvanceCounsel();
             AdvanceRoles();
+            AdvanceCharacterPhones();
         }
 
         partial void PressureMovement(Resident resident, ref bool skip)

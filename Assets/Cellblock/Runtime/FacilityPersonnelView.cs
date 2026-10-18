@@ -28,7 +28,7 @@ namespace Cellblock.Unity
                 if (has && badgePosts.TryGetValue(staff.Id, out shown) && shown == post) continue;
                 if (has) { Destroy(badge.gameObject); postBadges.Remove(staff.Id); badgePosts.Remove(staff.Id); }
                 if (post == "") continue;
-                badge = new GameObject(post + " insignia").transform; badge.SetParent(actor.Body, false);
+                badge = new GameObject(post + " insignia").transform; badge.SetParent(actor.Body, false); badge.localPosition = Vector3.down * .9f;
                 if (post == "Warden")
                 {
                     for (int side = -1; side <= 1; side += 2)

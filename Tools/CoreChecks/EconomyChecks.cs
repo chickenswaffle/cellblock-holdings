@@ -148,11 +148,11 @@ static partial class Program
             RunTo(w, 420);
             Check(w.AtWork(cook) || Geometry.Distance(cook.Position, w.JobSlots().First(s => s.Key == a.JobSlot).Work) < 3, "The cook is not at the counter at breakfast");
             RunTo(w, 1250);
-            int minutes = a.WorkedMinutes; long before = a.BalanceCents, wages = Booked(w, "inmate-wages");
+            int minutes = a.WorkedMinutes, daysBefore = a.DaysWorked; long before = a.BalanceCents, wages = Booked(w, "inmate-wages");
             Check(minutes >= 240, "The cook barely worked: " + minutes);
             RunTo(w, 1261);
             long rate = (long)Math.Round(45 * w.ModeLocation.WageIndex);
-            Check(a.BalanceCents - before == minutes * rate / 60 && Booked(w, "inmate-wages") - wages == -(minutes * rate / 60) && a.WorkedMinutes == 0 && a.DaysWorked == 1, "Pay " + (a.BalanceCents - before) + " for " + minutes + " minutes at " + rate);
+            Check(a.BalanceCents - before == minutes * rate / 60 && Booked(w, "inmate-wages") - wages == -(minutes * rate / 60) && a.WorkedMinutes == 0 && a.DaysWorked == daysBefore + 1, "Pay " + (a.BalanceCents - before) + " for " + minutes + " minutes at " + rate);
             Check(w.TrustReconciles() && w.Reconciles(), "Books do not reconcile after payroll");
         });
         Test("restitution comes out of a sentenced worker's pay; a cost-of-care deduction goes to the company", () => {
@@ -209,6 +209,8 @@ static partial class Program
         });
         Test("the store man lends at two-for-one; missed payments sour things and a third miss is a default", () => {
             World w = EconomyWorld();
+            // Isolate debt consequences from new voluntary conversation sessions during the day.
+            foreach (Resident r in w.Data.Residents) r.NextPlanMinute = int.MaxValue / 2;
             Resident lender = w.Data.Residents[0], borrower = w.Data.Residents.Skip(1).OrderBy(r => Geometry.Distance(r.Home, lender.Home)).First();
             lender.Sociability = 70; lender.Discipline = 50; w.AccountOf(lender).Soups = 20;
             foreach (Resident r in w.Data.Residents.Where(r => r != lender && r != borrower)) r.Food = 90;

@@ -224,6 +224,30 @@ static partial class Program
             w.AdvanceMinutes(2);
             Check(w.Escape.Phase != "None" && w.Struggle.Active, "The two-hour limit abandoned an attempt in the middle of a struggle");
         });
+        Test("staff character control yields to restraint recovery and arrest escort, then becomes available again", () => {
+            Resident r; StaffMember guard; World w = StruggleWorld(out r, out guard, false);
+            Check(w.BeginCharacterControl(guard.Id), w.Notice);
+            w.SetCharacterMoveIntent(new Point(1, 0));
+            w.AdvanceMinutes(1);
+            Check(w.Struggle.Active && !w.CharacterControlActive, "Contact did not reclaim manual movement");
+            Check(!w.BeginCharacterControl(guard.Id), "Direct control stole an active restraint");
+            StaffMember helper = SecondOfficer(w, guard); w.Struggle.Helper = helper.Id;
+            Check(!w.BeginCharacterControl(helper.Id), "Direct control stole the helper");
+            w.Struggle.Helper = ""; Land(w, "Strike");
+            Check(!w.BeginCharacterControl(guard.Id), "Direct control bypassed the officer's recovery");
+            w.Struggle.Staggered = ""; w.Struggle.StaggeredUntil = -1;
+            w.Struggle.Escort = guard.Id; w.Struggle.Escorted = r.Id; r.Legal.Custody = "Escorted";
+            Check(!w.BeginCharacterControl(guard.Id), "Direct control stole arrest escort authority");
+            w.Struggle.Escort = w.Struggle.Escorted = ""; r.Legal.Custody = "In facility";
+            Check(w.BeginCharacterControl(guard.Id), w.Notice);
+        });
+        Test("an old struggle cannot hold staff when a different escape attempt by the same resident is loaded", () => {
+            Resident r; StaffMember guard; World w = Grappling(out r, out guard);
+            State stale = RoundTrip(w.Data); stale.Struggle.AttemptStart--;
+            World loaded = new World(stale); StaffMember officer = loaded.Data.Staff.First(x => x.Id == guard.Id);
+            Check(!loaded.Struggle.Active && !loaded.EscapeStruggleOwns(officer) && loaded.Struggle.FleeUntil == -1, "Stale attempt kept physical authority before the first tick");
+            Check(loaded.BeginCharacterControl(officer.Id), loaded.Notice);
+        });
         Test("saved struggles validate: unknown phases are refused and holds without an officer are released", () => {
             Resident r; StaffMember guard; World w = Grappling(out r, out guard);
             State bad = RoundTrip(w.Data); bad.Struggle.Phase = "Wrestling";

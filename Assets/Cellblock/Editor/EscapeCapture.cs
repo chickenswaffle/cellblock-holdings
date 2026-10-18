@@ -5,57 +5,85 @@ using System.Linq;
 using Cellblock.Core;
 using Cellblock.Unity;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
 namespace Cellblock.Editor
 {
-    // Real Play-mode frame sequences of the escape struggle, rendered by the game's own camera, lights and people.
-    // Claude's (escape overhaul, 2026-10-17). Run from Claude's clone, with graphics, under its local unity-editor lock:
-    //   Unity -batchmode -projectPath <clone> -buildTarget iOS -executeMethod Cellblock.Editor.EscapeCapture.Run -logFile <log>
-    // (no -quit: it enters Play mode, stages each beat, renders, then exits). Frames land in Builds/EscapeCapture/<shot>/.
-    // Game time runs at a fixed 30 frames per second while capturing, so the sequences show motion as it plays at 1x.
-    [InitializeOnLoad]
+    // The20 original sequences deliberately stage poses/outcomes. A fifth fixture lets core-selected
+    // exchanges complete after initial contact placement. PresentationPreview owns the sole editor,
+    // scene/save checks, refresh freeze, timeout and Play lifecycle; this class never launches Unity.
     public static class EscapeCapture
     {
-        const string ActiveKey = "Cellblock.Escape.Active", WaitKey = "Cellblock.Escape.Wait";
-        const string Output = "Builds/EscapeCapture";
+        const string PathKey = "Cellblock.Escape.Output", StartedKey = "Cellblock.Escape.Started";
+        const string OutputRoot = "Temp/CellblockEscape";
+        static string Output { get { return SessionState.GetString(PathKey, ""); } }
         static int step, frames, shotFrame, lastFrame = -1;
         static string shot = "", escapeeId = "", leadId = "";
         static StreamWriter log;
         static readonly List<string> failures = new List<string>();
+        static readonly List<string> captures = new List<string>();
+        static readonly HashSet<string> sequences = new HashSet<string>();
+        static bool running, completed, naturalContact, naturalCuffs, naturalEscort;
+        static int scenarios, naturalStartMinute, naturalInterceptions;
+        static Point naturalEscortStart;
 
-        static EscapeCapture() { EditorApplication.update += Tick; }
+        const string NightOnlyKey = "Cellblock.Escape.NightOnly";
+        static bool NightOnly { get { return SessionState.GetBool(NightOnlyKey, false); } }
 
-        // Only the night scenario (alarm grade and contact shadows).
-        public static void RunNight() { SessionState.SetBool("Cellblock.Escape.ShadowsOnly", true); Run(); }
+        // Only the night scenario (alarm grade and contact shadows), through the same safe runner.
+        [MenuItem("Cellblock/Capture night alarm review")]
+        public static void RunNight() { SessionState.SetBool(NightOnlyKey, true); PresentationPreview.RequestEscapeReview(); }
+        [MenuItem("Cellblock/Capture staged escape review")]
         public static void Run()
         {
-            ProjectSetup.Validate();
-            EditorSceneManager.OpenScene("Assets/Cellblock/Scenes/Main.unity");
-            if (Directory.Exists(Output)) Directory.Delete(Output, true);
-            Directory.CreateDirectory(Output);
-            SessionState.SetBool(ActiveKey, true);
-            SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + 4);
-            EditorApplication.EnterPlaymode();
+            SessionState.SetBool(NightOnlyKey, false);
+            PresentationPreview.RequestEscapeReview();
         }
-
-        static void Tick()
+        internal static void PrepareRequest()
         {
-            if (!SessionState.GetBool(ActiveKey, false) || EditorApplication.isCompiling || !EditorApplication.isPlaying) return;
-            if (EditorApplication.timeSinceStartup < SessionState.GetFloat(WaitKey, 0) || Time.frameCount == lastFrame) return;
+            Reset();
+            string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N").Substring(0, 6);
+            SessionState.SetString(PathKey, Path.GetFullPath(Path.Combine(OutputRoot, stamp)));
+            SessionState.SetString(StartedKey, DateTime.UtcNow.ToString("O"));
+            Directory.CreateDirectory(Output); WriteReport(false, "Preparing safe editor review.", new string[0], "preparing");
+        }
+        static void Reset()
+        {
+            Time.captureDeltaTime = 0;
+            if (log != null) { log.Dispose(); log = null; }
+            step = frames = shotFrame = scenarios = 0; lastFrame = doneSince = -1; shot = escapeeId = leadId = "";
+            running = completed = naturalContact = naturalCuffs = naturalEscort = false;
+            naturalStartMinute = naturalInterceptions = 0; naturalEscortStart = new Point();
+            failures.Clear(); captures.Clear(); sequences.Clear();
+        }
+        internal static void Begin(GameController game)
+        {
+            Reset();
+            if (!EditorApplication.isPlaying || game == null || Output == "") throw new InvalidOperationException("Escape review requires the prepared existing Play session.");
+            Directory.CreateDirectory(Output);
+            log = new StreamWriter(Path.Combine(Output, "timeline.csv")) { AutoFlush = true };
+            log.WriteLine("sequence,frame,minute,phase,move,renderBeat,staggered,attempt,stamina,puffs,impulse,fight");
+            running = true; WriteReport(false, "Running20 staged pose sequences plus an unforced core-outcome fixture.", new string[0], "running");
+        }
+        internal static bool TickReview(GameController game, string[] runtimeErrors)
+        {
+            if (completed) return true;
+            if (!running) throw new InvalidOperationException("Escape review state was interrupted. Request a fresh run.");
+            if (Time.frameCount == lastFrame) return false;
             lastFrame = Time.frameCount;
-            try
+            FacilityView view = UnityEngine.Object.FindFirstObjectByType<FacilityView>();
+            if (game == null || view == null) throw new InvalidOperationException("No game renderer in the existing Play session.");
+            Step(game, view);
+            runtimeErrors = PresentationPreview.ReviewErrors();
+            if (completed)
             {
-                GameController game = UnityEngine.Object.FindFirstObjectByType<GameController>();
-                FacilityView view = UnityEngine.Object.FindFirstObjectByType<FacilityView>();
-                if (game == null || view == null) throw new InvalidOperationException("No game in Play mode.");
-                if (log == null) log = new StreamWriter(Path.Combine(Output, "timeline.csv")) { AutoFlush = true };
-                Step(game, view);
+                bool passed = failures.Count == 0 && runtimeErrors.Length == 0;
+                WriteReport(passed, "20 staged pose sequences; unforced contact, cuffing, one arrest and physical escort after initial fixture placement. Not a device/performance test.", runtimeErrors, "completed");
+                Debug.Log(passed ? "CELLBLOCK_ESCAPE_CAPTURE_PASSED " + Output : "CELLBLOCK_ESCAPE_CAPTURE_FAILED " + Output);
             }
-            catch (Exception error) { Finish(1, "CELLBLOCK_ESCAPE_CAPTURE_FAILED " + error); }
+            return completed;
         }
 
         static void Step(GameController game, FacilityView view)
@@ -64,7 +92,7 @@ namespace Cellblock.Editor
             EscapeStruggle s = w == null ? new EscapeStruggle() : w.Struggle;
             switch (step)
             {
-                case 0: if (frames > 30) { if (SessionState.GetBool("Cellblock.Escape.ShadowsOnly", false)) step = 48; Next(); } return;
+                case 0: if (frames > 30) { if (NightOnly) step = 52; Next(); } return;
                 // Scenario one: a sprint, a clinch, a punch that drops the officer, a flying tackle from behind, the pin, cuffs,
                 // the lift and the walk back.
                 case 1: Company(game); Next(); return;
@@ -90,8 +118,8 @@ namespace Cellblock.Editor
                 case 16: Require(s.Phase == "Cuffing", "no cuffing after the pin: " + s.Phase); Next(); return;
                 case 17: Capture(game, view, "07-cuffing", () => s.Phase == "Rising", 2, 160, 2, () => Close(view, escapeeId, leadId)); return;
                 case 18: Capture(game, view, "08-rising", () => w.Escape.Phase == "None", 10, 160, 1, () => Side(view, escapeeId, leadId, 3.2f)); return;
-                case 19: Require(w.Escape.Phase == "None" && s.Escort != "", "the cuffs did not end the attempt with an escort"); Next(); return;
-                case 20: Capture(game, view, "09-escort", () => false, 0, 90, 3, () => Side(view, s.Escorted, s.Escort, 3.4f)); return;
+                case 19: Require(w.Escape.Phase == "None" && s.Escort != "", "the cuffs did not end the attempt with an escort"); leadId = s.Escort; Next(); return;
+                case 20: Capture(game, view, "09-escort", () => s.Escort == "", 0, 90, 3, () => Side(view, escapeeId, leadId, 3.4f)); return;
                 // Scenario two: cornered at the closed gate, a shove free, the flight, then a frontal takedown.
                 case 21: Company(game); Next(); return;
                 case 22: if (frames > 20) { StartRun(game, true); Next(); } return;
@@ -104,7 +132,7 @@ namespace Cellblock.Editor
                 case 29: if (w.Escape.Phase == "None") { Require(false, "arrested before the takedown"); step = 33; frames = 0; shot = ""; return; } if (!s.Active) Engage(game, "d", false); Next(); return;
                 case 30: if (s.Active || frames > 120) { Require(s.Active, "no contact for the takedown"); leadId = s.Officer; Force(w, "Grappling", "Takedown", 5); Next(); } return;
                 case 31: Capture(game, view, "13-takedown", () => s.Phase == "Down", 14, 90, 1, () => Side(view, escapeeId, leadId, 3.2f)); return;
-                case 32: Capture(game, view, "14-takedown-pin", () => false, 0, 30, 2, () => Close(view, escapeeId, leadId)); return;
+                case 32: Capture(game, view, "14-takedown-pin", () => s.Phase != "Down", 0, 30, 2, () => Close(view, escapeeId, leadId)); return;
                 // Scenario three: spent at the gate, hands on the knees; a surrender, standing cuffs and the lift.
                 case 33: Company(game); Next(); return;
                 case 34: if (frames > 20) { StartRun(game, true); Next(); } return;
@@ -123,16 +151,50 @@ namespace Cellblock.Editor
                 case 46: Separate(game); Next(); return;
                 case 47: if (w.Fight.Phase == "Separating" || frames > 300) { Require(w.Fight.Phase == "Separating", "no officer reached the fight: " + w.Fight.Phase); Next(); } return;
                 case 48: Capture(game, view, "20-separating", () => false, 0, 40, 2, () => Side(view, w.Fight.A, w.Fight.B, 3.8f)); return;
-                // Scenario five: night with the alarm sounding: the alarm grade, contact shadows, a run and a tackle under the lights.
-                case 49: Company(game, 21 * 60 + 30); Next(); return;
-                case 50: if (frames > 20) { StartRun(game); w.SetAlarm(true); Next(); } return;
-                case 51: Capture(game, view, "21-night-alarm", () => false, 0, 40, 3, () => Wide(view, escapeeId)); return;
-                case 52: if (w.Escape.Phase == "None") { Require(false, "the night run ended early"); step = 55; frames = 0; shot = ""; return; } Engage(game, "f", true); Next(); return;
-                case 53: if (s.Active || frames > 120) { Require(s.Active, "no contact at night"); leadId = s.Officer; if (s.Move != "Tackle") Force(w, "Grappling", "Tackle", 4); Next(); } return;
-                case 54: Capture(game, view, "22-night-tackle", () => s.Phase == "Down", 12, 90, 1, () => Side(view, escapeeId, leadId, 3.6f)); return;
-                case 55:
+                // A fifth fixture: initial positions/traits only. No forced phase/move, teleport,
+                // outcome or clock jump after contact; the ordinary core completes the arrest.
+                case 49: Company(game); Next(); return;
+                case 50:
+                    if (frames <= 20) return;
+                    StartRun(game); Engage(game, "unforced", false);
+                    Resident natural = w.Escapee; natural.Discipline = 95; natural.Impulsivity = 0; natural.Stress = 20;
+                    StaffMember responder = w.Data.Staff.First(o => o.Id == leadId); responder.Morale = 95; responder.Integrity = 100; responder.Favoritism = 0; responder.FavoredGang = "";
+                    PersonnelFile file = w.FileFor(responder); if (file != null) { file.Experience = 15; file.RankLevel = 2; }
+                    naturalStartMinute = w.Data.Minute; naturalInterceptions = w.Data.Justice.Interceptions;
+                    Next(); return;
+                case 51:
+                    naturalContact |= s.Active && s.Resident == escapeeId;
+                    naturalCuffs |= s.Phase == "Cuffing" && s.Resident == escapeeId;
+                    if (w.Escape.Phase == "None")
+                    {
+                        Resident arrested = w.Data.Residents.First(r => r.Id == escapeeId);
+                        naturalEscort = s.Escort != "" && s.Escorted == escapeeId && arrested.Legal.Custody == "Escorted";
+                        Require(naturalContact && naturalCuffs, "unforced contact did not visibly pass through cuffing");
+                        Require(w.Data.Justice.Interceptions == naturalInterceptions + 1 && naturalEscort, "unforced arrest did not create exactly one interception and an escort");
+                        naturalEscortStart = arrested.Position; leadId = s.Escort; Next(); return;
+                    }
+                    if (frames > 2400 || w.Data.Minute - naturalStartMinute > 150) throw new InvalidOperationException("Unforced contact did not finish within its bounded window.");
+                    CaptureNaturalFrame(game, view, "21-unforced-contact", escapeeId, s.Officer == "" ? leadId : s.Officer); return;
+                case 52:
+                    CaptureNaturalFrame(game, view, "22-unforced-escort", escapeeId, leadId);
+                    Resident escorted = w.Data.Residents.First(r => r.Id == escapeeId);
+                    if (frames >= 90 || s.Escort == "")
+                    {
+                        Require(naturalEscort && Geometry.Distance(naturalEscortStart, escorted.Position) > .15f, "unforced arrest escort did not physically move");
+                        Require(w.Data.Justice.Interceptions == naturalInterceptions + 1, "unforced escort credited the interception twice");
+                        Next();
+                    }
+                    return;
+                // Scenario six: night with the alarm sounding: the alarm grade, contact shadows, a run and a tackle under the lights.
+                case 53: Company(game, 21 * 60 + 30); Next(); return;
+                case 54: if (frames > 20) { StartRun(game); w.SetAlarm(true); Next(); } return;
+                case 55: Capture(game, view, "23-night-alarm", () => false, 0, 40, 3, () => Wide(view, escapeeId)); return;
+                case 56: if (w.Escape.Phase == "None") { Require(false, "the night run ended early"); step = 59; frames = 0; shot = ""; return; } Engage(game, "f", true); Next(); return;
+                case 57: if (s.Active || frames > 120) { Require(s.Active, "no contact at night"); leadId = s.Officer; if (s.Move != "Tackle") Force(w, "Grappling", "Tackle", 4); Next(); } return;
+                case 58: Capture(game, view, "24-night-tackle", () => s.Phase == "Down", 12, 90, 1, () => Side(view, escapeeId, leadId, 3.6f)); return;
+                case 59:
                     Debug.Log("CELLBLOCK_ESCAPE contact shadows: " + view.PreviewContactShadowInfo);
-                    if (SessionState.GetBool("Cellblock.Escape.ShadowsOnly", false))
+                    if (NightOnly)
                     {
                         // Straight down over the escapee, shadows on and then off: the difference is exactly what they draw.
                         Vector3 at; view.TryGetPersonPosition(escapeeId, out at); at.y = 0.3f;
@@ -144,8 +206,9 @@ namespace Cellblock.Editor
                     }
                     Require(view.PreviewAlarmMood > 0.5f && view.PreviewContactShadows > 3, "night: alarm mood " + view.PreviewAlarmMood + ", contact shadows " + view.PreviewContactShadows); Next(); return;
                 default:
-                    if (failures.Count > 0) throw new InvalidOperationException(string.Join("; ", failures));
-                    Finish(0, "CELLBLOCK_ESCAPE_CAPTURE_PASSED " + Path.GetFullPath(Output)); return;
+                    if (NightOnly) Require(sequences.Count == 2 && scenarios == 1, "night review did not produce its 2 sequences");
+                    else Require(sequences.Count == 24 && scenarios == 6, "escape review did not produce 22 staged and 2 unforced sequences across 6 scenarios");
+                    Finish(); return;
             }
         }
         static void Next() { step++; frames = 0; shotFrame = 0; shot = ""; }
@@ -155,6 +218,16 @@ namespace Cellblock.Editor
         {
             Time.captureDeltaTime = 0;
             game.StartArtPreview("county-maximum", "briar-county", minuteOfDay);
+            World w = game.World; scenarios++;
+            w.Data.Incidents = new IncidentState(); w.Data.Justice.Attempt = new EscapeAttempt(); w.Data.Struggle = new EscapeStruggle();
+            w.Population.MoratoriumUntil = int.MaxValue / 2; w.Population.Backlog = 0; w.Population.NextSurgeMinute = int.MaxValue / 2;
+            w.Data.Justice.NextAttemptMinute = int.MaxValue / 2;
+            w.Population.Audit.Phase = "Scheduled"; w.Population.Audit.NextMinute = int.MaxValue / 2;
+            w.Population.Riot.Phase = "None"; w.Population.Riot.Rioters.Clear();
+            w.Stories.NextIncidentMinute = int.MaxValue / 2; w.Stories.Incidents.Clear();
+            foreach (NotableResident notable in w.Stories.Notables) notable.NextPressureMinute = int.MaxValue / 2;
+            w.IntelWork.Tips.Clear(); w.IntelWork.Intel.Clear(); w.Contraband.Drones.Clear(); w.Contraband.Items.Clear();
+            foreach (Resident r in w.Data.Residents) { r.LastFightMinute = w.Data.Minute; r.NextPlanMinute = int.MaxValue / 2; r.Legal.NextCourtMinute = -1; }
             escapeeId = leadId = "";
         }
         // The demo's pick, moved onto open ground first so the run is visible, with every other officer held far away.
@@ -267,12 +340,13 @@ namespace Cellblock.Editor
         // Renders every few frames until the condition has held for the given tail of frames, or the cap is reached.
         static void Capture(GameController game, FacilityView view, string name, Func<bool> done, int tail, int max, int every, Func<Shot> at)
         {
-            if (shot != name) { shot = name; shotFrame = 0; doneSince = -1; Directory.CreateDirectory(Path.Combine(Output, name)); }
+            if (shot != name) { shot = name; shotFrame = 0; doneSince = -1; sequences.Add(name); Directory.CreateDirectory(Path.Combine(Output, name)); }
             if ((frames - 1) % every == 0)
             {
                 World w = game.World; EscapeStruggle s = w.Struggle; Shot frame = at();
                 game.FrameArt(frame.Focus, frame.Distance, frame.Yaw, frame.Pitch);
-                Render(game.ArtCamera, 960, 540, Path.Combine(Output, name, name + "-" + shotFrame.ToString("000") + ".png"));
+                string path = Path.Combine(Output, name, name + "-" + shotFrame.ToString("000") + ".png");
+                Render(game.ArtCamera, 960, 540, path); captures.Add(Path.GetFullPath(path));
                 log.WriteLine(name + "," + shotFrame + "," + w.Data.Minute + "," + s.Phase + "," + s.Move + "," + view.PreviewEscapeBeat + "," + s.Staggered + "," + w.Escape.Phase + "," +
                     Math.Round(s.Stamina) + "," + view.PreviewActivePuffs + "," + Math.Round(view.CameraImpulse, 2) + "," + w.Fight.Phase);
                 shotFrame++;
@@ -280,30 +354,59 @@ namespace Cellblock.Editor
             if (doneSince < 0 && done()) doneSince = frames;
             if (frames >= max * every || (doneSince >= 0 && frames - doneSince >= tail)) Next();
         }
+        static void CaptureNaturalFrame(GameController game, FacilityView view, string name, string resident, string officer)
+        {
+            if (shot != name) { shot = name; shotFrame = 0; sequences.Add(name); Directory.CreateDirectory(Path.Combine(Output, name)); }
+            if ((frames - 1) % 3 != 0) return;
+            Shot frame = Side(view, resident, officer, 3.8f); game.FrameArt(frame.Focus, frame.Distance, frame.Yaw, frame.Pitch);
+            string path = Path.Combine(Output, name, name + "-" + shotFrame.ToString("000") + ".png"); Render(game.ArtCamera, 960, 540, path); captures.Add(Path.GetFullPath(path));
+            World w = game.World; EscapeStruggle s = w.Struggle;
+            log.WriteLine(name + "," + shotFrame++ + "," + w.Data.Minute + "," + s.Phase + "," + s.Move + "," + view.PreviewEscapeBeat + "," + s.Staggered + "," + w.Escape.Phase + "," + Math.Round(s.Stamina) + "," + view.PreviewActivePuffs + "," + Math.Round(view.CameraImpulse, 2) + "," + w.Fight.Phase);
+        }
         static void Render(Camera camera, int width, int height, string path)
         {
             var target = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4, name = "Escape capture" };
             target.Create();
-            float aspect = camera.aspect; camera.aspect = (float)width / height;
+            float aspect = camera.aspect; RenderTexture previous = RenderTexture.active; Texture2D image = null; camera.aspect = (float)width / height;
             try
             {
                 RenderPipeline.SubmitRenderRequest(camera, new UniversalRenderPipeline.SingleCameraRequest { destination = target });
-                RenderTexture previous = RenderTexture.active; RenderTexture.active = target;
-                var image = new Texture2D(width, height, TextureFormat.RGB24, false);
+                RenderTexture.active = target;
+                image = new Texture2D(width, height, TextureFormat.RGB24, false);
                 image.ReadPixels(new Rect(0, 0, width, height), 0, 0); image.Apply();
                 RenderTexture.active = previous;
                 File.WriteAllBytes(path, image.EncodeToPNG());
-                UnityEngine.Object.DestroyImmediate(image);
             }
-            finally { camera.aspect = aspect; camera.ResetAspect(); target.Release(); UnityEngine.Object.DestroyImmediate(target); }
+            finally { RenderTexture.active = previous; if (image != null) UnityEngine.Object.DestroyImmediate(image); camera.aspect = aspect; target.Release(); UnityEngine.Object.DestroyImmediate(target); }
         }
-        static void Finish(int code, string message)
+        [Serializable] sealed class EscapeReport
         {
-            SessionState.SetBool(ActiveKey, false); Time.captureDeltaTime = 0;
+            public bool passed, staged = true, unforcedContact, unforcedCuffing, unforcedEscort;
+            public string status, editor, message, fullPath, timeline, startedUtc;
+            public int captureCount, sequenceCount, scenarioCount, stagedScenarioCount, unforcedScenarioCount;
+            public string[] errors, runtimeErrors, captures;
+        }
+        static void WriteReport(bool passed, string message, string[] runtimeErrors, string status)
+        {
+            if (Output == "") return;
+            Directory.CreateDirectory(OutputRoot); Directory.CreateDirectory(Output);
+            var report = new EscapeReport { passed = passed, status = status, editor = Application.unityVersion, message = message,
+                fullPath = Path.GetFullPath(Output), timeline = Path.Combine(Output, "timeline.csv"), startedUtc = SessionState.GetString(StartedKey, ""),
+                captureCount = captures.Count, sequenceCount = sequences.Count, scenarioCount = scenarios, stagedScenarioCount = Math.Min(4, scenarios), unforcedScenarioCount = scenarios >= 5 ? 1 : 0,
+                unforcedContact = naturalContact, unforcedCuffing = naturalCuffs, unforcedEscort = naturalEscort,
+                errors = failures.Concat(runtimeErrors).Distinct().ToArray(), runtimeErrors = runtimeErrors, captures = captures.ToArray() };
+            string json = JsonUtility.ToJson(report, true); File.WriteAllText(Path.Combine(Output, "report.json"), json);
+            string stable = Path.Combine(OutputRoot, "report.json"), temporary = stable + ".tmp";
+            File.WriteAllText(temporary, json); if (File.Exists(stable)) File.Replace(temporary, stable, null); else File.Move(temporary, stable);
+        }
+        internal static void Abort(string reason, string[] runtimeErrors)
+        {
+            failures.Add(reason); Finish(); WriteReport(false, reason, runtimeErrors, "failed");
+        }
+        static void Finish()
+        {
+            running = false; completed = true; Time.captureDeltaTime = 0;
             if (log != null) { log.Dispose(); log = null; }
-            if (code == 0) Debug.Log(message); else Debug.LogError(message);
-            EditorApplication.isPlaying = false;
-            if (Application.isBatchMode) EditorApplication.delayCall += () => EditorApplication.Exit(code);
         }
     }
 }

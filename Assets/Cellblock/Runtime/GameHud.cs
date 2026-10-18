@@ -52,7 +52,8 @@ namespace Cellblock.Unity
         bool inspectorOpen = true, cameraOpen, compact, layoutReady, guideOpen, hadDraft;
         object previousSelection;
         float nextRefresh;
-        public bool BlocksWorldInput { get { return InteractionModalOpen || guideOpen || (menu != null && menu.style.display.value != DisplayStyle.None); } }
+        public bool BlocksSimulation { get { return InteractionModalOpen || guideOpen || (menu != null && menu.style.display.value != DisplayStyle.None); } }
+        public bool BlocksWorldInput { get { return BlocksSimulation || CharacterPhoneOpen; } }
         public Vector2 WorldViewCenter { get; private set; } = new Vector2(0.5f, 0.5f);
         public static string Money(long cents) { return "$" + (cents / 100d).ToString("N0", CultureInfo.InvariantCulture); }
 
@@ -96,8 +97,9 @@ namespace Cellblock.Unity
             BuildQuote();
             menu = Panel("menu"); menu.style.display = DisplayStyle.None;
             guide = Panel("guide-overlay"); guide.style.display = DisplayStyle.None;
-            BuildFrontend();
+            BuildFrontend(); BuildHomePresentation();
             facilityPane.Add(Action("Goals & facility journal", ShowFacilityEvents, "primary"));
+            BuildCharacterInspector(); BuildCharacterPhone();
             root.RegisterCallback<GeometryChangedEvent>(e => Layout()); Layout();
         }
 
@@ -283,6 +285,7 @@ namespace Cellblock.Unity
         public void ShowPeople()
         {
             workspace = Workspace.People; inspectorOpen = true; if (compact) cameraOpen = false;
+            OpenCharacterRoster();
             ((ScrollView)inspector).scrollOffset = Vector2.zero;
             if (game.Tool != BuildTool.Inspect && game.Draft == null) game.SetTool(BuildTool.Inspect);
             Refresh(true);
@@ -524,6 +527,7 @@ namespace Cellblock.Unity
             bool same = workspace == value;
             if (!same) ((ScrollView)inspector).scrollOffset = Vector2.zero;
             workspace = value;
+            if (value == Workspace.People) OpenCharacterRoster();
             inspectorOpen = same ? !inspectorOpen : true;
             if (compact && inspectorOpen) cameraOpen = false;
             if (value != Workspace.Build && game.Tool != BuildTool.Inspect && game.Draft == null) game.SetTool(BuildTool.Inspect);
@@ -594,6 +598,8 @@ namespace Cellblock.Unity
             cameraToggle.EnableInClassList("selected", cameraOpen);
             LayoutPressure(left, right, navTop + 54, menuOpen);
             LayoutFrontend(left, right, top, bottom, menuOpen);
+            LayoutCharacterInspector(left, right, top, bottom, menuOpen);
+            LayoutCharacterPhone(left, right, top, bottom);
         }
 
         public bool IsOverUI(Vector2 screen)
@@ -676,18 +682,18 @@ namespace Cellblock.Unity
         }
         public void RevealSelection()
         {
-            bool person = game.SelectedResident != null || game.SelectedStaff != null;
+            bool person = game.SelectedCharacterId != "";
             if (!person && game.SelectedWall == null && game.SelectedFixture == null) return;
             inspectorOpen = true; if (compact) cameraOpen = false;
             workspace = person ? Workspace.People : Workspace.Facility;
             ((ScrollView)inspector).scrollOffset = Vector2.zero;
-            if (person) showStaff = game.SelectedStaff != null;
+            if (person) { showStaff = game.SelectedStaff != null; ShowCompactCharacter(game.SelectedCharacterId); }
             Refresh(true);
         }
-        public void NavigateBack() { if (settingsOpen) CloseSettings(); else if (modePickerOpen) HideModePicker(); else CloseOverlays(); }
+        public void NavigateBack() { if (CharacterPhoneOpen) { CloseCharacterPhone(); return; } if (settingsOpen) CloseSettings(); else if (modePickerOpen) HideModePicker(); else CloseOverlays(); }
         public void CloseOverlays()
         {
-            CloseInteractionSheets();
+            CloseCharacterPhone(); CloseInteractionSheets();
             if (guideOpen) { CloseGuide(); return; }
             if (game.World != null && menu != null) menu.style.display = DisplayStyle.None;
             cameraOpen = false; Layout();
@@ -701,12 +707,12 @@ namespace Cellblock.Unity
             World world = game.World; if (world == null) return;
             if (game.Draft != null && !hadDraft) { inspectorOpen = false; cameraOpen = false; }
             hadDraft = game.Draft != null;
-            object selection = (object)game.SelectedResident ?? (object)game.SelectedStaff ?? (object)game.SelectedFixture ?? game.SelectedWall;
+            object selection = (object)game.SelectedResident ?? (object)game.SelectedStaff ?? (object)game.SelectedFixture ?? (object)game.SelectedWall ?? (game.SelectedCharacterId == "" ? null : (object)game.SelectedCharacterId);
             if (selection != null && selection != previousSelection)
             {
                 inspectorOpen = true; if (compact) cameraOpen = false;
                 ((ScrollView)inspector).scrollOffset = Vector2.zero;
-                workspace = game.SelectedResident != null || game.SelectedStaff != null ? Workspace.People : Workspace.Facility;
+                workspace = game.SelectedCharacterId != "" ? Workspace.People : Workspace.Facility;
                 if (workspace == Workspace.People) showStaff = game.SelectedStaff != null;
             }
             previousSelection = selection;
@@ -807,6 +813,7 @@ namespace Cellblock.Unity
                 quoteCost.EnableInClassList("negative", q != null && !q.Valid); approve.SetEnabled(q != null && q.Valid);
             }
             RefreshSecurity(world); RefreshCommandHud(world);
+            RefreshCharacterInspector(world); RefreshCharacterControls(world); RefreshCharacterPhone(world);
             Layout();
         }
 

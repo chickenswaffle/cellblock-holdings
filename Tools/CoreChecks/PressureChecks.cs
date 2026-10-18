@@ -580,7 +580,8 @@ static partial class Program
                 officer.FavoredGang = corrupt ? "Harbor Union" : ""; officer.Favoritism = corrupt ? 50 : 0;
                 Check(world.SetDuty(officer.Id, "Cell checks"), world.Notice); officer.NextDutyMinute = 0;
                 world.AdvanceMinutes(600);
-                return world.Data.Contraband.Seized;
+                // Count this duty's discoveries, excluding mail/yard screening elsewhere.
+                return world.Data.History.Count(e => e.Description.StartsWith(officer.Name + " found contraband in a cell check:"));
             }
             int honest = Finds(false), corrupt = Finds(true);
             Check(honest >= 2 && corrupt == 0, "Cell checks: honest found " + honest + ", corrupt found " + corrupt);

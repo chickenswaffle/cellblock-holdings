@@ -440,26 +440,28 @@ namespace Cellblock.Core
         }
         // Reused seats share a serving clock. Personal routine offsets must not overlap
         // adjacent shifts or let early travel count as eating. Walking time is part of service.
-        public bool MealDue(int index, Resident resident)
+        public bool MealDue(int index, Resident resident) { return MealDueAt(index, resident, Data.Minute); }
+        internal bool MealDueAt(int index, Resident resident, int atMinute)
         {
             int shifts = MealShifts, shift = MealShift(index);
             if (shift >= MaxMealShifts) return false;
-            int minute = MealClock(resident, shifts), block = 120 / shifts;
+            int minute = MealClock(resident, shifts, atMinute), block = 120 / shifts;
             // Nobody follows the last shift at a place, so someone still hungry after a long walk keeps it for another hour.
             int grace = shifts > 1 && shift == shifts - 1 && resident.Food < MealSated ? 60 : 0;
             foreach (int start in new[] { 7 * 60, 12 * 60, 18 * 60 })
                 if (minute >= start + shift * block && minute < start + (shift + 1) * block + grace) return true;
             return false;
         }
-        public bool MealTravelDue(int index,Resident resident)
+        public bool MealTravelDue(int index,Resident resident) { return MealTravelDueAt(index, resident, Data.Minute); }
+        internal bool MealTravelDueAt(int index,Resident resident,int atMinute)
         {
             int shifts=MealShifts,shift=MealShift(index);if(shift>=MaxMealShifts)return false;
-            int minute=MealClock(resident,shifts),block=120/shifts,lead=shifts>1?Math.Min(45,block-1):0;
+            int minute=MealClock(resident,shifts,atMinute),block=120/shifts,lead=shifts>1?Math.Min(45,block-1):0;
             int grace = shifts > 1 && shift == shifts - 1 && resident.Food < MealSated ? 60 : 0;
             foreach(int start in new[]{7*60,12*60,18*60})if(minute>=start+shift*block-lead&&minute<start+(shift+1)*block+grace)return true;
             return false;
         }
-        int MealClock(Resident resident,int shifts){return ((Data.Minute+(shifts>1?0:resident.RoutineOffset))%1440+1440)%1440;}
+        int MealClock(Resident resident,int shifts,int atMinute){return ((atMinute+(shifts>1?0:resident.RoutineOffset))%1440+1440)%1440;}
         public int MealPlaceCount { get { return CurrentMealPlan().Places.Count; } }
         public int MealShifts { get { return CurrentMealPlan().Shifts; } }
         // Roster indexes past the plan (checks probing future slots) continue the shifts after the planned ones.
@@ -472,7 +474,7 @@ namespace Cellblock.Core
         // Which shift's block of the two-hour window this person's clock is in.
         public int CurrentMealBlock(Resident resident, int shifts)
         {
-            int minute = MealClock(resident,shifts), hour = minute / 60;
+            int minute = MealClock(resident,shifts,Data.Minute), hour = minute / 60;
             int start = hour >= 18 ? 18 * 60 : hour >= 12 ? 12 * 60 : 7 * 60;
             return Math.Max(0, Math.Min(shifts - 1, (minute - start) * shifts / 120));
         }
@@ -889,6 +891,7 @@ namespace Cellblock.Core
                 AdvanceJustice();
                 AdvancePressure();
                 AdvanceLives();
+                AdvanceCharacterControl();
                 MoveResidents();
                 if (Data.Minute % 30 == 0) PeopleDynamics.Advance(this);
                 Data.OperatingRemainder += Contract.DailyOperatingCents / 1440.0;
@@ -953,6 +956,13 @@ namespace Cellblock.Core
                 // When the dining room has fewer places than residents, meals run in up to four shifts.
                 // Anyone beyond four shifts of places has no seat this window and waits at home.
                 Point mealSeat=ServiceDestination(index,true);
+                if (IsCharacterControlled(resident.Id) || CharacterUsingPhone(resident.Id))
+                {
+                    float manualGain = meals && Geometry.Distance(resident.Position, mealSeat) < .8f ? .6f : -.025f;
+                    MealGain(resident, index, meals, ref manualGain);
+                    resident.Food = Geometry.Clamp(resident.Food + manualGain, 0, 100);
+                    continue;
+                }
                 Point target = mealTravel ? mealSeat : yard ? ServiceDestination(index,false) : resident.Home;
                 ChooseResidentActivity(resident, ref target);
                 PressureTarget(resident, ref target);

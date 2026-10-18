@@ -96,6 +96,7 @@ namespace Cellblock.Unity
             if (homeContent != null) { homeContent.style.paddingLeft = left + (compact ? 10 : 38); homeContent.style.paddingRight = right + (compact ? 10 : 38); homeContent.style.paddingTop = top + 4; homeContent.style.paddingBottom = bottom; }
             if (settingsOverlay != null) { settingsOverlay.style.paddingLeft = left; settingsOverlay.style.paddingRight = right; settingsOverlay.style.paddingTop = top; settingsOverlay.style.paddingBottom = bottom; }
             LayoutCommandHud(left, right, top, bottom, menuOpen);
+            RefreshHomePresentation(game.World);
         }
 #if UNITY_EDITOR
         public bool PreviewHomeArtReady { get { return homeArtwork != null && homeArtwork.image != null && homeArtwork.worldBound.width >= root.worldBound.width - 1 && homeArtwork.worldBound.height >= root.worldBound.height - 1; } }

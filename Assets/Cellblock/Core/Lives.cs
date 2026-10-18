@@ -92,6 +92,7 @@ namespace Cellblock.Core
                 if (r.ActivityPartner != "" && !ids.Contains(r.ActivityPartner)) { r.ActivityPartner = ""; if (r.Activity == "Talk") { r.Activity = ""; r.ActivityUntil = -1; } }
                 if (r.MentorId != "" && !ids.Contains(r.MentorId)) r.MentorId = "";
             }
+            World.HydrateRoutineState(state);
         }
     }
 
@@ -114,7 +115,7 @@ namespace Cellblock.Core
         // ---- the plan, read-only for movement ---------------------------------------------------------
         partial void ChooseResidentActivity(Resident resident, ref Point target)
         {
-            if (resident.Activity == "" || resident.ActivityUntil <= Data.Minute || resident.Activity == "Quiet") return;
+            if (resident.Activity == "" || resident.ActivityPhase == "Suspended" || resident.ActivityUntil <= Data.Minute || resident.Activity == "Quiet") return;
             // Only free time: anything the routine already wants (meals, yard, court) wins.
             if (Geometry.Distance(target, resident.Home) > 0.05f) return;
             if (!FreeTime(resident)) return;
@@ -123,19 +124,19 @@ namespace Cellblock.Core
         // The destination movement would get for this routine target (what the hook returns), for checks and the HUD.
         internal Point DestinationFor(Resident resident, Point routine) { Point target = routine; ChooseResidentActivity(resident, ref target); return target; }
         // Free time: daytime, not locked down, and no meal, yard, work or separation claiming the person.
-        public bool FreeTime(Resident r)
+        public bool FreeTime(Resident r) { return FreeTimeAt(r, Data.Minute); }
+        bool FreeTimeAt(Resident r, int atMinute, bool ignoreCurrentPhone = false)
         {
-            int minute = Data.Minute % 1440;
+            int minute = atMinute % 1440;
             if (minute < 6 * 60 || minute >= 22 * 60 || Data.Operations.Lockdown || Data.Mode == null || !Data.Mode.Applied) return false;
-            if (!IsPresent(r) || InIntake(r) || !r.Legal.Ready || r.Legal.Custody != "In facility" || r.SeparatedUntil > Data.Minute || r.ProtectiveCustody) return false;
-            // A confrontation owns both people from the first step toward it until it resolves.
-            if (IncidentOwnsResident(r)) return false;
+            if (!IsPresent(r) || InIntake(r) || IncidentOwnsResident(r) || (Escape.Phase != "None" && Escape.ResidentId == r.Id) || !r.Legal.Ready || r.Legal.Custody != "In facility" || r.Legal.RestrictedUntil > atMinute || r.SeparatedUntil > atMinute || r.ProtectiveCustody) return false;
             if (Population.Riot.Phase != "None" && Population.Riot.Rioters.Contains(r.Id)) return false;
+            if (!ignoreCurrentPhone && CharacterUsingPhone(r.Id)) return false;
             int index = Data.Residents.IndexOf(r);
-            if (index >= 0 && (MealTravelDue(index, r) || MealDue(index, r))) return false;
-            if (PeopleDynamics.IsYardWindow(Data.Minute + r.RoutineOffset)) return false;
+            if (index >= 0 && (MealTravelDueAt(index, r, atMinute) || MealDueAt(index, r, atMinute))) return false;
+            if (PeopleDynamics.IsYardWindow(atMinute + r.RoutineOffset)) return false;
             TrustAccount a = AccountOf(r);
-            if (a != null && a.Job != "" && EconomyRules.WorkTravel(a.Job, Data.Minute)) return false;
+            if (a != null && a.Job != "" && EconomyRules.WorkTravel(a.Job, atMinute)) return false;
             return true;
         }
 
@@ -145,10 +146,12 @@ namespace Cellblock.Core
             if (Data.Mode == null || !Data.Mode.Applied || Data.Lives == null) return;
             foreach (Resident r in Data.Residents)
             {
-                if (r.Activity != "" && (r.ActivityUntil <= Data.Minute || !FreeTime(r))) EndActivity(r);
-                if (r.Activity == "" && Data.Minute >= r.NextPlanMinute && FreeTime(r)) PlanActivity(r);
-                if (r.Activity != "") LiveActivity(r);
+                AdvanceRoutine(r);
+                if (r.Activity == "" && !IsCharacterControlled(r.Id) && Data.Minute >= r.NextPlanMinute && FreeTime(r)) PlanActivity(r);
             }
+            // Resolve both sides' readiness before either receives effects or ends its plan.
+            foreach (Resident r in Data.Residents) ApplyRoutineEffort(r);
+            foreach (Resident r in Data.Residents) CompleteRoutine(r);
             if (Data.Minute % 30 == 23) NoticeRelationships();
             if (Data.Minute % 10 == 4) NoticeCourt();
         }
@@ -157,21 +160,24 @@ namespace Cellblock.Core
             // A conversation ends for both people: nobody is left waiting at the meeting spot.
             Resident partner = r.Activity == "Talk" ? Find(r.ActivityPartner) : null;
             r.Activity = ""; r.ActivityFixture = ""; r.ActivityPartner = ""; r.ActivityUntil = -1;
+            r.ActivityTarget = r.Position; r.ActivityPhase = ""; r.ActivityRemaining = r.ActivityDuration = 0; r.ActivityBlocker = "";
+            ChangeRoutineRoute(r);
             // Staggered: each person reconsiders on their own clock, never the whole room at once.
             r.NextPlanMinute = Data.Minute + 10 + (int)(JusticeRules.Hash(r.Id + ":replan", unchecked((uint)Data.Seed)) % 20u);
-            if (partner != null && partner.Activity == "Talk" && partner.ActivityPartner == r.Id) EndActivity(partner);
+            if (partner != null && partner.Activity == "Talk" && partner.ActivityPartner == r.Id && partner.ActivityPhase != "Leaving") EndActivity(partner);
         }
         Dictionary<string, bool> reachCache = new Dictionary<string, bool>(); int reachRevision = -1;
         bool Reachable(Resident r, Point target)
         {
             if (reachRevision != GeometryRevision) { reachCache.Clear(); reachRevision = GeometryRevision; }
-            string key = r.Home.X.ToString("0.0") + "," + r.Home.Y.ToString("0.0") + ">" + target.X.ToString("0.00") + "," + target.Y.ToString("0.00");
+            if (reachCache.Count > 1024) reachCache.Clear();
+            string key = r.Position.X.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "," + r.Position.Y.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + ">" + target.X.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "," + target.Y.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
             bool ok;
-            if (!reachCache.TryGetValue(key, out ok)) { ok = Routes.Clear(target, target) && Routes.Find(r.Home, target) != null; reachCache[key] = ok; }
+            if (!reachCache.TryGetValue(key, out ok)) { ok = PeopleDynamics.ClearStaffStation(target, Routes, Data.Fixtures) && Routes.Find(r.Position, target) != null; reachCache[key] = ok; }
             return ok;
         }
         // Places for an activity at a furnishing: in front of a shelf, a seat facing the screen, a table place, the bench.
-        List<Point> ActivityPlaces(Fixture f, string activity)
+        internal List<Point> ActivityPlaces(Fixture f, string activity)
         {
             var places = new List<Point>();
             Point access = Geometry.AccessPoint(f);
@@ -184,7 +190,7 @@ namespace Cellblock.Core
             else if (activity == "Television")
             {
                 // Benches and chairs within 5 m of the screen are seats; otherwise people stand in front of it.
-                foreach (Fixture seat in Data.Fixtures.Where(x => (x.Kind == "Bench" || x.Kind == "Chair") && Geometry.Distance(x.Position, f.Position) < 5).OrderBy(x => Geometry.Distance(x.Position, f.Position)).ThenBy(x => x.Id, StringComparer.Ordinal))
+                foreach (Fixture seat in Data.Fixtures.Where(x => (x.Kind == "Bench" || x.Kind == "Chair") && Geometry.Distance(x.Position, f.Position) < 5 && Rooms.Any(room => Geometry.Contains(room, f.Position) && Geometry.Contains(room, x.Position)) && SightLines.Clear(Geometry.AccessPoint(x), access)).OrderBy(x => Geometry.Distance(x.Position, f.Position)).ThenBy(x => x.Id, StringComparer.Ordinal))
                     places.Add(Geometry.AccessPoint(seat));
                 Point away = access - f.Position; float len = Math.Max(0.01f, away.Length); Point dir = away * (1f / len), side = new Point(-dir.Y, dir.X);
                 for (int i = -2; i <= 2; i++) places.Add(access + dir * 1.4f + side * (i * 0.7f));
@@ -195,67 +201,93 @@ namespace Cellblock.Core
             else places.Add(access);
             return places;
         }
-        internal void PlanActivity(Resident r)
+        internal bool PlanActivity(Resident r, string request = "", string requestedFixture = "")
         {
-            int n = Data.Minute / 30;
+            int n = Data.Minute / 30, window = RoutineFreeWindow(r);
             var options = new List<(string activity, Fixture fixture, Point place, float score, string partner)>();
             float Noise(string what) { return JusticeRules.Unit(Data.Seed, r.Id, "life-" + what, n) * 0.5f; }
             var pending = new HashSet<string>(Data.Projects.Where(p => !p.Completed).SelectMany(p => p.RemoveFixtures));
             foreach (string activity in new[] { "Reading", "Exercise", "Television", "Study" })
             {
+                if (request != "" && request != activity) continue;
                 float score = activity == "Reading" ? 0.5f + r.Discipline / 120f + (r.BooksRead > 0 ? 0.2f : 0) :
                     activity == "Exercise" ? 0.4f + (r.Stress > 50 ? 0.5f : 0) + (100 - r.Patience) / 250f :
                     activity == "Television" ? 0.35f + r.Sociability / 220f + r.Impulsivity / 220f :
                     (r.Discipline >= 55 ? 0.45f : 0.1f) + (r.Legal.Status == "Sentenced" ? 0.25f : 0) + (r.StudyMinutes > 0 ? 0.2f : 0);
                 score += Noise(activity);
-                foreach (Fixture f in Data.Fixtures.Where(x => x.Kind == LifeRules.FixtureFor(activity) && !pending.Contains(x.Id) && Rooms.Any(room => Geometry.Contains(room, x.Position))).OrderBy(x => Geometry.Distance(x.Position, r.Home)).Take(3))
+                if (r.LastActivity == activity && Data.Minute - r.LastActivityMinute < 120) score -= .5f;
+                if ((r.Health < 65 || r.Safety < 40) && activity == "Exercise") score -= .6f;
+                if (r.Safety < 40 && r.Memories.Any(m => (m.Kind == "fight" || m.Kind == "nemesis" || m.Kind == "beef") && Data.Minute - m.Minute < 2 * 1440)) score -= .45f;
+                foreach (Fixture f in Data.Fixtures.Where(x => x.Kind == LifeRules.FixtureFor(activity) && (requestedFixture == "" || x.Id == requestedFixture) && !pending.Contains(x.Id) && (r.AvoidActivityUntil <= Data.Minute || x.Id != r.AvoidActivityFixture) && Rooms.Any(room => Geometry.Contains(room, x.Position))).OrderBy(x => Geometry.Distance(x.Position, r.Position)).Take(3))
                 {
                     if (activity == "Study" && Geometry.Distance(f.Position, Data.Dining) < 0.1f && PeopleDynamics.IsMealWindow(Data.Minute + 60)) continue;
                     bool found = false; Point place = default(Point);
                     foreach (Point p in ActivityPlaces(f, activity))
-                        if (Reachable(r, p) && !Data.Residents.Any(o => o != r && o.Activity != "" && o.ActivityUntil > Data.Minute && Geometry.Distance(o.ActivityTarget, p) < 0.4f)) { place = p; found = true; break; }
+                        if (ActivityPlaceFree(p, r) && Reachable(r, p) && RoutineJourneyMinutes(r, p) + 10 <= window) { place = p; found = true; break; }
                     if (!found) continue;
                     // Farther furnishings are less tempting.
-                    options.Add((activity, f, place, score - Geometry.Distance(f.Position, r.Home) / 60f, ""));
+                    options.Add((activity, f, place, score - Geometry.Distance(f.Position, r.Position) / 60f, ""));
                     break;
                 }
             }
             // A friend who also has free time.
             Relationship friend = r.Relationships.Where(x => x.Trust >= 60 && x.Tension < 35).OrderByDescending(x => x.Trust).ThenBy(x => x.OtherId, StringComparer.Ordinal)
-                .FirstOrDefault(x => { Resident o = Find(x.OtherId); return o != null && o.Activity == "" && FreeTime(o) && Geometry.Distance(o.Home, r.Home) < 20; });
-            if (friend != null)
+                .FirstOrDefault(x => { Resident o = Find(x.OtherId); return o != null && o.Activity == "" && FreeTime(o) && Geometry.Distance(o.Position, r.Position) < 20; });
+            if (friend != null && (request == "" || request == "Talk"))
                 options.Add(("Talk", null, default(Point), 0.4f + r.Sociability / 110f + (r.Belonging < 40 ? 0.35f : 0) + Noise("Talk"), friend.OtherId));
-            options.Add(("Quiet", null, r.Home, 0.35f + (r.Stress > 70 ? 0.3f : 0) + (100 - r.Sociability) / 220f + Noise("Quiet"), ""));
+            if (request == "" || request == "Quiet") options.Add(("Quiet", null, r.Home, 0.35f + (r.Stress > 70 ? 0.3f : 0) + (r.Safety < 40 ? .7f : 0) + (r.Health < 65 ? .5f : 0) + (100 - r.Sociability) / 220f + Noise("Quiet"), ""));
+            if (options.Count == 0) return false;
             var best = options.OrderByDescending(o => o.score).ThenBy(o => o.activity, StringComparer.Ordinal).First();
             int until = Data.Minute + 40 + (int)(JusticeRules.Hash(r.Id + ":block:" + n, unchecked((uint)Data.Seed)) % 40u);
             if (best.activity == "Talk")
             {
                 Resident other = Find(best.partner);
-                Point meet = MeetingSpot(r, other);
-                if (!Reachable(r, meet) || !Reachable(other, meet + new Point(0.8f, 0))) { r.NextPlanMinute = Data.Minute + 15; return; }
+                Point meet, second;
+                if (!TryMeetingPlaces(r, other, out meet, out second))
+                {
+                    var alternate = options.Where(o => o.activity != "Talk").OrderByDescending(o => o.score).ThenBy(o => o.activity, StringComparer.Ordinal).ToList();
+                    if (alternate.Count == 0) return false; best = alternate[0];
+                }
+                else
+                {
+                int journey = Math.Max(RoutineJourneyMinutes(r, meet), RoutineJourneyMinutes(other, second));
+                int sharedWindow = Math.Min(window, RoutineFreeWindow(other));
+                if (journey + 10 > sharedWindow)
+                {
+                    if (request != "") return false;
+                    Begin(r, "Quiet", "", r.Home, Data.Minute + Math.Min(40, Math.Max(6, window)), ""); return true;
+                }
+                until = Data.Minute + Math.Min(until - Data.Minute, Math.Max(6, sharedWindow - journey - 4));
                 Begin(r, "Talk", "", meet, until, other.Id);
-                Begin(other, "Talk", "", NearbyClear(meet + new Point(0.8f, 0), Routes), until, r.Id);
-                return;
+                Begin(other, "Talk", "", second, until, r.Id);
+                return true;
+                }
             }
+            until = Data.Minute + Math.Min(until - Data.Minute, Math.Max(6, window - RoutineJourneyMinutes(r, best.place) - 4));
             Begin(r, best.activity, best.fixture == null ? "" : best.fixture.Id, best.place, until, "");
+            return true;
         }
-        void Begin(Resident r, string activity, string fixture, Point target, int until, string partner)
+        internal void Begin(Resident r, string activity, string fixture, Point target, int until, string partner)
         {
             r.Activity = activity; r.ActivityFixture = fixture; r.ActivityTarget = target; r.ActivityUntil = until; r.ActivityPartner = partner;
+            r.ActivityDuration = r.ActivityRemaining = Math.Max(1, Math.Min(120, until - Data.Minute));
+            r.ActivityPhase = "Travel"; r.ActivityPlannedMinute = r.ActivityPhaseMinute = r.ActivityLastProgressMinute = Data.Minute;
+            r.ActivityLastPosition = r.Position; r.ActivityReason = ReasonFor(r, activity); r.ActivityBlocker = ""; r.ActivityLastEffectMinute = r.ActivityResumeBy = -1;
+            ChangeRoutineRoute(r);
         }
-        // Friends meet somewhere sociable: a common-room bench or table near both, or halfway between their bunks.
+        // Prefer a nearby visible social place, otherwise meet halfway from current positions.
         Point MeetingSpot(Resident a, Resident b)
         {
-            Point mid = new Point((a.Home.X + b.Home.X) / 2, (a.Home.Y + b.Home.Y) / 2);
-            Fixture seat = Data.Fixtures.Where(f => (f.Kind == "Bench" || f.Kind == "Table") && Rooms.Any(room => Geometry.Contains(room, f.Position)) && Geometry.Distance(f.Position, mid) < 10)
+            Point mid = new Point((a.Position.X + b.Position.X) / 2, (a.Position.Y + b.Position.Y) / 2);
+            Fixture seat = Data.Fixtures.Where(f => (f.Kind == "Bench" || f.Kind == "Table") && Rooms.Any(room => Geometry.Contains(room, f.Position)) && Geometry.Distance(f.Position, mid) < 5 && SightLines.Clear(a.Position, Geometry.AccessPoint(f)) && SightLines.Clear(b.Position, Geometry.AccessPoint(f)))
                 .OrderBy(f => Geometry.Distance(f.Position, mid)).ThenBy(f => f.Id, StringComparer.Ordinal).FirstOrDefault();
             return NearbyClear(seat != null ? Geometry.AccessPoint(seat) : mid, Routes);
         }
-        bool AtActivity(Resident r) { return Geometry.Distance(r.Position, r.Activity == "Quiet" ? r.Home : r.ActivityTarget) < 1.0f; }
-        public bool DoingActivity(Resident r) { return r.Activity != "" && r.ActivityUntil > Data.Minute && AtActivity(r); }
+        bool AtActivity(Resident r) { return Geometry.Distance(r.Position, r.Activity == "Quiet" ? r.Home : r.ActivityTarget) < .22f; }
+        public bool DoingActivity(Resident r) { return r.Activity != "" && r.ActivityPhase == "Acting" && r.ActivityRemaining > 0 && r.ActivityUntil > Data.Minute && FreeTime(r) && AtActivity(r) && ActivityObjectValid(r); }
         internal void LiveActivity(Resident r)
         {
-            if (!AtActivity(r)) return;
+            if (!DoingActivity(r)) return;
             LivesState l = Lives;
             switch (r.Activity)
             {
@@ -276,7 +308,7 @@ namespace Cellblock.Core
                     if (Data.Minute % 5 == 0)
                         foreach (Resident o in Data.Residents)
                         {
-                            if (o == r || o.Activity != "Television" || o.ActivityFixture != r.ActivityFixture || !AtActivity(o)) continue;
+                            if (o == r || o.Activity != "Television" || o.ActivityFixture != r.ActivityFixture || !DoingActivity(o) || Geometry.Distance(o.Position, r.Position) > 3.2f || !SightLines.Clear(o.Position, r.Position)) continue;
                             Relationship rel = r.Relationships.FirstOrDefault(x => x.OtherId == o.Id);
                             if (rel == null) continue;
                             // Shared shows build familiarity; a rival in the next seat means arguments over the channel.
@@ -287,7 +319,7 @@ namespace Cellblock.Core
                 case "Study":
                 {
                     // A library clerk at work or a caseworker on shift makes study go faster.
-                    bool tutor = Data.Residents.Any(o => o != r && AccountOf(o) != null && AccountOf(o).Job == "library" && AtWork(o)) || Data.Staff.Any(s => IsOnShift(s) && s.Role == "Caseworker" && !IsNurse(s));
+                    bool tutor = Data.Residents.Any(o => o != r && AccountOf(o) != null && AccountOf(o).Job == "library" && AtWork(o) && Geometry.Distance(o.Position, r.Position) < 4 && SightLines.Clear(o.Position, r.Position)) || Data.Staff.Any(s => IsOnShift(s) && s.Role == "Caseworker" && !IsNurse(s) && Geometry.Distance(s.Position, r.Position) < 4 && SightLines.Clear(s.Position, r.Position));
                     r.StudyMinutes += tutor && Data.Minute % 2 == 0 ? 2 : 1;
                     r.Stress = Math.Max(0, r.Stress - 0.006f); r.Discipline = Math.Min(90, r.Discipline + 0.002f);
                     if (r.StudyMinutes >= (r.Certificates + 1) * LifeRules.CertificateMinutes)
@@ -301,7 +333,7 @@ namespace Cellblock.Core
                 case "Talk":
                 {
                     Resident o = Find(r.ActivityPartner);
-                    if (o == null || !AtActivity(o) || Geometry.Distance(o.Position, r.Position) > 2.6f) break;
+                    if (o == null || o.Activity != "Talk" || o.ActivityPartner != r.Id || !DoingActivity(o) || Geometry.Distance(o.Position, r.Position) > 2.6f || !SightLines.Clear(r.Position, o.Position)) break;
                     r.TalkMinutes++;
                     Relationship rel = r.Relationships.FirstOrDefault(x => x.OtherId == o.Id);
                     if (rel != null) { rel.Trust = Math.Min(100, rel.Trust + 0.04f); rel.Tension = Math.Max(0, rel.Tension - 0.03f); }
@@ -381,7 +413,7 @@ namespace Cellblock.Core
             if (r.Activity == "" || r.ActivityUntil <= Data.Minute) return "";
             string what = LifeRules.Describe(r.Activity);
             if (r.Activity == "Talk") { Resident o = Find(r.ActivityPartner); if (o != null) what = "Talking with " + o.Name; }
-            return what + (AtActivity(r) ? "" : " (on the way)");
+            return what + (r.ActivityPhase == "Acting" ? "" : " · " + r.ActivityPhase.ToLowerInvariant());
         }
 
         // Demo: a free hour with every kind of activity in reach.
