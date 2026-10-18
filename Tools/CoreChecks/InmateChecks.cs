@@ -131,13 +131,42 @@ static partial class Program
             RunTo(w, (w.Data.Minute / 1440 + 1) * 1440 + 6 * 60 + 1);
             Check(!w.InmateSleeping && Geometry.Distance(you.Position, you.Home) < .1f, "Still asleep, or wandered off");
         });
-        Test("prisoner mode · serving the sentence walks you out and ends the run", () => {
-            Resident you; World w = InmateWorld(out you); OfficersAway(w);
+        Test("prisoner mode · serving the sentence walks you out and ends the run only on actual release", () => {
+            // Officers stay on post: this run saves and reloads mid-walk, and off-site staff are not a valid save.
+            Resident you; World w = InmateWorld(out you);
             w.EndCharacterControl();
             you.Legal.ReleaseMinute = w.Data.Minute + 5;
-            for (int i = 0; i < 2000 && w.InmateRun.Outcome == ""; i++) w.AdvanceMinutes(1);
-            Check(w.InmateRun.Outcome == "Released" && w.InmateRun.OutcomeText.Contains("walked out"), "Not released: " + you.Legal.Custody + " " + w.InmateRun.Outcome);
-            Check(!w.InmateServing && !w.InmateMayControl(you.Id), "Still serving after release");
+            for (int i = 0; i < 200 && you.Legal.Custody != "Release processing"; i++) w.AdvanceMinutes(1);
+            Check(you.Legal.Custody == "Release processing", "Release processing never began: " + you.Legal.Custody);
+            Point start = you.Position; int walked = 0; bool reloaded = false;
+            while (you.Legal.Custody == "Release processing" && walked++ < 2000)
+            {
+                Check(w.InmateRun.Outcome == "" && w.InmateServing, "FREE was declared during release processing");
+                w.AdvanceMinutes(1);
+                if (!reloaded && walked == 3)
+                {
+                    w = new World(RoundTrip(w.Data)); reloaded = true; you = w.Inmate;
+                    Check(you != null && you.Legal.Custody == "Release processing" && w.InmateRun.Outcome == "", "Reload during processing lost the walk");
+                }
+            }
+            Check(w.InmateRun.Outcome == "Released" && w.InmateRun.OutcomeText.Contains("walked out"), "Not released: " + w.InmateRun.Outcome);
+            Resident former = w.FormerResidents.FirstOrDefault(r => r.Id == w.InmateRun.ResidentId);
+            Check(former != null && former.Legal.Custody == "Released" && Geometry.Distance(former.Position, start) > 1, "Released without the physical walk");
+            Check(w.InmateRun.Journal.Count(j => j.EndsWith("Walking out to the sally port.")) == 1, "The walk-out note repeated after reload");
+            Check(!w.InmateServing && !w.InmateMayControl(w.InmateRun.ResidentId), "Still serving after release");
+        });
+        Test("prisoner mode · a blocked exit leaves you awaiting release, and the run resumes when access returns", () => {
+            Resident you; World w = InmateWorld(out you); w.EndCharacterControl();
+            State blocked = RoundTrip(w.Data);
+            Wall[] room = { Facility.Line(-5,-15,1,-15), Facility.Line(1,-15,1,-10), Facility.Line(1,-10,-5,-10), Facility.Line(-5,-10,-5,-15) };
+            for (int i = 0; i < room.Length; i++) { room[i].Id = "release-block-" + i; blocked.Walls.Add(room[i]); }
+            w = new World(blocked); you = w.Inmate; you.Legal.ReleaseMinute = w.Data.Minute + 1;
+            w.AdvanceMinutes(240);
+            Check(w.Data.Residents.Contains(you) && you.Legal.Custody == "Release processing" && w.InmateRun.Outcome == "", "A blocked exit ended the run: " + you.Legal.Custody + " " + w.InmateRun.Outcome);
+            State cleared = RoundTrip(w.Data); cleared.Walls.RemoveAll(x => x.Id.StartsWith("release-block-")); cleared.GeometryGeneration++;
+            World restored = new World(cleared);
+            for (int i = 0; i < 600 && restored.InmateRun.Outcome == ""; i++) restored.AdvanceMinutes(1);
+            Check(restored.InmateRun.Outcome == "Released" && restored.FormerResidents.Any(r => r.Id == restored.InmateRun.ResidentId), "Restoring access did not finish the release");
         });
     }
 }

@@ -27,6 +27,7 @@ namespace Cellblock.Editor
         static RenderTexture hud;
         static string youId = "", otherId = "";
         static int shot, readyFrame, width = 1600, height = 900, polls;
+        static bool sawProcessing; static Point processingFrom;
 
         static InmateCapture()
         {
@@ -43,7 +44,7 @@ namespace Cellblock.Editor
             if (!EditorApplication.isPlaying) throw new InvalidOperationException("Feature review requires the shared Play runner.");
             Output = Path.Combine("Temp/CellblockFeatureReviews", "inmate", DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N").Substring(0, 6));
             Directory.CreateDirectory(Output);
-            errors.Clear(); notes.Clear(); shot = 0;
+            errors.Clear(); notes.Clear(); shot = 0; sawProcessing = false;
             SessionState.SetBool(ActiveKey, true); SessionState.SetInt(StageKey, 0);
             SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + 4);
         }
@@ -153,12 +154,27 @@ namespace Cellblock.Editor
                         string state = game.PreviewInmate; notes.Add("menu: " + state);
                         Check(state.Contains("sheet=1") && state.Contains("PAUSED") && game.PreviewBlocksSimulation, "Menu sheet: " + state);
                         Composite(game, "prisoner-menu");
-                        game.PreviewInmateSheet(false);
+                        // Unfinished run: Save and leave is a real session boundary (preview companies never write a slot).
+                        game.LeaveInmateRun();
+                        Next(1); return;
+                    }
+                    case 11:
+                    {
+                        string state = game.PreviewInmate; notes.Add("left unfinished: " + state);
+                        Check(state.Contains("home=1") && state.Contains("sheet=0") && state.Contains("card=0") && !game.CharacterDirect, "Save and leave did not reach a clean Home: " + state);
+                        Composite(game, "prisoner-left-home");
+                        game.PreviewHomeContinue();
+                        Next(1); return;
+                    }
+                    case 12:
+                    {
+                        string state = game.PreviewInmate; notes.Add("continued: " + state + " speed=" + w.Data.Speed);
+                        Check(state.Contains("home=0") && state.Contains("sheet=0") && w.Data.Speed == 1, "Continue did not resume the run: " + state + " speed=" + w.Data.Speed);
                         w.Inmate.Legal.RestrictedUntil = w.Data.Minute; w.Inmate.SeparatedUntil = -1;
                         game.PreviewControlDevice(ControlDevice.Touch); Target(game, 900, 420);
                         Next(1.5f); return;
                     }
-                    case 11:
+                    case 13:
                     {
                         game.PreviewRelayout();
                         string state = game.PreviewInmate; notes.Add("touch 900x420: " + state);
@@ -169,17 +185,49 @@ namespace Cellblock.Editor
                         w.Inmate.Legal.ReleaseMinute = w.Data.Minute + 2;
                         Next(.5f); return;
                     }
-                    case 12:
+                    case 14:
                     {
-                        if (w.InmateRun.Outcome == "" && polls < 40) { game.PreviewAdvance(60); Again(.2f); return; }
+                        // Small steps, so release processing is observed as a walk and never as an early FREE.
+                        if (w.Inmate != null && w.Inmate.Legal.Custody == "Release processing")
+                        {
+                            Check(w.InmateRun.Outcome == "", "FREE was shown while still walking out");
+                            if (!sawProcessing) { sawProcessing = true; processingFrom = w.Inmate.Position; notes.Add("release processing began at " + processingFrom); }
+                        }
+                        if (w.InmateRun.Outcome == "" && polls < 400) { game.PreviewAdvance(sawProcessing ? 2 : 30); Again(.05f); return; }
                         Check(w.InmateRun.Outcome == "Released", "Serving the sentence did not release the prisoner: " + w.Inmate?.Legal.Custody);
+                        Resident former = w.FormerResidents.FirstOrDefault(r => r.Id == w.InmateRun.ResidentId);
+                        Check(sawProcessing && former != null && former.Legal.Custody == "Released" && Geometry.Distance(former.Position, processingFrom) > 1, "No physical walk to the sally port before FREE");
+                        notes.Add("released at " + (former == null ? "?" : former.Position.ToString()));
                         Next(1); return;
                     }
-                    case 13:
+                    case 15:
                     {
                         string state = game.PreviewInmate; notes.Add("released: " + state);
                         Check(state.Contains("sheet=1") && state.Contains("FREE"), "No release sheet: " + state);
                         Composite(game, "prisoner-released");
+                        game.LeaveInmateRun(); // the displayed Back to Home
+                        Next(1.5f); return;
+                    }
+                    case 16:
+                    {
+                        string state = game.PreviewInmate; notes.Add("home after FREE: " + state);
+                        Check(state.Contains("home=1") && state.Contains("sheet=0"), "Back to Home left the ending sheet up: " + state);
+                        Composite(game, "prisoner-free-home");
+                        game.PreviewHomeContinue();
+                        Next(1); return;
+                    }
+                    case 17:
+                    {
+                        string state = game.PreviewInmate; notes.Add("continue finished run: " + state);
+                        Check(state.Contains("home=0") && state.Contains("sheet=1") && state.Contains("FREE") && w.Data.Speed == 0, "Continue on a finished run should return to its ending: " + state);
+                        game.LeaveInmateRun();
+                        game.PreviewModeCompany("county-maximum", "briar-county");
+                        Next(1); return;
+                    }
+                    case 18:
+                    {
+                        string state = game.PreviewInmate; notes.Add("another holding: " + state);
+                        Check(!game.InmateMode && state.Contains("sheet=0") && state.Contains("card=0"), "Prisoner UI followed into another holding: " + state);
                         Finish(game, errors.Count == 0); return;
                     }
                 }

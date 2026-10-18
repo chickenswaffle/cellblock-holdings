@@ -15,7 +15,14 @@ namespace Cellblock.Unity
     public sealed partial class GameController
     {
         float inmateRetryAt;
-        bool inmateFastForward;
+        bool inmateFastForward, inmateHomeShown;
+        // Pending design approval (docs/prisoner-mode-plan.md), prisoner play exists only in the editor and development
+        // builds; release players never offer or start it.
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        public const bool InmateModeAvailable = true;
+#else
+        public const bool InmateModeAvailable = false;
+#endif
         public bool InmateMode { get { return World != null && World.InmateMode; } }
         public bool InmateFastForward { get { return inmateFastForward; } }
         public void ToggleInmateFastForward() { inmateFastForward = !inmateFastForward; hud.Refresh(true); }
@@ -23,6 +30,7 @@ namespace Cellblock.Unity
         // From the charter screen: build the facility, then serve time in it.
         public bool StartInmateRun(string type, string location, int days)
         {
+            if (!InmateModeAvailable) return false;
             if (!StartModeCompany(type, location)) return false;
             if (!World.StartInmateRun(days)) { Message(World.Notice); return false; }
             World.Data.Speed = 1; inmateFastForward = false; inmateRetryAt = 0;
@@ -32,9 +40,18 @@ namespace Cellblock.Unity
         // Every frame with a company open, before input.
         void InmateUpdate()
         {
-            hud.SetInmateMode(InmateMode);
-            if (!InmateMode) return;
+            // Home sits above the run: no sheet, no control, no camera changes until the player comes back.
+            bool home = hud.HomeShown;
+            hud.SetInmateMode(InmateMode && !home);
+            if (!InmateMode) { inmateFastForward = false; inmateHomeShown = false; return; }
             World w = World; InmateRunState run = w.InmateRun;
+            if (home) { inmateHomeShown = true; return; }
+            if (inmateHomeShown)
+            {
+                // Back from Home (Continue): Home paused the clock and there is no management speed control here.
+                inmateHomeShown = false; inmateRetryAt = 0;
+                if (run.Outcome == "" && w.Data.Speed == 0) w.Data.Speed = 1;
+            }
             if (run.Outcome != "")
             {
                 if (CharacterDirect) EndCharacterView(false);
@@ -76,7 +93,14 @@ namespace Cellblock.Unity
             if (!open) return false;
             ClearCharacterInput(); hud.ShowInmateSheet(); return true;
         }
-        public void LeaveInmateRun() { Save(false); hud.CloseInmateSheet(); EndCharacterView(false); hud.ShowMenu(); }
+        // Save and leave (unfinished) or Back to Home (finished): an explicit session boundary. Input and cursor are
+        // released, the sheet is dismissed even though a finished run's sheet has no ordinary Back, and InmateUpdate
+        // stays quiet while Home is up.
+        public void LeaveInmateRun()
+        {
+            Save(false); ClearCharacterInput(); hud.DismissInmateSheet(); EndCharacterView(false);
+            inmateFastForward = false; inmateHomeShown = true; hud.ShowMenu();
+        }
 #if UNITY_EDITOR
         public string PreviewInmate { get { return hud.PreviewInmateState; } }
         public void PreviewCharterStep(string type, string location, int step) { hud.PreviewCharterStep(type, location, step); }
@@ -88,6 +112,7 @@ namespace Cellblock.Unity
             if (!World.StartInmateRun(days)) throw new System.InvalidOperationException(World.Notice);
             World.Data.Speed = 1; inmateFastForward = false; inmateRetryAt = 0;
         }
+        public void PreviewHomeContinue() { hud.PreviewHomeContinue(); }
         public void PreviewInmateSheet(bool open) { if (open) hud.ShowInmateSheet(); else hud.CloseInmateSheet(); }
         public bool PreviewBlocksSimulation { get { return hud.BlocksSimulation; } }
         public bool PreviewPersonPosition(string id, out Vector3 position) { return view.TryGetPersonPosition(id, out position); }
@@ -142,15 +167,21 @@ namespace Cellblock.Unity
         {
             if (on == inmateModeShown || root == null) return;
             inmateModeShown = on; root.EnableInClassList("inmate-mode", on);
-            if (!on) { inmateCard.style.display = DisplayStyle.None; CloseInmateSheet(); }
+            if (!on) { inmateCard.style.display = DisplayStyle.None; DismissInmateSheet(); }
             Refresh(true);
         }
         public void ShowInmateSheet()
         {
-            if (inmateSheetOpen || inmateSheet == null || game.World == null || !game.World.InmateMode) return;
+            if (inmateSheetOpen || inmateSheet == null || game.World == null || !game.World.InmateMode || HomeShown) return;
             inmateSheetOpen = true; inmateSheet.style.display = DisplayStyle.Flex; inmateSheet.BringToFront();
             CloseCharacterPhone(); game.ClearCharacterInput(); ResetCharacterSticks();
             RefreshInmateSheet(game.World);
+        }
+        public bool HomeShown { get { return menu != null && menu.style.display.value != DisplayStyle.None; } }
+        public void DismissInmateSheet()
+        {
+            if (!inmateSheetOpen) return;
+            inmateSheetOpen = false; inmateSheet.style.display = DisplayStyle.None; Refresh(true);
         }
         public void CloseInmateSheet()
         {
@@ -215,7 +246,7 @@ namespace Cellblock.Unity
         {
             get
             {
-                return "card=" + (inmateCard != null && inmateCard.style.display != DisplayStyle.None ? 1 : 0) + " sheet=" + (inmateSheetOpen ? 1 : 0) +
+                return "home=" + (HomeShown ? 1 : 0) + " card=" + (inmateCard != null && inmateCard.style.display != DisplayStyle.None ? 1 : 0) + " sheet=" + (inmateSheetOpen ? 1 : 0) +
                     " name=" + (inmateName == null ? "" : inmateName.text) + " day=" + (inmateDay == null ? "" : inmateDay.text) + " schedule=" + (inmateSchedule == null ? "" : inmateSchedule.text) +
                     " alert=" + (inmateAlert == null ? "" : inmateAlert.text) + " title=" + (inmateSheetTitle == null ? "" : inmateSheetTitle.text);
             }

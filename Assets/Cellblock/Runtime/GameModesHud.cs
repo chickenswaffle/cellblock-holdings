@@ -87,7 +87,7 @@ namespace Cellblock.Unity
             modeLocations.style.display=modeStep==2?DisplayStyle.Flex:DisplayStyle.None;
             var steps=modeScroll.Query<Label>(className:"mode-step").ToList();for(int i=0;i<steps.Count;i++)steps[i].style.display=i==modeStep?DisplayStyle.Flex:DisplayStyle.None;
             modeBack.style.display=modeStep==0?DisplayStyle.None:DisplayStyle.Flex;modeNext.style.display=modeStep<2?DisplayStyle.Flex:DisplayStyle.None;modeCreate.style.display=modeStep==2?DisplayStyle.Flex:DisplayStyle.None;
-            FacilityType doTimeType=GameModes.Type(pickType);modeDoTime.style.display=modeStep==2&&onCharter!=null&&doTimeType!=null&&doTimeType.Housing!="Single cells"?DisplayStyle.Flex:DisplayStyle.None;
+            FacilityType doTimeType=GameModes.Type(pickType);modeDoTime.style.display=GameController.InmateModeAvailable&&modeStep==2&&onCharter!=null&&doTimeType!=null&&doTimeType.Housing!="Single cells"?DisplayStyle.Flex:DisplayStyle.None;
 
             foreach (ModeTier tier in GameModes.Tiers)
             {

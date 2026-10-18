@@ -15,9 +15,11 @@ namespace Cellblock.Editor
     public static class ClaudeBatch
     {
         const string ModeKey = "Cellblock.ClaudeBatch.Mode", LaunchKey = "Cellblock.ClaudeBatch.Launch", PlayedKey = "Cellblock.ClaudeBatch.Played";
-        static ClaudeBatch() { if (SessionState.GetString(ModeKey, "") != "") EditorApplication.update += Wait; }
+        static ClaudeBatch() { if (Application.isBatchMode && SessionState.GetString(ModeKey, "") != "") EditorApplication.update += Wait; }
         public static void Run()
         {
+            // Enforced, not just documented: an interactive editor (the shared Mac checkout) must never get a scheduled exit.
+            if (!Application.isBatchMode) { Debug.LogError("CELLBLOCK_BATCH refused: ClaudeBatch.Run is batch-mode only."); return; }
             string[] args = Environment.GetCommandLineArgs();
             int i = Array.IndexOf(args, "-cellblockFeature");
             string mode = i >= 0 && i + 1 < args.Length ? args[i + 1] : "";

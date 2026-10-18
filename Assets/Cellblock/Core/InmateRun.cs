@@ -487,8 +487,11 @@ namespace Cellblock.Core
             if (!InmateServing) return;
             InmateRunState run = InmateRun;
             Resident you = Inmate;
-            if (you == null || you.Legal.Custody == "Release processing" || you.Legal.Custody == "Released" || you.Legal.Custody == "Deceased" || you.Legal.Custody == "At large")
+            if (you == null || you.Legal.Custody == "Released" || you.Legal.Custody == "Deceased" || you.Legal.Custody == "At large")
             { EndRun(you); return; }
+            // Release processing is a physical walk to the sally port that Justice owns; a blocked route leaves you
+            // awaiting release. The run ends only when Justice actually releases you (you leave the roster).
+            if (you.Legal.Custody == "Release processing") { BeginReleaseWalk(you); return; }
             if (!IsPresent(you)) return; // court, transport: their systems own the person for now
             run.Heat = Math.Max(0, run.Heat - .04f);
             bool moving = character != null && character.Resident == you && character.Intent.Length > .0001f;
@@ -566,6 +569,14 @@ namespace Cellblock.Core
                 else Notice = foe.Name + " hits you!";
             }
         }
+        void BeginReleaseWalk(Resident you)
+        {
+            // Nothing else owns you now: no sleep, no lock-in walk, no fight. Read from the saved journal so a reload
+            // mid-walk neither repeats the note nor diverges.
+            if (inmateSleeping || responsePhase != "" || foeUntil.Count > 0) { inmateSleeping = false; if (responsePhase != "") CancelResponse(); foeUntil.Clear(); foeSwingAt.Clear(); }
+            const string walking = "release paperwork done. Walking out to the sally port.";
+            if (!InmateRun.Journal.Any(j => j.EndsWith(walking))) { InmateNote(When(Data.Minute) + ": " + walking); Notice = "Release processing: you are walked out to the sally port."; }
+        }
         void EndRun(Resident you)
         {
             InmateRunState run = InmateRun;
@@ -584,6 +595,7 @@ namespace Cellblock.Core
         {
             if (!InmateServing) return;
             Resident you = Inmate; if (you == null) return;
+            if (resident == you && you.Legal.Custody != "In facility") return; // release/court walks belong to Justice
             if (resident == you)
             {
                 if (inmateSleeping) { skip = true; resident.Position = resident.Home; return; }

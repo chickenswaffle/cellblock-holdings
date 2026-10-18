@@ -202,6 +202,17 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 
 ## Claude log
 
+### 2026-10-18 — c75efa6 acknowledged: prisoner lifecycle blockers, batch guard, LookCapture input restore
+
+- Acknowledged Codex `c75efa6` on `codex/claude-overload` (merged as `1e84371` over `fcc2b95`). Scope: exactly the review's items, plus the dev gate exception it granted. Accepted controller fixes and both `pad`/`inmate` dispatch cases retained unchanged.
+- **P1 FREE before release:** `Core/InmateRun.cs` AdvanceInmate no longer ends the run on `Release processing`; it clears sleep/response/foes once, writes one journal note (read from the saved journal, so reload mid-walk neither repeats it nor diverges) and returns. InmateMovement yields to Justice whenever custody is not `In facility`. The run ends only when Justice actually releases you (roster → Former). Justice.cs untouched; its blocked-release rule holds.
+- **P1 Back to Home:** `LeaveInmateRun` is an explicit session boundary: save, ClearCharacterInput, `DismissInmateSheet` (bypasses the finished-run Back restriction), end the character view, show Home. `InmateUpdate` suppresses inmate UI/control while `HomeShown`; `ShowInmateSheet` refuses under Home. Continue on an unfinished run restores speed 1 (Home paused it and there is no management speed control); Continue on a finished run returns to its ending sheet; another holding drops all inmate UI.
+- **Dev gate:** `GameController.InmateModeAvailable` (`UNITY_EDITOR || DEVELOPMENT_BUILD`). Release players hide the charter Do time row and `StartInmateRun` refuses. Implementation kept.
+- **Batch guard:** `ClaudeBatch.Run` and its InitializeOnLoad resubscription refuse unless `Application.isBatchMode`.
+- **LookCapture:** snapshots/restores both global Input System settings in Finish (abort routes through Finish), same contract as PadCapture; the report records the restored values.
+- **Evidence (Claude clone, batch):** core **431/431** (two new inmate checks: clear walk with save/reload mid-walk + physical distance + single note; blocked exit stays Release processing and finishes after access returns). Mutant restoring the old early EndRun fails both. InmateCapture extended to 18 stages/10 frames, PASSED: Save and leave → clean Home → Continue (speed 1) → release walk observed (11.5 m, never FREE early) → FREE → Back to Home (sheet gone) → Continue (ending) → another holding (no inmate UI). LookCapture PASSED with settings restored (`ResetAndDisableNonBackgroundDevices` / `PointersAndKeyboardsRespectGameViewFocus`).
+- Open: ClickEvent-only HUD cards → semantic controls (controller follow-on); partial-body reticle anchors. No edits to Justice, Home/save shell beyond the two `GameInmate.cs` partial members, or Codex runtime files.
+
 ### 2026-10-16 — justice/custody acknowledgement
 
 - Read `AGENTS.md`, `CLAUDE.md`, this file, and `docs/claude-handoff.md` at `950455e`. Claude cannot read `/Users/trading/Documents/ChatGPT/Cellblock Holdings` (macOS privacy denies the terminal), so it works in a separate remote-style clone at `~/ClaudeWorkspace/cellblock-holdings` on branch `codex/claude-justice-custody` from `950455e`. The local lock (`claim claude justice`) exists only in that clone; this row is the cross-clone claim.
