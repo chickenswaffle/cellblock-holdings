@@ -31,6 +31,12 @@ static partial class Program
         return w;
     }
     static void FreeHour(World w) { RunTo(w, 9 * 60 + 1); }
+    static void ActingAt(World w, Resident r, string activity, string kind)
+    {
+        Fixture f = w.Data.Fixtures.First(x => x.Kind == kind);
+        Point p = w.ActivityPlaces(f, activity).First(x => PeopleDynamics.ClearStaffStation(x, w.Routes, w.Data.Fixtures));
+        w.Begin(r, activity, f.Id, p, w.Data.Minute + 80, ""); r.Position = p; r.ActivityPhase = "Acting";
+    }
 
     static void RunResidentLivesChecks()
     {
@@ -46,9 +52,9 @@ static partial class Program
             Check(w.Data.Residents.Count(r => r.Activity != "") >= 4, "Few residents chose an activity at 09:30: " + w.Data.Residents.Count(r => r.Activity != ""));
             Check(w.Data.Residents.Select(r => r.Activity).Distinct().Count() >= 3, "Everyone chose the same thing: " + string.Join(",", w.Data.Residents.Select(r => r.Activity)));
             RunTo(w, 12 * 60 + 30);
-            Check(w.Data.Residents.Where(r => w.IsPresent(r)).All(r => r.Activity == "" || r.Activity == "Quiet"), "An activity ran through lunch");
+            Check(w.Data.Residents.Where(r => w.IsPresent(r)).All(r => !w.DoingActivity(r) && (r.Activity == "" || r.ActivityPhase == "Suspended")), "An activity ran through lunch");
             RunTo(w, 23 * 60);
-            Check(w.Data.Residents.All(r => r.Activity == ""), "Activities at night");
+            Check(w.Data.Residents.All(r => !w.DoingActivity(r) && (r.Activity == "" || r.ActivityPhase == "Suspended")), "Activities at night");
             World locked = LivesWorld(); locked.SetLockdown(true); FreeHour(locked); locked.AdvanceMinutes(30);
             Check(locked.Data.Residents.All(r => r.Activity == ""), "Activities during lockdown");
         });
@@ -74,7 +80,7 @@ static partial class Program
         Test("reading finishes books and study earns a certificate that counts at sentencing", () => {
             World w = LivesWorld(); Resident r = w.Data.Residents[0];
             FreeHour(w);
-            r.Activity = "Reading"; r.ActivityFixture = "life-shelf"; r.ActivityTarget = r.Position; r.ActivityUntil = int.MaxValue / 2;
+            ActingAt(w, r, "Reading", "Bookshelf");
             r.ReadingMinutes = 199; r.BooksRead = 0;
             w.AdvanceMinutes(1);
             Check(r.BooksRead == 0 && r.ReadingMinutes == 200, "A book finished after 200 minutes: minutes " + r.ReadingMinutes + " books " + r.BooksRead);
@@ -82,7 +88,7 @@ static partial class Program
             w.AdvanceMinutes(1);
             Check(r.BooksRead == 1 && r.ReadingMinutes == 240 && r.Memories.Any(m => m.Kind == "book"), "No book finished at 240 minutes: " + r.ReadingMinutes);
             Resident s = w.Data.Residents[1];
-            s.StudyMinutes = 799; s.Activity = "Study"; s.ActivityTarget = s.Position; s.ActivityUntil = int.MaxValue / 2;
+            s.StudyMinutes = 799; ActingAt(w, s, "Study", "Table");
             w.AdvanceMinutes(1);
             Check(s.Certificates == 0, "A certificate after 800 minutes of study");
             s.StudyMinutes = 899; s.Activity = "Study"; s.ActivityTarget = s.Position; s.ActivityUntil = int.MaxValue / 2;
@@ -107,7 +113,8 @@ static partial class Program
             // Near-equals both clear the thresholds, but neither is clearly steadier: nobody mentors.
             World v = LivesWorld(); Resident c = v.Data.Residents[0], d = v.Data.Residents[1];
             c.Discipline = 85; c.Impulsivity = 62; d.Discipline = 72; d.Impulsivity = 80; Pair(c, d, 5, 85);
-            foreach (Resident x in new[] { c, d }) { x.Activity = "Talk"; x.ActivityPartner = x == c ? d.Id : c.Id; x.ActivityTarget = x.Position; x.ActivityUntil = int.MaxValue / 2; }
+            v.Data.Minute = 541;
+            foreach (Resident x in new[] { c, d }) { x.Food = 100; x.RoutineOffset = 0; x.Activity = "Talk"; x.ActivityPhase = "Acting"; x.ActivityDuration = x.ActivityRemaining = 80; x.ActivityPartner = x == c ? d.Id : c.Id; x.ActivityTarget = x.Position; x.ActivityUntil = int.MaxValue / 2; }
             d.Position = c.Position + new Point(0.8f, 0); d.ActivityTarget = d.Position;
             v.LiveActivity(c); v.LiveActivity(d);
             Check(c.MentorId == "" && d.MentorId == "" && v.Lives.Mentorships == 0, "Near-equals started mentoring");

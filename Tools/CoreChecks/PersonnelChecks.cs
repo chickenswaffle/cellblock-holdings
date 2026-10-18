@@ -112,10 +112,12 @@ static partial class Program
             Resident resident = world.Data.Residents[4]; float before = world.EscapeRisk(resident);
             Check(world.AssignWatch(officer.Id, resident.Id), world.Notice);
             Check(Math.Abs(world.EscapeRisk(resident) - Math.Max(0, before - 18)) < 0.01f, "An integrity-80 watch did not cut risk by 18");
-            world.AdvanceMinutes(300);
+            int priorityMinutes = 0;
+            for (int minute = 0; minute < 300; minute++) { world.AdvanceMinutes(1); if (new[] { "Radioing control", "Responding to fight", "Separating residents", "Responding to escape" }.Contains(officer.Duty)) priorityMinutes++; }
             PersonnelFile file = FileOf(world, officer);
+            // Incident response legitimately interrupts a close-watch assignment.
             // With duty-target hysteresis the watcher stays close 82-96% of the time; re-planning every minute gives 41-69%.
-            Check(file.WatchMinutes > 250 && file.WatchCloseMinutes / (float)file.WatchMinutes > 0.75f, "The watch officer did not stay close: " + file.WatchCloseMinutes + "/" + file.WatchMinutes);
+            Check(file.WatchMinutes + priorityMinutes > 250 && file.WatchMinutes > 0 && file.WatchCloseMinutes / (float)file.WatchMinutes > 0.75f, "The watch officer did not stay close: " + file.WatchCloseMinutes + "/" + file.WatchMinutes);
             Check(!world.Personnel.WriteUps.Any(w => w.SubjectId == officer.Id && w.Category == "Neglect of duty"), "A watch officer keeping pace was written up for neglect");
             officer.FavoredGang = resident.Gang; officer.Favoritism = 40;
             Check(world.WatchReliability(officer, resident) == 0, "A watch officer who favors the resident's gang still counted");
@@ -344,6 +346,8 @@ static partial class Program
             World world = County(); world.EnsureLegalProfiles();
             Resident minor = world.Data.Residents[0], serious = world.Data.Residents[1];
             minor.Health = 60; serious.Health = 30; minor.Food = serious.Food = 90;
+            // Isolate natural recovery from seeded incidental fights; keep meal access live.
+            foreach (Resident person in world.Data.Residents) person.Impulsivity = 0;
             world.AdvanceMinutes(1200);
             Check(minor.Health >= 72, "A minor injury did not heal on its own: " + minor.Health);
             Check(serious.Health < 36, "A serious injury healed without a nurse: " + serious.Health);
