@@ -28,19 +28,19 @@ namespace Cellblock.Editor
         static bool running, completed, naturalContact, naturalCuffs, naturalEscort;
         static int scenarios, naturalStartMinute, naturalInterceptions;
         static Point naturalEscortStart;
+        static bool nightAlarm, nightShadows, shadowsOff, reducedMotionStatic, shadowRetired, shadowWorldReset;
+        static bool capturedPreferences, previousReducedMotion, previousShadows;
+        static float reducedVignetteMin, reducedVignetteMax;
+        static GameController preferencesOwner;
 
-        const string NightOnlyKey = "Cellblock.Escape.NightOnly";
-        static bool NightOnly { get { return SessionState.GetBool(NightOnlyKey, false); } }
-
-        // Only the night scenario (alarm grade and contact shadows), through the same safe runner.
-        [MenuItem("Cellblock/Capture night alarm review")]
-        public static void RunNight() { SessionState.SetBool(NightOnlyKey, true); PresentationPreview.RequestEscapeReview(); }
         [MenuItem("Cellblock/Capture staged escape review")]
         public static void Run()
         {
-            SessionState.SetBool(NightOnlyKey, false);
             PresentationPreview.RequestEscapeReview();
         }
+        // Compatibility entry: night coverage is part of the full safe review, never a second runner.
+        [MenuItem("Cellblock/Capture night atmosphere with escape review")]
+        public static void RunNight() { Run(); }
         internal static void PrepareRequest()
         {
             Reset();
@@ -51,21 +51,25 @@ namespace Cellblock.Editor
         }
         static void Reset()
         {
+            RestoreCapturePreferences();
             Time.captureDeltaTime = 0;
             if (log != null) { log.Dispose(); log = null; }
             step = frames = shotFrame = scenarios = 0; lastFrame = doneSince = -1; shot = escapeeId = leadId = "";
             running = completed = naturalContact = naturalCuffs = naturalEscort = false;
             naturalStartMinute = naturalInterceptions = 0; naturalEscortStart = new Point();
+            nightAlarm = nightShadows = shadowsOff = reducedMotionStatic = shadowRetired = shadowWorldReset = false;
+            reducedVignetteMin = float.MaxValue; reducedVignetteMax = float.MinValue;
             failures.Clear(); captures.Clear(); sequences.Clear();
         }
         internal static void Begin(GameController game)
         {
             Reset();
             if (!EditorApplication.isPlaying || game == null || Output == "") throw new InvalidOperationException("Escape review requires the prepared existing Play session.");
+            preferencesOwner = game; previousReducedMotion = game.Preferences.ReducedMotion; previousShadows = game.Preferences.Shadows; capturedPreferences = true;
             Directory.CreateDirectory(Output);
             log = new StreamWriter(Path.Combine(Output, "timeline.csv")) { AutoFlush = true };
             log.WriteLine("sequence,frame,minute,phase,move,renderBeat,staggered,attempt,stamina,puffs,impulse,fight");
-            running = true; WriteReport(false, "Running20 staged pose sequences plus an unforced core-outcome fixture.", new string[0], "running");
+            running = true; WriteReport(false, "Running22 staged sequences including night atmosphere, plus2 unforced core-outcome sequences.", new string[0], "running");
         }
         internal static bool TickReview(GameController game, string[] runtimeErrors)
         {
@@ -80,7 +84,7 @@ namespace Cellblock.Editor
             if (completed)
             {
                 bool passed = failures.Count == 0 && runtimeErrors.Length == 0;
-                WriteReport(passed, "20 staged pose sequences; unforced contact, cuffing, one arrest and physical escort after initial fixture placement. Not a device/performance test.", runtimeErrors, "completed");
+                WriteReport(passed, "22 staged sequences including night alarm/contact shadows;2 unforced sequences through one arrest and escort after initial fixture placement. Actual ReducedMotion vignette, immediate same-world shadow retirement and fresh-world reset assertions. Not a device/performance test.", runtimeErrors, "completed");
                 Debug.Log(passed ? "CELLBLOCK_ESCAPE_CAPTURE_PASSED " + Output : "CELLBLOCK_ESCAPE_CAPTURE_FAILED " + Output);
             }
             return completed;
@@ -92,7 +96,7 @@ namespace Cellblock.Editor
             EscapeStruggle s = w == null ? new EscapeStruggle() : w.Struggle;
             switch (step)
             {
-                case 0: if (frames > 30) { if (NightOnly) step = 52; Next(); } return;
+                case 0: if (frames > 30) Next(); return;
                 // Scenario one: a sprint, a clinch, a punch that drops the officer, a flying tackle from behind, the pin, cuffs,
                 // the lift and the walk back.
                 case 1: Company(game); Next(); return;
@@ -185,29 +189,57 @@ namespace Cellblock.Editor
                         Next();
                     }
                     return;
-                // Scenario six: night with the alarm sounding: the alarm grade, contact shadows, a run and a tackle under the lights.
-                case 53: Company(game, 21 * 60 + 30); Next(); return;
-                case 54: if (frames > 20) { StartRun(game); w.SetAlarm(true); Next(); } return;
+                // Published f201d81 night sequence, appended to the safe retained review.
+                case 53: Company(game, 21 * 60 + 30); game.Preferences.ReducedMotion = false; game.Preferences.Shadows = true; game.ApplyPreferences(); Next(); return;
+                case 54:
+                    if (frames == 1) { game.Preferences.Shadows = false; game.ApplyPreferences(); return; }
+                    if (frames == 3)
+                    {
+                        shadowsOff = view.PreviewShadowActiveCount == 0 && view.PreviewContactShadows == 0;
+                        Require(shadowsOff, "Shadows OFF retained active contact shadows: " + view.PreviewShadowActiveCount);
+                        game.Preferences.Shadows = true; game.ApplyPreferences(); return;
+                    }
+                    if (frames > 20) { StartRun(game); w.SetAlarm(true); Next(); }
+                    return;
                 case 55: Capture(game, view, "23-night-alarm", () => false, 0, 40, 3, () => Wide(view, escapeeId)); return;
-                case 56: if (w.Escape.Phase == "None") { Require(false, "the night run ended early"); step = 59; frames = 0; shot = ""; return; } Engage(game, "f", true); Next(); return;
-                case 57: if (s.Active || frames > 120) { Require(s.Active, "no contact at night"); leadId = s.Officer; if (s.Move != "Tackle") Force(w, "Grappling", "Tackle", 4); Next(); } return;
+                case 56:
+                    if (w.Escape.Phase == "None") throw new InvalidOperationException("The staged night run ended before contact.");
+                    Engage(game, "night", true); Next(); return;
+                case 57:
+                    if (s.Active || frames > 120)
+                    {
+                        Require(s.Active, "no contact at night"); leadId = s.Officer;
+                        if (s.Move != "Tackle") Force(w, "Grappling", "Tackle", 4);
+                        Next();
+                    }
+                    return;
                 case 58: Capture(game, view, "24-night-tackle", () => s.Phase == "Down", 12, 90, 1, () => Side(view, escapeeId, leadId, 3.6f)); return;
                 case 59:
-                    Debug.Log("CELLBLOCK_ESCAPE contact shadows: " + view.PreviewContactShadowInfo);
-                    if (NightOnly)
-                    {
-                        // Straight down over the escapee, shadows on and then off: the difference is exactly what they draw.
-                        Vector3 at; view.TryGetPersonPosition(escapeeId, out at); at.y = 0.3f;
-                        game.FrameArt(at, 2.6f, 0, 89);
-                        Render(game.ArtCamera, 960, 540, Path.Combine(Output, "diag-shadows-on.png"));
-                        view.PreviewShadowsShown = false;
-                        Render(game.ArtCamera, 960, 540, Path.Combine(Output, "diag-shadows-off.png"));
-                        view.PreviewShadowsShown = true;
-                    }
-                    Require(view.PreviewAlarmMood > 0.5f && view.PreviewContactShadows > 3, "night: alarm mood " + view.PreviewAlarmMood + ", contact shadows " + view.PreviewContactShadows); Next(); return;
+                    nightAlarm = view.PreviewAlarmMood > .5f; nightShadows = view.PreviewContactShadows > 3;
+                    Require(nightAlarm && nightShadows, "night: alarm mood " + view.PreviewAlarmMood + ", contact shadows " + view.PreviewContactShadows);
+                    Debug.Log("CELLBLOCK_ESCAPE night contact shadows: " + view.PreviewContactShadowInfo);
+                    w.Data.Speed = 0; game.Preferences.ReducedMotion = true; game.ApplyPreferences(); Next(); return;
+                case 60:
+                    if (frames < 2) return;
+                    reducedVignetteMin = Mathf.Min(reducedVignetteMin, view.PreviewAlarmVignette);
+                    reducedVignetteMax = Mathf.Max(reducedVignetteMax, view.PreviewAlarmVignette);
+                    if (frames < 20) return;
+                    reducedMotionStatic = Mathf.Abs(reducedVignetteMin - .2f) < .0001f && Mathf.Abs(reducedVignetteMax - .2f) < .0001f;
+                    Require(reducedMotionStatic, "ReducedMotion vignette changed: " + reducedVignetteMin + ".." + reducedVignetteMax); Next(); return;
+                case 61:
+                    Resident retired = w.Data.Residents.FirstOrDefault(r => r.Id != escapeeId && w.IsPresent(r) && HasRenderedPerson(view, r.Id));
+                    if (retired == null) throw new InvalidOperationException("No present resident is available for the shadow-retirement assertion.");
+                    int poolBefore = view.PreviewShadowPoolCount;
+                    w.Data.Residents.Remove(retired); view.Refresh(w, true);
+                    shadowRetired = view.PreviewShadowPoolCount == poolBefore - 1 && view.PreviewMotionBindingsAlive;
+                    Require(shadowRetired, "same-world removal retained a shadow: pool " + poolBefore + "→" + view.PreviewShadowPoolCount); Next(); return;
+                case 62:
+                    // A real new disposable World exercises production world-change cleanup, not a synthetic reset.
+                    game.StartPresentationPreview("county"); game.World.Data.Speed = 0; view.Refresh(game.World, true);
+                    shadowWorldReset = view.PreviewMotionWorld(game.World) && view.PreviewMotionBindingsAlive && Mathf.Abs(view.PreviewAlarmMood) < .0001f;
+                    Require(shadowWorldReset, "fresh preview retained old shadow bindings or alarm atmosphere"); Next(); return;
                 default:
-                    if (NightOnly) Require(sequences.Count == 2 && scenarios == 1, "night review did not produce its 2 sequences");
-                    else Require(sequences.Count == 24 && scenarios == 6, "escape review did not produce 22 staged and 2 unforced sequences across 6 scenarios");
+                    Require(sequences.Count == 24 && scenarios == 6, "escape review did not produce22 staged and2 unforced sequences across6 scenarios");
                     Finish(); return;
             }
         }
@@ -297,11 +329,12 @@ namespace Cellblock.Editor
             return new Shot { Focus = focus, Distance = 2.6f, Yaw = yaw, Pitch = 34 };
         }
         static Shot High(Shot shot) { shot.Pitch = 40; return shot; }
-        static Shot Wide(FacilityView view, string a)
+        static Shot Wide(FacilityView view, string actor)
         {
-            Vector3 pa; view.TryGetPersonPosition(a, out pa); pa.y = 0.4f;
-            return new Shot { Focus = pa, Distance = 7f, Yaw = 30, Pitch = 42 };
+            Vector3 position; view.TryGetPersonPosition(actor, out position); position.y = .4f;
+            return new Shot { Focus = position, Distance = 7, Yaw = 30, Pitch = 42 };
         }
+        static bool HasRenderedPerson(FacilityView view, string id) { Vector3 position; return view.TryGetPersonPosition(id, out position); }
         static void StartFight(GameController game)
         {
             World w = game.World;
@@ -381,9 +414,9 @@ namespace Cellblock.Editor
         }
         [Serializable] sealed class EscapeReport
         {
-            public bool passed, staged = true, unforcedContact, unforcedCuffing, unforcedEscort;
+            public bool passed, staged = true, unforcedContact, unforcedCuffing, unforcedEscort, nightAlarm, nightShadows, shadowsOff, reducedMotionStatic, shadowRetired, shadowWorldReset;
             public string status, editor, message, fullPath, timeline, startedUtc;
-            public int captureCount, sequenceCount, scenarioCount, stagedScenarioCount, unforcedScenarioCount;
+            public int captureCount, sequenceCount, scenarioCount, stagedScenarioCount, stagedSequenceCount, unforcedScenarioCount;
             public string[] errors, runtimeErrors, captures;
         }
         static void WriteReport(bool passed, string message, string[] runtimeErrors, string status)
@@ -392,8 +425,9 @@ namespace Cellblock.Editor
             Directory.CreateDirectory(OutputRoot); Directory.CreateDirectory(Output);
             var report = new EscapeReport { passed = passed, status = status, editor = Application.unityVersion, message = message,
                 fullPath = Path.GetFullPath(Output), timeline = Path.Combine(Output, "timeline.csv"), startedUtc = SessionState.GetString(StartedKey, ""),
-                captureCount = captures.Count, sequenceCount = sequences.Count, scenarioCount = scenarios, stagedScenarioCount = Math.Min(4, scenarios), unforcedScenarioCount = scenarios >= 5 ? 1 : 0,
+                captureCount = captures.Count, sequenceCount = sequences.Count, scenarioCount = scenarios, stagedScenarioCount = Math.Min(4, scenarios) + (scenarios >= 6 ? 1 : 0), stagedSequenceCount = sequences.Count(name => !name.Contains("unforced")), unforcedScenarioCount = scenarios >= 5 ? 1 : 0,
                 unforcedContact = naturalContact, unforcedCuffing = naturalCuffs, unforcedEscort = naturalEscort,
+                nightAlarm = nightAlarm, nightShadows = nightShadows, shadowsOff = shadowsOff, reducedMotionStatic = reducedMotionStatic, shadowRetired = shadowRetired, shadowWorldReset = shadowWorldReset,
                 errors = failures.Concat(runtimeErrors).Distinct().ToArray(), runtimeErrors = runtimeErrors, captures = captures.ToArray() };
             string json = JsonUtility.ToJson(report, true); File.WriteAllText(Path.Combine(Output, "report.json"), json);
             string stable = Path.Combine(OutputRoot, "report.json"), temporary = stable + ".tmp";
@@ -405,8 +439,15 @@ namespace Cellblock.Editor
         }
         static void Finish()
         {
+            RestoreCapturePreferences();
             running = false; completed = true; Time.captureDeltaTime = 0;
             if (log != null) { log.Dispose(); log = null; }
+        }
+        static void RestoreCapturePreferences()
+        {
+            if (capturedPreferences && preferencesOwner != null && preferencesOwner.Preferences != null)
+            { preferencesOwner.Preferences.ReducedMotion = previousReducedMotion; preferencesOwner.Preferences.Shadows = previousShadows; preferencesOwner.ApplyPreferences(); }
+            capturedPreferences = false; preferencesOwner = null;
         }
     }
 }

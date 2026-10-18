@@ -191,6 +191,7 @@ namespace Cellblock.Unity
             if (characterSheet == null) return;
             RestoreCharacterHeader();
             bool visible = workspace == Workspace.People && inspectorOpen && !characterAdvanced && !menuOpen && !guideOpen && !game.CharacterViewActive;
+            bool advancedCompact = compact && workspace == Workspace.People && inspectorOpen && characterAdvanced && !menuOpen && !guideOpen && !game.CharacterViewActive;
             characterSheet.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
             characterAdvancedBack.style.display = workspace == Workspace.People && characterAdvanced ? DisplayStyle.Flex : DisplayStyle.None;
             if (visible) { inspector.style.display = DisplayStyle.None; if (compact) navigation.style.display = DisplayStyle.None; }
@@ -203,7 +204,15 @@ namespace Cellblock.Unity
             if (covered) sheetWidth = available;
             characterSheet.style.right = right; characterSheet.style.width = sheetWidth;
             characterSheet.style.top = compact ? top : top + 96; characterSheet.style.bottom = bottom + (compact ? 0 : 94);
-            if (visible)
+            // A full file needs useful reading space on a landscape phone as well. The retained
+            // Back control and section navigation stay visible; the global dock returns on close.
+            if (advancedCompact)
+            {
+                inspector.style.right = right; inspector.style.width = sheetWidth;
+                inspector.style.top = top; inspector.style.bottom = bottom;
+                navigation.style.display = DisplayStyle.None;
+            }
+            if (visible || advancedCompact)
             {
                 characterHeaderReduced = true;
                 float worldRight = width - right - sheetWidth - 12;

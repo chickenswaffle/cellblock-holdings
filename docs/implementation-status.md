@@ -2,6 +2,29 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
+## October 18 staff field view, compact profiles and combined motion
+
+Implementation merge **`9d1aaef`** combines the staff checkpoint with Claude's published **f201d81** graphics/motion snapshot. **373 core checks pass, 0 failures.** The final unchanged-source Unity matrix passes **85 actual Game-view captures**, plus **24 animation sequences / 982 rendered frames across 6 disposable scenarios**. Every final report has an empty errors array. Earlier failed/cancelled review candidates are superseded, not added to these totals.
+
+- **Readable People cards:** Now / Life / Record / Items; one purpose and three numbered bars first, with Why/next disclosed deliberately. The full file remains reachable and gets the phone's safe height. All six activity suggestions retain 44px targets.
+- **Staff-only direct play:** real main-camera eye view and a wider shoulder view, WASD/arrows or MOVE/LOOK pads, useful work phone, and return to the previous management camera. Residents/crews remain inspectable and followable; a separate prisoner mode is planned.
+- **Useful staff phone:** real messages, contacts, duty information, confirmation and game-clock call progress. Reload preserves remaining call time; no offline advance or instant-alarm shortcut.
+- **Presentation:** stronger Home hierarchy/Continue, installed furniture hardware/detail, revised light/shadow bias, shared gait/leg IK, staged fight/escape choreography, pooled contact ellipses and restrained alarm grading. Shadow/reduced-motion preferences apply to the new effects.
+- **Incident view on landscape phones:** Follow moves the response card beside a reserved world view. Both tracked actors, all three 44px actions and return to the management dock are checked. The review allows the real sprint/radio sequence to play out.
+- **Integration:** restraints/recovery/escort reclaim movement; saved holds must match the actual attempt; actor/world removal immediately clears animation/shadow bindings. Generated shadow meshes/material and alarm volume profiles are disposed explicitly.
+
+| Actual Unity review | Captures | Evidence |
+| --- | --- | --- |
+| Staff controls, compact dossiers, work phone, Home and lifecycle | 27 | [Character report](reviews/2026-10-18-staff-graphics-characters.json) |
+| Complete daily interactions and compact/advanced phone flow | 17 | [Routine report](reviews/2026-10-18-staff-graphics-routines.json) |
+| Player incident camera, radio, pursuit and physical outcomes | 16 | [Incident report](reviews/2026-10-18-staff-graphics-incidents.json) |
+| Home, saves/recovery/autosave/settings and placement regression | 25 | [Frontend report](reviews/2026-10-18-staff-graphics-frontend.json) |
+| Staged day/night animation plus unforced contact/cuffs/arrest/escort | 24 sequences | [Animation report](reviews/2026-10-18-staff-graphics-escapes.json) |
+
+[Core transcript](reviews/2026-10-18-staff-graphics-core.txt) · [captured source fingerprint](reviews/2026-10-18-staff-graphics-source.json) · [editor cleanup/Play audit](reviews/2026-10-18-staff-graphics-editor-audit.json). Full local frames are in `Builds/{Character,Routine,Incident,Frontend,Escape}Review/2026-10-18/staff-graphics-final-27011080`. The staged animation camera can include foreground fence bars/reversed labels; these captures establish pose/phase checks, while the separate incident Game-view review checks the player camera. Fixed preview time excludes PNG encoding latency from its game/scene clock; ordinary gameplay retains its existing clock.
+
+Independent critics reviewed source and representative actual frames. Native touch comfort/performance, native stripped builds and production character art remain unverified. This is a playable development milestone, not a finished game. [Controls](character-experience.md) · [planned prisoner mode](prisoner-mode-plan.md).
+
 ## October 17 physical incidents and visible guard response
 
 Source **`8f38ce2`** adds [incident scenes](incident-scenes.md) to the Home/save/HUD milestone and Claude's published fixes through `1a9aa5b` (merge `9f55fd9`). **305 core checks pass, 0 failures.** The final focused Unity review passed **16 actual Game-view captures, errors empty**, including physically converging residents, distinct articulated scuffle poses, a real guard approach and separation, a visible 12-minute radio call before alarm/gate/lockdown, pursuit, physical interception, an undefended escape and saved mid-scene states. The incident card reports the current control flags after manual stand-down. Desktop and 900×420 phone-layout bounds passed. The independent critic reviewed source and actual corrected images; no blocking findings remain.

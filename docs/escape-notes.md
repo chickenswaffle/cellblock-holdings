@@ -126,13 +126,13 @@ The brawl view handles resident fights:
 
 ## Verification
 
-- `Editor/EscapeCapture.cs` renders real Play-mode sequences with the game's own camera, lights and people into `Builds/EscapeCapture/<shot>/`, with `timeline.csv` recording the phase, move, beat, stamina, active puffs and camera impulse for each frame.
-- It covers four scenarios and 20 shots, with scripted checks on each phase:
-  - sprint, clinch, strike, knocked down, a tackle from behind, pinned, cuffing, rising and escort
-  - the gate, shove, flight, a frontal takedown and its pin
-  - exhausted, surrender and standing cuffs
-  - squaring up, brawl and separating
-- Run it the same way as `ArtCapture`: batchmode with graphics, no `-quit`, from Claude's clone only.
+The integrated Mac review uses the **existing sole Unity editor** through `PresentationPreview`. Choose **Cellblock → Capture staged escape review**, or write `escape` to `Temp/CellblockPresentation.request` while holding the runner scope. `RunNight()` uses the same safe full review. Do not start another editor/build against this checkout.
+
+The runner preserves the current company, refuses unsaved editor scenes, uses disposable companies and writes each run to a unique `Temp/CellblockEscape/<runstamp>` directory. Completion, cancellation and failure release auto-refresh and restore preferences. PNG encoding uses a preview-only fixed game/scene step; normal gameplay is unchanged.
+
+Final combined evidence: **373 core checks**, **24 sequences / 982 frames / 6 scenarios**, errors empty. Twenty-two sequences stage day/night poses; two exercise unforced contact through cuffing, exactly one interception and a moving escort after initial fixture placement. Other checks cover Shadows OFF, static reduced-motion vignette, immediate same-world actor-shadow retirement and fresh-world reset. These are not balance or device performance measurements. Some staged angles include fence/label obstruction; the separate16-frame incident Game-view review checks player camera/response.
+
+[Final animation report](reviews/2026-10-18-staff-graphics-escapes.json), [core transcript](reviews/2026-10-18-staff-graphics-core.txt), [complete validation](implementation-status.md).
 
 ## Research
 

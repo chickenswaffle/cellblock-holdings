@@ -1,0 +1,7 @@
+{
+  "base": "79d7da6",
+  "mergedClaude": "f201d81e166055ea2fd9e9f7207a3aa852fc5909",
+  "sha256": "27011080ebc1f21ceb665325f89ea63379ff69789c9b027139248a5f3ad55bdf",
+  "fileCount": 284,
+  "scope": "Sorted Assets/Cellblock files with .cs, .uss, .shader, .png and .meta suffixes; path bytes followed by file bytes."
+}

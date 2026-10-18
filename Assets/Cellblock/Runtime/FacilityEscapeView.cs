@@ -42,7 +42,7 @@ namespace Cellblock.Unity
         // The controller advances one game minute every 0.2 s per unit of speed: this is how far into the current minute we are.
         void AdvanceSceneClock(World world)
         {
-            float dt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
+            float dt = Mathf.Min(SceneFrameDelta, 0.1f);
             if (world.Data.Minute != sceneMinute) { sceneMinute = world.Data.Minute; sceneFraction = 0; }
             else if (Time.unscaledTime >= hitStopUntil) sceneFraction = Mathf.Min(0.999f, sceneFraction + dt * 5 * world.Data.Speed);
             CameraImpulse = Mathf.MoveTowards(CameraImpulse, 0, dt * 1.4f);

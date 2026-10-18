@@ -180,6 +180,9 @@ namespace Cellblock.Unity
             }
             else accumulator = 0;
             if (SelectedFixture != null) SelectedFixture = World.Data.Fixtures.FirstOrDefault(f => f.Id == SelectedFixture.Id);
+#if UNITY_EDITOR
+            view.PreviewFixedFrameDelta = presentationPreview && Time.captureDeltaTime > 0 ? Time.captureDeltaTime : 0;
+#endif
             if (!CharacterInputUpdate(magnification)) InputUpdate(magnification); view.ReducedMotion = Preferences.ReducedMotion; view.Refresh(World); view.RefreshCharacterPhones(World, hud.CharacterPhoneOpen ? CharacterPhoneSubjectId : ""); view.SetWatchedCamera(WatchedCamera); pressureView.Refresh(World, Time.unscaledDeltaTime); UpdateRideAlong(); if (!CharacterViewActive) UpdateIncidentCamera(); hud.Refresh();
             TickAutosave();
         }

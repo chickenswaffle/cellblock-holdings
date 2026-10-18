@@ -121,6 +121,7 @@ namespace Cellblock.Editor
                 { Fail("The Game view capture has an unexpected size: " + width + " × " + height); return; }
                 SessionState.SetString(PendingKey, "");
                 if (mode == "characters" && ApplyCharacterAfterCapture()) return;
+                if (mode == "incidents" && ApplyIncidentAfterCapture()) return;
             }
             GameController game = UnityEngine.Object.FindFirstObjectByType<GameController>();
             if (game == null) { Fail("The game controller did not initialize in Play mode."); return; }

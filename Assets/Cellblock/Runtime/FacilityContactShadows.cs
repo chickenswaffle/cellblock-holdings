@@ -22,9 +22,12 @@ namespace Cellblock.Unity
         Transform shadowRoot;
         bool shadowsUnavailable;
         int shadowsDrawn;
+        public bool ContactShadowsEnabled { get; set; } = true;
 
         void RefreshContactShadows()
         {
+            if (shadowRoot != null) shadowRoot.gameObject.SetActive(ContactShadowsEnabled);
+            if (!ContactShadowsEnabled) { shadowsDrawn = 0; return; }
             if (shadowsUnavailable) return;
             if (shadowMaterial == null)
             {

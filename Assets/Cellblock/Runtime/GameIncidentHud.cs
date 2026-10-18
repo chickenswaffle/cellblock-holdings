@@ -71,19 +71,56 @@ namespace Cellblock.Unity
             incidentWatch.text = game.FollowingIncident ? "Release camera" : "Watch action"; incidentClock.text = world.Data.Speed == 0 ? "Resume 1×" : "Pause";
             incidentAlarm.text = world.Data.Operations.Alarm ? "Control panel" : "Raise alarm";
         }
-        void LayoutIncidentHud(float left, float right, float top, bool blocked)
+        void LayoutIncidentHud(float left, float right, float top, float bottom, bool blocked)
         {
             if (incidentCard == null) return;
             incidentCard.style.display = incidentVisible && !blocked ? DisplayStyle.Flex : DisplayStyle.None;
-            incidentCard.style.left = left; incidentCard.style.top = top + 88;
+            incidentCard.style.left = left; incidentCard.style.right = StyleKeyword.Auto; incidentCard.style.top = top + 88;
+            incidentCard.style.maxHeight = StyleKeyword.Null;
             float available = root.resolvedStyle.width - left - right - (inspectorOpen ? inspector.resolvedStyle.width + 18 : cameraOpen ? 350 : 0);
             incidentCard.style.width = Mathf.Min(530, Mathf.Max(250, available));
-            if (incidentVisible && !blocked) { commandOverview.style.display = DisplayStyle.None; eventFeed.style.display = DisplayStyle.None; }
+            if (!incidentVisible || blocked) return;
+            commandOverview.style.display = DisplayStyle.None; eventFeed.style.display = DisplayStyle.None;
+            if (!compact || !game.FollowingIncident) return;
+            // Watching a scene on a landscape phone leaves a deliberate world rectangle beside
+            // the card. Run after character layout, which restores the ordinary header each pass.
+            float width = root.resolvedStyle.width, height = root.resolvedStyle.height;
+            float cardWidth = Mathf.Min(width - left - right, Mathf.Clamp((width - left - right) * .4f, 300, 380));
+            float worldWidth = Mathf.Max(0, width - left - right - cardWidth - 12);
+            incidentCard.style.left = StyleKeyword.Auto; incidentCard.style.right = right;
+            incidentCard.style.top = top; incidentCard.style.width = cardWidth;
+            incidentCard.style.maxHeight = height - top - bottom;
+            navigation.style.display = DisplayStyle.None;
+            header.style.right = right + cardWidth + 12;
+            ReduceCharacterHeader(worldWidth);
+            status.style.right = right + cardWidth + 12; status.style.bottom = bottom;
+            status.style.maxWidth = worldWidth;
+            bool covered = worldWidth < 230;
+            if (covered) { header.style.display = DisplayStyle.None; status.style.display = DisplayStyle.None; }
+            float statusHeight = status.resolvedStyle.height;
+            if (float.IsNaN(statusHeight) || statusHeight <= 0) statusHeight = 48;
+            float worldTop = top + (covered ? 0 : 88), worldBottom = bottom + (covered ? 0 : statusHeight + 12);
+            WorldViewCenter = new Vector2((left + worldWidth * .5f) / width,
+                (worldBottom + Mathf.Max(0, height - worldTop - worldBottom) * .5f) / height);
         }
 #if UNITY_EDITOR
         public string PreviewIncidentDescription { get { return incidentDetail == null ? "" : incidentDetail.text; } }
         public bool PreviewIncidentPanelVisible { get { return incidentCard != null && incidentCard.resolvedStyle.display != DisplayStyle.None; } }
-        public bool PreviewIncidentPanelFits { get { return incidentCard.worldBound.xMax <= root.worldBound.xMax && incidentCard.worldBound.yMax <= root.worldBound.yMax - 68; } }
+        public bool PreviewIncidentPanelFits { get { return incidentCard.worldBound.xMin >= root.worldBound.xMin && incidentCard.worldBound.xMax <= root.worldBound.xMax && incidentCard.worldBound.yMax <= root.worldBound.yMax - (compact && game.FollowingIncident ? 10 : 68) && incidentWatch.worldBound.height >= 43 && incidentClock.worldBound.height >= 43 && incidentAlarm.worldBound.height >= 43; } }
+        public bool PreviewIncidentActorVisible(string id)
+        {
+            Vector3 actor; var view = game.GetComponentInChildren<FacilityView>();
+            if (view == null || !view.TryGetPersonPosition(id, out actor)) return false;
+            // Check feet and head against both the screen and the actual card rectangle.
+            foreach (Vector3 point in new[] { actor, actor + Vector3.up * 1.9f })
+            {
+                Vector3 screen = game.ArtCamera.WorldToScreenPoint(point);
+                Vector2 panel = RuntimePanelUtils.ScreenToPanel(root.panel, new Vector2(screen.x, Screen.height - screen.y));
+                if (screen.z <= 0 || !root.worldBound.Contains(panel) || incidentCard.worldBound.Contains(panel)) return false;
+            }
+            return true;
+        }
+        public bool PreviewIncidentDockVisible { get { return navigation.resolvedStyle.display != DisplayStyle.None; } }
 #endif
     }
 }
