@@ -1,6 +1,10 @@
 # Character experience: compact management, direct control and a useful phone
 
-## Confirmed direction
+## Latest decision — 2026-10-18
+
+Direct play is **staff-only** in the management game. Residents and construction crews retain inspection and Follow. This supersedes the earlier all-character proposal below. Interactive work-phone actions require the controlled staff member; a camera toggle cannot enter resident/crew play. [A separate prisoner mode is planned](prisoner-mode-plan.md), with no current player entry.
+
+## Earlier design context
 
 The user wants substantially less information on screen at once, real direct first/third person play as any on-site character, and a phone that connects messages, contacts and tasks to the person’s actual role. Direct movement with an explicit Exit to management and role-specific legal/illicit choices were confirmed. Existing management/building stays available through the same company and clock.
 
@@ -10,9 +14,9 @@ Replace the long selected-person document with real disclosure pages: Overview, 
 
 Central visibility runs after existing refresh methods so modules cannot re-open hidden sections. Keep elements and buttons stable, retain actual numbered risk semantics, preserve44px controls, and give compact screens a focused sheet rather than squeezing more text into the existing147px viewport. Control/build navigation retains its existing behavior.
 
-## One character session
+## One staff character session
 
-- All present residents, staff roles and both crew members use stable IDs. Absence, custody restrictions and hard transport/escort authority explain why someone is unavailable.
+- All people retain stable IDs for inspection/Follow. Only present staff enter movement control. Absence, suspension and hard escort authority explain why a staff member is unavailable.
 - A runtime-only core session owns movement; saves retain legal ordinary positions and loads return movement to AI.
 - Input supplies a normalized direction. The explicit minute loop consumes one ordinary-speed step, validates the swept segment and access, and prevents diagonal boosts, pause movement or off-clock catch-up.
 - Preserve food, health, wages, construction and physical service checks. Control only suppresses automatic displacement; a cook/worker cannot perform work while standing somewhere else.

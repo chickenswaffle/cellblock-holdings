@@ -30,6 +30,8 @@ namespace Cellblock.Unity
             if (!looks.TryGetValue(actor, out look)) { look = Dress(actor, resident); looks.Add(actor, look); PruneLooks(); }
             string palette = Palette(world, resident);
             if (palette != look.Palette) Recolor(look, palette);
+            if (world.IsCharacterControlled(resident.Id) && world.CharacterIsMoving)
+            { look.Pose = LifePose.None; look.Weight = 0; look.HasSeat = false; actor.PoseArms = false; HideRoutineProps(actor); return; }
             if (world.IncidentOwnsResident(resident) || (world.Escape.Phase != "None" && world.Escape.ResidentId == resident.Id))
             { look.Pose = LifePose.None; look.Weight = 0; look.HasSeat = false; HideRoutineProps(actor); return; }
             if (Time.unscaledTime >= look.NextScan || look.Activity != resident.Activity || look.ActivityPhase != resident.ActivityPhase)

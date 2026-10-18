@@ -89,6 +89,7 @@ namespace Cellblock.Unity
 #if UNITY_EDITOR
         public void PreviewRoutineScroll(bool suggestions = false)
         {
+            characterAdvanced = true; inspectorOpen = true; Layout();
             VisualElement target = suggestions ? routineCard.Q<VisualElement>(className: "life-suggestions") : routineCard;
             inspector.schedule.Execute(() => { var scroll = (ScrollView)inspector; scroll.scrollOffset = new Vector2(0, Mathf.Max(0, target.ChangeCoordinatesTo(scroll.contentContainer, Vector2.zero).y - 8)); }).StartingIn(50);
         }

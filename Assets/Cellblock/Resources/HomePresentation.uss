@@ -1,0 +1,62 @@
+/* Home retains the actual game render and save controls; ink frames it and brass leads to Continue. */
+.home-presentation .home-scene-veil { position: absolute; left: 0; top: 0; right: 0; bottom: 0; }
+.home-presentation .home-shade { background-color: rgba(3, 12, 18, .06); }
+.home-presentation .home-mast { min-height: 68px; border-bottom-width: 1px; border-bottom-color: rgba(180, 166, 130, .2); padding-bottom: 10px; }
+.home-presentation-brand { flex-direction: row; align-items: center; flex-shrink: 1; min-width: 0; margin-right: 14px; }
+.home-presentation-seal { width: 34px; height: 34px; border-width: 1px; border-color: rgb(162, 145, 108); color: rgb(231, 213, 174); -unity-text-align: middle-center; font-size: 12px; -unity-font-style: bold; letter-spacing: 1px; margin-right: 12px; flex-shrink: 0; }
+.home-presentation .home-wordmark { font-size: 11px; letter-spacing: 2.3px; color: rgb(228, 216, 187); }
+.home-presentation Button.home-link { min-height: 44px; height: 44px; border-color: rgba(128, 149, 151, .38); background-color: rgba(12, 27, 35, .82); font-size: 12px; }
+.home-presentation Button.home-link:hover { border-color: rgb(192, 168, 117); background-color: rgb(29, 48, 55); }
+.home-presentation .home-column { width: 480px; max-width: 100%; margin-top: 48px; margin-bottom: 20px; }
+.home-presentation-hero, .home-presentation-actions { flex-shrink: 0; min-width: 0; }
+.home-presentation .home-eyebrow { font-size: 10px; letter-spacing: 2.3px; color: rgb(183, 185, 162); margin-bottom: 15px; white-space: normal; }
+.home-presentation .home-title { font-size: 58px; letter-spacing: 2px; color: rgb(247, 241, 223); margin-bottom: 17px; }
+.home-presentation .home-tagline { font-size: 19px; color: rgb(188, 209, 207); margin-bottom: 30px; }
+.home-presentation Button.home-continue { position: relative; min-height: 140px; padding: 18px 58px 18px 20px; margin-bottom: 10px; border-width: 1px; border-left-width: 1px; border-color: rgb(235, 217, 178); border-radius: 7px; background-color: rgb(218, 198, 153); }
+.home-presentation Button.home-continue:hover { background-color: rgb(237, 218, 180); border-color: rgb(250, 237, 208); }
+.home-presentation Button.home-continue .home-action-kicker { color: rgb(82, 78, 58); font-size: 10px; letter-spacing: 1.2px; margin-bottom: 7px; }
+.home-presentation Button.home-continue .home-save-title { color: rgb(17, 35, 39); font-size: 24px; margin-bottom: 5px; }
+.home-presentation Button.home-continue .home-save-detail { color: rgb(53, 72, 70); font-size: 12px; margin-bottom: 10px; }
+.home-presentation Button.home-continue .home-save-stamp { color: rgb(41, 91, 70); font-size: 10px; letter-spacing: .5px; }
+.home-presentation-arrow { position: absolute; right: 20px; top: 42%; color: rgb(38, 65, 65); font-size: 28px; }
+.home-presentation Button.home-new { min-height: 48px; height: 48px; margin: 0; border-color: rgb(94, 117, 120); background-color: rgba(17, 34, 42, .94); color: rgb(226, 228, 208); font-size: 12px; letter-spacing: 1.2px; }
+.home-presentation Button.home-new:hover { background-color: rgb(39, 58, 62); border-color: rgb(180, 161, 119); }
+.home-presentation .home-assurance { color: rgb(158, 181, 178); font-size: 9px; letter-spacing: 1.1px; margin-top: 14px; }
+.home-presentation .home-foot { border-top-width: 1px; border-top-color: rgba(166, 162, 134, .16); padding-top: 11px; margin-top: 10px; }
+.home-presentation .home-foot-line, .home-presentation .home-art-credit { font-size: 9px; letter-spacing: 1px; color: rgb(143, 171, 173); white-space: normal; }
+.home-presentation .library-title { font-size: 32px; margin-top: 30px; }
+.home-presentation .library-intro { max-width: 650px; color: rgb(183, 204, 201); }
+.home-presentation .library-card { background-color: rgba(12, 29, 37, .97); border-color: rgb(73, 99, 104); border-left-width: 3px; border-left-color: rgb(166, 146, 101); }
+.home-presentation .library-card Button.library-load { min-height: 44px; }
+.home-presentation.home-compact .home-mast { min-height: 56px; padding-bottom: 6px; }
+.home-presentation.home-compact .home-column { width: 450px; margin-top: 22px; }
+.home-presentation.home-compact .home-title { font-size: 39px; letter-spacing: 1.4px; margin-bottom: 12px; }
+.home-presentation.home-compact .home-tagline { font-size: 15px; margin-bottom: 20px; }
+.home-presentation.home-compact Button.home-continue { min-height: 116px; padding: 13px 46px 13px 16px; }
+.home-presentation.home-compact Button.home-continue .home-save-title { font-size: 20px; }
+.home-presentation.home-compact Button.home-continue .home-save-detail { font-size: 11px; margin-bottom: 7px; }
+.home-presentation.home-compact Button.home-continue .home-save-stamp { font-size: 9px; }
+.home-presentation.home-compact Button.home-new { height: 46px; min-height: 46px; }
+.home-presentation.home-compact .home-presentation-arrow { right: 15px; font-size: 24px; }
+.home-presentation.home-compact .home-foot { padding-top: 7px; margin-top: 6px; }
+.home-presentation.home-narrow .home-presentation-seal { width: 28px; height: 28px; font-size: 10px; margin-right: 8px; }
+.home-presentation.home-narrow .home-wordmark { font-size: 9px; letter-spacing: 1px; max-width: 135px; }
+.home-presentation.home-narrow .home-links { flex-shrink: 0; }
+.home-presentation.home-narrow Button.home-link { min-width: 72px; padding: 0 8px; font-size: 11px; }
+.home-presentation.home-narrow .home-column { width: 100%; }
+.home-presentation.home-narrow .home-foot-line { font-size: 8px; letter-spacing: .7px; }
+.home-presentation.home-presentation-wide-short .home-column { width: 100%; flex-direction: row; align-items: center; margin-top: 17px; margin-bottom: 8px; }
+.home-presentation-wide-short .home-presentation-hero { flex-grow: 1; flex-basis: 0; flex-shrink: 1; margin-right: 30px; }
+.home-presentation-wide-short .home-presentation-actions { width: 49%; max-width: 470px; flex-shrink: 0; }
+.home-presentation.home-presentation-wide-short .home-title { font-size: 38px; margin-bottom: 12px; }
+.home-presentation.home-presentation-wide-short .home-tagline { font-size: 15px; margin-bottom: 0; }
+.home-presentation.home-presentation-wide-short .home-eyebrow { display: flex; font-size: 9px; letter-spacing: 1px; margin-bottom: 12px; }
+.home-presentation.home-presentation-wide-short .home-assurance { display: none; }
+.home-presentation.home-presentation-narrow-short .home-column { margin-top: 10px; margin-bottom: 5px; }
+.home-presentation.home-presentation-narrow-short .home-title { font-size: 25px; letter-spacing: .7px; margin-bottom: 12px; }
+.home-presentation.home-presentation-narrow-short .home-tagline, .home-presentation.home-presentation-narrow-short .home-eyebrow, .home-presentation.home-presentation-narrow-short .home-assurance { display: none; }
+.home-presentation.home-presentation-narrow-short Button.home-continue { min-height: 100px; padding-top: 10px; padding-bottom: 10px; }
+.home-presentation.home-presentation-narrow-short Button.home-continue .home-save-title { font-size: 18px; }
+.home-presentation.home-presentation-narrow-short .home-mast { min-height: 50px; }
+.home-presentation.home-presentation-tall-narrow .home-title { font-size: 44px; }
+.home-presentation.home-presentation-tall-narrow .home-eyebrow { display: flex; font-size: 9px; letter-spacing: 1.4px; margin-bottom: 12px; }

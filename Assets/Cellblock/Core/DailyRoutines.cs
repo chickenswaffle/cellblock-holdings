@@ -86,6 +86,7 @@ namespace Cellblock.Core
             if (!IsPresent(r)) return "Away from the facility.";
             if (IncidentOwnsResident(r) || (Escape.Phase != "None" && Escape.ResidentId == r.Id)) return "An active incident has priority.";
             if (InIntake(r)) return "Intake processing has priority.";
+            if (CharacterUsingPhone(r.Id)) return "A phone call is in progress.";
             if (r.Legal.Custody != "In facility") return "Custody movement has priority.";
             if (r.Legal.RestrictedUntil > Data.Minute || r.SeparatedUntil > Data.Minute || r.ProtectiveCustody) return "Restricted to assigned housing.";
             if (Data.Operations.Lockdown) return "Facility lockdown has priority.";
@@ -207,19 +208,19 @@ namespace Cellblock.Core
             if (activity == "Television") return "Taking a break in the common area.";
             return r.Health < 65 || r.Safety < 40 ? "Resting somewhere familiar after a difficult spell." : "Prefers some quiet personal time.";
         }
-        public bool SuggestActivity(string residentId, string activity)
+        public bool SuggestActivity(string residentId, string activity, string requestedFixture = "")
         {
             Resident r = Find(residentId);
             if (r == null || activity == "" || !LifeRules.Activities.Contains(activity)) { Notice = "Choose a resident and a valid free-time activity."; return false; }
             if (!FreeTime(r)) { Notice = r.Name + ": " + RoutineConstraint(r); return false; }
-            if (r.Activity == activity && r.ActivityPhase != "Suspended") { Notice = r.Name + " already has that plan."; return true; }
+            if (r.Activity == activity && (requestedFixture == "" || r.ActivityFixture == requestedFixture) && r.ActivityPhase != "Suspended") { Notice = r.Name + " already has that plan."; return true; }
             if (activity != "Quiet" && r.Discipline < 25 && r.Stress > 80 && r.Impulsivity > 70)
             {
                 if (!r.Memories.Any(m => m.Kind == "activity-refusal" && Data.Minute - m.Minute < 1440))
                 { Remember(r, "activity-refusal", "Declined a suggested activity while overwhelmed and agitated."); r.Stress = Math.Min(100, r.Stress + .5f); }
                 Notice = r.Name + " declined: high stress and low discipline. Suggest rest or improve their conditions."; return false;
             }
-            if (!PlanActivity(r, activity)) { Notice = r.Name + ": no place or willing partner reachable within this free-time block for " + activity.ToLowerInvariant() + ". The existing plan is retained."; return false; }
+            if (!PlanActivity(r, activity, requestedFixture)) { Notice = r.Name + ": no place or willing partner reachable within this free-time block for " + activity.ToLowerInvariant() + ". The existing plan is retained."; return false; }
             r.ActivityReason = "Following a free-time suggestion. " + ReasonFor(r, activity);
             Notice = r.Name + " accepted the suggestion and will travel to the reserved place."; return true;
         }

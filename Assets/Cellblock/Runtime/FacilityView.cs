@@ -137,7 +137,7 @@ namespace Cellblock.Unity
             sun.transform.SetParent(transform, false); sun.type = LightType.Directional;
             sun.transform.rotation = Quaternion.Euler(43, -32, 0); sun.intensity = 1.5f;
             sun.color = new Color(1f, 0.93f, 0.83f); sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.82f; sun.shadowBias = 0.02f; sun.shadowNormalBias = 0.14f;
+            sun.shadowStrength = 0.86f; sun.shadowBias = 0.015f; sun.shadowNormalBias = 0.10f;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.69f, 0.76f, 0.80f);
             RenderSettings.ambientEquatorColor = new Color(0.46f, 0.51f, 0.52f);
@@ -560,6 +560,7 @@ namespace Cellblock.Unity
                 }
             }
             else DetailedFixture(root, fixture.Kind);
+            if (!preview && parent == structures) AddPresentationDetail(root, fixture.Kind);
             if (preview)
             {
                 Material tint = Material(palette, palette == "ghost" ? Teal : Ochre);
@@ -573,6 +574,7 @@ namespace Cellblock.Unity
 
         void DetailedFixture(Transform root, string kind)
         {
+            if (kind == "Payphone") { BuildPayphone(root); return; }
             Color ceramic = new Color(0.84f, 0.86f, 0.80f), paleMetal = new Color(0.55f, 0.61f, 0.59f);
             Color timber = new Color(0.64f, 0.58f, 0.45f), dark = new Color(0.10f, 0.12f, 0.12f);
             if (kind == "Chair" || kind == "Bench")
@@ -1074,6 +1076,7 @@ namespace Cellblock.Unity
 #endif
         void OnDestroy()
         {
+            DisposeCharacterPresentation();
             if (sirenClip != null) Destroy(sirenClip);
             // Include baked scenery and resident parts so leaving Play does not leak generated meshes.
             foreach (MeshFilter filter in GetComponentsInChildren<MeshFilter>(true))

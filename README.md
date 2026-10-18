@@ -81,6 +81,10 @@ The native Mac magnify plugin is included for Intel and Apple silicon. Rebuild i
 
 Read [the Claude handoff](docs/claude-handoff.md) and [shared coordination](COORDINATION.md) before parallel work. Claude's legal profiles, court transport and interactive escape gameplay are integrated. Its next reserved slice is resident animation, daily life and stories; see `docs/claude-lives-handoff.md`. Codex owns connected doors, security equipment and building services; see `docs/security-and-services-status.md` and `docs/claude-coordination-update.md`. Claude has also received the new opening-mode/HUD direction.
 
+## Staff field view and readable profiles
+
+People now opens a compact Now / Life / Record / Items dossier with three numbered condition bars and details on demand. Residents and construction crews can be inspected and followed. **Staff only** have **Play as**: WASD/arrows or the touch MOVE pad walk, drag/right LOOK looks, **V** changes first/third person, **P** opens the work phone, **E** opens the duty brief, and **Escape / Management** returns. Phone Messages/Contacts/Tasks read the real role and operation; calls use the game clock. [Controls and boundaries](docs/character-experience.md). A [separate prisoner mode is planned](docs/prisoner-mode-plan.md).
+
 ## Population pressure and presentation
 
 **Operations** (formerly Pressure) shows transfers, intake lanes, crowding, contraband, unrest, audits and upgrade programs. Choose a transfer policy, staff actual intake stations, improve beds/meal capacity and respond to disturbances. Contract pressure and cent-based costs persist in saves. **People → Ride along** follows a present resident or staff member with an optional body-camera inset; Escape returns to the build camera. This is a watch camera.

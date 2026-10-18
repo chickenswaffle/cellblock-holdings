@@ -301,6 +301,8 @@ namespace Cellblock.Core
         }
         bool Walk(string key, ref Point position, Point target, float speed)
         {
+            if (CharacterOwnsWorkerMovement(key)) return Geometry.Distance(position, target) < .12f;
+            if (CharacterUsingPhone(key)) return false;
             if (Geometry.Distance(position, target) < 0.12f) return true;
             Travel travel;
             if (!workerPaths.TryGetValue(key, out travel) || travel.Revision != GeometryRevision || Geometry.Distance(travel.Target, target) > 0.05f)

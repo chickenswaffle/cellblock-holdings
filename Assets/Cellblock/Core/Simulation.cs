@@ -891,6 +891,7 @@ namespace Cellblock.Core
                 AdvanceJustice();
                 AdvancePressure();
                 AdvanceLives();
+                AdvanceCharacterControl();
                 MoveResidents();
                 if (Data.Minute % 30 == 0) PeopleDynamics.Advance(this);
                 Data.OperatingRemainder += Contract.DailyOperatingCents / 1440.0;
@@ -955,6 +956,13 @@ namespace Cellblock.Core
                 // When the dining room has fewer places than residents, meals run in up to four shifts.
                 // Anyone beyond four shifts of places has no seat this window and waits at home.
                 Point mealSeat=ServiceDestination(index,true);
+                if (IsCharacterControlled(resident.Id) || CharacterUsingPhone(resident.Id))
+                {
+                    float manualGain = meals && Geometry.Distance(resident.Position, mealSeat) < .8f ? .6f : -.025f;
+                    MealGain(resident, index, meals, ref manualGain);
+                    resident.Food = Geometry.Clamp(resident.Food + manualGain, 0, 100);
+                    continue;
+                }
                 Point target = mealTravel ? mealSeat : yard ? ServiceDestination(index,false) : resident.Home;
                 ChooseResidentActivity(resident, ref target);
                 PressureTarget(resident, ref target);

@@ -29,6 +29,7 @@ namespace Cellblock.Unity
         public bool StartRideAlong(string id)
         {
             if (World == null || Draft != null || string.IsNullOrEmpty(id)) { Message("Finish or discard the plan before riding along."); return false; }
+            EndCharacterView(false);
             bool staff = World.Data.Staff.Any(s => s.Id == id);
             if (!staff && !World.Data.Residents.Any(r => r.Id == id)) return false;
             Vector3 position;
@@ -76,7 +77,7 @@ namespace Cellblock.Unity
         }
         void WatchRoleCards()
         {
-            if (World == null || World.ControlledId == "") return;
+            if (CharacterViewActive || World == null || World.ControlledId == "") return;
             if (World.Roles.NextId > seenCards && World.PendingCards.Any(c => c.PersonId == World.ControlledId))
             { seenCards = World.Roles.NextId; World.Data.Speed = 0; hud.Refresh(true); }
         }

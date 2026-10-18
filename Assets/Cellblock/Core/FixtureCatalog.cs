@@ -31,6 +31,7 @@ namespace Cellblock.Core
             new FixtureDefinition("Chair", "Dining chair", "Dining", "Individual steel framed chair with a wipe clean seat and supportive back.", 0.60f, 0.65f, 0.88f, 9500, 0, -0.68f),
             new FixtureDefinition("ServingCounter", "Serving counter", "Dining", "Stainless food service counter with inset trays, shelf and sneeze screen.", 2.0f, 0.85f, 1.55f, 115000, 0, -0.78f),
             new FixtureDefinition("Bench", "Common room bench", "Recreation", "Three seat bench for shared spaces, with a timber seat and steel frame.", 1.70f, 0.65f, 0.88f, 21000, 0, -0.68f),
+            new FixtureDefinition("Payphone", "Monitored payphone", "Recreation", "An institutional telephone on a steel pedestal. Requires the phone-service upgrade; calls use real time, credit and a nearby user.", .65f, .4f, 1.7f, 50000, 0, -.7f),
             new FixtureDefinition("Bookshelf", "Library shelf", "Recreation", "Open shelving stocked with books for a reading or common room.", 0.95f, 0.42f, 1.74f, 32000, 0, -0.56f),
             new FixtureDefinition("Television", "Television cabinet", "Recreation", "A television on a secure low cabinet for a shared recreation space.", 1.15f, 0.52f, 1.42f, 48000, 0, -0.62f),
             new FixtureDefinition("ExerciseBench", "Exercise bench", "Recreation", "Padded exercise station with a supported bar and weight plates.", 1.10f, 1.95f, 1.35f, 73000, 0.90f, 0),

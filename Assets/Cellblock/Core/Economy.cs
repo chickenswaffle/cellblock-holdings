@@ -688,18 +688,14 @@ namespace Cellblock.Core
             foreach (TrustAccount a in e.Accounts)
             {
                 if (1200 + (int)(JusticeRules.Hash(a.ResidentId + ":call", unchecked((uint)Data.Seed)) % 90u) != minute) continue;
-                Resident r = Find(a.ResidentId); if (r == null || !IsPresent(r) || InIntake(r) || r.Legal.Custody != "In facility") continue;
+                Resident r = Find(a.ResidentId); if (r == null || !IsPresent(r) || InIntake(r) || r.Legal.Custody != "In facility" || CharacterPhoneSuppressesBackgroundCall(r.Id) || IsCharacterControlled(r.Id)) continue;
                 float want = (a.Support > 0 ? 0.32f : 0.08f) + (r.Belonging < 40 ? 0.12f : 0);
                 float price = Math.Max(0.2f, Math.Min(1.3f, 1.6f - e.PhoneRateCents / 15f * 0.6f));
                 if (JusticeRules.Unit(Data.Seed, a.ResidentId, "call", Day) >= want * price) continue;
                 int minutes = 10 + (int)(JusticeRules.Unit(Data.Seed, a.ResidentId, "call-length", Day) * 10);
                 long cost = minutes * e.PhoneRateCents;
                 if (a.BalanceCents < cost + SavingsReserve(r, a) / 2) continue;
-                Debit(a, cost); a.CallsCents += cost; a.LastCallMinute = Data.Minute; a.Warmth = Math.Min(3, a.Warmth + 1);
-                r.Belonging = Math.Min(100, r.Belonging + 3); r.Stress = Math.Max(0, r.Stress - 2);
-                long commission = cost * EconomyRules.PhoneCommissionPercent / 100;
-                Book(commission, "phone-commission", "Phone call commissions");
-                e.Today.Phone += commission;
+                ChargeResidentPhoneCall(r, minutes, e.PhoneRateCents, true);
             }
         }
 

@@ -125,12 +125,13 @@ namespace Cellblock.Core
         internal Point DestinationFor(Resident resident, Point routine) { Point target = routine; ChooseResidentActivity(resident, ref target); return target; }
         // Free time: daytime, not locked down, and no meal, yard, work or separation claiming the person.
         public bool FreeTime(Resident r) { return FreeTimeAt(r, Data.Minute); }
-        bool FreeTimeAt(Resident r, int atMinute)
+        bool FreeTimeAt(Resident r, int atMinute, bool ignoreCurrentPhone = false)
         {
             int minute = atMinute % 1440;
             if (minute < 6 * 60 || minute >= 22 * 60 || Data.Operations.Lockdown || Data.Mode == null || !Data.Mode.Applied) return false;
             if (!IsPresent(r) || InIntake(r) || IncidentOwnsResident(r) || (Escape.Phase != "None" && Escape.ResidentId == r.Id) || !r.Legal.Ready || r.Legal.Custody != "In facility" || r.Legal.RestrictedUntil > atMinute || r.SeparatedUntil > atMinute || r.ProtectiveCustody) return false;
             if (Population.Riot.Phase != "None" && Population.Riot.Rioters.Contains(r.Id)) return false;
+            if (!ignoreCurrentPhone && CharacterUsingPhone(r.Id)) return false;
             int index = Data.Residents.IndexOf(r);
             if (index >= 0 && (MealTravelDueAt(index, r, atMinute) || MealDueAt(index, r, atMinute))) return false;
             if (PeopleDynamics.IsYardWindow(atMinute + r.RoutineOffset)) return false;
@@ -146,7 +147,7 @@ namespace Cellblock.Core
             foreach (Resident r in Data.Residents)
             {
                 AdvanceRoutine(r);
-                if (r.Activity == "" && Data.Minute >= r.NextPlanMinute && FreeTime(r)) PlanActivity(r);
+                if (r.Activity == "" && !IsCharacterControlled(r.Id) && Data.Minute >= r.NextPlanMinute && FreeTime(r)) PlanActivity(r);
             }
             // Resolve both sides' readiness before either receives effects or ends its plan.
             foreach (Resident r in Data.Residents) ApplyRoutineEffort(r);
@@ -200,7 +201,7 @@ namespace Cellblock.Core
             else places.Add(access);
             return places;
         }
-        internal bool PlanActivity(Resident r, string request = "")
+        internal bool PlanActivity(Resident r, string request = "", string requestedFixture = "")
         {
             int n = Data.Minute / 30, window = RoutineFreeWindow(r);
             var options = new List<(string activity, Fixture fixture, Point place, float score, string partner)>();
@@ -217,7 +218,7 @@ namespace Cellblock.Core
                 if (r.LastActivity == activity && Data.Minute - r.LastActivityMinute < 120) score -= .5f;
                 if ((r.Health < 65 || r.Safety < 40) && activity == "Exercise") score -= .6f;
                 if (r.Safety < 40 && r.Memories.Any(m => (m.Kind == "fight" || m.Kind == "nemesis" || m.Kind == "beef") && Data.Minute - m.Minute < 2 * 1440)) score -= .45f;
-                foreach (Fixture f in Data.Fixtures.Where(x => x.Kind == LifeRules.FixtureFor(activity) && !pending.Contains(x.Id) && (r.AvoidActivityUntil <= Data.Minute || x.Id != r.AvoidActivityFixture) && Rooms.Any(room => Geometry.Contains(room, x.Position))).OrderBy(x => Geometry.Distance(x.Position, r.Position)).Take(3))
+                foreach (Fixture f in Data.Fixtures.Where(x => x.Kind == LifeRules.FixtureFor(activity) && (requestedFixture == "" || x.Id == requestedFixture) && !pending.Contains(x.Id) && (r.AvoidActivityUntil <= Data.Minute || x.Id != r.AvoidActivityFixture) && Rooms.Any(room => Geometry.Contains(room, x.Position))).OrderBy(x => Geometry.Distance(x.Position, r.Position)).Take(3))
                 {
                     if (activity == "Study" && Geometry.Distance(f.Position, Data.Dining) < 0.1f && PeopleDynamics.IsMealWindow(Data.Minute + 60)) continue;
                     bool found = false; Point place = default(Point);
