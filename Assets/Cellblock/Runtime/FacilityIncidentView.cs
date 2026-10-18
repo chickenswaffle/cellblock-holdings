@@ -26,12 +26,10 @@ namespace Cellblock.Unity
                     Resident a = world.Data.Residents.Find(r => r.Id == fight.A), b = world.Data.Residents.Find(r => r.Id == fight.B);
                     bool firstReady = a != null && SettleIncidentActor(first, a.Position, world);
                     bool secondReady = b != null && SettleIncidentActor(second, b.Position, world);
-                    if (firstReady && secondReady) { FightPose(first, second, world); FightPose(second, first, world); }
+                    // Once both are on their marks the brawl view stages the exchanges (FacilityBrawlView.cs).
+                    if (firstReady && secondReady) incidentPoseCount += 2;
                 }
             }
-            Resident escapee = world.Escapee;
-            Actor escaping;
-            if (escapee != null && actors.TryGetValue(escapee.Id, out escaping)) JogPose(escaping, world, world.Escape.Detected);
             foreach (StaffMember staff in world.Data.Staff)
             {
                 Actor actor; if (!actors.TryGetValue(staff.Id, out actor)) continue;
@@ -54,7 +52,8 @@ namespace Cellblock.Unity
                     actor.Body.localRotation = Quaternion.Euler(3, -6, 0);
                     ShowIncidentName(actor, staff.Name + "\nRADIOING CONTROL", new Color(.88f, .76f, .48f));
                 }
-                else if (staff.Duty == "Responding to escape" || staff.Duty == "Responding to fight") JogPose(actor, world, true);
+                // Responders run with the shared locomotion (FacilityMotion.cs); the escape scene poses the struggle (FacilityEscapeView.cs).
+                else if (staff.Duty == "Responding to escape" || staff.Duty == "Responding to fight") incidentPoseCount++;
                 else if (staff.Duty == "Separating residents" && fight.Active)
                 {
                     if (!SettleIncidentActor(actor, staff.Position, world)) { JogPose(actor, world, true); continue; }
@@ -64,6 +63,7 @@ namespace Cellblock.Unity
                     ShowIncidentName(actor, staff.Name + "\nSEPARATING", new Color(.55f, .78f, .87f));
                 }
             }
+            RefreshEscapeScene(world);
             RefreshIncidentRing(world);
             string radioKey = world.IncidentReport.Guard + "/" + world.IncidentReport.Phase + "/" + world.IncidentReport.PhaseMinute;
             if (world.Data.Speed > 0 && radioKey != heardRadio && (world.IncidentReport.Phase == "Radioing control" || world.IncidentReport.Phase == "Broadcast"))
@@ -84,7 +84,7 @@ namespace Cellblock.Unity
         {
             // A slow frame may leave presentation behind the core. Finish that final clear approach
             // before playing contact poses; never cut a wall or teleport to match a phase label.
-            Vector3 target = V(position, .14f), before = actor.Root.position;
+            Vector3 target = V(position, StandHeight(actor, position, world)), before = actor.Root.position;
             if (world.Routes.Clear(new Point(before.x, before.z), position))
                 actor.Root.position = Vector3.MoveTowards(before, target, Mathf.Min(Time.unscaledDeltaTime, .15f) * 3.2f);
             return Vector3.Distance(actor.Root.position, target) < .12f;
@@ -132,7 +132,8 @@ namespace Cellblock.Unity
             }
             incidentRing.gameObject.SetActive(visible); if (!visible) return;
             Point center = world.Escapee != null ? world.Escapee.Position : world.Fight.Center;
-            for (int i = 0; i < 40; i++) { float angle = i * Mathf.PI / 20; incidentRing.SetPosition(i, V(center, .06f) + new Vector3(Mathf.Cos(angle) * 1.5f, 0, Mathf.Sin(angle) * 1.5f)); }
+            float ringHeight = StandHeight(world, center) + SoleRest + 0.03f;
+            for (int i = 0; i < 40; i++) { float angle = i * Mathf.PI / 20; incidentRing.SetPosition(i, V(center, ringHeight) + new Vector3(Mathf.Cos(angle) * 1.5f, 0, Mathf.Sin(angle) * 1.5f)); }
         }
 #if UNITY_EDITOR
         public int PreviewIncidentPoseCount { get { return incidentPoseCount; } }
@@ -144,7 +145,7 @@ namespace Cellblock.Unity
                 Actor a, b;
                 Resident first = incidentWorld.Data.Residents.Find(r => r.Id == incidentWorld.Fight.A), second = incidentWorld.Data.Residents.Find(r => r.Id == incidentWorld.Fight.B);
                 return first != null && second != null && actors.TryGetValue(first.Id, out a) && actors.TryGetValue(second.Id, out b) &&
-                    Vector3.Distance(a.Root.position, V(first.Position, .14f)) < .15f && Vector3.Distance(b.Root.position, V(second.Position, .14f)) < .15f && Vector3.Distance(a.Root.position, b.Root.position) > .55f;
+                    Vector3.Distance(a.Root.position, V(first.Position, a.Root.position.y)) < .15f && Vector3.Distance(b.Root.position, V(second.Position, b.Root.position.y)) < .15f && Vector3.Distance(a.Root.position, b.Root.position) > .55f;
             }
         }
         public bool PreviewRadioPropVisible { get { foreach (var pair in incidentRadios) if (pair.Value != null && pair.Value.gameObject.activeInHierarchy) return true; return false; } }

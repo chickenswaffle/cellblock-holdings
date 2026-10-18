@@ -984,15 +984,14 @@ namespace Cellblock.Core
             if (resident == null) { Data.Justice.Attempt = new EscapeAttempt(); return; }
             // A watch officer who favors the resident's gang looks the other way.
             List<StaffMember> officers = ResponseOfficers().Where(s => !Compromised(s, resident)).ToList();
-            StaffMember close = attempt.Detected && Data.Minute - attempt.DetectedMinute >= 5
-                ? OfficerWithSight(officers.Where(CanInterceptEscape).ToList(), resident.Position, 1.8f) : null;
-            if (close != null) { Credit(close, true); EndAttempt(resident, "intercepted", close.Name + " stopped " + resident.Name + " in person.", close); return; }
+            // Contact starts a physical struggle; only the cuffs end the attempt (EscapeStruggle.cs).
+            if (AdvanceEscapeStruggle(attempt, resident, officers)) return;
             bool held = attempt.Phase == "Held at gate";
             if (held && Data.Operations.GateOpen) { EndAttempt(resident, "escaped", ""); return; }
             if (!held)
             {
-                float speed = (attempt.Detected ? 0.46f : 0.40f) * resident.WalkSpeed;
-                bool arrived = Walk("justice/escape/" + resident.Id, ref resident.Position, attempt.Exit, speed);
+                float speed = EscapePace(attempt, resident);
+                bool arrived = EscapeRun(attempt, resident, speed);
                 attempt.StillMinutes = Geometry.Distance(resident.Position, attempt.LastPosition) < 0.01f ? attempt.StillMinutes + 1 : 0;
                 attempt.LastPosition = resident.Position;
                 if (arrived)
@@ -1033,6 +1032,8 @@ namespace Cellblock.Core
                 }
                 attempt.ResponseDueMinute = eta < 0 ? -1 : Data.Minute + eta;
             }
+            // Nobody quietly gives up in the middle of a chase they just fought their way back into (EscapeStruggle.cs).
+            if (EscapeChaseHot(attempt)) return;
             if (held && Data.Minute - attempt.HeldMinute >= 40) { EndAttempt(resident, "abandoned", resident.Name + " gave up at the closed vehicle gate and was returned to housing."); return; }
             if (Data.Minute - attempt.StartMinute >= 120) EndAttempt(resident, "abandoned", resident.Name + " abandoned the attempt and was returned to housing.");
         }

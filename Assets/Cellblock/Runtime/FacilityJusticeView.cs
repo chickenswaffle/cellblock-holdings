@@ -128,7 +128,8 @@ namespace Cellblock.Unity
             if (!show) return;
             Actor actor;
             Vector3 position = actors.TryGetValue(escapee.Id, out actor) && actor.Root.gameObject.activeInHierarchy ? actor.Root.position : V(escapee.Position, 0.14f);
-            escapeAlert.position = new Vector3(position.x, 0.12f, position.z);
+            // The disc lies a centimetre above whatever the escapee stands on (FacilityMotion.StandHeight puts soles on it).
+            escapeAlert.position = new Vector3(position.x, actor != null ? position.y - 0.0015f : 0.12f, position.z);
             float pulse = 1 + Mathf.Sin(Time.unscaledTime * 6) * 0.18f;
             escapeAlert.localScale = new Vector3(pulse, 1, pulse);
             escapeBeacon.localPosition = new Vector3(0, 2.25f + Mathf.Sin(Time.unscaledTime * 3) * 0.08f, 0);

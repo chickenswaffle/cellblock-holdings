@@ -185,7 +185,8 @@ namespace Cellblock.Unity
         void LateUpdate() { if (cameraRig != null) { if (RideAlongActive) RideAlongCamera(); else CameraPosition(); } RefreshCameraFeed(); RefreshBodyCam(); }
         void CameraPosition(bool immediate = false)
         {
-            float blend = immediate || !Preferences.SmoothCamera || Preferences.ReducedMotion ? 1 : 1 - Mathf.Exp(-Time.unscaledDeltaTime * 14);
+            // Following an incident, the camera eases more gently so a chase does not jerk it around.
+            float blend = immediate || !Preferences.SmoothCamera || Preferences.ReducedMotion ? 1 : 1 - Mathf.Exp(-Time.unscaledDeltaTime * (followIncident ? 3.5f : 14));
             displayedFocus = Vector3.Lerp(displayedFocus, focus, blend);
             displayedDistance = Mathf.Lerp(displayedDistance, distance, blend);
             displayedYaw = Mathf.LerpAngle(displayedYaw, yaw, blend); displayedPitch = Mathf.Lerp(displayedPitch, pitch, blend);
@@ -198,6 +199,26 @@ namespace Cellblock.Unity
                 (0.5f - displayedViewCenter.y) * visibleHeight, 0);
             cameraRig.transform.position = displayedFocus + rotation * new Vector3(0, 0, -displayedDistance * 1.55f) + composition;
             cameraRig.transform.rotation = rotation;
+            // A short rotational kick when a blow lands in view (FacilityEscapeView): trauma squared on smooth noise. Rotation
+            // only, so the camera never shakes into a wall; never with reduced motion.
+            float kick = view == null || Preferences.ReducedMotion ? 0 : view.CameraImpulse;
+            if (kick > 0.001f && Vector3.Distance(view.CameraImpulsePoint, displayedFocus) < displayedDistance * 0.9f)
+            {
+                float trauma = kick * kick, time = Time.unscaledTime * 14;
+                cameraRig.transform.rotation = rotation * Quaternion.Euler(1.0f * trauma * (Mathf.PerlinNoise(31.7f, time) * 2 - 1),
+                    1.2f * trauma * (Mathf.PerlinNoise(7.3f, time) * 2 - 1), 1.6f * trauma * (Mathf.PerlinNoise(91.1f, time) * 2 - 1));
+            }
+        }
+        // A chase seen side-on: the camera looks across the line of the run (or of the hold) and drifts toward that slowly,
+        // instead of swinging with the bearing between the pursuer and the fugitive.
+        float ChaseYaw(Point from, Point toward, float current, bool snap)
+        {
+            Point d = toward - from;
+            if (d.Length < 0.05f) return current;
+            float heading = Mathf.Atan2(d.X, d.Y) * Mathf.Rad2Deg;
+            float a = heading + 90, b = heading - 90;
+            float desired = Mathf.Abs(Mathf.DeltaAngle(current, a)) <= Mathf.Abs(Mathf.DeltaAngle(current, b)) ? a : b;
+            return snap ? desired : Mathf.MoveTowardsAngle(current, desired, Time.unscaledDeltaTime * 18);
         }
         public void Recenter()
         {

@@ -433,7 +433,7 @@ namespace Cellblock.Core
                 Resident escapee = responding ? Data.Residents.FirstOrDefault(r => r.Id == Escape.ResidentId) : null;
                 if (escapee != null)
                 {
-                    Point goal = NearbyClear(escapee.Position, Routes);
+                    Point goal = EscapePursuitGoal(staff, escapee);
                     if (Routes.Find(staff.Position, goal) != null) staff.Destination = goal;
                     staff.NextDutyMinute = Data.Minute; // refresh a moving target, including after a reload
                 }
@@ -458,7 +458,8 @@ namespace Cellblock.Core
                     staff.Destination = Routes.Find(staff.Position, goal) != null ? goal : staff.Station;
                     staff.NextDutyMinute = Data.Minute + (staff.Role == "Officer" ? 35 : 50);
                 }
-                float pace=responding?ResponseSpeed:.37f;
+                // Responders sprint to close on a resident they can see (EscapeStruggle.cs).
+                float pace=responding?EscapeResponsePace(staff,escapee):.37f;
                 if(!responding&&!capitalEscort&&!secureEscort&&staff.Role=="Officer"&&staff.SecurityRole=="")
                 {
                     PersonnelFile assignment=FileFor(staff);
@@ -467,7 +468,7 @@ namespace Cellblock.Core
                     // Ordinary patrol pace and physical wall/door routing still apply.
                     if(watched!=null)pace=Math.Max(pace,Math.Min(.68f,Math.Max(Geometry.Distance(staff.Position,watched.Position)>2.5f||!SightLines.Clear(staff.Position,watched.Position)?.68f:.37f,.32f*watched.WalkSpeed+.06f)));
                 }
-                bool at = Walk(staff.Id, ref staff.Position, staff.Destination, pace);
+                bool at = responding ? EscapeStride(staff.Id, ref staff.Position, staff.Destination, pace) : Walk(staff.Id, ref staff.Position, staff.Destination, pace);
                 staff.Duty = !at ? staff.Role == "Officer" ? Data.Operations.Alarm ? "Responding to alarm" : "Patrolling" : "Walking to service" :
                     staff.Role == "Officer" ? Data.Operations.Alarm ? "Alarm welfare check" : "Welfare check" : staff.Role == "Caseworker" ? "Casework" : Data.Fixtures.Any(f => SecurityRules.Equipment(f.Kind)) ? "Maintaining equipment" : "Inspecting utilities";
                 if (staff.SecurityRole == "Tower" && Data.Fixtures.Any(f => f.Id == staff.SecurityPostId && f.Kind == "GuardTower"))

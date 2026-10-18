@@ -35,12 +35,15 @@ namespace Cellblock.Unity
             Resident escapee = World.Escapee;
             if (escapee != null)
             {
-                StaffMember chaser = World.Data.Staff.Where(s => s.Duty == "Responding to escape" ||
+                // During a struggle, frame the escapee and the officer holding them (EscapeStruggle.cs).
+                StaffMember holder = World.Struggle.Active ? World.Data.Staff.FirstOrDefault(s => s.Id == World.Struggle.Officer) : null;
+                StaffMember chaser = holder ?? World.Data.Staff.Where(s => s.Duty == "Responding to escape" ||
                     (World.IncidentReport.Phase == "Radioing control" && World.IncidentReport.Guard == s.Id))
                     .OrderBy(s => Geometry.Distance(s.Position, escapee.Position)).FirstOrDefault();
                 focus = FacilityView.V(chaser == null ? escapee.Position : (escapee.Position + chaser.Position) * .5f);
-                distance = chaser == null ? 9 : Mathf.Clamp(8 + Geometry.Distance(escapee.Position, chaser.Position) * .65f, 9, 30);
-                yaw = chaser == null ? 12 : Mathf.Atan2(-(escapee.Position.Y - chaser.Position.Y), escapee.Position.X - chaser.Position.X) * Mathf.Rad2Deg + 12;
+                distance = chaser == null ? 9 : holder != null ? 7.5f : Mathf.Clamp(8 + Geometry.Distance(escapee.Position, chaser.Position) * .65f, 9, 30);
+                // Side-on to the run, or to the hold during a struggle, drifting slowly (GameController.ChaseYaw).
+                yaw = ChaseYaw(escapee.Position, holder != null ? holder.Position : World.Escape.Phase == "Moving" ? World.Escape.Exit : chaser == null ? escapee.Position : chaser.Position, yaw, Time.unscaledTime < incidentCameraGrace);
             }
             else if (World.Fight.Active)
             {
