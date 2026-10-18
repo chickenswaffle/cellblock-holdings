@@ -4,7 +4,7 @@ This records a working local development milestone, with the broader game still 
 
 ## October 18 reviewed Claude services and staff input
 
-Final source fingerprint **`cff62f41`** combines natural motion`42c1796` with Claude's published **`bb9d3f6`** sanitation, yard life, staff actions and device look controls. **420 core checks pass /0 failures.** All final Unity reports have empty error arrays.
+Implementation merge **`8507b82`**, final source fingerprint **`cff62f41`**, combines natural motion`42c1796` with Claude's published **`bb9d3f6`** sanitation, yard life, staff actions and device look controls. **420 core checks pass /0 failures.** All final Unity reports have empty error arrays.
 
 | Review | Final evidence |
 | --- | --- |

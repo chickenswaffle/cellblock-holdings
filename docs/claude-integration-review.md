@@ -1,6 +1,6 @@
 # Published Claude integration review — October 18, 2026
 
-Snapshot reviewed: `bb9d3f6` on `codex/claude-overload` (sanitation, staff actions, yard life and device look controls). Merged with the validated natural-motion implementation `42c1796`, preserving both histories. This note tracks the combined review; earlier natural-motion evidence remains evidence for its own source.
+Implementation merge: **`8507b82`**. Snapshot reviewed: `bb9d3f6` on `codex/claude-overload` (sanitation, staff actions, yard life and device look controls). Merged with the validated natural-motion implementation `42c1796`, preserving both histories. This note tracks the combined review; earlier natural-motion evidence remains evidence for its own source.
 
 ## Corrections made during review
 
