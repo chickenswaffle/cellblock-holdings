@@ -50,3 +50,8 @@ The combined branch includes Claude's published fixes through `1a9aa5b` as merge
 ## October 18 staff/motion handoff
 
 Staff-only field control, compact dossiers, useful work phone and Claude's published f201d81 motion/graphics are integrated. Read docs/character-experience.md and the latest implementation-status section. Final proof: 373 core checks, 85 Game-view captures and 24 animation sequences/982 frames. Preserve the exact shared ownership/hooks and use only the existing sole editor. Phone-size evidence is landscape editor layout; native touch/performance and production character assets remain open.
+
+
+## October 18 natural-motion checkpoint
+
+Validated implementation42c1796 adds planted-foot contacts/ankles, smoother starts/stops/turns, quiet staff gestures, blinks and refined people. Read docs/natural-character-motion.md. Same-source proof:373 core checks,945 prescribed motion frames/112 renderer captures,60 Game-view captures and24 escape sequences/982 frames. The sole editor returned to ordinary Home. Codex is continuing the user-requested review of newly published Claude sanitation/yard/actions/look controls; re-read the active coordination log before touching those integration files or running Unity.

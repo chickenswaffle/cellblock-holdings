@@ -2,6 +2,16 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
+## October 18 natural movement and human detail
+
+Implementation **`42c1796`**, source fingerprint **`5636201c`**, improves planted feet, independent ankles, starts/stops, turns, weight transfer and gaze. Brief blinks, continuous trouser knees, fitted hats and more detailed faces/clothing improve the existing procedural people. Staff use explicit quiet work gestures; pursuit no longer receives the generic raised-arm loop. Read the [research and design notes](natural-character-motion.md).
+
+**373 core checks pass.** On unchanged source, actual Unity review passes **945 prescribed motion-probe frames /112 renderer captures**, **60 Game-view captures** (27 characters,17 routines,16 incidents), and **24 escape-animation sequences /982 frames /6 scenarios**. Every final error array is empty. The probe keeps the simulation paused/unchanged and measures actual ankle/joint transforms at1x/2x/4x; peak planted drift is1.79e-7m, anchor jumps0, and settled-pause joint/clock drift0. These are sampled rendering checks, not crowd behavior or device-performance claims.
+
+[Motion report](reviews/2026-10-18-natural-motion.json) · [characters](reviews/2026-10-18-natural-characters.json) · [routines](reviews/2026-10-18-natural-routines.json) · [incidents](reviews/2026-10-18-natural-incidents.json) · [escape animation](reviews/2026-10-18-natural-escapes.json) · [core transcript](reviews/2026-10-18-natural-core.txt) · [source](reviews/2026-10-18-natural-source.json) · [Home restore audit](reviews/2026-10-18-natural-editor-audit.json). Full local frames: `Builds/{NaturalMotion,Character,Routine,Incident,Escape}Review/2026-10-18/natural-final-5636201c`.
+
+The independent critic approved the corrected natural-motion source and actual stride/stop/turn/knee/cap/face captures. An earlier fixture aborted before animation, and a diagnostic candidate failed accelerated stance exposure; both remain preserved and are excluded from final totals. Production skinned meshes/authored clips, uneven terrain/stairs and native-device performance remain ahead. This checkpoint incorporates Claude through `c54d106`; later Claude work is a separate integration review.
+
 ## October 18 staff field view, compact profiles and combined motion
 
 Implementation merge **`9d1aaef`** combines the staff checkpoint with Claude's published **f201d81** graphics/motion snapshot. **373 core checks pass, 0 failures.** The final unchanged-source Unity matrix passes **85 actual Game-view captures**, plus **24 animation sequences / 982 rendered frames across 6 disposable scenarios**. Every final report has an empty errors array. Earlier failed/cancelled review candidates are superseded, not added to these totals.

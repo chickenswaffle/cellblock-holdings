@@ -1,0 +1,25 @@
+{
+  "passed": true,
+  "editor": "6000.3.24f1",
+  "message": "Actual Unity Play: demo actions start1x and frame real actors; pause freezes staging; physical converging/tension/scuffle/guard approach/separation/once-only outcome; Unity JSON mid-scuffle/intervention/radio/chase; visible handheld radio before alarm, real control closure/lockdown, pursuit and in-person capture, phone side-card/44px actions and projected actors/dock restoration, no-observer escape without phantom alarm, Home retained. Disposable preview companies only. Native device feel and sustained performance remain unmeasured.",
+  "errors": [],
+  "captures": [
+    "01-framed-confrontation.png",
+    "02-rising-tension.png",
+    "03-physical-scuffle.png",
+    "04-officer-intervention.png",
+    "05-separation-after-reload.png",
+    "06-fight-outcome.png",
+    "07-framed-escape.png",
+    "08-guard-radioing.png",
+    "09-phone-radio-scene.png",
+    "10-radio-received-lockdown.png",
+    "11-guard-pursuit.png",
+    "12-secured-outcome.png",
+    "13-phone-secured.png",
+    "14-no-free-response.png",
+    "15-at-large-outcome.png",
+    "16-home-after-scene.png"
+  ],
+  "sourceFingerprint": "5636201ca7722dcc4719806e619d0251cb1198ed7266d19a635c806894960dbd"
+}

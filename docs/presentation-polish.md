@@ -17,3 +17,10 @@ Audit visitors now use the same articulated person factory and clipboard poses a
 Shared dining places now use non-overlapping shifts on a common serving clock. Residents can travel early and wait short of the occupied bench; eating/meal poses begin only during their assigned block. Personality offsets continue in other routines. Close-watch officers can physically jog into position when distant or out of sight, then settle to a matching pace.
 
 An additive versioned movement-memory record saves resident and worker route cursors, including crews/helpers, intake/custody, dogs and visiting inspectors. Loading preserves overdue decisions instead of postponing them. Cache records are bounded, validated, and discarded when their actor/geometry/remaining path becomes invalid. Legacy saves hydrate an empty record without charges or identity changes. Exact long-term replay is not a product guarantee.
+
+
+## October 18 natural people
+
+[Research and implementation](natural-character-motion.md): world-space planted feet with articulated ankles, predictive recovery, completed stopping/settle steps, restrained heading/gaze and weight transfer. Faces use continuous shaped meshes with small eyes/lids, fitted hair/beards and brief game-clock blinks. Cloth folds/stitching, continuous knee coverage, hand details and fitted headgear refine the current procedural rig. Routine/radio/struggle ownership remains authoritative; first-person hiding includes initially inactive eyelid renderers.
+
+Validated implementation42c1796 retains the staff-only control policy and existing save format. Source-aligned proof and device/art boundaries are in implementation-status.md.
