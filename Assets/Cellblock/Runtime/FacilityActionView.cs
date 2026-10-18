@@ -40,7 +40,7 @@ namespace Cellblock.Unity
                 float fell; if (!fellAt.TryGetValue(r.Id, out fell)) fellAt[r.Id] = fell = now;
                 Take(down, Hold.Body); down.PoseArms = true; incidentPoseCount++;
                 float t = Mathf.Clamp01((now - fell) / 0.35f);
-                Lay(down, 90 * Smooth01(t), Mathf.Lerp(0.95f, 0.16f, Smooth01(t)), Vector3.zero, t < 1 ? 1 : blend);
+                Lay(down, -90 * Smooth01(t), Mathf.Lerp(0.95f, 0.16f, Smooth01(t)), Vector3.zero, t < 1 ? 1 : blend);
                 for (int arm = 0; arm < 2; arm++) { Joint(down.Limbs[arm], new Vector3(-20, 0, arm == 0 ? 40 : -40), blend); Joint(down.Forearms[arm], new Vector3(-30, 0, 0), blend); }
             }
             if (officer == null) return;

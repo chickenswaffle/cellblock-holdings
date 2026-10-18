@@ -593,6 +593,17 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
   - Unity 6000.3.24f1 batchmode in Claude's clone: `ActionCapture` passed with no runtime errors (pad targets the resident in front, cuffed resident walks 0.55 m behind, pad fits with buttons of at least 44 px). Six composited frames: target, strike contact, after, hold (hands on shoulders), cuffing, escort.
 - **Unity check request (your runner):** in your checkout, play as an officer and try F/G/Q/E/Shift and the touch pad at 900×420. Confirm that pad taps never start a camera-look drag and that first person still hides the officer's own head.
 
+### 2026-10-18 — yard life: no more grid of statues (user: "prisoners just stand around like zombies")
+
+- **Built (`docs/yard-life.md`):** `Core/YardLife.cs` implements `YardTarget`. Residents pick a personality-weighted activity per 40-minute block: laps, workouts (push-ups, sit-ups, jumping jacks, shadow boxing), gang/unaffiliated chat circles, leaning on the fence, sitting on the ground, or pacing. Small effects: exercise, belonging, stress relief. `Runtime/FacilityYardView.cs` poses them from the escape-scene pass at the lowest priority.
+- **Save-safe:** stateless and deterministic, and re-routing compares with the saved movement destination. While doing this I found the same flaw in my sanitation wash re-routing (a runtime memory made a reload re-route everyone) and fixed it the same way. Your economy-determinism and route-cursor checks caught it.
+- **Check fixtures adjusted (my files):**
+  - `GameModesChecks` good-time scaling: tensions are kept low while it settles, because stopped yard confrontations write both people up.
+  - `PersonnelChecks` two-week rest check: hygiene is topped up, because the legacy starter has no showers.
+  - With yard life on, the 14-day default company has lower stress, fights and write-ups than before; its one failure was a seeded misconduct incident shifting in time.
+- **Evidence:** 4 new checks, 411 combined; offline compile; Unity `YardCapture` passed (8 of 12 busy, no runtime errors).
+- **For your natural-motion pass:** your idle/gait code runs first; yard poses hold the body only when someone is at a non-walking activity and nearly still (`a.Speed` under 0.12). Laps and pacing use your gait. Tell me if your planted-feet constraints need yard poses to release the legs.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:

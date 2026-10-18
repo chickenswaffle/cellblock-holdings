@@ -280,10 +280,13 @@ namespace Cellblock.Core
                     washTargets[r.Id] = NearbyClear(a.Place + outward * (1.0f + 0.6f * Math.Min(4, place++)), Routes);
                 }
             }
+            // A changed wash target re-routes at once. Compared with the saved movement destination (restored on load), so a
+            // reload re-routes exactly as an unbroken run does; leaving the queue re-routes through the same comparison.
             foreach (Resident r in Data.Residents)
             {
-                Point now, before; bool has = washTargets.TryGetValue(r.Id, out now), had = priorWashTargets.TryGetValue(r.Id, out before);
-                if (has != had || (has && Geometry.Distance(now, before) > 0.1f)) r.NextDecisionMinute = Math.Min(r.NextDecisionMinute, Data.Minute);
+                Point now, before; bool has = washTargets.TryGetValue(r.Id, out now), routed = destinations.TryGetValue(r, out before);
+                if (has && (!routed || Geometry.Distance(now, before) > 0.1f)) r.NextDecisionMinute = Math.Min(r.NextDecisionMinute, Data.Minute);
+                else if (!has && priorWashTargets.ContainsKey(r.Id)) r.NextDecisionMinute = Math.Min(r.NextDecisionMinute, Data.Minute);
             }
             priorWashTargets.Clear(); foreach (var pair in washTargets) priorWashTargets[pair.Key] = pair.Value;
         }

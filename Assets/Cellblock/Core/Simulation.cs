@@ -896,6 +896,7 @@ namespace Cellblock.Core
                 AdvanceCharacterControl();
                 AdvanceStaffActions();
                 MoveResidents();
+                AdvanceYardLife();
                 if (Data.Minute % 30 == 0) PeopleDynamics.Advance(this);
                 Data.OperatingRemainder += Contract.DailyOperatingCents / 1440.0;
                 Data.CrewRemainder += Data.Crews.Sum(c => c.DailyCents) / 1440.0;

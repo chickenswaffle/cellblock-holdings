@@ -170,6 +170,9 @@ static partial class Program
                 RunUntil(world, () => r.Legal.PendingReview == "", 4320, "The good-time hearing");
                 return (int)((before - r.Legal.ReleaseMinute) / 1440);
             }
+            // Eligibility needs a clean week: keep tensions low while the population settles, so stopped confrontations in the
+            // yard (each writes both people up) do not decide who can be recommended. This check is about the type's credit.
+            foreach (Resident r in baseWorld.Data.Residents) foreach (Relationship rel in r.Relationships) rel.Tension = Math.Min(rel.Tension, 20);
             baseWorld.AdvanceMinutes(6 * 1440); State settled = RoundTrip(baseWorld.Data); baseWorld = new World(settled);
             // The grant roll is seeded per resident, so find one the court grants, then compare the same person under both types.
             string granted = baseWorld.GoodTimeEligible().Select(r => r.Id).FirstOrDefault(id => Credit(Swap(baseWorld, "county-intake"), id) > 0);
