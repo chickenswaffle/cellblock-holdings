@@ -67,6 +67,7 @@ namespace Cellblock.Unity
             pressurePane.Add(searches);
             BuildIntel(pressurePane);
             BuildCounsel(pressurePane);
+            BuildSanitation(pressurePane);
 
             pressurePane.Add(Text("AUDITS", "section-label"));
             auditInfo = Text("", "pressure-line"); pressurePane.Add(auditInfo);
@@ -213,6 +214,7 @@ namespace Cellblock.Unity
             shakedown.SetEnabled(world.Data.Minute - cb.LastShakedownMinute >= 1440);
             RefreshIntel(world);
             RefreshCourts(world);
+            RefreshSanitation(world);
 
             AuditState a = p.Audit;
             auditInfo.text = standard.Oversight + ": " + (a.Phase == "In progress" ? "inspecting now (" + (world.Data.Minute - a.StartMinute) + " of 240 min)" : a.NextMinute >= 0 ? "next " + JusticeRules.When(a.NextMinute) + (a.Reason != "Routine" ? " · " + a.Reason.ToLowerInvariant() : "") : "scheduling") +
@@ -243,13 +245,15 @@ namespace Cellblock.Unity
             if (p.Terminated) alert = "CONTRACT TERMINATED · revenue and transfers have stopped";
             else if (p.Riot.Phase == "Riot") alert = "RIOT IN PROGRESS · " + p.Riot.Rioters.Count + " rioting · send officers";
             else if (p.Riot.Phase == "Disturbance") alert = "DISTURBANCE · " + Mathf.Max(0, 30 - (world.Data.Minute - p.Riot.StartMinute)) + " min to contain it";
+            else if (world.OutbreakActive) alert = SanitationAlert(world);
             else if (p.Audit.Phase == "In progress") alert = "INSPECTION UNDER WAY · " + world.Standard.Oversight;
             else if (p.Bus.Phase == "At gate") alert = "TRANSFER BUS HELD AT THE CLOSED GATE";
             else if (p.Unrest >= PopulationRules.VolatileUnrest) alert = "UNREST " + world.UnrestBand.ToUpperInvariant() + " · " + Mathf.RoundToInt(p.Unrest);
             else if (p.Audit.Phase == "Announced" && p.Audit.NextMinute - world.Data.Minute <= 720) alert = "INSPECTION " + JusticeRules.When(p.Audit.NextMinute).ToUpperInvariant();
+            else if (SanitationAlert(world) != "") alert = SanitationAlert(world);
             pressureAlert.style.display = alert == "" || game.Draft != null ? DisplayStyle.None : DisplayStyle.Flex;
             alertText.text = alert;
-            pressureAlert.EnableInClassList("severe", p.Terminated || p.Riot.Phase != "None" || p.Unrest >= PopulationRules.CriticalUnrest);
+            pressureAlert.EnableInClassList("severe", p.Terminated || p.Riot.Phase != "None" || p.Unrest >= PopulationRules.CriticalUnrest || world.OutbreakActive);
         }
 
         void RefreshRidePanel(World world)
@@ -305,17 +309,28 @@ namespace Cellblock.Unity
             }
         }
 
+        static float Finite(float value, float fallback) { return float.IsNaN(value) || value <= 0 ? fallback : value; }
         partial void LayoutPressure(float left, float right, float top, bool menuOpen)
         {
             if (pressureAlert == null) return;
             float width = Mathf.Min(compact ? 300 : 360, root.resolvedStyle.width - left - right - (inspectorOpen ? 360 : 0));
-            pressureAlert.style.left = left; pressureAlert.style.top = top; pressureAlert.style.width = Mathf.Max(200, width);
+            // The command meters and the journal own the top-left column: the banner sits in the world view to their
+            // right, or below the journal when the screen is too narrow for both.
+            float x = left, y = top;
+            if (commandOverview != null && commandOverview.style.display.value == DisplayStyle.Flex)
+            {
+                float column = Finite(commandOverview.resolvedStyle.width, 420), room = root.resolvedStyle.width - right - (inspectorOpen ? Finite(inspector.resolvedStyle.width, 360) + 18 : 0) - (left + column + 12);
+                if (room >= 220) { x = left + column + 12; width = Mathf.Min(width, room); }
+                else if (eventFeed != null && eventFeed.style.display.value != DisplayStyle.None) y = Finite(eventFeed.resolvedStyle.top, top + 70) + Finite(eventFeed.resolvedStyle.height, 110) + 8;
+                else y = top + Finite(commandOverview.resolvedStyle.height, 66) + 8;
+            }
+            pressureAlert.style.left = x; pressureAlert.style.top = y; pressureAlert.style.width = Mathf.Max(200, width);
             if (menuOpen) pressureAlert.style.display = DisplayStyle.None;
             bool alert = pressureAlert.style.display.value == DisplayStyle.Flex;
             float alertHeight = alert && !float.IsNaN(pressureAlert.resolvedStyle.height) && pressureAlert.resolvedStyle.height > 0 ? pressureAlert.resolvedStyle.height + 8 : alert ? 52 : 0;
-            ridePanel.style.left = left; ridePanel.style.top = top + alertHeight; ridePanel.style.width = Mathf.Max(220, width);
+            ridePanel.style.left = x; ridePanel.style.top = y + alertHeight; ridePanel.style.width = Mathf.Max(220, width);
             // Never past the bottom safe margin: the monitor shrinks first, then the card clips its last lines.
-            float available = root.resolvedStyle.height - (top + alertHeight) - 64;
+            float available = root.resolvedStyle.height - (y + alertHeight) - 64;
             ridePanel.style.maxHeight = Mathf.Max(120, available);
             rideFeed.style.height = Mathf.Clamp(available - 150, 56, compact ? 112 : 150);
             if (menuOpen) ridePanel.style.display = DisplayStyle.None;

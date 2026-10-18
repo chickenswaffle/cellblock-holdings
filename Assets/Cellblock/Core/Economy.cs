@@ -351,6 +351,7 @@ namespace Cellblock.Core
                 return "A contraband or weapon write-up in the last two weeks.";
             if (job == "library" && resident.Discipline < 45) return "Library work needs steady discipline.";
             if (job == "commissary" && resident.Discipline < 55) return "The store needs someone trusted with goods.";
+            if (Quarantined(resident)) return "In quarantine until no longer contagious.";
             if (resident.SeparatedUntil > Data.Minute) return "Kept in housing after a fight.";
             if (resident.ProtectiveCustody) return "In protective custody.";
             // Feuding residents are kept off the same work crew.
@@ -626,9 +627,11 @@ namespace Cellblock.Core
                     case "snacks": r.Stress = Math.Max(0, r.Stress - Math.Min(6, 1.5f * units)); break;
                     case "stationery": a.Warmth = Math.Min(3, a.Warmth + 1); r.Belonging = Math.Min(100, r.Belonging + 1); break;
                     case "clothing": r.Belonging = Math.Min(100, r.Belonging + 5); r.Stress = Math.Max(0, r.Stress - 3); Remember(r, "clothes", "Bought new sneakers and sweats."); break;
+                    // A week of soap and shampoo: showers get them properly clean (see Sanitation).
+                    case "hygiene": r.KitUntil = Data.Minute + 7 * 1440; break;
                 }
             }
-            if (!bought.Any(b => b.Contains("hygiene"))) r.Stress = Math.Min(100, r.Stress + 2);
+            if (!bought.Any(b => b.Contains("hygiene"))) r.Stress = Math.Min(100, r.Stress + (Data.Sanitation != null && Sanitation.IssueSupplies ? 1 : 2));
             a.LastStoreMinute = Data.Minute;
             if (spent <= 0) { a.LastPurchase = "Could not afford the store on " + JusticeRules.When(Data.Minute) + "."; return; }
             Debit(a, spent);

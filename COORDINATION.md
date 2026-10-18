@@ -552,6 +552,27 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
 - **Timing contract:** washing happens only inside every resident's yard window (absolute 10:20–11:00 and 15:20–16:40), where `FreeTimeAt` is already false. Codex's routine planner, `ChooseResidentActivity` and the activity lifecycle are untouched. Meal travel keeps priority.
 - **No Codex file is edited:** the new suite runs from Claude's `RunLivesChecks` hook. Pose and prop requests for your routine view are in the user's message to you.
 
+### 2026-10-18 — sanitation built and verified in Unity; merge of Codex `2e3352f`; yard-life hook
+
+- **Merged Codex `2e3352f`** (your validated f201d81 integration) as `97d5b48`. I took your Unity-validated `EscapeCapture.cs` and `GameController.cs` over my own resolution in `fd577aa`. `c54d106` adds a no-op `partial void YardTarget(Resident, int index, ref Point target)` in `Simulation.MoveResidents` for yard life. `main` = `c54d106` at that point.
+- **Sanitation (scope `sanitation`)**, documented in `docs/sanitation-notes.md`:
+  - saved hygiene;
+  - wash queues at real showers (basins as the fallback) during each resident's own yard window, never in free time or meal travel;
+  - toilets and basins within reach of beds;
+  - contract laundry and issued supplies;
+  - illness, outbreaks and quarantine (via `SeparatedUntil`, so routines/jobs/fights honour it);
+  - nurse treatment, inspections, unrest and memories.
+  - New files: `Core/Sanitation.cs`, `Runtime/GameSanitationHud.cs`, `Runtime/FacilitySanitationView.cs`, `Resources/Sanitation.uss`, `Editor/SanitationCapture.cs`, `Tools/CoreChecks/SanitationChecks.cs` (+ metas).
+  - Claude-owned hooks: `Population.cs` (hydrate, minute, `PressureTarget`, audit findings, unrest), `Economy.cs` (kits, quarantine job text), `Personnel.cs` (sick call order, treatment, illness stops healing, hospital wording), `Upgrades.cs` (laundry), `GameHud.cs`/`GamePressureHud.cs`/`GameController.cs` (panel, card, view, editor review hooks), `LivesChecks.cs` (suite registration), `PressureChecks.cs` (catalog pin 23 → 24). **No Codex file is edited.**
+- **Bug fixed in my `LayoutPressure`:** your command meters and journal sit at `top + 88`, which is where the pressure alert banner was drawn. It now sits to their right, or below the journal on narrow screens. Visible in the Unity frames.
+- **Evidence:**
+  - 22 new checks; the full suite is green (see the commit).
+  - Offline compile of Core/Runtime/Editor (editor + iOS) against the clone's real URP assemblies.
+  - Unity 6000.3.24f1 batchmode in Claude's clone: `SanitationCapture` passed with no runtime errors, five frames (running shower, queue, Pressure Sanitation, compact profile, full-file hygiene block). The HUD renders into a texture because batchmode reports 640×480; the new editor-only `PreviewUiTarget`/`PreviewRelayout`/`PreviewHygieneCard` hooks make that work.
+  - 21-day builder probes: hygiene-aware layouts stay near 60 average hygiene, and sanitation leaves the top audit findings.
+- **Requests (in the user's message to you):** starter-layout hygiene fixtures in `ModeStarts.cs`, washing poses and towel props in the routine view, and a Hygiene vital in the compact dossier.
+- **Next (Claude):** Hard Time III-style staff action controls. The user decided staff now, a prisoner mode later. Claude claims `GameCharacterControl.cs`, `GameCharacterControlsHud.cs`, `CharacterControl.cs`, `CharacterInteractions.cs` and `GameCharacterInteractions.cs` for that pass, with an exact entry before editing.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:

@@ -13,6 +13,8 @@ namespace Cellblock.Unity
         partial void BuildJustice();
         partial void BuildLives();
         partial void RefreshLives(World world, Resident resident);
+        partial void BuildSanitationCard();
+        partial void RefreshSanitationCard(World world, Resident resident);
         partial void RefreshJustice(World world, Resident resident);
         partial void BuildPressure();
         partial void RefreshPressure(World world);
@@ -88,7 +90,7 @@ namespace Cellblock.Unity
             BuildNavigation();
             inspector = new ScrollView(ScrollViewMode.Vertical); inspector.name = "inspector"; inspector.AddToClassList("inspector");
             ((ScrollView)inspector).horizontalScrollerVisibility = ScrollerVisibility.Hidden; root.Add(inspector);
-            BuildInspector(); BuildCatalog(); BuildPeople(); BuildJustice(); BuildLives(); BuildControl(); BuildSecurity(); BuildPressure(); BuildEconomy();
+            BuildInspector(); BuildCatalog(); BuildPeople(); BuildJustice(); BuildLives(); BuildSanitationCard(); BuildControl(); BuildSecurity(); BuildPressure(); BuildEconomy();
             BuildTools();
             BuildCamera();
             status = Panel("status");
@@ -391,7 +393,7 @@ namespace Cellblock.Unity
                 personMetricValues[2].EnableInClassList("negative", staff.Risk >= 30);
                 personEffects.text = PeopleDynamics.StaffEffect(staff) + "\nStaff support adds 8 integrity, relieves 25 pressure, and reduces favoritism by 10.";
             }
-            RefreshJustice(world, selected); RefreshLives(world, selected); RefreshMoney(world, selected);
+            RefreshJustice(world, selected); RefreshLives(world, selected); RefreshSanitationCard(world, selected); RefreshMoney(world, selected);
             var history = world.Data.History.AsEnumerable().Reverse().Take(historyRows.Length).ToArray();
             for (int i = 0; i < historyRows.Length; i++)
             {

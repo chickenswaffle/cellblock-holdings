@@ -86,6 +86,8 @@ namespace Cellblock.Core
                 Tiers = new[] { T("Shadow boards", 150000, 500, "Ninety percent fewer knives go missing from the kitchen.") } },
             new UpgradeDefinition { Id = "phones", Name = "Monitored resident phones", Category = "Services", Description = "Recorded phone access for calls home.",
                 Tiers = new[] { T("Resident phones", 700000, 2000, "Calls home at your per-minute rate: the facility keeps a 40% commission, families send more.") } },
+            new UpgradeDefinition { Id = "laundry", Name = "Laundry", Category = "Services", Description = "Clean clothes, towels and bedding on a schedule.",
+                Tiers = new[] { T("Contract laundry", 300000, 2500, "Clean clothes and linens twice a week: hygiene falls 18% more slowly and skin infections are rarer.") } },
             // ---- planned: committed in the roadmap, not yet simulated ----
             new UpgradeDefinition { Id = "transport-fleet", Name = "Transport fleet", Category = "Intake", Status = "Planned", Description = "Larger and more transfer buses, then an owned fleet." },
             new UpgradeDefinition { Id = "video-court", Name = "Video court", Category = "Intake", Status = "Planned", Description = "Remote hearings that cut court van runs." },

@@ -52,7 +52,7 @@ Everything in Cellblock Holdings that makes sense to upgrade, so later work can 
 | Dining places | Tables (6 places) and chairs (1) in the dining room | Meal places × up to 4 shifts | **Live** |
 | Kitchen | Serving counter → kitchen line → industrial kitchen | Meal quality, a faster serving rate, kitchen jobs. Hooch risk from produce | Planned |
 | Meal delivery to housing | Trays to units | Meals during lockdown | Planned |
-| Laundry | Outsourced → on-site laundry | Hygiene, laundry jobs, a contraband hiding place | Planned |
+| Laundry | Contract laundry → on-site laundry | Hygiene falls 18% slower and fewer skin infections (contract); on-site adds laundry jobs and a contraband hiding place | **Live** (contract tier, see `docs/sanitation-notes.md`); on-site Planned (washer/dryer fixtures) |
 | Commissary | 1 | −3 unrest, less tobacco demand, $1.50/resident/day | **Live** |
 | Resident phones | 1 → video calls | −2 unrest, less pull for contraband phones, $1/resident/day | **Live** (tier 1) |
 
