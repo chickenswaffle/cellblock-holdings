@@ -44,8 +44,22 @@ MDickie's Hard Time III, and it has to work for people on a computer, a controll
   left stick walk, X strike, LB face-nearest, third-person follow), checks the response maths, the cursor capture and
   release, and frames keyboard, controller, 900×420 touch and the Controls settings page into `Builds/LookReview/`.
 
+## Controller in management and menus (`Runtime/GameGamepad.cs`)
+
+- Left stick moves the view, right stick orbits/tilts, LT/RT zoom, LB/RB change speed (previous/next in a ride-along),
+  Start pauses, Select opens Holdings, R3 recentres, L3 swaps 3D/plan.
+- A reticle marks the centre of the world view and snaps onto a person within ~7.5% of the screen height (the view slows
+  while it is on someone). A selects or places there; B cancels a plan or tool, then deselects; X rotates a placement;
+  Y plays as the selected officer or follows the selected prisoner. The caption under the reticle says what A/B/X/Y do.
+- With a plan pending, A jumps the highlight to the quote's Approve (or Discard when the plan is invalid): A again approves.
+- Buttons: a highlight ring moves spatially between visible, reachable buttons (D-pad steps, a held left stick repeats),
+  A presses, B goes back (menus/phone/sheets) or steps back to the world, the right stick scrolls the list. Menus, the work
+  phone and Home pick a first button themselves (primary action, then the open tab, then the biggest button). In
+  management the D-pad steps from the reticle into the nearest button on that side. Sliders move with left/right.
+- The toolkit's own navigation events are stopped while the controller is active, so mouse focus never double-presses.
+- Review: `Editor/PadCapture.cs` (Builds/PadReview/).
+
 ## Not yet
 
-- Controllers do not drive the management game or menus yet (only direct control).
 - Real-device checks: an actual controller on Mac/iPhone, and touch feel on an actual phone.
 - The interaction context line (Codex's `CharacterInteractionHint`) still says "E / Interact" on a controller.

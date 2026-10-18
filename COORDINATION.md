@@ -618,6 +618,14 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
 - **Checks:** 411/411 core. Unity `LookCapture` PASSED in Claude's clone (virtual Input System controller: right stick turns, left stick walked 2.96 m, X struck, LB faced the nearest prisoner to 1°, third-person follow swing; cursor captured on entry and released on exit; keyboard/controller/900×420 touch/settings frames reviewed). Not covered: a physical controller, touch on a real phone.
 - **Unity check request (your runner):** merge `main`, let Unity resolve the Input System package (offline, bundled), and confirm your frontend/character reviews still pass with Both input handlers. If your FrontendReview pins the Controls page length, the new block adds about 300 px of scrolling content.
 
+### 2026-10-18 — controller in management and menus (user: "work on making things better"; follows the look pass)
+
+- New Claude files: `Runtime/GameGamepad.cs` (partial GameController + GameHud), `Resources/Gamepad.uss`, `Editor/PadCapture.cs`, metas. Claude-owned hooks: `GameController.Update` calls `GamepadInterfaceUpdate()` after `UpdateControlDevice()`; `InputUpdate` returns after `GamepadManagement()` when a controller is active; `GameHud.Initialize` calls `BuildGamepad()`; the Inspect instruction line and the field guide are device-aware. `GameLookInput` controller buttons are ignored on frames the controller worked a menu (so B closing the phone never also grabs).
+- Exact exception in Codex's `GameSettingsHud.cs`: one extra "Controller: …" line in the management controls-reference string. Nothing else.
+- Generic: the highlight walks any visible, enabled, reachable `Button`/`Toggle`/`Slider` (focusable) in the UI tree, so Codex's Home, phone, settings and sheets work without changes. Buttons with `focusable = false` (touch pads) are skipped; ClickEvent-only elements (e.g. the pressure alert) are not reachable yet — making them Buttons would fix that.
+- Checks: PadCapture PASSED (stick pan 13.9 m, RT zoom 44→26, reticle snapped to and A selected a prisoner, A/Y played as an officer, Select opened the phone with a highlight and B closed it without a grab, D-pad into the buttons and 1×→2× with A set 2×, B back to the world, Holdings highlight starts on Continue and steps down, a placement's A reaches the quote and B/B discards). LookCapture still PASSED; 411/411 core checks.
+- Not yet: a real controller on Mac/iPhone; portrait layouts.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:

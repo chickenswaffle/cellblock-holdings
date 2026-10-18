@@ -172,7 +172,7 @@ namespace Cellblock.Unity
             bool blocked = World == null || hud == null || hud.BlocksWorldInput || appPaused || unfocused;
             if (blocked || nativeInputWasBlocked) magnification = 0;
             nativeInputWasBlocked = blocked;
-            UpdateControlDevice();
+            UpdateControlDevice(); GamepadInterfaceUpdate();
             if (World == null) return;
             UpdateCharacterSession();
             if (!appPaused && (!unfocused || presentationPreview) && !hud.BlocksSimulation && World.Data.Speed > 0)
@@ -333,6 +333,7 @@ namespace Cellblock.Unity
                 if (Input.GetKeyDown(KeyCode.Escape)) hud.NavigateBack();
                 return;
             }
+            if (GamepadManagement()) return;
             if (Input.touchCount > 0)
             {
                 if (Input.touchCount >= 2)

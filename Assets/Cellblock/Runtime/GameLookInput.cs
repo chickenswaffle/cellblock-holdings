@@ -158,7 +158,7 @@ namespace Cellblock.Unity
         {
 #if ENABLE_INPUT_SYSTEM
             Gamepad pad = Pad;
-            if (pad == null) return false;
+            if (pad == null || padInterfaceFrame) return false;
             if (pad.startButton.wasPressedThisFrame) { World.Data.Speed = World.Data.Speed == 0 ? 1 : 0; accumulator = 0; ClearCharacterInput(); hud.Refresh(true); return true; }
             if (pad.dpad.left.wasPressedThisFrame) { EndCharacterView(); return true; }
             if (pad.selectButton.wasPressedThisFrame && CharacterDirect) { hud.ToggleCharacterPhone(); ClearCharacterInput(); return true; }
@@ -179,7 +179,7 @@ namespace Cellblock.Unity
         {
 #if ENABLE_INPUT_SYSTEM
             Gamepad pad = Pad;
-            return pad != null && (pad.selectButton.wasPressedThisFrame || pad.buttonEast.wasPressedThisFrame);
+            return pad != null && !padInterfaceFrame && (pad.selectButton.wasPressedThisFrame || pad.buttonEast.wasPressedThisFrame);
 #else
             return false;
 #endif
