@@ -17,7 +17,7 @@ namespace Cellblock.Unity
         Transform structures, planned, ghost, people;
         sealed class Actor
         {
-            public Transform Root, Model, Body, Head, Marker, SecurityProp, WatchProp;
+            public Transform Root, Model, Body, Head, Blink, Marker, SecurityProp, WatchProp;
             public TextMesh NameTag;
             public Transform[] Limbs;
             public float Speed, Gait, TurnRate;
@@ -28,7 +28,7 @@ namespace Cellblock.Unity
             public bool Staff, Seen, PoseArms;
             public Resident Motion;
             public Transform WorkTool, Cargo, Workbench;
-            public Transform[] Forearms, Hands, Tools, Knees;
+            public Transform[] Forearms, Hands, Tools, Knees, Feet;
             public float PoseClock;
         }
         readonly Dictionary<string, Actor> actors = new Dictionary<string, Actor>();
@@ -90,7 +90,7 @@ namespace Cellblock.Unity
             if (name == "wood" || name == "bark") return "wood";
             if (name == "gravel") return "gravel";
             if (name == "plaster" || name == "paving" || name == "foundation" || name == "cap") return "concrete";
-            if (name == "blanket" || name == "linen" || name.StartsWith("uniform")) return "fabric";
+            if (name == "blanket" || name == "linen" || name == "trousers" || name.StartsWith("uniform")) return "fabric";
             return null;
         }
 
@@ -758,8 +758,9 @@ namespace Cellblock.Unity
             var torso = new GameObject("Waist / upper-body pivot").transform; torso.SetParent(model, false); torso.localPosition = Vector3.up * 0.9f;
             body.SetParent(torso, false); body.localPosition = Vector3.down * 0.9f;
             Transform head=DetailedHead(torso,index,skinName,skin,staff);
+            Transform blink=CreateFaceMotion(head,index,skinName,skin);
             var parts = new Transform[4];
-            var forearms = new Transform[2]; var hands = new Transform[2]; var knees = new Transform[2];
+            var forearms = new Transform[2]; var hands = new Transform[2]; var knees = new Transform[2]; var feet = new Transform[2];
             for (int i = 0; i < 4; i++)
             {
                 bool arm = i < 2; float side = i % 2 == 0 ? -1 : 1;
@@ -771,7 +772,9 @@ namespace Cellblock.Unity
                     Combine(pivot);
                     var elbow = new GameObject("Elbow").transform; elbow.SetParent(pivot, false); elbow.localPosition = new Vector3(0, -0.28f, 0);
                     Capsule(elbow, "Forearm", new Vector3(0, -0.11f, 0.025f), new Vector3(0.095f, 0.135f, 0.095f), skinName, skin);
-                    Sphere(elbow, "Hand", new Vector3(0, -0.25f, 0.03f), new Vector3(0.085f, 0.12f, 0.07f), skinName, skin);
+                    Sphere(elbow, "Hand", new Vector3(0, -0.25f, 0.03f), new Vector3(0.078f, 0.11f, 0.060f), skinName, skin);
+                    Sphere(elbow, "Thumb", new Vector3(-side * .034f, -.231f, .048f), new Vector3(.029f, .059f, .032f), skinName, skin);
+                    for (int finger = 0; finger < 3; finger++) Sphere(elbow, "Knuckle", new Vector3(-.021f + finger * .021f, -.274f, .061f), new Vector3(.018f, .028f, .013f), skinName, skin);
                     Combine(elbow); forearms[i] = elbow;
                     hands[i] = new GameObject("Grip").transform; hands[i].SetParent(elbow, false); hands[i].localPosition = new Vector3(0, -0.25f, 0.05f);
                 }
@@ -781,22 +784,26 @@ namespace Cellblock.Unity
                     Combine(pivot);
                     Transform knee = new GameObject("Knee").transform; knee.SetParent(pivot, false); knee.localPosition = new Vector3(0, -0.40f, 0);
                     Capsule(knee, "Lower trouser leg", new Vector3(0, -0.19f, 0), new Vector3(0.135f, 0.20f, 0.15f), "trousers", new Color(0.30f, 0.34f, 0.33f));
-                    Sphere(knee, "Work shoe", new Vector3(0, -0.41f, 0.052f), new Vector3(0.16f, 0.14f, 0.29f), "rubber", new Color(0.10f, 0.12f, 0.12f));
-                    Box(knee,"Shoe sole",new Vector3(0,-.46f,.052f),new Vector3(.162f,.035f,.28f),"rubber",new Color(.08f,.09f,.09f));
-                    for(int lace=0;lace<3;lace++)Box(knee,"Boot lace",new Vector3(0,-.355f,.04f+lace*.035f),new Vector3(.075f,.009f,.008f),"shoe-lace",new Color(.23f,.24f,.22f));
+                    Sphere(knee, "Continuous trouser knee", new Vector3(0, -.008f, .003f), new Vector3(.145f, .16f, .168f), "trousers", new Color(.30f, .34f, .33f));
                     Box(knee,"Trouser side seam",new Vector3(side*.067f,-.19f,0),new Vector3(.008f,.32f,.014f),"trouser-seam",new Color(.24f,.28f,.28f));
-                    Combine(knee); knees[i - 2] = knee;
+                    Combine(knee);
+                    Transform ankle = new GameObject("Ankle / planted shoe").transform; ankle.SetParent(knee, false); ankle.localPosition = new Vector3(0, -.43f, 0);
+                    Sphere(ankle, "Work shoe", new Vector3(0, .02f, .052f), new Vector3(.16f, .14f, .29f), "rubber", new Color(.10f, .12f, .12f));
+                    Box(ankle, "Shoe sole", new Vector3(0, -.03f, .052f), new Vector3(.162f, .035f, .28f), "rubber", new Color(.08f, .09f, .09f));
+                    for (int lace=0;lace<3;lace++) Box(ankle,"Boot lace",new Vector3(0,.075f,.04f+lace*.035f),new Vector3(.075f,.009f,.008f),"shoe-lace",new Color(.23f,.24f,.22f));
+                    Combine(ankle); feet[i - 2] = ankle;
+                    knees[i - 2] = knee;
                 }
                 parts[i] = pivot;
             }
             root.localScale = new Vector3(.94f+index%5*.025f,.96f+index%4*.025f,.94f+index%5*.025f);
             Transform marker = Cylinder(root, "Selected person", new Vector3(0, 0.015f, 0), new Vector3(0.72f, 0.008f, 0.72f), "handle", Teal);
             marker.gameObject.SetActive(false);
-            var actor = new Actor { Root = root, Model = model, Body = torso, Head = head, Limbs = parts, Marker = marker, Staff = staff, Motion = new Resident(), Forearms = forearms, Hands = hands, Knees = knees, Gait = index % 97 * 0.13f, TurnRate = 7 + index % 5 };
+            var actor = new Actor { Root = root, Model = model, Body = torso, Head = head, Blink = blink, Limbs = parts, Marker = marker, Staff = staff, Motion = new Resident(), Forearms = forearms, Hands = hands, Knees = knees, Feet = feet, Gait = index % 97 * 0.13f, TurnRate = 7 + index % 5 };
             if (role == "Builder")
             {
-                Sphere(body, "Hard hat", new Vector3(0, 1.79f, 0), new Vector3(0.28f, 0.16f, 0.29f), "hi-vis", new Color(0.96f, 0.77f, 0.14f));
-                Cylinder(body, "Hat brim", new Vector3(0, 1.77f, 0), new Vector3(0.34f, 0.018f, 0.34f), "hi-vis", new Color(0.96f, 0.77f, 0.14f));
+                Sphere(head, "Hard hat", new Vector3(0, .14f, 0), new Vector3(0.28f, 0.16f, 0.29f), "hi-vis", new Color(0.96f, 0.77f, 0.14f));
+                Cylinder(head, "Hat brim", new Vector3(0, .11f, 0), new Vector3(0.34f, 0.018f, 0.34f), "hi-vis", new Color(0.96f, 0.77f, 0.14f));
                 Box(body, "Reflective vest band", new Vector3(0, 1.20f, 0.14f), new Vector3(0.34f, 0.06f, 0.018f), "reflective", new Color(0.94f, 0.94f, 0.80f));
                 CreateBuilderKit(actor);
             }
@@ -838,12 +845,23 @@ namespace Cellblock.Unity
 
         void MoveActor(Actor actor, Resident resident, World world, bool snap)
         {
-            float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
+#if UNITY_EDITOR
+            if (NaturalMotionProbeOwns(actor)) return;
+#endif
+            MoveActor(actor, resident, world, snap, Mathf.Min(SceneFrameDelta, .05f));
+        }
+        void MoveActor(Actor actor, Resident resident, World world, bool snap, float dt)
+        {
+            // New handed-over floors can change support under an idle person. Rebind
+            // transient contacts to the authoritative surfaces after a geometry revision.
+            Stride contactStride = StrideFor(actor);
+            if (contactStride.ContactRevision != world.GeometryRevision)
+            { ResetFootContacts(actor); contactStride.ContactRevision = world.GeometryRevision; }
             // Soles on whatever the person stands on: room floors, paving or grass (FacilityMotion.StandHeight).
             Vector3 target = V(resident.Position, StandHeight(actor, resident.Position, world)), previous = actor.Root.position;
             if (snap || (target - previous).sqrMagnitude > 200)
             {
-                actor.Root.position = target; actor.Speed = 0; previous = target;
+                actor.Root.position = target; actor.Speed = 0; previous = target; ResetFootContacts(actor);
                 actor.RenderRoute = null; actor.RouteIndex = 0; actor.RouteRevision = -1; actor.NextRouteRefresh = 0;
             }
             Vector3 travel = target - previous;
@@ -884,7 +902,8 @@ namespace Cellblock.Unity
                 float baseSpeed = 1.6f * Mathf.Max(1, world.Data.Speed) * resident.WalkSpeed;
                 // A sprinting escapee or a running responder moves faster than a walk; follow the simulation's own pace (FacilityMotion.cs).
                 float desiredSpeed = Mathf.Min(Mathf.Max(baseSpeed * 1.20f, TrackedPace(actor, target)), gap / (0.16f / Mathf.Sqrt(Mathf.Max(1,world.Data.Speed))));
-                actor.Speed = Mathf.MoveTowards(actor.Speed, desiredSpeed, dt * baseSpeed * 8);
+                Stride stride = StrideFor(actor);
+                actor.Speed = Mathf.SmoothDamp(actor.Speed, desiredSpeed, ref stride.SpeedVelocity, desiredSpeed > actor.Speed ? .12f : .18f, Mathf.Infinity, dt);
                 Vector3 candidate = Vector3.MoveTowards(previous, waypoint, actor.Speed * dt);
                 if (world.Routes.Clear(from, new Point(candidate.x, candidate.z))) actor.Root.position = candidate;
             }

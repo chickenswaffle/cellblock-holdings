@@ -10,6 +10,9 @@ namespace Cellblock.Unity
         // temporary; roster removal and replacement of the displayed world release the bindings.
         void ForgetActorMotion(Actor actor)
         {
+#if UNITY_EDITOR
+            naturalMotionProbes.Remove(actor);
+#endif
             strides.Remove(actor); heldPoses.Remove(actor); heldThisFrame.Remove(actor);
             ShadowSlot shadow;
             if (shadowSlots.TryGetValue(actor, out shadow))
@@ -29,6 +32,9 @@ namespace Cellblock.Unity
             shadowSlots.Clear(); shadowRetired.Clear(); shadowsDrawn = 0;
             alarmWeight = alarmVelocity = 0;
             if (alarmVolume != null) { alarmVolume.weight = 0; alarmVolume.gameObject.SetActive(false); }
+#if UNITY_EDITOR
+            naturalMotionProbes.Clear();
+#endif
             strides.Clear(); strideStaff.Clear(); strideStaffFrame = -1;
             heldPoses.Clear(); heldThisFrame.Clear();
             cast.ProneYaw = 0; cast.ProneKey = cast.ImpactKey = cast.LandingKey = cast.StaggerKey = cast.StaggerLanding = int.MinValue;
