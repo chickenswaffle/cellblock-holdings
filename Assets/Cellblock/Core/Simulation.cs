@@ -193,6 +193,8 @@ namespace Cellblock.Core
         // Population pressure: transfers, intake, housing, contraband, unrest and audits (Population.cs and siblings).
         static partial void HydratePressure(State state);
         partial void AdvancePressure();
+        // Yard life: where a resident goes during yard time instead of their standing spot. Unimplemented, it is the spot.
+        partial void YardTarget(Resident resident, int index, ref Point target);
         partial void PressureMovement(Resident resident, ref bool skip);
         partial void PressureTarget(Resident resident, ref Point target);
         // Food gained (or lost) this minute; the kitchen and prison economy adjust it.
@@ -964,6 +966,8 @@ namespace Cellblock.Core
                     continue;
                 }
                 Point target = mealTravel ? mealSeat : yard ? ServiceDestination(index,false) : resident.Home;
+                // Yard activities may replace the standing spot during the person's own yard window (meal travel keeps priority).
+                if (yard && !mealTravel) YardTarget(resident, index, ref target);
                 ChooseResidentActivity(resident, ref target);
                 PressureTarget(resident, ref target);
                 Point prior;
