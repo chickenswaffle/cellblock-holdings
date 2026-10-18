@@ -52,7 +52,7 @@ namespace Cellblock.Unity
             string surface = Surface(name);
             bool emission=name=="ghost"||name=="planned"||name=="handle"||name=="lamp"||name=="ceiling-on"||name=="alarm"||name=="door-outline";
             bool detailed=surface!=null&&surface!="grass";
-            Material template = Resources.Load<Material>(emission?"LuminaireMaterial":detailed?"DetailedBuildingMaterial":"BuildingMaterial");
+            Material template = (emission ? null : SurfaceTemplate(name)) ?? Resources.Load<Material>(emission?"LuminaireMaterial":detailed?"DetailedBuildingMaterial":"BuildingMaterial");
             if (template == null || template.shader == null)
                 throw new System.InvalidOperationException("BuildingMaterial is missing. Run Cellblock > Prepare project before Play or building a player.");
             value = new Material(template) { name = name, color = color, enableInstancing = true };
@@ -77,6 +77,7 @@ namespace Cellblock.Unity
                 value.EnableKeyword("_EMISSION");
                 value.SetColor("_EmissionColor", color * (name == "lamp" ? 0.8f : 0.18f));
             }
+            if (!emission) DressSurface(value, name);
             materials[name] = value;
             return value;
         }

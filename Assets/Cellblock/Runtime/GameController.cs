@@ -189,7 +189,7 @@ namespace Cellblock.Unity
             if (!InmateInput() && !CharacterInputUpdate(magnification) && !InmateMode) InputUpdate(magnification); view.ReducedMotion = Preferences.ReducedMotion; view.Refresh(World); view.RefreshCharacterPhones(World, hud.CharacterPhoneOpen ? CharacterPhoneSubjectId : ""); view.SetWatchedCamera(WatchedCamera); pressureView.Refresh(World, Time.unscaledDeltaTime); sanitationView.Refresh(World, Time.unscaledDeltaTime); UpdateRideAlong(); if (!CharacterViewActive) UpdateIncidentCamera(); hud.Refresh();
             TickAutosave();
         }
-        void LateUpdate() { if (cameraRig != null) { if (CharacterViewActive) CharacterCamera(); else if (RideAlongActive) RideAlongCamera(); else CameraPosition(); } RefreshCameraFeed(); RefreshBodyCam(); }
+        void LateUpdate() { if (cameraRig != null) { if (CharacterViewActive) CharacterCamera(); else if (RideAlongActive) RideAlongCamera(); else CameraPosition(); } RefreshCameraFeed(); RefreshBodyCam(); PresentationShadows.Fit(displayedDistance > 0 ? displayedDistance : distance, CharacterViewActive); }
         void CameraPosition(bool immediate = false)
         {
             // Following an incident, the camera eases more gently so a chase does not jerk it around.
@@ -272,7 +272,7 @@ namespace Cellblock.Unity
             var request = new UnityEngine.Rendering.Universal.UniversalRenderPipeline.SingleCameraRequest { destination = cctvTexture };
             UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(cctvCamera, request);
         }
-        void OnDestroy() { EndCharacterView(false); DisposeDoorPreview();if (cctvTexture != null) { cctvTexture.Release(); Destroy(cctvTexture); } ReleaseBodyCam(); }
+        void OnDestroy() { PresentationShadows.Restore(); EndCharacterView(false); DisposeDoorPreview();if (cctvTexture != null) { cctvTexture.Release(); Destroy(cctvTexture); } ReleaseBodyCam(); }
         public void Orbit(float horizontalDegrees, float verticalDegrees)
         { yaw += horizontalDegrees; pitch = Mathf.Clamp(pitch + verticalDegrees, 28, 78); }
         public void Zoom(float amount) { distance = Mathf.Clamp(distance * Mathf.Exp(-amount * 0.12f), 11, 85); }
@@ -763,7 +763,7 @@ namespace Cellblock.Unity
         // Places the camera like the management rig does (focus, distance, yaw, pitch) without the interface offset.
         public void FrameArt(Vector3 artFocus, float artDistance, float artYaw, float artPitch)
         {
-            planView = false; cameraRig.orthographic = false;
+            planView = false; cameraRig.orthographic = false; PresentationShadows.Fit(artDistance, false);
             Quaternion rotation = Quaternion.Euler(artPitch, artYaw, 0);
             cameraRig.transform.position = artFocus + rotation * new Vector3(0, 0, -artDistance * 1.55f); cameraRig.transform.rotation = rotation;
         }
