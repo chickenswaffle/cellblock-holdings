@@ -465,9 +465,18 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
   - Two officers: no escapes, 26% surrender.
   - Average resident, one officer, gate open: 10% escape.
 - **Checks:**
-  - Core: 330/330, including 13 escape checks.
-  - Mutation: the 20-mutant run on the first pass caught all 20. A 26-mutant run on the current code is in progress.
-  - Unity: `Editor/EscapeCapture.cs` renders 20 shots across four scenarios with every scripted check satisfied (`CELLBLOCK_ESCAPE_CAPTURE_PASSED`).
+  - Core: 332/332, including 15 escape checks.
+  - Mutation:
+    - The first pass caught 20 of 20 mutants.
+    - The second pass caught 24 of 26 mutants. The two survivors (the hot-chase rule and the waypoint carry-over) led to two new checks, each verified to catch its mutant.
+  - Unity: `Editor/EscapeCapture.cs` renders 22 shots across five scenarios, including a night alarm scene, with every scripted check satisfied (`CELLBLOCK_ESCAPE_CAPTURE_PASSED`).
+- **Second milestone (graphics from the research):**
+  - `Runtime/FacilityAlarmMood.cs`: an alarm grade at volume priority 11, a red-edged vignette breathing at 0.7 Hz, and still under Reduced Motion.
+  - `Runtime/FacilityContactShadows.cs` and `Resources/ContactShadow.shader`: pooled per-person soft shadows on an SRP-batcher-compatible unlit shader.
+  - Wild swings inside holds.
+  - Strain jitter as target-angle noise (it no longer accumulates).
+  - `docs/research-escape-motion.md` (the research brief) and `Tools/RigModel/` (its forward-kinematics model of the rig).
+  - `GameController.LateUpdate` passes Reduced Motion to the view.
 - **More narrow hooks, beyond the list above:**
   - `Operations.cs`: responder pace and stride.
   - `GameIncidentControl.cs`: the side-on yaw (`GameController.ChaseYaw`).

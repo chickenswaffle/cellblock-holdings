@@ -29,6 +29,8 @@ namespace Cellblock.Editor
 
         static EscapeCapture() { EditorApplication.update += Tick; }
 
+        // Only the night scenario (alarm grade and contact shadows).
+        public static void RunNight() { SessionState.SetBool("Cellblock.Escape.ShadowsOnly", true); Run(); }
         public static void Run()
         {
             ProjectSetup.Validate();
@@ -62,7 +64,7 @@ namespace Cellblock.Editor
             EscapeStruggle s = w == null ? new EscapeStruggle() : w.Struggle;
             switch (step)
             {
-                case 0: if (frames > 30) Next(); return;
+                case 0: if (frames > 30) { if (SessionState.GetBool("Cellblock.Escape.ShadowsOnly", false)) step = 48; Next(); } return;
                 // Scenario one: a sprint, a clinch, a punch that drops the officer, a flying tackle from behind, the pin, cuffs,
                 // the lift and the walk back.
                 case 1: Company(game); Next(); return;
@@ -121,6 +123,26 @@ namespace Cellblock.Editor
                 case 46: Separate(game); Next(); return;
                 case 47: if (w.Fight.Phase == "Separating" || frames > 300) { Require(w.Fight.Phase == "Separating", "no officer reached the fight: " + w.Fight.Phase); Next(); } return;
                 case 48: Capture(game, view, "20-separating", () => false, 0, 40, 2, () => Side(view, w.Fight.A, w.Fight.B, 3.8f)); return;
+                // Scenario five: night with the alarm sounding: the alarm grade, contact shadows, a run and a tackle under the lights.
+                case 49: Company(game, 21 * 60 + 30); Next(); return;
+                case 50: if (frames > 20) { StartRun(game); w.SetAlarm(true); Next(); } return;
+                case 51: Capture(game, view, "21-night-alarm", () => false, 0, 40, 3, () => Wide(view, escapeeId)); return;
+                case 52: if (w.Escape.Phase == "None") { Require(false, "the night run ended early"); step = 55; frames = 0; shot = ""; return; } Engage(game, "f", true); Next(); return;
+                case 53: if (s.Active || frames > 120) { Require(s.Active, "no contact at night"); leadId = s.Officer; if (s.Move != "Tackle") Force(w, "Grappling", "Tackle", 4); Next(); } return;
+                case 54: Capture(game, view, "22-night-tackle", () => s.Phase == "Down", 12, 90, 1, () => Side(view, escapeeId, leadId, 3.6f)); return;
+                case 55:
+                    Debug.Log("CELLBLOCK_ESCAPE contact shadows: " + view.PreviewContactShadowInfo);
+                    if (SessionState.GetBool("Cellblock.Escape.ShadowsOnly", false))
+                    {
+                        // Straight down over the escapee, shadows on and then off: the difference is exactly what they draw.
+                        Vector3 at; view.TryGetPersonPosition(escapeeId, out at); at.y = 0.3f;
+                        game.FrameArt(at, 2.6f, 0, 89);
+                        Render(game.ArtCamera, 960, 540, Path.Combine(Output, "diag-shadows-on.png"));
+                        view.PreviewShadowsShown = false;
+                        Render(game.ArtCamera, 960, 540, Path.Combine(Output, "diag-shadows-off.png"));
+                        view.PreviewShadowsShown = true;
+                    }
+                    Require(view.PreviewAlarmMood > 0.5f && view.PreviewContactShadows > 3, "night: alarm mood " + view.PreviewAlarmMood + ", contact shadows " + view.PreviewContactShadows); Next(); return;
                 default:
                     if (failures.Count > 0) throw new InvalidOperationException(string.Join("; ", failures));
                     Finish(0, "CELLBLOCK_ESCAPE_CAPTURE_PASSED " + Path.GetFullPath(Output)); return;
@@ -129,10 +151,10 @@ namespace Cellblock.Editor
         static void Next() { step++; frames = 0; shotFrame = 0; shot = ""; }
         static void Require(bool ok, string what) { if (!ok) { failures.Add(what); Debug.LogWarning("CELLBLOCK_ESCAPE_CHECK " + what); } }
 
-        static void Company(GameController game)
+        static void Company(GameController game, int minuteOfDay = 14 * 60 + 30)
         {
             Time.captureDeltaTime = 0;
-            game.StartArtPreview("county-maximum", "briar-county", 14 * 60 + 30);
+            game.StartArtPreview("county-maximum", "briar-county", minuteOfDay);
             escapeeId = leadId = "";
         }
         // The demo's pick, moved onto open ground first so the run is visible, with every other officer held far away.
@@ -202,6 +224,11 @@ namespace Cellblock.Editor
             return new Shot { Focus = focus, Distance = 2.6f, Yaw = yaw, Pitch = 34 };
         }
         static Shot High(Shot shot) { shot.Pitch = 40; return shot; }
+        static Shot Wide(FacilityView view, string a)
+        {
+            Vector3 pa; view.TryGetPersonPosition(a, out pa); pa.y = 0.4f;
+            return new Shot { Focus = pa, Distance = 7f, Yaw = 30, Pitch = 42 };
+        }
         static void StartFight(GameController game)
         {
             World w = game.World;

@@ -58,10 +58,10 @@ namespace Cellblock.Unity
                 Vector3 middle = (a.Root.position + b.Root.position) * 0.5f;
                 Turn(officer, Yaw(Vector3.Cross(axis, Vector3.up) * (Vector3.Dot(officer.Root.position - middle, Vector3.Cross(axis, Vector3.up)) > 0 ? -1 : 1)), 720);
                 Offset(officer, Vector3.zero, Vector3.zero, Quaternion.identity, blend);
-                Stance(officer, 0.84f, 0.14f, -0.14f, blend); Torso(officer, 10, 0, 0, blend);
+                Vector2 shake = Tremor(tempo, 3);
+                Stance(officer, 0.84f, 0.14f, -0.14f, blend); Torso(officer, 10 + shake.x, shake.y, 0, blend);
                 ArmPose(officer, 0, officer.Model.InverseTransformPoint(Chest(a.Root.position + Vector3.Cross(Vector3.up, axis).normalized * 0f, a)), blend);
                 ArmPose(officer, 1, officer.Model.InverseTransformPoint(Chest(b.Root.position, b)), blend);
-                Effort(officer, tempo, 3);
                 ShowIncidentName(officer, "OFFICER\nSEPARATING", Lawman);
                 ShowIncidentName(a, ra.Name + "\nHELD BACK", Fugitive); ShowIncidentName(b, rb.Name + "\nHELD BACK", Fugitive);
                 return;
@@ -120,9 +120,9 @@ namespace Cellblock.Unity
         void Strain(Actor a, Actor other, float tempo, float blend)
         {
             Stance(a, 0.84f, 0.22f, -0.22f, blend);
-            Torso(a, 20 + Mathf.Sin(tempo * 2.7f) * 5, 0, 0, blend);
+            Vector2 shake = Tremor(tempo, 5);
+            Torso(a, 20 + Mathf.Sin(tempo * 2.7f) * 5 + shake.x, shake.y, 0, blend);
             for (int arm = 0; arm < 2; arm++) ArmPose(a, arm, a.Model.InverseTransformPoint(other.Body.position + Vector3.up * (0.5f + 0.08f * Mathf.Sin(tempo * 3 + arm)) + other.Root.right * (arm == 0 ? 0.15f : -0.15f)), blend);
-            Effort(a, tempo, 5);
         }
         // Returns the attacker's step toward the target for this frame.
         Vector3 Attack(Actor at, Actor target, string move, float t, float blend, float fast)

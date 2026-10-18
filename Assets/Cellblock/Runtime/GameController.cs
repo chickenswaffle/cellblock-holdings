@@ -182,7 +182,7 @@ namespace Cellblock.Unity
             InputUpdate(magnification); view.Refresh(World); view.SetWatchedCamera(WatchedCamera); pressureView.Refresh(World, Time.unscaledDeltaTime); UpdateRideAlong(); UpdateIncidentCamera(); hud.Refresh();
             TickAutosave();
         }
-        void LateUpdate() { if (cameraRig != null) { if (RideAlongActive) RideAlongCamera(); else CameraPosition(); } RefreshCameraFeed(); RefreshBodyCam(); }
+        void LateUpdate() { if (view != null) view.ReducedMotion = Preferences.ReducedMotion; if (cameraRig != null) { if (RideAlongActive) RideAlongCamera(); else CameraPosition(); } RefreshCameraFeed(); RefreshBodyCam(); }
         void CameraPosition(bool immediate = false)
         {
             // Following an incident, the camera eases more gently so a chase does not jerk it around.
