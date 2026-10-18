@@ -29,7 +29,8 @@ namespace Cellblock.Unity
             if (seenBeats.Count > 64) seenBeats.IntersectWith(world.ActionBeats);
 
             Actor officer = world.CharacterKind == "Staff" ? Live(world.CharacterId) : null;
-            RefreshActionRing(world, officer);
+            // Prisoner mode: the pad belongs to the resident under control, and fights are between residents.
+            RefreshActionRing(world, officer ?? (world.InmateMode && world.CharacterId != "" ? Live(world.CharacterId) : null));
 
             // Knocked down: fall onto the back over a third of a second, then stay down until the core lets them up.
             foreach (Resident r in world.Data.Residents)
@@ -43,7 +44,7 @@ namespace Cellblock.Unity
                 Lay(down, -90 * Smooth01(t), Mathf.Lerp(0.95f, 0.16f, Smooth01(t)), Vector3.zero, t < 1 ? 1 : blend);
                 for (int arm = 0; arm < 2; arm++) { Joint(down.Limbs[arm], new Vector3(-20, 0, arm == 0 ? 40 : -40), blend); Joint(down.Forearms[arm], new Vector3(-30, 0, 0), blend); }
             }
-            if (officer == null) return;
+            if (officer == null) { foreach (LiveBeat live in liveBeats) StageBeat(world, live, Live(live.Beat.ActorId), now, blend); return; }
 
             Resident heldResident = world.Data.Residents.FirstOrDefault(r => r.Id == world.HeldResidentId);
             Actor held = heldResident == null ? null : Live(heldResident.Id);
@@ -99,17 +100,29 @@ namespace Cellblock.Unity
                 if (busy == "Bunk search") ArmPose(officer, 0, new Vector3(-0.15f, 0.5f, 0.4f + Mathf.Sin(now * 5) * 0.06f), blend);
             }
 
-            foreach (LiveBeat live in liveBeats) StageBeat(world, live, officer, now, blend);
+            foreach (LiveBeat live in liveBeats) StageBeat(world, live, Live(live.Beat.ActorId) ?? officer, now, blend);
         }
 
         // One strike, counter, grab or shove, staged over half a second from the moment the core recorded it.
         void StageBeat(World world, LiveBeat live, Actor officer, float now, float blend)
         {
             ActionBeat beat = live.Beat;
+            if (officer == null) return;
             float t = Mathf.Clamp01((now - live.Start) / StrikeSeconds);
             Actor target = Live(beat.TargetId);
             switch (beat.Kind)
             {
+                case "Talk":
+                {
+                    // An open hand while talking, and the other person turns to listen.
+                    if (target == null || heldThisFrame.Contains(officer)) break;
+                    Take(officer, Hold.Upper); officer.PoseArms = true;
+                    Turn(officer, Yaw(target.Root.position - officer.Root.position), 540);
+                    float open = Window(t, 0, 0.3f) * (1 - Window(t, 0.75f, 1));
+                    ArmPose(officer, 1, Vector3.Lerp(new Vector3(0.2f, 0.95f, 0.05f), new Vector3(0.22f, 1.18f, 0.32f), open), blend);
+                    if (!heldThisFrame.Contains(target)) Turn(target, Yaw(officer.Root.position - target.Root.position), 360);
+                    break;
+                }
                 case "Strike":
                 case "Swing":
                 case "Takedown":

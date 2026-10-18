@@ -54,7 +54,7 @@ namespace Cellblock.Unity
         bool inspectorOpen = true, cameraOpen, compact, layoutReady, guideOpen, hadDraft;
         object previousSelection;
         float nextRefresh;
-        public bool BlocksSimulation { get { return InteractionModalOpen || guideOpen || (menu != null && menu.style.display.value != DisplayStyle.None); } }
+        public bool BlocksSimulation { get { return InteractionModalOpen || guideOpen || inmateSheetOpen || (menu != null && menu.style.display.value != DisplayStyle.None); } }
         public bool BlocksWorldInput { get { return BlocksSimulation || CharacterPhoneOpen; } }
         public Vector2 WorldViewCenter { get; private set; } = new Vector2(0.5f, 0.5f);
         public static string Money(long cents) { return "$" + (cents / 100d).ToString("N0", CultureInfo.InvariantCulture); }
@@ -101,7 +101,7 @@ namespace Cellblock.Unity
             guide = Panel("guide-overlay"); guide.style.display = DisplayStyle.None;
             BuildFrontend(); BuildHomePresentation();
             facilityPane.Add(Action("Goals & facility journal", ShowFacilityEvents, "primary"));
-            BuildCharacterInspector(); BuildCharacterPhone(); BuildGamepad();
+            BuildCharacterInspector(); BuildCharacterPhone(); BuildInmate(); BuildGamepad();
             root.RegisterCallback<GeometryChangedEvent>(e => Layout()); Layout();
         }
 
@@ -699,7 +699,7 @@ namespace Cellblock.Unity
             if (person) { showStaff = game.SelectedStaff != null; ShowCompactCharacter(game.SelectedCharacterId); }
             Refresh(true);
         }
-        public void NavigateBack() { if (CharacterPhoneOpen) { CloseCharacterPhone(); return; } if (settingsOpen) CloseSettings(); else if (modePickerOpen) HideModePicker(); else CloseOverlays(); }
+        public void NavigateBack() { if (inmateSheetOpen) { CloseInmateSheet(); return; } if (CharacterPhoneOpen) { CloseCharacterPhone(); return; } if (settingsOpen) CloseSettings(); else if (modePickerOpen) HideModePicker(); else CloseOverlays(); }
         public void CloseOverlays()
         {
             CloseCharacterPhone(); CloseInteractionSheets();
@@ -823,7 +823,7 @@ namespace Cellblock.Unity
                 quoteCost.EnableInClassList("negative", q != null && !q.Valid); approve.SetEnabled(q != null && q.Valid);
             }
             RefreshSecurity(world); RefreshCommandHud(world);
-            RefreshCharacterInspector(world); RefreshCharacterControls(world); RefreshCharacterPhone(world);
+            RefreshCharacterInspector(world); RefreshCharacterControls(world); RefreshCharacterPhone(world); RefreshInmate(world);
             Layout();
         }
 

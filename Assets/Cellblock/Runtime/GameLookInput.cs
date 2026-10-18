@@ -298,6 +298,12 @@ namespace Cellblock.Unity
         // The help line under the character name, written for the device in use.
         public string CharacterControlsHelp(World world)
         {
+            if (world.InmateMode)
+            {
+                if (!CharacterDirect) return controlDevice == ControlDevice.Gamepad ? "WATCHING · you can't move right now · right stick looks · Start menu" : "WATCHING · you can't move right now · drag to look · Esc menu";
+                string pad = InmateHelp(world);
+                if (pad != null) return pad;
+            }
             if (!CharacterDirect) return controlDevice == ControlDevice.Gamepad ? "FOLLOWING · People continue their own routines · right stick looks · D-pad ← management" :
                 "FOLLOWING · People continue their own routines · drag to look · Esc management";
             if (world.Data.Speed == 0) return controlDevice == ControlDevice.Gamepad ? "PAUSED · Start resumes" : "PAUSED · Resume to walk or make a call";
@@ -308,6 +314,17 @@ namespace Cellblock.Unity
                 return "Left stick moves · swipe right side or LOOK stick to look · double-tap to look ahead · buttons act";
             return MouseLookCaptured ? "WASD move · mouse looks · click strike · right-click grab · E use · Q pick up · Shift run · V view · Esc frees the cursor"
                 : "WASD move · click the world to look with the mouse · E use · V view · P phone · Esc management";
+        }
+        // The same pad as staff, with a prisoner's words; Esc and Start open the menu (there is no management view).
+        string InmateHelp(World world)
+        {
+            if (world.Data.Speed == 0) return null;
+            if (controlDevice == ControlDevice.Gamepad)
+                return GamepadPlayStation ? "L stick move · R stick look · Square punch · Circle shove · Triangle pick up · Cross talk / use · L1 face nearest · R1 view · Options menu"
+                    : "L stick move · R stick look · X punch · B shove · Y pick up · A talk / use · LB face nearest · RB view · Start menu";
+            if (controlDevice == ControlDevice.Touch) return "Left stick moves · swipe to look · PUNCH, SHOVE, PICK UP and USE act · Menu pauses";
+            return MouseLookCaptured ? "WASD move · mouse looks · click punch · right-click shove · E talk / use · Q pick up · Shift run · V view · Esc frees the cursor"
+                : "WASD move · click the world to look · E talk / use · V view · Esc menu";
         }
 #if UNITY_EDITOR
         public void PreviewControlDevice(ControlDevice device) { controlDevice = device; }

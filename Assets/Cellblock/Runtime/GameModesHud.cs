@@ -18,6 +18,7 @@ namespace Cellblock.Unity
         int surpriseCount,modeStep;
         bool modePickerOpen;
         Button modeNext,modeBack,modeCreate;
+        VisualElement modeDoTime;
         System.Action<string, string> onCharter;
 
         void BuildModePicker()
@@ -50,7 +51,11 @@ namespace Cellblock.Unity
             modeBack=Action("Back",()=>{modeStep--;RebuildModePicker();modeScroll.scrollOffset=Vector2.zero;},"quiet");buttons.Add(modeBack);
             modeNext=Action("Continue  →",()=>{modeStep++;RebuildModePicker();modeScroll.scrollOffset=Vector2.zero;},"primary");buttons.Add(modeNext);
             modeCreate=Action("Charter facility  →",Charter,"primary");buttons.Add(modeCreate);
-            footer.Add(buttons); card.Add(footer);
+            footer.Add(buttons);
+            // Prisoner mode: serve a sentence in the institution just chosen instead of running it.
+            modeDoTime = Element("mode-do-time"); modeDoTime.Add(Text("OR DO TIME HERE AS A PRISONER", "mode-do-time-label"));
+            foreach (int days in InmateRules.Sentences) { int d = days; modeDoTime.Add(Action(d + " days", () => DoTime(d), "quiet")); }
+            footer.Add(modeDoTime); card.Add(footer);
         }
 
         // Hosts the charter screen. With no callback it re-charters the current company (first day only).
@@ -82,6 +87,7 @@ namespace Cellblock.Unity
             modeLocations.style.display=modeStep==2?DisplayStyle.Flex:DisplayStyle.None;
             var steps=modeScroll.Query<Label>(className:"mode-step").ToList();for(int i=0;i<steps.Count;i++)steps[i].style.display=i==modeStep?DisplayStyle.Flex:DisplayStyle.None;
             modeBack.style.display=modeStep==0?DisplayStyle.None:DisplayStyle.Flex;modeNext.style.display=modeStep<2?DisplayStyle.Flex:DisplayStyle.None;modeCreate.style.display=modeStep==2?DisplayStyle.Flex:DisplayStyle.None;
+            FacilityType doTimeType=GameModes.Type(pickType);modeDoTime.style.display=modeStep==2&&onCharter!=null&&doTimeType!=null&&doTimeType.Housing!="Single cells"?DisplayStyle.Flex:DisplayStyle.None;
 
             foreach (ModeTier tier in GameModes.Tiers)
             {
@@ -147,6 +153,23 @@ namespace Cellblock.Unity
             RebuildModePicker();
         }
 
+        void DoTime(int days)
+        {
+            string location = CharterLocation(); HideModePicker();
+            if (!game.StartInmateRun(pickType, location, days)) { Refresh(true); return; }
+            menu.style.display = DisplayStyle.None; workspace = Workspace.Facility; inspectorOpen = false; cameraOpen = false; previousSelection = null; Refresh(true); Layout();
+        }
+        string CharterLocation()
+        {
+            string location = pickLocation;
+            if (pickRandomLocation)
+            {
+                string ignored; GameModes.Random((game.World != null ? game.World.Data.Seed : 11) + surpriseCount * 104729, pickTier, out ignored, out location);
+                if (!GameModes.Tier(pickTier).Locations.Contains(location)) location = GameModes.Tier(pickTier).Locations[0];
+            }
+            if (!GameModes.Tier(pickTier).Locations.Contains(location)) location = GameModes.Tier(pickTier).Locations[0];
+            return location;
+        }
         void Charter()
         {
             string location = pickLocation;

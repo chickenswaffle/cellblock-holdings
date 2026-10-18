@@ -174,7 +174,7 @@ namespace Cellblock.Unity
             nativeInputWasBlocked = blocked;
             UpdateControlDevice(); GamepadInterfaceUpdate();
             if (World == null) return;
-            UpdateCharacterSession();
+            UpdateCharacterSession(); InmateUpdate();
             if (!appPaused && (!unfocused || presentationPreview) && !hud.BlocksSimulation && World.Data.Speed > 0)
             {
                 accumulator += Mathf.Min(SimulationFrameDelta, 0.1f) * World.Data.Speed;
@@ -186,7 +186,7 @@ namespace Cellblock.Unity
 #if UNITY_EDITOR
             view.PreviewFixedFrameDelta = presentationPreview && Time.captureDeltaTime > 0 ? Time.captureDeltaTime : 0;
 #endif
-            if (!CharacterInputUpdate(magnification)) InputUpdate(magnification); view.ReducedMotion = Preferences.ReducedMotion; view.Refresh(World); view.RefreshCharacterPhones(World, hud.CharacterPhoneOpen ? CharacterPhoneSubjectId : ""); view.SetWatchedCamera(WatchedCamera); pressureView.Refresh(World, Time.unscaledDeltaTime); sanitationView.Refresh(World, Time.unscaledDeltaTime); UpdateRideAlong(); if (!CharacterViewActive) UpdateIncidentCamera(); hud.Refresh();
+            if (!InmateInput() && !CharacterInputUpdate(magnification) && !InmateMode) InputUpdate(magnification); view.ReducedMotion = Preferences.ReducedMotion; view.Refresh(World); view.RefreshCharacterPhones(World, hud.CharacterPhoneOpen ? CharacterPhoneSubjectId : ""); view.SetWatchedCamera(WatchedCamera); pressureView.Refresh(World, Time.unscaledDeltaTime); sanitationView.Refresh(World, Time.unscaledDeltaTime); UpdateRideAlong(); if (!CharacterViewActive) UpdateIncidentCamera(); hud.Refresh();
             TickAutosave();
         }
         void LateUpdate() { if (cameraRig != null) { if (CharacterViewActive) CharacterCamera(); else if (RideAlongActive) RideAlongCamera(); else CameraPosition(); } RefreshCameraFeed(); RefreshBodyCam(); }

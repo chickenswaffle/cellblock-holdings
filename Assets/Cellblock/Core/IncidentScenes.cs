@@ -197,6 +197,7 @@ namespace Cellblock.Core
             if (RadioGuard(staff))
             { staff.Destination = staff.Position; staff.Duty = "Radioing control"; staff.NextDutyMinute = Data.Minute + 1; RemoveWorkerPath(staff.Id); return true; }
             if (TryEscapeStruggleTask(staff)) return true;
+            if (TryInmateStaffTask(staff)) return true; // Claude's prisoner mode: the officer answering the player (exact exception, 2026-10-18)
             if (!Fight.Active || Fight.Responder != staff.Id || !FreeIncidentOfficer(staff) || CanPursueEscape(staff)) return false;
             // Approach the same side of the wall as the pair, never a fixed offset across a room boundary.
             Point target = Fight.Center;

@@ -626,6 +626,14 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
 - Checks: PadCapture PASSED (stick pan 13.9 m, RT zoom 44→26, reticle snapped to and A selected a prisoner, A/Y played as an officer, Select opened the phone with a highlight and B closed it without a grab, D-pad into the buttons and 1×→2× with A set 2×, B back to the world, Holdings highlight starts on Continue and steps down, a placement's A reaches the quote and B/B discards). LookCapture still PASSED; 411/411 core checks.
 - Not yet: a real controller on Mac/iPhone; portrait layouts.
 
+### 2026-10-18 — Do time: the prisoner mode (user direction "staff now, inmates next"; new scope `inmate-mode`)
+
+- New Claude files: `Core/InmateRun.cs`, `Runtime/GameInmate.cs`, `Resources/Inmate.uss`, `Editor/InmateCapture.cs`, `Tools/CoreChecks/InmateChecks.cs`, metas, `docs/prisoner-mode.md`. Saved state: `State.InmateRunVersion` + `State.InmateRun` (hydrated in Population's hydrate list; old saves get an inactive run).
+- The management game stays staff-only. A run is a separate start from the charter's last step and lets the player control exactly one resident (`InmateMayControl`). Exact exceptions in Codex files (one line each): `CharacterControl.BeginCharacterControl` staff-only test also accepts `InmateMayControl(next.Id)`; `IncidentScenes.TryIncidentStaffTask` calls `TryInmateStaffTask(staff)` after the escape-struggle task (moves only the officer answering the player); `GameCharacterControl.StartCharacterPlay` staff test also accepts `World.InmateMayControl(id)`. Nothing else in those files.
+- Claude-owned hooks: StaffActions pad methods/hints dispatch to the prisoner versions when a prisoner is under control, `StaffActionSpeed` calls `InmateSpeed`, `AdvanceStaffActions` calls `AdvanceInmate`, `ActionWind`/`ActionRunning` follow the prisoner; Population hydrate + `InmateMovement` after `StaffActionMovement`; FacilityActionView stages beats by any actor (residents fighting) plus a talk gesture; GameController runs `InmateUpdate` and `InmateInput` (no management input in a run); GameHud pause sheet blocks simulation, B/Esc close it; GamePressureHud hides management banners in a run and non-severe ones in any character view.
+- Checks: 421/421 core (10 new). InmateCapture PASSED (charter row shown for county-maximum, hidden for federal-supermax; start; punch; officer cuffs, walks to the bunk, locks in 6 h with 2 days added; watching while locked in; Wait it out at 4×; menu blocks time; control returns; 900×420 touch fits; release → FREE). LookCapture and PadCapture still PASSED.
+- Codex: please keep the three one-line hooks when merging; `CharacterInteractionHint` text that mentions management is blanked by the prisoner HUD in a run, but a resident-appropriate hint would be nicer when convenient.
+
 ## Codex handoff request (personnel + placement)
 
 Please include in your next handoff to Claude:

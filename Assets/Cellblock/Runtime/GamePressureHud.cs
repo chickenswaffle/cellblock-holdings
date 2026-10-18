@@ -251,9 +251,12 @@ namespace Cellblock.Unity
             else if (p.Unrest >= PopulationRules.VolatileUnrest) alert = "UNREST " + world.UnrestBand.ToUpperInvariant() + " · " + Mathf.RoundToInt(p.Unrest);
             else if (p.Audit.Phase == "Announced" && p.Audit.NextMinute - world.Data.Minute <= 720) alert = "INSPECTION " + JusticeRules.When(p.Audit.NextMinute).ToUpperInvariant();
             else if (SanitationAlert(world) != "") alert = SanitationAlert(world);
-            pressureAlert.style.display = alert == "" || game.Draft != null ? DisplayStyle.None : DisplayStyle.Flex;
+            bool severe = p.Terminated || p.Riot.Phase != "None" || p.Unrest >= PopulationRules.CriticalUnrest || world.OutbreakActive;
+            // Management advice stays out of a character view (only the severe ones show there), and out of prisoner mode entirely.
+            bool hidden = alert == "" || game.Draft != null || world.InmateMode || game.CharacterViewActive && !severe;
+            pressureAlert.style.display = hidden ? DisplayStyle.None : DisplayStyle.Flex;
             alertText.text = alert;
-            pressureAlert.EnableInClassList("severe", p.Terminated || p.Riot.Phase != "None" || p.Unrest >= PopulationRules.CriticalUnrest || world.OutbreakActive);
+            pressureAlert.EnableInClassList("severe", severe);
         }
 
         void RefreshRidePanel(World world)

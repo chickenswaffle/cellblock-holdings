@@ -115,7 +115,7 @@ namespace Cellblock.Unity
 
         public bool StartCharacterPlay(string id)
         {
-            if (World == null || !World.Data.Staff.Any(s => s.Id == id)) { Message("Direct control is for staff. Resident play is reserved for a future separate mode."); return false; }
+            if (World == null || !World.Data.Staff.Any(s => s.Id == id) && !World.InmateMayControl(id)) { Message("Direct control is for staff. Resident play is reserved for a future separate mode."); return false; }
             if (World == null || Draft != null) { Message("Approve or discard the current plan before playing as a character."); return false; }
             string canonical, label; Vector3 position, eye, forward;
             if (!TryCharacterIdentity(id, out canonical, out label) || !view.TryGetCharacterPose(canonical, out position, out eye, out forward))
