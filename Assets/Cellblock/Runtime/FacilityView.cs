@@ -839,7 +839,8 @@ namespace Cellblock.Unity
         void MoveActor(Actor actor, Resident resident, World world, bool snap)
         {
             float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
-            Vector3 target = V(resident.Position, 0.14f), previous = actor.Root.position;
+            // Soles on whatever the person stands on: room floors, paving or grass (FacilityMotion.StandHeight).
+            Vector3 target = V(resident.Position, StandHeight(actor, resident.Position, world)), previous = actor.Root.position;
             if (snap || (target - previous).sqrMagnitude > 200)
             {
                 actor.Root.position = target; actor.Speed = 0; previous = target;
@@ -876,52 +877,29 @@ namespace Cellblock.Unity
                         while (actor.RouteIndex + 1 < actor.RenderRoute.Count && world.Routes.Clear(from, actor.RenderRoute[actor.RouteIndex + 1]))
                             actor.RouteIndex++;
                         if (actor.RouteIndex < actor.RenderRoute.Count && world.Routes.Clear(from, actor.RenderRoute[actor.RouteIndex]))
-                            waypoint = V(actor.RenderRoute[actor.RouteIndex], 0.14f);
+                            waypoint = V(actor.RenderRoute[actor.RouteIndex], target.y);
                     }
                 }
                 else { actor.RenderRoute = null; actor.RouteIndex = 0; }
                 float baseSpeed = 1.6f * Mathf.Max(1, world.Data.Speed) * resident.WalkSpeed;
-                float desiredSpeed = Mathf.Min(baseSpeed * 1.20f, gap / (0.16f / Mathf.Sqrt(Mathf.Max(1,world.Data.Speed))));
+                // A sprinting escapee or a running responder moves faster than a walk; follow the simulation's own pace (FacilityMotion.cs).
+                float desiredSpeed = Mathf.Min(Mathf.Max(baseSpeed * 1.20f, TrackedPace(actor, target)), gap / (0.16f / Mathf.Sqrt(Mathf.Max(1,world.Data.Speed))));
                 actor.Speed = Mathf.MoveTowards(actor.Speed, desiredSpeed, dt * baseSpeed * 8);
                 Vector3 candidate = Vector3.MoveTowards(previous, waypoint, actor.Speed * dt);
                 if (world.Routes.Clear(from, new Point(candidate.x, candidate.z))) actor.Root.position = candidate;
             }
             else actor.Speed = Mathf.MoveTowards(actor.Speed, 0, dt * 15);
-            Vector3 movement = actor.Root.position - previous;
-            float speed = dt > 0 ? movement.magnitude / dt : 0;
-            bool walking = speed > 0.035f;
-            if (walking)
-            {
-                Quaternion rotation = Quaternion.LookRotation(movement);
-                actor.Root.rotation = Quaternion.Slerp(actor.Root.rotation, rotation, 1 - Mathf.Exp(-actor.TurnRate * dt));
-                actor.Gait += movement.magnitude * (7.0f + resident.WalkSpeed * 0.6f);
-            }
-            AnimateCharacterDetail(actor,resident,world,walking,dt);
-            float stride = walking ? Mathf.Clamp01(speed / 1.3f) : 0;
-            float swing = Mathf.Sin(actor.Gait) * 21 * stride;
-            for (int leg = 0; leg < 2; leg++) actor.Knees[leg].localRotation = Quaternion.Slerp(actor.Knees[leg].localRotation,
-                Quaternion.Euler(Mathf.Max(0, -Mathf.Sin(actor.Gait + leg * Mathf.PI)) * 38 * stride, 0, 0), dt * 18);
-            actor.Body.localPosition = Vector3.Lerp(actor.Body.localPosition,
-                Vector3.up * (0.9f + (walking ? Mathf.Abs(Mathf.Sin(actor.Gait)) * 0.018f * stride : 0)), dt * 14);
-            if (!actor.PoseArms)
-            {
-                actor.Body.localRotation = Quaternion.Slerp(actor.Body.localRotation, Quaternion.identity, dt * 12);
-                for (int arm = 0; arm < 2; arm++) actor.Forearms[arm].localRotation = Quaternion.Slerp(actor.Forearms[arm].localRotation, Quaternion.Euler(-8, 0, 0), dt * 14);
-            }
-            for (int j = 0; j < 4; j++)
-            {
-                if (j < 2 && actor.PoseArms) continue;
-                actor.Limbs[j].localRotation = Quaternion.Slerp(actor.Limbs[j].localRotation,
-                    Quaternion.Euler(swing * (j % 2 == 0 ? 1 : -1) * (j < 2 ? -0.65f : 1), 0, j < 2 ? (j == 0 ? 4 : -4) : 0), dt * 16);
-            }
+            // Gait, posture and limbs for what the root just did (FacilityMotion.cs).
+            Locomote(actor, resident, world, previous, dt);
         }
 
         public void Refresh(World world, bool force = false)
         {
             if (!object.ReferenceEquals(presentedWorld, world))
             {
+                ResetMotionPresentation();
                 foreach (Actor oldActor in actors.Values) { Clear(oldActor.Root); Destroy(oldActor.Root.gameObject); }
-                actors.Clear(); looks.Clear();residentActorIds.Clear();staffActorIds.Clear();actorRetireMinute=-1;
+                actors.Clear(); looks.Clear();residentActorIds.Clear();staffActorIds.Clear();crewActorIds.Clear();actorRetireMinute=-1;
                 foreach (ProjectView oldProject in constructionViews.Values) { Clear(oldProject.Root); Destroy(oldProject.Root.gameObject); }
                 constructionViews.Clear();
                 if (transportRoot != null) Clear(transportRoot); trucks.Clear();
@@ -950,7 +928,8 @@ namespace Cellblock.Unity
                 actor.Marker.gameObject.SetActive(id == selectedResidentId);
                 UpdateCharacterNameTag(actor,resident.Name,id==selectedResidentId);
                 PrepareResidentPose(actor, resident, world);
-                if (world.IncidentOwnsResident(resident) || (world.Escape.Phase != "None" && world.Escape.ResidentId == resident.Id)) actor.PoseArms = true;
+                // A fight owns the arms; a running escapee keeps the shared gait's arm pump (FacilityMotion.cs).
+                if (world.IncidentOwnsResident(resident)) actor.PoseArms = true;
                 MoveActor(actor, resident, world, force || created);
                 AnimateResidentLife(actor, resident, world);
             }
@@ -964,23 +943,25 @@ namespace Cellblock.Unity
 
         readonly HashSet<string> residentActorIds=new HashSet<string>();
         readonly HashSet<string> staffActorIds=new HashSet<string>();
-        int actorRetireMinute=-1,retireResidentCount=-1,retireStaffCount=-1;
+        readonly HashSet<string> crewActorIds=new HashSet<string>();
+        int actorRetireMinute=-1,retireResidentCount=-1,retireStaffCount=-1,retireCrewCount=-1;
         // Being away at court is temporary. A roster removal is permanent; retire its meshes
         // and appearance binding rather than retaining every released person for the whole game.
         void RetireDepartedActors(World world)
         {
-            if(actorRetireMinute==world.Data.Minute&&retireResidentCount==world.Data.Residents.Count&&retireStaffCount==world.Data.Staff.Count&&
-                world.Data.Residents.All(r=>residentActorIds.Contains(r.Id))&&world.Data.Staff.All(s=>staffActorIds.Contains(s.Id)))return;
-            actorRetireMinute=world.Data.Minute;retireResidentCount=world.Data.Residents.Count;retireStaffCount=world.Data.Staff.Count;
+            if(actorRetireMinute==world.Data.Minute&&retireResidentCount==world.Data.Residents.Count&&retireStaffCount==world.Data.Staff.Count&&retireCrewCount==world.Data.Crews.Count&&
+                world.Data.Residents.All(r=>residentActorIds.Contains(r.Id))&&world.Data.Staff.All(s=>staffActorIds.Contains(s.Id))&&world.Data.Crews.All(c=>crewActorIds.Contains(c.Id+"/builder-0")&&crewActorIds.Contains(c.Id+"/builder-1")))return;
+            actorRetireMinute=world.Data.Minute;retireResidentCount=world.Data.Residents.Count;retireStaffCount=world.Data.Staff.Count;retireCrewCount=world.Data.Crews.Count;
             var residents=new HashSet<string>(world.Data.Residents.Select(r=>r.Id));
             var staff=new HashSet<string>(world.Data.Staff.Select(s=>s.Id));
-            foreach(string id in residentActorIds.Where(id=>!residents.Contains(id)).Concat(staffActorIds.Where(id=>!staff.Contains(id))).ToArray())
+            var crews=new HashSet<string>(world.Data.Crews.SelectMany(c=>new[]{c.Id+"/builder-0",c.Id+"/builder-1"}));
+            foreach(string id in residentActorIds.Where(id=>!residents.Contains(id)).Concat(staffActorIds.Where(id=>!staff.Contains(id))).Concat(crewActorIds.Where(id=>!crews.Contains(id))).ToArray())
             {
                 Actor actor;if(!actors.TryGetValue(id,out actor))continue;
-                looks.Remove(actor);Clear(actor.Root);Destroy(actor.Root.gameObject);actors.Remove(id);
+                ForgetActorMotion(actor);looks.Remove(actor);Clear(actor.Root);Destroy(actor.Root.gameObject);actors.Remove(id);
                 if(selectedResidentId==id)selectedResidentId=null;
             }
-            residentActorIds.Clear();residentActorIds.UnionWith(residents);staffActorIds.Clear();staffActorIds.UnionWith(staff);
+            residentActorIds.Clear();residentActorIds.UnionWith(residents);staffActorIds.Clear();staffActorIds.UnionWith(staff);crewActorIds.Clear();crewActorIds.UnionWith(crews);
         }
 #if UNITY_EDITOR
         public int PreviewResidentActorCount {get{return actors.Count(p=>residentActorIds.Contains(p.Key));}}
@@ -1076,6 +1057,7 @@ namespace Cellblock.Unity
 #endif
         void OnDestroy()
         {
+            ResetMotionPresentation();
             DisposeCharacterPresentation();
             if (sirenClip != null) Destroy(sirenClip);
             // Include baked scenery and resident parts so leaving Play does not leak generated meshes.

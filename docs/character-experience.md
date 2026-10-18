@@ -13,7 +13,7 @@ The header's **People** action returns to the roster. **Management options** ope
 
 ## Follow or play
 
-**Follow** watches the person's own simulation. **Play as** takes movement control. Only staff roles have a direct-play entry. Residents and construction crews remain inspectable and followable. Absence, suspension and hard escort assignments can prevent staff entry or take authority back; the camera then follows the response and explains the interruption.
+**Follow** watches the person's own simulation. **Play as** takes movement control. Only staff roles have a direct-play entry. Residents and construction crews remain inspectable and followable. Absence, suspension, physical restraints/recovery and hard escort assignments can prevent staff entry or take authority back; the camera then follows the response and explains the interruption.
 
 | Action | Mac | Touch |
 | --- | --- | --- |
@@ -26,7 +26,7 @@ The header's **People** action returns to the roster. **Management options** ope
 | Pause / resume | Space | Pause / Resume button |
 | Return to management | Escape or Management | Management button |
 
-The actual main camera goes to the character's eye position in first person. Third person uses a close shoulder boom and completed geometry for camera clearance. A very tight space moves that camera to eye level; the context line explains why. Follow uses a wider overhead view. Leaving restores the prior management view, cutaway, time speed and decision ownership.
+The actual main camera goes to the character's eye position in first person. Third person uses a wider raised shoulder boom, cutaway walls and completed geometry for camera clearance. A very tight space moves that camera to eye level; the context line explains why. Follow uses a wider overhead view. Leaving restores the prior management view, cutaway, time speed and decision ownership.
 
 Walking uses the explicit game clock at 1×. Pause stops it. Phone/screens, focus loss and cancelled input clear movement; fresh input is required afterward. Existing simulation duties, food, costs and physical service checks continue. Builders retain their own physical construction tasks; inspecting or following them does not complete work remotely.
 

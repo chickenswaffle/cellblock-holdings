@@ -92,6 +92,7 @@ namespace Cellblock.Core
             {
                 if (!Data.Staff.Contains(s) || !s.Arrived) return "This staff member is no longer on site.";
                 if (IsSuspended(s)) return "This staff member is suspended from duty.";
+                if (EscapeStruggleOwns(s)) return "The escape response has physical movement authority during restraint, recovery or arrest escort.";
                 Point target;
                 if (CapitalEscortTarget(s, out target) || (s.Duty == "Secure movement escort" && SecureEscortTarget(s, out target)))
                     return "A secure escort has movement authority.";

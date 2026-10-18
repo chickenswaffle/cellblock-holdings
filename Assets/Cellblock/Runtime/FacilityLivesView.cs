@@ -212,6 +212,8 @@ namespace Cellblock.Unity
             }
             // Head poses (reading, watching, studying) run after MoveActor's idle glance, so they win while active;
             // when they end, FacilityCharacterDetail eases the head back on its own.
+            // Seats and beds stand on the room-floor height; a person standing on lower outdoor ground is lifted to meet them.
+            if (look.HasSeat) modelPosition += Vector3.up * (RoomStand - actor.Root.position.y) * w;
             actor.Model.localPosition = Vector3.Lerp(actor.Model.localPosition, modelPosition, ease);
             actor.Model.localRotation = Quaternion.Slerp(actor.Model.localRotation, modelRotation, ease);
             RefreshRoutineProps(actor, look.Pose, look.Weight, world);

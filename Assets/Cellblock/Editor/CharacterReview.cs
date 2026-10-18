@@ -80,8 +80,17 @@ namespace Cellblock.Editor
                 case 28: Require(hud.PreviewHomePresentationReady && hud.PreviewHomeActionsFit(), "Phone Home actions clipped: " + hud.PreviewHomePresentationLayout); CharacterShot(game, "26-home-phone.png", () => SetGameSize(640, 360)); break;
                 case 29: Require(hud.PreviewHomeActionsFit(), "Narrow Home actions clipped: " + hud.PreviewHomePresentationLayout); CharacterShot(game, "27-home-narrow.png", () => SetGameSize(1600, 900)); break;
                 default:
+                    // Exercise the new shared gait/held-pose caches on actual generated actors.
+                    view.Refresh(w, true); int actorCount = view.PreviewMotionActorCount;
+                    Require(view.PreviewStrideCount > 0 && view.PreviewMotionBindingsAlive, "Motion bindings were not created safely");
+                    w.Data.Residents.Remove(w.Data.Residents[0]); w.Data.Staff.Remove(w.Data.Staff[0]);
+                    var crew = w.Data.Crews.First(c => c.Id == "character-review-crew"); w.Data.Crews.Remove(crew);
+                    view.Refresh(w, true);
+                    Require(view.PreviewMotionActorCount == actorCount - 4 && view.PreviewMotionBindingsAlive, "Resident/staff/crew motion bindings were not retired");
+                    game.StartPresentationPreview("county"); view.Refresh(game.World, true);
+                    Require(view.PreviewMotionWorld(game.World), "World replacement retained old motion/staff bindings");
                     string errors = SessionState.GetString(ErrorKey, ""); Require(Directory.GetFiles(Output, "*.png").Length == 27, "Missing staff/character frames");
-                    var report = new Report { passed = errors == "", editor = Application.unityVersion, message = "Actual Unity Play: compact resident/crew read-only profiles and Follow; resident/crew direct entry and perspective bypass rejected; direct staff1P/3P, fresh stick steering, main eye camera/head/cap alignment/ceilings; issued work phone messages/contacts/actual confirm/call/reload/completion/no alarm shortcut; management camera restored; desktop/landscape-phone bounds and44px actions; enhanced Home desktop/phone/narrow. Source-aligned screenshots defer changes until PNG completes. Disposable companies. Actual native touch feel and performance remain unverified.", errors = errors.Split('\n').Where(e => e != "").ToArray(), captures = Directory.GetFiles(Output, "*.png").Select(Path.GetFileName).ToArray() };
+                    var report = new Report { passed = errors == "", editor = Application.unityVersion, message = "Actual Unity Play: compact resident/crew read-only profiles and Follow; resident/crew direct entry and perspective bypass rejected; direct staff1P/3P, fresh stick steering, main eye camera/head/cap alignment/ceilings; issued work phone messages/contacts/actual confirm/call/reload/completion/no alarm shortcut; management camera restored; desktop/landscape-phone bounds and44px actions; enhanced Home desktop/phone/narrow; retired resident/staff/crew motion bindings and world replacement. Source-aligned screenshots defer changes until PNG completes. Disposable companies. Actual native touch feel and performance remain unverified.", errors = errors.Split('\n').Where(e => e != "").ToArray(), captures = Directory.GetFiles(Output, "*.png").Select(Path.GetFileName).ToArray() };
                     File.WriteAllText(Path.Combine(Output, "report.json"), JsonUtility.ToJson(report, true)); Debug.Log(report.passed ? "CELLBLOCK_CHARACTER_REVIEW_PASSED" : "CELLBLOCK_CHARACTER_REVIEW_FAILED"); ReleaseRefresh(); SessionState.SetString(ModeKey, "stopping"); EditorApplication.isPlaying = false; return false;
             }
             return true;

@@ -26,7 +26,7 @@ namespace Cellblock.Unity
         string characterSubject = "", characterRosterSignature = "";
         World characterSheetWorld;
         int characterPage, characterRosterGroup;
-        bool characterRoster = true, characterAdvanced, characterWhyExpanded;
+        bool characterRoster = true, characterAdvanced, characterWhyExpanded, characterHeaderReduced;
         public bool CharacterCompactInspectorOpen { get { return characterSheet != null && characterSheet.resolvedStyle.display != DisplayStyle.None; } }
 
         void BuildCharacterInspector()
@@ -189,13 +189,78 @@ namespace Cellblock.Unity
         void LayoutCharacterInspector(float left, float right, float top, float bottom, bool menuOpen)
         {
             if (characterSheet == null) return;
+            RestoreCharacterHeader();
             bool visible = workspace == Workspace.People && inspectorOpen && !characterAdvanced && !menuOpen && !guideOpen && !game.CharacterViewActive;
             characterSheet.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
             characterAdvancedBack.style.display = workspace == Workspace.People && characterAdvanced ? DisplayStyle.Flex : DisplayStyle.None;
             if (visible) { inspector.style.display = DisplayStyle.None; if (compact) navigation.style.display = DisplayStyle.None; }
-            characterSheet.style.right = right; characterSheet.style.width = Mathf.Min(380, root.resolvedStyle.width - left - right);
+            float width = root.resolvedStyle.width, height = root.resolvedStyle.height;
+            float available = Mathf.Max(0, width - left - right);
+            float sheetWidth = compact ? Mathf.Min(available, Mathf.Clamp(available * .44f, 300, 380)) : Mathf.Min(380, available);
+            // On a narrow portrait display the profile becomes a deliberate sheet, rather than leaving
+            // a sliver of overlapping HUD. Landscape retains a useful view beside the selected person.
+            bool covered = compact && available - sheetWidth - 12 < 230;
+            if (covered) sheetWidth = available;
+            characterSheet.style.right = right; characterSheet.style.width = sheetWidth;
             characterSheet.style.top = compact ? top : top + 96; characterSheet.style.bottom = bottom + (compact ? 0 : 94);
+            if (visible)
+            {
+                characterHeaderReduced = true;
+                float worldRight = width - right - sheetWidth - 12;
+                float worldWidth = Mathf.Max(0, worldRight - left);
+                cameraPanel.style.display = DisplayStyle.None;
+                status.style.right = right + sheetWidth + 12;
+                status.style.maxWidth = Mathf.Min(compact ? 610 : 720, worldWidth);
+                if (compact) status.style.bottom = bottom;
+                if (covered) { header.style.display = DisplayStyle.None; status.style.display = DisplayStyle.None; }
+                if (commandOverview != null)
+                {
+                    commandOverview.style.width = Mathf.Min(420, worldWidth);
+                    if (worldWidth < 240) commandOverview.style.display = DisplayStyle.None;
+                }
+                eventFeed.style.maxWidth = Mathf.Min(280, worldWidth);
+                if (covered) eventFeed.style.visibility = Visibility.Hidden;
+                if (compact && !covered)
+                {
+                    header.style.right = right + sheetWidth + 12;
+                    ReduceCharacterHeader(worldWidth);
+                }
+                float statusHeight = status.resolvedStyle.height;
+                if (float.IsNaN(statusHeight) || statusHeight <= 0) statusHeight = 48;
+                float worldTop = top + 88 + (worldWidth >= 240 ? 68 : 0);
+                float worldBottom = bottom + (compact ? 0 : 80) + statusHeight + 12;
+                WorldViewCenter = covered ? new Vector2(.5f, .5f) : new Vector2((left + worldWidth * .5f) / width,
+                    (worldBottom + Mathf.Max(0, height - worldTop - worldBottom) * .5f) / height);
+            }
             LayoutCharacterControls(left, right, top, bottom, menuOpen);
+        }
+        void ReduceCharacterHeader(float worldWidth)
+        {
+            characterHeaderReduced = true;
+            SetCharacterHeaderPart("header-actions", false);
+            SetCharacterHeaderPart("identity", worldWidth >= 420);
+            SetCharacterHeaderPart("balance", worldWidth >= 300);
+            // Keep clock, pause and normal speed at their full touch target size. Extra speeds are
+            // disclosed again as soon as the profile closes or there is space alongside the sheet.
+            foreach (var entry in speedButtons)
+                if (entry.Key > 1 && worldWidth < 360) entry.Value.style.display = DisplayStyle.None;
+        }
+        void SetCharacterHeaderPart(string className, bool visible)
+        {
+            VisualElement part = header.Q<VisualElement>(className: className);
+            if (part != null && !visible) part.style.display = DisplayStyle.None;
+        }
+        void RestoreCharacterHeader()
+        {
+            if (!characterHeaderReduced) return;
+            foreach (string className in new[] { "header-actions", "identity", "balance" })
+            {
+                VisualElement part = header.Q<VisualElement>(className: className);
+                if (part != null) part.style.display = StyleKeyword.Null;
+            }
+            foreach (var entry in speedButtons) entry.Value.style.display = StyleKeyword.Null;
+            eventFeed.style.visibility = StyleKeyword.Null;
+            characterHeaderReduced = false;
         }
 #if UNITY_EDITOR
         public void PreviewCharacterPage(int page) { SelectCharacterPage(page); }

@@ -45,6 +45,16 @@ namespace Cellblock.Unity
                     world.Escape.Detected ? "Detected by " + world.Escape.DetectedBy + ". Waiting for an observing guard or camera operator to report." : "The resident is moving toward the vehicle gate. Guards need sight or camera coverage to notice.";
                 float value = report.Phase == "Broadcast" ? 100 : report.Phase == "Radioing control" ? 100f * (world.Data.Minute - report.PhaseMinute) / World.RadioMinutes : 0;
                 incidentProgress.SetScore(report.Phase == "Radioing control" ? "RADIO TRANSMISSION" : "CONTROL NOTIFICATION", value, MeterMeaning.Neutral, report.Phase == "Broadcast" ? "RECEIVED" : Mathf.RoundToInt(value) + "%");
+                // The physical struggle leads the card while it lasts (EscapeStruggle.cs).
+                string struggle = world.Escape.Phase != "None" ? world.EscapeStruggleDetail() : "";
+                if (struggle != "")
+                {
+                    incidentDetail.text = struggle + (report.Phase == "Radioing control" ? " " + (observer?.Name ?? "An officer") + " is still on the radio." : "");
+                    EscapeStruggle hold = world.Struggle;
+                    if (hold.Active)
+                        incidentProgress.SetScore("STRUGGLE / " + hold.Phase.ToUpperInvariant(), hold.Phase == "Grappling" ? 35 : hold.Phase == "Surrendered" ? 55 : hold.Phase == "Down" ? 70 : 88,
+                            MeterMeaning.Neutral, hold.Phase == "Grappling" ? "EXCHANGE " + (hold.Exchanges + 1) : hold.Phase.ToUpperInvariant());
+                }
             }
             else
             {

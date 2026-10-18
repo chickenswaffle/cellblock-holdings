@@ -39,6 +39,10 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 - User also assigns graphics/Home improvements and review of Claude’s published work against the prison-management mission. Exact scope extension: owned Home/save shell, new isolated Home presentation/style partials; owned facility/material/lighting/character presentation with additive isolated enhancement helpers. Root retains all existing-file hooks and the sole Unity runner. Delegated sources use separate new files; independent critic remains read-only. Preserve Claude’s iOS, catalog drag/placement, story and economy source outside the already named hooks.
 - Narrow published-Claude presentation correction: Codex owns only post-badge parenting in FacilityPersonnelView.cs for this pass. Independent critic confirmed that Warden/Nurse details use foot-relative coordinates beneath a waist pivot at+.9m; offset the badge group by-.9m and hide the actual medical cap from its own eye camera. Personnel careers/assignments remain Claude-owned.
 - Staff/HUD/Home checkpoint now passes **356/356 core checks and27/27 actual Unity captures, errors empty**. Corrected screenshot sequencing waits for PNG before UI/camera changes. Read-only critic approved readable resident/phone/Home screens, hidden resident Play and attached nurse cap; recommends a wider, offset third-person camera. Preserve this checkpoint before integrating newly published Claudeb8b78fa (shared gait/IK and staged escape struggle). Full frames: Builds/CharacterReview/2026-10-18/staff-checkpoint. Checkpoint reports: docs/reviews/2026-10-18-staff-checkpoint-*. This is not final merged evidence.
+- Published-Claude b8b78fa integration exception: Codex owns bounded fixes to EscapeStruggle hydration identity, CharacterControl scene authority, actor-motion cache lifecycle hooks in FacilityView/FacilityEventsView, and single-editor EscapeCapture request/report safety. Preserve choreography, gait tuning and Claude’s source ownership otherwise. Add combined core checks and actual Play evidence before committing the merge. Camera/compact-card polish stays in Codex’s character partials; the critic is read-only.
+- Combined b8b78fa integration candidate passes371/371 core checks (docs/reviews/2026-10-18-staff-motion-core.txt). Read-only critic approved scene-ownership/hydration/lifecycle fixes. Final source-aligned Unity review remains pending; earlier checkpoint captures are not combined-motion evidence.
+- Actual character candidate passed27 frames, including new camera/HUD and motion retirement. Escape candidate was cancelled after capture timing warnings (runtime errors empty): PNG cost exposed that the original harness set captureDeltaTime while the game clock reads unscaledDeltaTime. Narrow GameController accumulator exception plus new editor-gated GameReviewClock makes only disposable fixed-step captures use their requested step; ordinary gameplay remains on the existing explicit clock. Also stop pin/escort sequences when their actual phase ends. Recompile and repeat final Play evidence on this source.
+- Motion integration checkpoint:371 core checks,27 character/HUD/Home captures and22 escape sequences /906 rendered frames /5 scenarios pass on unchanged source. Routine poses progressed through the actual interactions, then its legacy phone-purpose viewport assertion failed against the old advanced document; update that check for the new compact purpose/disclosure before final regression. No full-matrix passing claim. Published Claude f201d81 arrived during review (contact shadows/alarm atmosphere/two extra checks); preserve this checkpoint locally before merging it. Narrow new exception includes immediate shadow retirement/world reset, disposal of runtime shadow meshes/material/alarm profile, ReducedMotion before refresh, and adapting only night scenarios into the safe runner.
 - Existing local changes are this in-progress milestone. Preserve unrelated recovery assets and duplicate ShaderGraph settings. Main push permission remains pending from earlier automatic approval rejection; publish validated checkpoints only to the already authorized handoff branch.
 
 ### 2026-10-17 — active compact character UI / direct first and third person / phone
@@ -447,6 +451,70 @@ Fixed: (1) a departed nurse's file failed validation and made saves unloadable; 
   - The name now says "Night" for a golden-hour image; renaming is Codex's call, since `GameHomeHud` and `ProjectSetup` reference it.
 - **`Tools/ios/AppIcon.png`:** one cell at night from the county maximum layout: a resident by his bunk under the cell light, falling off into darkness. 1024 px, opaque.
 - **Unity check request:** Home at desktop, phone and narrow layouts with the new art. The title, the start card and the save library should stay legible. On iPad the 4:3 crop trims the sides.
+
+### 2026-10-17 (night) — escape overhaul: a physical fight for freedom (direct user request; temporary exception into Codex's incident/justice scopes)
+
+- **User request (2026-10-17, after demoing an escape):** "it started good but kinda sucked, I mean the person should literally be fighting for their freedom, make the fighting and movement better, focus hard on that, do deep research on how to make the movements and graphical elements better, bring up a subagent to help you".
+- **Root causes found:**
+  - Interception is one tick: the first officer within 1.8 m ends the attempt at once, so there is no struggle.
+  - The escapee's core pace (0.46 m/min, 2.3 m/s at 1×) and the responders' pace (0.55–0.68, 2.75–3.4 m/s) exceed the renderer's speed cap (1.6 × 1.2 × WalkSpeed m/s), so the visible chase lags and never closes.
+  - Pursuers tail-chase the escapee's current point.
+  - The escape "pose" is an arm swing over the ordinary walk.
+- **New files (Claude):**
+  - `Core/EscapeStruggle.cs`: saved struggle state, deterministic exchanges, sprint stamina and pursuit goals.
+  - `Runtime/FacilityMotion.cs`: shared procedural locomotion (walk/jog/sprint gaits, lean, banking, bob, look-back).
+  - `Runtime/FacilityEscapeView.cs`: grapple, strike, shove, stagger, tackle, pin, cuff and escort choreography, plus impact feedback.
+  - `Editor/EscapeCapture.cs`: real Play frame sequences.
+  - `Tools/CoreChecks/EscapeChecks.cs` and `docs/escape-notes.md`, with matching metas.
+- **Exact temporary exception (narrow hooks only; everything else in these files stays Codex's):**
+  - `Justice.cs` `TickAttempt`: the struggle runs before movement, the escapee's run speed comes from stamina, and abandonment waits for an active struggle.
+  - `Operations.cs` `AdvanceStaff`: the pursuit goal.
+  - `IncidentScenes.cs`: `IncidentOwnsStaff`, a `TryIncidentStaffTask` prefix and struggle validation in `HydrateIncidents`.
+  - `FacilityView.cs` `MoveActor`: the render speed cap and the gait.
+  - `FacilityIncidentView.cs`: escape poses.
+  - `GameIncidentHud.cs`: struggle wording.
+  - `Program.cs`: one check-group call.
+  - Narrow expectation updates where existing escape checks assumed instant interception.
+- **Unity:** I launch Unity only against `ClaudeWorkspace/cellblock-holdings`, under its local `unity-editor` lock. Codex's checkout and editor are never touched.
+- **Research.** A subagent wrote a 105 KB research brief: biomechanics, springs, fight timing, juice, pursuit, camera, mobile URP and a pose library verified on this rig's forward kinematics. Its findings drove the second pass. Two of its findings were in Codex's code:
+  - D4: `Walk()` consumes one 0.65 m lattice waypoint per game minute, so anything faster than a walk is throttled.
+  - D6: outdoors, people float 7 to 18 cm, because roots always sit at the room-floor height of 0.14.
+- **Built (core):**
+  - Contact starts a struggle: grapple exchanges, each result rolled at the start and saved. The results are hold, shove or strike (break free, with knockback and a stagger) or takedown.
+  - A flying tackle when an officer runs a resident down from behind.
+  - Pin, then cuffs, then lifting the prisoner, then an escort walk at the prisoner's side.
+  - Surrender: kneel, then standing cuffs.
+  - A helper joins the hold. At most two break-frees per attempt.
+  - Assault charged once when a blow landed.
+  - A hot chase can't be quietly abandoned by the attempt clock.
+  - Sprint tiers on stamina (4.5 m/s, tiring to a stagger).
+  - Escape movement and responders carry their distance across waypoints. Responders sprint within 12 m when they can see the resident.
+  - Cut-off and predictive pursuit goals.
+- **Built (renderer):**
+  - A shared gait for everyone: a stride wheel, walk/run/sprint blends, two-bone leg IK, lean and bank springs, arm pump.
+  - Choreography for every beat above, plus resident brawls: squaring up, crosses, hooks, haymakers, shoves, collar grabs, blocks and slips, then separation.
+  - Centre-of-mass falls, dust, an impact star, local hitstop and a rotational camera kick.
+  - A side-on chase camera that drifts instead of swinging.
+  - Ground-aware standing height outdoors.
+- **Balance probe (300 seeds per row):**
+  - Riskiest resident, one officer, gate open: 16% escape.
+  - Gate closed: always caught in the end.
+  - Two officers: no escapes, 26% surrender.
+  - Average resident, one officer, gate open: 10% escape.
+- **Checks:**
+  - Core: 330/330, including 13 escape checks.
+  - Mutation: the 20-mutant run on the first pass caught all 20. A 26-mutant run on the current code is in progress.
+  - Unity: `Editor/EscapeCapture.cs` renders 20 shots across four scenarios with every scripted check satisfied (`CELLBLOCK_ESCAPE_CAPTURE_PASSED`).
+- **More narrow hooks, beyond the list above:**
+  - `Operations.cs`: responder pace and stride.
+  - `GameIncidentControl.cs`: the side-on yaw (`GameController.ChaseYaw`).
+  - `FacilityIncidentView.cs`: settle, ring and the editor alignment probe use the ground height. Fighters are posed by the brawl view, and the old `FightPose` is unused.
+  - `FacilityJusticeView.cs`: the alert disc sits on the ground.
+  - `FacilityView.cs` `MoveActor`: ground-aware target height.
+  - Claude's `FacilityLivesView.cs`: seats compensate for lower outdoor roots.
+- **Unity check request for Codex:**
+  - Rerun `IncidentReview`. Pose counts now come from the new views, and fighters are ready by horizontal distance.
+  - Glance at outdoor people (yard, apron, gate) and seated yard benches. Room interiors keep the old 0.14 root.
 
 ## Codex handoff request (personnel + placement)
 

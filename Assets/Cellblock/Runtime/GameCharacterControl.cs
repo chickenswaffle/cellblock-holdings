@@ -23,7 +23,9 @@ namespace Cellblock.Unity
         World characterViewWorld;
         string characterViewId = "", selectedCrewCharacter = "";
         CharacterPerspective characterPerspective = CharacterPerspective.ThirdPerson;
-        float characterYaw, characterPitch = 16, characterBoom = 3.8f;
+        const float CharacterThirdPitch = 29, CharacterThirdBoom = 5.6f;
+        float characterYaw, characterPitch = CharacterThirdPitch, characterBoom = CharacterThirdBoom;
+        float characterFirstPitch = 4, characterThirdPitch = CharacterThirdPitch;
         bool characterInputArmed, characterMoveStickArmed, characterMouseLook, characterInputSuppressed;
         int characterLookFinger = -1, characterPinchA = -1, characterPinchB = -1;
         Vector2 characterLastMouse;
@@ -123,7 +125,8 @@ namespace Cellblock.Unity
             if (!World.BeginCharacterControl(canonical)) { hud.Refresh(true); return false; }
             CaptureCharacterCamera(); characterViewWorld = World; characterViewId = canonical;
             if (newSnapshot) characterSnapshot.Speed = previousSpeed;
-            characterPerspective = CharacterPerspective.ThirdPerson; characterPitch = 16; characterBoom = 3.8f;
+            characterPerspective = CharacterPerspective.ThirdPerson; characterPitch = characterThirdPitch = CharacterThirdPitch;
+            characterFirstPitch = 4; characterBoom = CharacterThirdBoom;
             characterYaw = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg; characterCameraReady = false;
             string role = World.RoleOf(canonical);
             World.ReleaseRole();
@@ -199,12 +202,17 @@ namespace Cellblock.Unity
         {
             if (!CharacterViewActive) return;
             if (!CharacterDirect && !StartCharacterPlay(characterViewId)) return;
+            if (characterPerspective == CharacterPerspective.FirstPerson) characterFirstPitch = characterPitch;
+            else if (characterPerspective == CharacterPerspective.ThirdPerson) characterThirdPitch = characterPitch;
             characterPerspective = firstPerson ? CharacterPerspective.FirstPerson : CharacterPerspective.ThirdPerson;
-            characterPitch = Mathf.Clamp(characterPitch, -60, 60); characterCameraReady = false; ApplyCharacterHeight(); ClearCharacterInput(); hud.Refresh(true);
+            characterPitch = firstPerson ? Mathf.Clamp(characterFirstPitch, -70, 72) : Mathf.Clamp(characterThirdPitch, 10, 65);
+            characterCameraReady = false; ApplyCharacterHeight(); ClearCharacterInput(); hud.Refresh(true);
         }
         void ApplyCharacterHeight()
         {
-            bool full = characterPerspective != CharacterPerspective.Follow;
+            // Raised third-person framing uses the same cutaway shell as management. Eye view keeps the
+            // complete room; collision still samples the actual rendered shell and authoritative fixtures.
+            bool full = characterPerspective == CharacterPerspective.FirstPerson;
             if (view.FullHeight != full) { view.FullHeight = full; view.Refresh(World, true); }
             guides.Height = view.WallHeight + .35f;
         }
@@ -312,7 +320,9 @@ namespace Cellblock.Unity
                 if (!CharacterPointOwned(cursor)) ZoomCharacter(Mathf.Abs(magnification) > .00001f ? magnification * 8 : Input.mouseScrollDelta.y);
             }
             characterYaw = Mathf.Repeat(characterYaw + look.x, 360);
-            characterPitch = Mathf.Clamp(characterPitch + look.y, characterPerspective == CharacterPerspective.Follow ? 24 : -70, characterPerspective == CharacterPerspective.Follow ? 72 : 72);
+            characterPitch = Mathf.Clamp(characterPitch + look.y,
+                characterPerspective == CharacterPerspective.Follow ? 24 : characterPerspective == CharacterPerspective.ThirdPerson ? 10 : -70,
+                characterPerspective == CharacterPerspective.ThirdPerson ? 65 : 72);
             if (CharacterDirect)
             {
                 Vector2 move = World.Data.Speed > 0 ? Vector2.ClampMagnitude((characterInputArmed ? keyboard : Vector2.zero) +
@@ -336,7 +346,7 @@ namespace Cellblock.Unity
         void ZoomCharacter(float amount)
         {
             if (characterPerspective == CharacterPerspective.FirstPerson || Mathf.Abs(amount) < .00001f) return;
-            characterBoom = Mathf.Clamp(characterBoom * Mathf.Exp(-amount * .12f), characterPerspective == CharacterPerspective.Follow ? 4.5f : 1.5f, characterPerspective == CharacterPerspective.Follow ? 14 : 5.5f);
+            characterBoom = Mathf.Clamp(characterBoom * Mathf.Exp(-amount * .12f), characterPerspective == CharacterPerspective.Follow ? 4.5f : 2.4f, characterPerspective == CharacterPerspective.Follow ? 14 : 9);
         }
 
         // This is the actual main camera at eye/shoulder height, rather than the low-resolution body-cam monitor.
@@ -349,8 +359,8 @@ namespace Cellblock.Unity
             if (first && CharacterDirect)
             { view.FaceCharacter(characterViewId, characterYaw); view.TryGetCharacterPose(characterViewId, out position, out eye, out forward); }
             Quaternion rotation = Quaternion.Euler(characterPitch, characterYaw, 0);
-            Vector3 target = first ? eye : characterPerspective == CharacterPerspective.Follow ? position + Vector3.up * 1.1f : eye + Vector3.down * .37f;
-            Vector3 desired = first ? eye : target + rotation * new Vector3(characterPerspective == CharacterPerspective.Follow ? 0 : .30f, 0, -characterBoom);
+            Vector3 target = first ? eye : characterPerspective == CharacterPerspective.Follow ? position + Vector3.up * 1.1f : eye + Vector3.down * .63f;
+            Vector3 desired = first ? eye : target + rotation * new Vector3(characterPerspective == CharacterPerspective.Follow ? 0 : 1.0f, 0, -characterBoom);
             if (!first && characterPerspective != CharacterPerspective.Follow) desired = view.ClipCharacterCamera(World, target, desired);
             // A very small cell may have no shoulder-camera space. Use the real eye point when the boom is
             // compressed, never a point inside the character's chest or beyond a wall.
@@ -358,7 +368,7 @@ namespace Cellblock.Unity
             bool eyeView = first || CharacterCameraObstructed;
             if (eyeView) desired = eye;
             view.SetCharacterPresentation(World, characterViewId, eyeView, cameraRig);
-            cameraRig.orthographic = false; cameraRig.fieldOfView = eyeView ? 76 : characterPerspective == CharacterPerspective.Follow ? 52 : 62;
+            cameraRig.orthographic = false; cameraRig.fieldOfView = eyeView ? 76 : characterPerspective == CharacterPerspective.Follow ? 52 : 64;
             cameraRig.nearClipPlane = eyeView ? .045f : .075f; cameraRig.farClipPlane = 100; cameraRig.cullingMask = characterSnapshot.Mask & ~(1 << 29);
             // The actor already interpolates its route. A second eye interpolation would lag around corners.
             float blend = eyeView || !characterCameraReady || Preferences.ReducedMotion || !Preferences.SmoothCamera ? 1 : 1 - Mathf.Exp(-Time.unscaledDeltaTime * 12);

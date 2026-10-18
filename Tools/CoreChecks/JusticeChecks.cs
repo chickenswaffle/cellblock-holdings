@@ -225,10 +225,12 @@ static partial class Program
             world.SetAlarm(true); world.AdvanceMinutes(1);
             Check(Geometry.Distance(before, responder.Position) > 0.01f && responder.Duty == "Responding to escape", "Officer did not physically respond");
             Check(world.Escape.Phase == "None" || world.Escape.ResponseDueMinute - world.Data.Minute < oldEta, "Alarm did not shorten the physical ETA");
-            // A closer reachable responder must intercept by proximity, not a timer.
+            // A closer reachable responder must intercept by proximity, not a timer. Contact starts a struggle; only the cuffs end it.
             responder.Position = responder.Destination = resident.Position + new Point(1,0);
-            RunUntil(world, () => world.Escape.Phase == "None", 20, "Physical engagement after the radio call");
-            Check(world.Escape.Phase == "None" && world.Data.Justice.Interceptions == 1 && Ledger(world, "custody-penalty") == 0, "A present officer did not intercept");
+            RunUntil(world, () => world.Struggle.Active || world.Escape.Phase == "None", 20, "Physical engagement after the radio call");
+            Check(world.Struggle.Active && world.Escape.Phase != "None", "Contact ended the attempt without a struggle");
+            RunUntil(world, () => world.Escape.Phase == "None", 200, "The struggle ending in an arrest");
+            Check(world.Escape.Phase == "None" && world.Data.Justice.Interceptions == 1 && Ledger(world, "custody-penalty") == 0, "A present officer did not intercept: " + world.IncidentReport.Outcome + " / " + world.Struggle.LastMove + " breaks " + world.Struggle.BreakFrees + " / " + resident.Legal.Custody);
             Check(resident.Legal.Charges.Any(c => c.Offense == "Attempted escape") && resident.Legal.RestrictedUntil > world.Data.Minute, "Interception consequences missing");
             world.SetAlarm(false); world.SetLockdown(false);
             RunUntil(world, () => resident.Legal.Custody == "In facility", 300, "Escort back to housing");

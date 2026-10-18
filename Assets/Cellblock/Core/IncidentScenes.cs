@@ -61,6 +61,7 @@ namespace Cellblock.Core
             { report.Phase = "None"; report.Guard = ""; }
             if (state.Justice.Attempt.Detected && state.Justice.Attempt.Phase != "None" && value.Report.Phase == "None")
                 value.Report = new EscapeReport { Resident = state.Justice.Attempt.ResidentId, Phase = "Awaiting observer", PhaseMinute = state.Minute };
+            HydrateEscapeStruggle(state);
         }
         public bool IncidentOwnsResident(Resident resident) { return Fight.Active && (Fight.A == resident.Id || Fight.B == resident.Id); }
         bool FreeIncidentOfficer(StaffMember staff)
@@ -85,7 +86,7 @@ namespace Cellblock.Core
             return Data.Operations.Alarm || IncidentReport.Phase == "Broadcast" || (Escapee != null && Geometry.Distance(staff.Position, Escapee.Position) <= 8 && SightLines.Clear(staff.Position, Escapee.Position));
         }
         bool CanInterceptEscape(StaffMember staff) { return CanPursueEscape(staff) || (FileFor(staff)?.Duty == "Gate post" && IsOnShift(staff) && !IsSuspended(staff) && !IsWarden(staff)); }
-        bool IncidentOwnsStaff(StaffMember staff) { return RadioGuard(staff) || CanPursueEscape(staff) || (Fight.Active && Fight.Responder == staff.Id); }
+        bool IncidentOwnsStaff(StaffMember staff) { return RadioGuard(staff) || CanPursueEscape(staff) || (Fight.Active && Fight.Responder == staff.Id) || EscapeStruggleOwns(staff); }
         void Confront(Resident a, Resident b, Relationship link, List<Resident> present)
         {
             BeginFightScene(a, b, false);
@@ -195,6 +196,7 @@ namespace Cellblock.Core
         {
             if (RadioGuard(staff))
             { staff.Destination = staff.Position; staff.Duty = "Radioing control"; staff.NextDutyMinute = Data.Minute + 1; RemoveWorkerPath(staff.Id); return true; }
+            if (TryEscapeStruggleTask(staff)) return true;
             if (!Fight.Active || Fight.Responder != staff.Id || !FreeIncidentOfficer(staff) || CanPursueEscape(staff)) return false;
             // Approach the same side of the wall as the pair, never a fixed offset across a room boundary.
             Point target = Fight.Center;

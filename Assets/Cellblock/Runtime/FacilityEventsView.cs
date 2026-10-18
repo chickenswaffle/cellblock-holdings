@@ -39,7 +39,7 @@ namespace Cellblock.Unity
             foreach(string id in eventActorIds)
             {
                 Actor old;if(!actors.TryGetValue(id,out old)||old.Seen)continue;
-                Clear(old.Root);Destroy(old.Root.gameObject);actors.Remove(id);visitorProps.Remove(id);retiredEventActors.Add(id);
+                ForgetActorMotion(old);Clear(old.Root);Destroy(old.Root.gameObject);actors.Remove(id);visitorProps.Remove(id);retiredEventActors.Add(id);
             }
             foreach(string id in retiredEventActors)eventActorIds.Remove(id);
             foreach(CapitalCase capital in world.Stories.CapitalCases)

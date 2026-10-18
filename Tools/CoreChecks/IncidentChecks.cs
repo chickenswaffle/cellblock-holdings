@@ -117,8 +117,12 @@ static partial class Program
             interceptor.ShiftStart = w.Data.Minute / 60 % 24;
             interceptor.Position = interceptor.Station = interceptor.Destination = w.Escapee.Position + new Point(-.7f, 0); interceptor.NextDutyMinute = int.MaxValue / 2;
             w.AdvanceMinutes(1);
+            // Contact starts a struggle (EscapeChecks cover it). This check is about the radio, so the cuffs are already going on.
+            Check(w.Struggle.Active && w.Struggle.Officer == interceptor.Id && w.Escape.Phase != "None", "The second guard did not engage physically");
+            w.Struggle.Phase = "Rising"; w.Struggle.Move = "Rise"; w.Struggle.MoveEnd = w.Data.Minute + 1;
+            w.AdvanceMinutes(1);
             Check(w.Escape.Phase == "None" && w.IncidentReport.Phase == "Radioing control" && w.Data.Justice.Interceptions == 1, "A real second guard did not capture during the call");
-            w = new World(RoundTrip(w.Data)); w.AdvanceMinutes(World.RadioMinutes - 5);
+            w = new World(RoundTrip(w.Data)); w.AdvanceMinutes(World.RadioMinutes - 6);
             Check(w.IncidentReport.Phase == "Broadcast" && w.Data.Operations.Alarm && w.IncidentReport.Outcome == "Intercepted in person", "The started call lost its headcount outcome");
         });
     }
