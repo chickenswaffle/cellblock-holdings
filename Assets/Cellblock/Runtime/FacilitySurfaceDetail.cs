@@ -62,7 +62,7 @@ namespace Cellblock.Unity
                 float dx=Height(surface,(x+1)%size,y)-Height(surface,(x+size-1)%size,y),dy=Height(surface,x,(y+1)%size)-Height(surface,x,(y+size-1)%size);
                 Vector3 n=new Vector3(-dx,-dy,1).normalized;pixels[y*size+x]=new Color(n.x*.5f+.5f,n.y*.5f+.5f,n.z*.5f+.5f,1);
             }
-            texture=new Texture2D(size,size,TextureFormat.RGBA32,true,true){name="Cellblock micro relief "+surface,wrapMode=TextureWrapMode.Repeat,filterMode=FilterMode.Trilinear,anisoLevel=2};texture.SetPixels32(pixels);texture.Apply(true,true);textures.Add(key,texture);return texture;
+            texture=new Texture2D(size,size,TextureFormat.RGBA32,true,true){name="Cellblock micro relief "+surface,wrapMode=TextureWrapMode.Repeat,filterMode=FilterMode.Trilinear,anisoLevel=2};texture.SetPixels32(pixels);texture.Apply(true,true);textures.Add(key,texture);generatedTextures.Add(texture);return texture;
         }
         static float Height(string surface,int x,int y)
         {

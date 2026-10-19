@@ -25,6 +25,10 @@ namespace Cellblock.Editor
             changed |= Set(settings, "m_AdditionalLightShadowsSupported", 1);
             changed |= Set(settings, "m_AdditionalLightsShadowmapResolution", mobile ? 1024 : 2048);
             changed |= Set(settings, "m_AdditionalLightsPerObjectLimit", 8);
+            // Budgeted room spots must fit without URP dynamically halving the atlas resolution.
+            changed |= Set(settings, "m_AdditionalLightsShadowResolutionTierLow", 128);
+            changed |= Set(settings, "m_AdditionalLightsShadowResolutionTierMedium", mobile ? 128 : 256);
+            changed |= Set(settings, "m_AdditionalLightsShadowResolutionTierHigh", mobile ? 256 : 512);
             changed |= Set(settings, "m_SoftShadowsSupported", 1);
             if (changed) { settings.ApplyModifiedPropertiesWithoutUndo(); EditorUtility.SetDirty(pipeline); }
             AssetDatabase.SaveAssets();

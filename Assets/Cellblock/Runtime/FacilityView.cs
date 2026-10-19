@@ -28,12 +28,15 @@ namespace Cellblock.Unity
             public bool Staff, Seen, PoseArms;
             public Resident Motion;
             public Transform WorkTool, Cargo, Workbench;
-            public Transform[] Forearms, Hands, Tools, Knees, Feet;
+            public Transform[] Forearms, Hands, Tools, Knees, Feet, WorkChips;
             public float PoseClock;
+            public string BuilderSoundTask = "";
+            public int LastBuilderImpact, BuilderSoundTool;
         }
         readonly Dictionary<string, Actor> actors = new Dictionary<string, Actor>();
         readonly Dictionary<string, Material> materials = new Dictionary<string, Material>();
         readonly Dictionary<string, Texture2D> textures = new Dictionary<string, Texture2D>();
+        readonly HashSet<Texture2D> generatedTextures = new HashSet<Texture2D>();
         int revision = -1, previewHash = int.MinValue;
         string selectedResidentId = "";
         World presentedWorld;
@@ -126,7 +129,7 @@ namespace Cellblock.Unity
                 byte channel = (byte)Mathf.RoundToInt(Mathf.Clamp01(shade) * 255);
                 pixels[y * size + x] = new Color32(channel, channel, channel, 255);
             }
-            texture.SetPixels32(pixels); texture.Apply(true, true); textures[surface] = texture;
+            texture.SetPixels32(pixels); texture.Apply(true, true); textures[surface] = texture; generatedTextures.Add(texture);
             return texture;
         }
 
@@ -1079,6 +1082,8 @@ namespace Cellblock.Unity
         void OnDestroy()
         {
             DisposeMotionResources();
+            if (cornerHousing != null) Destroy(cornerHousing);
+            if (cornerLens != null) Destroy(cornerLens);
             DisposeCharacterPresentation();
             if (sirenClip != null) Destroy(sirenClip);
             // Include baked scenery and resident parts so leaving Play does not leak generated meshes.
@@ -1086,7 +1091,8 @@ namespace Cellblock.Unity
                 if (filter.sharedMesh != null && filter.sharedMesh.name.StartsWith("Generated ")) Destroy(filter.sharedMesh);
             if (radioClick != null) Destroy(radioClick);
             foreach (Material material in materials.Values) Destroy(material);
-            foreach (Texture2D texture in textures.Values) Destroy(texture);
+            foreach (Texture2D texture in generatedTextures) if (texture != null) Destroy(texture);
+            generatedTextures.Clear(); textures.Clear();
             foreach(Mesh mesh in bevels.Values)Destroy(mesh);
         }
     }

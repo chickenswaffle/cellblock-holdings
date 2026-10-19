@@ -56,6 +56,7 @@ namespace Cellblock.Unity
                 foreach (WorkItem work in project.Work)
                 {
                     float progress = Mathf.Clamp01(1 - work.Remaining / work.Required);
+                    if (work.Kind == "Removal") DemolitionDetail(visual.Root, world, work, progress);
                     if (work.Wall != null) ConstructionWall(visual.Root, work.Wall, progress);
                     if (work.Fixture != null)
                     {
@@ -75,7 +76,7 @@ namespace Cellblock.Unity
                     }
                 }
                 WorkItem first = project.Work.FirstOrDefault();
-                if (first != null)
+                if (first != null && project.Work.Any(w => w.Kind != "Removal"))
                 {
                     Point site = first.Site;
                     for (int i = 0; i < 3; i++) Box(visual.Root, "Stacked materials", V(site + new Point(1.2f, -1.3f), 0.20f + i * 0.12f), new Vector3(0.8f, 0.10f, 0.8f), "wood", new Color(0.54f, 0.43f, 0.27f));

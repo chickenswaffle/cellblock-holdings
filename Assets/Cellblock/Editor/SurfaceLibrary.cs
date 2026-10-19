@@ -22,7 +22,7 @@ namespace Cellblock.Editor
             string name = Path.GetFileNameWithoutExtension(assetPath);
             importer.textureType = name.EndsWith("_n") ? TextureImporterType.NormalMap : TextureImporterType.Default;
             // URP multiplies detail albedo by 2 in linear space, so the macro map is linear grey 0.5 = no change.
-            importer.sRGBTexture = !name.EndsWith("_m") && name != "macro";
+            importer.sRGBTexture = !name.EndsWith("_n") && !name.EndsWith("_m") && name != "macro";
             importer.alphaSource = name.EndsWith("_m") ? TextureImporterAlphaSource.FromInput : TextureImporterAlphaSource.None;
             importer.mipmapEnabled = true; importer.streamingMipmaps = false;
             importer.wrapMode = TextureWrapMode.Repeat; importer.filterMode = FilterMode.Trilinear;

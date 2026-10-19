@@ -4,19 +4,20 @@ using System.IO;
 using System.Linq;
 using Cellblock.Unity;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace Cellblock.Editor
 {
-    // Records what the soundscape actually outputs (Claude, 2026-10-18): the mixed AudioListener signal for a few
-    // staged moments, written as WAVs to Builds/SoundReview/ with levels and the live mix in report.txt. Run from
-    // Claude's clone like ArtCapture: Unity -batchmode -projectPath <clone> -executeMethod Cellblock.Editor.SoundCapture.Run
+    // Records the actual mixed AudioListener signal through the sole shared Play runner.
+    // Each review preserves WAVs and level reports in a unique Temp/CellblockFeatureReviews/sound folder.
     [InitializeOnLoad]
     public static class SoundCapture
     {
         const string ActiveKey = "Cellblock.SoundCapture.Active", StageKey = "Cellblock.SoundCapture.Stage", WaitKey = "Cellblock.SoundCapture.Wait";
-        const string Output = "Builds/SoundReview";
+        static string Output = "";
+        internal static bool IsRunning { get { return SessionState.GetBool(ActiveKey, false); } }
+        static readonly List<string> errors = new List<string>();
+        static float savedVolume; static bool savedPause, listenerSaved;
         struct Scene { public string Name, Type, Location; public int Minute; public float Seconds; public string Mode; }
         static readonly Scene[] Scenes =
         {
@@ -36,15 +37,18 @@ namespace Cellblock.Editor
         }
 
         static SoundCapture() { EditorApplication.update += Tick; }
-        public static void Run()
+        public static void Run() { PresentationPreview.RequestFeatureReview("sound"); }
+        internal static void BeginExisting()
         {
-            ProjectSetup.Validate(); SurfaceLibrary.Ensure(); LightingSetup.Ensure();
-            EditorSceneManager.OpenScene("Assets/Cellblock/Scenes/Main.unity");
-            Directory.CreateDirectory(Output); report.Clear();
+            if (!EditorApplication.isPlaying) throw new InvalidOperationException("Sound capture requires the shared Play runner.");
+            Output = Path.Combine("Temp/CellblockFeatureReviews", "sound", DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N").Substring(0, 6));
+            Directory.CreateDirectory(Output); report.Clear(); errors.Clear();
+            savedVolume = AudioListener.volume; savedPause = AudioListener.pause; listenerSaved = true;
+            AudioListener.volume = .65f; AudioListener.pause = false;
             SessionState.SetBool(ActiveKey, true); SessionState.SetInt(StageKey, 0);
             SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + 4);
-            EditorApplication.EnterPlaymode();
         }
+        internal static void Abort(string reason) { if (IsRunning) { errors.Add(reason); Finish(1); } }
 
         static void Tick()
         {
@@ -81,13 +85,16 @@ namespace Cellblock.Editor
                 Write(Path.Combine(Output, s.Name + ".wav"), data, recorder.Channels, AudioSettings.outputSampleRate);
                 double sum = 0; float peak = 0; foreach (float v in data) { sum += v * v; peak = Mathf.Max(peak, Mathf.Abs(v)); }
                 double rms = data.Length == 0 ? 0 : Math.Sqrt(sum / data.Length);
+                if (data.Length < AudioSettings.outputSampleRate * Math.Max(1, recorder.Channels)) errors.Add(s.Name + ": less than one second of actual listener samples.");
+                if (rms < .00001) errors.Add(s.Name + ": listener mix is silent.");
+                if (peak >= .999f || data.Any(v => float.IsNaN(v) || float.IsInfinity(v))) errors.Add(s.Name + ": clipped or invalid mix.");
                 report.Add(s.Name + ": " + (data.Length / Math.Max(1, recorder.Channels) / (double)AudioSettings.outputSampleRate).ToString("0.0") + " s, rms " +
                     (20 * Math.Log10(rms + 1e-9)).ToString("0.0") + " dBFS, peak " + (20 * Math.Log10(peak + 1e-9)).ToString("0.0") + " dBFS, clock " + game.World.Data.Minute % 1440 / 60 + ":" + (game.World.Data.Minute % 60).ToString("00") + "  mix: " + FacilitySoundscape.PreviewMix);
                 if (s.Mode == "alarm") game.World.SetAlarm(false);
                 if (game.CharacterViewActive) game.EndCharacterView(false);
                 SessionState.SetInt(StageKey, stage + 1); SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + 1);
             }
-            catch (Exception error) { report.Add("ERROR " + error); Finish(1); }
+            catch (Exception error) { errors.Add(error.ToString()); Finish(1); }
         }
 
         static void Write(string path, float[] data, int channels, int rate)
@@ -104,10 +111,13 @@ namespace Cellblock.Editor
         static void Finish(int code)
         {
             SessionState.SetBool(ActiveKey, false);
-            File.WriteAllText(Path.Combine(Output, "report.txt"), string.Join("\n", report));
-            if (code == 0) Debug.Log("CELLBLOCK_SOUND_CAPTURE_PASSED " + Path.GetFullPath(Output)); else Debug.LogError("CELLBLOCK_SOUND_CAPTURE_FAILED " + string.Join(" | ", report.Where(r => r.StartsWith("ERROR"))));
-            EditorApplication.isPlaying = false;
-            if (Application.isBatchMode) EditorApplication.delayCall += () => EditorApplication.Exit(code);
+            if (recorder != null) { recorder.On = false; UnityEngine.Object.DestroyImmediate(recorder); recorder = null; }
+            if (listenerSaved) { AudioListener.volume = savedVolume; AudioListener.pause = savedPause; listenerSaved = false; }
+            bool passed = code == 0 && errors.Count == 0;
+            File.WriteAllText(Path.Combine(Output, "report.txt"), (passed ? "PASSED" : "FAILED") + "\n" + string.Join("\n", report) + "\nErrors:\n" + string.Join("\n", errors));
+            PresentationPreview.WriteFeatureEvidence(Output, passed, errors.ToArray(), report.ToArray());
+            if (passed) Debug.Log("CELLBLOCK_SOUND_CAPTURE_PASSED " + Path.GetFullPath(Output));
+            else Debug.LogError("CELLBLOCK_SOUND_CAPTURE_FAILED " + string.Join(" | ", errors));
         }
     }
 }

@@ -75,14 +75,42 @@ namespace Cellblock.Core
             foreach (Project project in state.Projects)
             {
                 if (project == null || project.Work == null) continue;
+                foreach (WorkItem payload in project.Work) if (payload != null) NormalizeWorkPayload(payload);
+                // Old saves used one aggregate fixture-removal task. Split its remaining work proportionally,
+                // retaining the same total labour/progress and avoiding construction payload fields.
+                var removals = project.Work.Where(w => w != null && w.Wall == null && w.Fixture == null &&
+                    string.IsNullOrEmpty(w.RemovedWallId) && string.IsNullOrEmpty(w.RemovedFixtureId)).ToList();
+                if (!project.Completed && removals.Count == project.RemoveWalls.Count + (project.RemoveFixtures.Count > 0 ? 1 : 0))
+                {
+                    for (int r = 0; r < project.RemoveWalls.Count; r++) removals[r].RemovedWallId = project.RemoveWalls[r];
+                    if (project.RemoveFixtures.Count > 0)
+                    {
+                        WorkItem aggregate = removals[removals.Count - 1];
+                        float required = aggregate.Required / project.RemoveFixtures.Count, remaining = aggregate.Remaining / project.RemoveFixtures.Count;
+                        for (int r = 0; r < project.RemoveFixtures.Count; r++)
+                        {
+                            WorkItem part = r == 0 ? aggregate : new WorkItem { TaskId = aggregate.TaskId + "/split-" + r, Kind = "Removal" };
+                            part.RemovedFixtureId = project.RemoveFixtures[r]; part.Required = required; part.Remaining = remaining;
+                            Fixture old = state.Fixtures.FirstOrDefault(f => f.Id == part.RemovedFixtureId);
+                            if (old != null) { part.Site = old.Position; part.HasSite = true; }
+                            if (r > 0) project.Work.Add(part);
+                        }
+                    }
+                }
                 for (int i = 0; i < project.Work.Count; i++)
                 {
                     WorkItem work = project.Work[i]; if (work == null) continue;
                     NormalizeWorkPayload(work);
+                    if ((!string.IsNullOrEmpty(work.RemovedWallId) && !string.IsNullOrEmpty(work.RemovedFixtureId)) ||
+                        (work.Kind != "Removal" && (!string.IsNullOrEmpty(work.RemovedWallId) || !string.IsNullOrEmpty(work.RemovedFixtureId))))
+                        throw new ArgumentException("Conflicting removal target.");
+                    if ((!string.IsNullOrEmpty(work.RemovedWallId) && !project.RemoveWalls.Contains(work.RemovedWallId)) ||
+                        (!string.IsNullOrEmpty(work.RemovedFixtureId) && !project.RemoveFixtures.Contains(work.RemovedFixtureId)))
+                        throw new ArgumentException("Invalid removal target.");
                     if (string.IsNullOrEmpty(work.TaskId)) work.TaskId = project.Id + "/task-" + i;
                     if (work.HasSite) continue;
-                    Wall wall = work.Wall ?? (state.Walls == null ? null : state.Walls.FirstOrDefault(w => project.RemoveWalls != null && project.RemoveWalls.Contains(w.Id)));
-                    Fixture fixture = work.Fixture ?? (state.Fixtures == null ? null : state.Fixtures.FirstOrDefault(f => project.RemoveFixtures != null && project.RemoveFixtures.Contains(f.Id)));
+                    Wall wall = work.Wall ?? (state.Walls == null || !string.IsNullOrEmpty(work.RemovedFixtureId) ? null : state.Walls.FirstOrDefault(w => !string.IsNullOrEmpty(work.RemovedWallId) ? w.Id == work.RemovedWallId : project.RemoveWalls != null && project.RemoveWalls.Contains(w.Id)));
+                    Fixture fixture = work.Fixture ?? (state.Fixtures == null || !string.IsNullOrEmpty(work.RemovedWallId) ? null : state.Fixtures.FirstOrDefault(f => !string.IsNullOrEmpty(work.RemovedFixtureId) ? f.Id == work.RemovedFixtureId : project.RemoveFixtures != null && project.RemoveFixtures.Contains(f.Id)));
                     work.Site = wall != null ? Geometry.OnLength(wall, 0.5f) : fixture != null ? fixture.Position : new Point(2, -8);
                     work.HasSite = true;
                 }
@@ -337,17 +365,17 @@ namespace Cellblock.Core
                     { crew.HelperWorkTarget = target + offset; break; }
                 crew.WorkId = assignment; crew.AssignmentRevision = GeometryRevision;
                 crew.WorkFocus = work != null ? work.Site : project.Work.FirstOrDefault() != null ? project.Work[0].Site : target;
-                if (work != null && work.Wall != null)
-                    crew.WorkFocus = Enumerable.Range(0, 21).Select(i => work.Wall.At(i / 20f)).OrderBy(p => Geometry.Distance(p, target)).First();
+                if (work != null) crew.WorkFocus = WorkSurface(work, target);
                 TransportTrip truck = Data.Trips.FirstOrDefault(t => t.Id == crew.TripId);
                 Point depot = truck != null ? truck.Parking + new Point(1.35f, 1.2f) : new Point(-3.5f, -13);
                 crew.SupplyPoint = NearbyClear(depot, Routes);
-                crew.WorkPhase = work == null ? "Walking" : "Collecting";
+                crew.WorkPhase = work == null || work.Kind == "Removal" ? "Walking" : "Collecting";
                 crew.SupplyLoadMinutes = 0; crew.SuppliesUsed = 0;
             }
             crew.WorkKind = work == null ? project.Preparation > 0 ? "Survey" : "Inspect" : work.Wall != null ?
                 1 - work.Remaining / work.Required < 0.32f ? "Saw" : 1 - work.Remaining / work.Required < 0.72f ? "Hammer" : "Drill" : work.Fixture != null ? "Install" : "Demolish";
-            if (work != null && crew.SuppliesUsed >= 40) { crew.WorkPhase = "Collecting"; crew.SupplyLoadMinutes = 0; crew.SuppliesUsed = 0; }
+            if (work != null && work.Kind != "Removal" && crew.SuppliesUsed >= 40) { crew.WorkPhase = "Collecting"; crew.SupplyLoadMinutes = 0; crew.SuppliesUsed = 0; }
+            if (work != null && work.Kind == "Removal" && (crew.WorkPhase == "Collecting" || crew.WorkPhase == "Carrying")) crew.WorkPhase = "Walking";
             if (work != null && crew.WorkPhase == "Collecting")
             {
                 bool collecting = Walk(crew.Id, ref crew.Position, crew.SupplyPoint, 0.38f);
@@ -391,14 +419,38 @@ namespace Cellblock.Core
             }
             return clear;
         }
+        Point WorkSurface(WorkItem work, Point from)
+        {
+            Wall wall = work.Wall ?? Data.Walls.FirstOrDefault(w => w.Id == work.RemovedWallId);
+            Fixture fixture = work.Fixture ?? Data.Fixtures.FirstOrDefault(f => f.Id == work.RemovedFixtureId);
+            var edges = new List<Segment>();
+            if (wall != null) edges.AddRange(Geometry.Segments(wall, false));
+            if (fixture != null)
+            {
+                var outline = Geometry.Footprint(fixture);
+                for (int i = 0; i < outline.Count; i++) edges.Add(new Segment(outline[i], outline[(i + 1) % outline.Count]));
+            }
+            Point best = work.Site; float distance = float.MaxValue;
+            foreach (Segment edge in edges)
+            {
+                Point delta = edge.B - edge.A, offset = from - edge.A;
+                float length = delta.X * delta.X + delta.Y * delta.Y;
+                float t = length > .00001f ? Geometry.Clamp((offset.X * delta.X + offset.Y * delta.Y) / length, 0, 1) : 0;
+                Point point = edge.A + delta * t; float gap = Geometry.Distance(point, from);
+                if (gap < distance) { best = point; distance = gap; }
+            }
+            return best;
+        }
         bool FindWorksite(Crew crew, Project project, WorkItem work, out Point target)
         {
             Point from = crew.Position;
             WorkItem selected = work ?? project.Work.FirstOrDefault(w => w.Wall != null) ?? project.Work.FirstOrDefault();
             var candidates = new List<Point>();
-            if (selected != null && selected.Wall != null)
+            Wall removalWall = selected == null ? null : Data.Walls.FirstOrDefault(w => w.Id == selected.RemovedWallId);
+            Fixture removalFixture = selected == null ? null : Data.Fixtures.FirstOrDefault(f => f.Id == selected.RemovedFixtureId);
+            if (selected != null && (selected.Wall != null || removalWall != null))
             {
-                Wall wall = selected.Wall;
+                Wall wall = selected.Wall ?? removalWall;
                 foreach (float t in new[] { 0.35f, 0.65f, 0.15f, 0.85f })
                 {
                     Point p = wall.At(t), d = wall.At(Math.Min(1, t + 0.03f)) - wall.At(Math.Max(0, t - 0.03f));
@@ -406,14 +458,14 @@ namespace Cellblock.Core
                     candidates.Add(p + n * 0.8f); candidates.Add(p - n * 0.8f);
                 }
             }
-            else if (selected != null && selected.Fixture != null) candidates.Add(Geometry.AccessPoint(selected.Fixture));
+            else if (selected != null && (selected.Fixture != null || removalFixture != null)) candidates.Add(Geometry.AccessPoint(selected.Fixture ?? removalFixture));
             Point site = selected != null ? selected.Site : new Point(2, -8);
             foreach (float radius in new[] { 1.1f, 1.6f, 2.2f, 3f })
                 for (int i = 0; i < 8; i++) candidates.Add(site + new Point((float)Math.Cos(i * Math.PI / 4), (float)Math.Sin(i * Math.PI / 4)) * radius);
             var finalFixtures = FutureFixtures();
             var finished = new Navigation(FutureWalls(), finalFixtures);
             foreach (Point point in candidates.OrderBy(p => Geometry.Distance(from, p)))
-                if (!Data.Crews.Any(other => other != crew && other.ProjectId == project.Id && other.WorkId != "" && Geometry.Distance(other.WorkTarget, point) < 1.25f) && Routes.Clear(point, point) && PeopleDynamics.ClearStaffStation(point, finished, finalFixtures) && Routes.Find(from, point) != null)
+                if ((work == null || Geometry.Distance(point, WorkSurface(work, point)) <= .90f) && !Data.Crews.Any(other => other != crew && other.ProjectId == project.Id && other.WorkId != "" && Geometry.Distance(other.WorkTarget, point) < 1.25f) && Routes.Clear(point, point) && PeopleDynamics.ClearStaffStation(point, finished, finalFixtures) && Routes.Find(from, point) != null)
                 { target = point; return true; }
             target = default(Point); return false;
         }

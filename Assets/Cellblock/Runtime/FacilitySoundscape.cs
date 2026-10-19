@@ -37,13 +37,14 @@ namespace Cellblock.Unity
         readonly Dictionary<string, float> quietUntil = new Dictionary<string, float>();
         readonly Dictionary<string, Walker> walkers = new Dictionary<string, Walker>();
         readonly List<AudioSource> voices = new List<AudioSource>();
+        readonly HashSet<ActionBeat> heardBeats = new HashSet<ActionBeat>();
         readonly List<Point> doors = new List<Point>();
         readonly Dictionary<int, float> doorQuiet = new Dictionary<int, float>();
         AudioSource showerLoop, gateLoop, drillLoop;
         readonly System.Random random = new System.Random(1789);
 
         World seen; int doorsRevision = -1, lastMinute = -1, beatsSeen; string vanPhase = "", fightPhase = "None", riotPhase = "None";
-        bool alarmWas, lockdownWas, gateWas; float gateUntil, nextFight, nextBuild, nextWeights, nextTray, nextFlush;
+        bool alarmWas, lockdownWas, gateWas; float gateUntil, nextFight, nextWeights, nextTray, nextFlush;
 
         public static void Create(GameController game, Camera ear)
         {
@@ -101,6 +102,15 @@ namespace Cellblock.Unity
         // For other presentation code (e.g. the incident radio): true when a recording played.
         public static bool TryPlay2D(string name, float volume) { return instance != null && instance.Play2D(name, volume, .25f); }
         public static bool ProvidesAlarm { get { return instance != null && Resources.Load<AudioClip>("Sounds/loop_alarm_bell") != null; } }
+
+        public static void BuilderContact(string task, Vector3 position)
+        {
+            FacilitySoundscape sound = instance;
+            if (sound == null || sound.game == null || sound.game.World == null || sound.game.World.Data.Speed == 0 || sound.game.HomeShown || !Application.isFocused) return;
+            if (task == "Saw") sound.PlayAt("saw", position, .45f, .65f, .04f, 4);
+            else if (task == "Drill" || task == "Install") sound.DrillAt(position);
+            else if (task == "Hammer" || task == "Demolish") sound.PlayAt("hammer", position, task == "Demolish" ? .52f : .70f, .12f, .07f, 3);
+        }
 
         // ---- beds ------------------------------------------------------------------------------------------------
         Bed BedFor(string name, bool filtered)
@@ -172,7 +182,7 @@ namespace Cellblock.Unity
             float crowd = home ? 0 : .30f * population * awake * unrest * Mathf.Lerp(.35f, 1, indoor);
             Mix("amb_crowd", crowd, Mathf.Lerp(1100, 22000, indoor), dt, true);
             Mix("amb_yard", home ? 0 : .26f * Mathf.Sqrt(Mathf.Min(outside, 30) / 30f) * awake * (1 - indoor * .8f), Mathf.Lerp(22000, 1500, indoor), dt, true);
-            Mix("loop_alarm_bell", alarm && !home ? .42f : 0, Mathf.Lerp(5000, 22000, indoor), dt * 4, true);
+            Mix("loop_alarm_bell", alarm && !home && w.Data.Speed > 0 && Application.isFocused ? .42f : 0, Mathf.Lerp(5000, 22000, indoor), dt * 4, true);
 
             if (home || w == null) { StopLoops(); return; }
             bool running = w.Data.Speed > 0 && w.Data.Speed <= 4;
@@ -185,6 +195,10 @@ namespace Cellblock.Unity
 
         void ResetWorld()
         {
+            StopAllCoroutines();
+            foreach (AudioSource voice in voices) if (voice != null) voice.Stop();
+            quietUntil.Clear(); doorQuiet.Clear(); heardBeats.Clear();
+            if (seen != null) foreach (ActionBeat beat in seen.ActionBeats) heardBeats.Add(beat);
             walkers.Clear(); doorsRevision = -1; lastMinute = -1; beatsSeen = int.MaxValue; vanPhase = ""; fightPhase = "None"; riotPhase = "None";
             if (seen != null) { alarmWas = seen.Data.Operations.Alarm; lockdownWas = seen.Data.Operations.Lockdown; gateWas = seen.Data.Operations.GateOpen; }
             StopLoops();
@@ -219,9 +233,8 @@ namespace Cellblock.Unity
 
             // Staff actions (the Hard Time pad): every new beat gets its sound at the actor.
             IReadOnlyList<ActionBeat> beats = w.ActionBeats;
-            if (beatsSeen > beats.Count) beatsSeen = beats.Count;
-            for (int i = beatsSeen; i < beats.Count; i++) Beat(w, beats[i]);
-            beatsSeen = beats.Count;
+            foreach (ActionBeat beat in beats) if (heardBeats.Add(beat)) Beat(w, beat);
+            if (heardBeats.Count > 64) heardBeats.IntersectWith(beats);
 
             // Fights and riots: scuffle sounds while the scene is physical.
             FightScene fight = w.Fight;
@@ -237,18 +250,7 @@ namespace Cellblock.Unity
             riotPhase = riotNow;
 
             if (!running) return;
-            // Crews at work: hammering, the odd saw or drill run.
-            if (Time.unscaledTime >= nextBuild)
-            {
-                nextBuild = Time.unscaledTime + Range(.45f, 1.3f);
-                Crew crew = w.Data.Crews.Where(c => c.Arrived && c.Working && Geometry.Distance(c.Position, ground) < 45).OrderBy(c => random.Next()).FirstOrDefault();
-                if (crew != null)
-                {
-                    if (Chance(.06f)) PlayAt("saw", At(crew.Position, 1), .45f, 6, .04f, 4);
-                    else PlayAt("hammer", At(crew.Position, 1), .7f, 0, .07f, 3);
-                    if (Chance(.03f)) { DrillAt(At(crew.Position, 1)); }
-                }
-            }
+            // Construction sounds arrive from visible tool contact cycles, never a random inspection tick.
             if (!close) return;
             // Exercise benches: plates set down. Meal service: trays.
             if (Time.unscaledTime >= nextWeights)
@@ -376,7 +378,7 @@ namespace Cellblock.Unity
             Fixture shower = active ? w.Data.Fixtures.Where(f => f.Kind == "Shower" && Geometry.Distance(f.Position, ground) < 18 && w.Data.Residents.Any(r => w.IsPresent(r) && Geometry.Distance(r.Position, f.Position) < 1.1f)).OrderBy(f => Geometry.Distance(f.Position, ground)).FirstOrDefault() : null;
             showerLoop = Hold(showerLoop, "loop_shower", shower != null, shower == null ? Vector3.zero : At(shower.Position, 1.8f), .42f, dt);
             gateLoop = Hold(gateLoop, "loop_gate", Time.unscaledTime < gateUntil && w.Data.Speed > 0, At(JusticeRules.GateInside, 1), .55f, dt, 7);
-            if (drillLoop != null && drillLoop.isPlaying && Time.unscaledTime > drillUntil) drillLoop.Stop();
+            if (drillLoop != null && drillLoop.isPlaying && (!active || w.Data.Operations.Alarm || Time.unscaledTime > drillUntil || !w.Data.Crews.Any(c => c.Working && (c.WorkKind == "Drill" || c.WorkKind == "Install")))) drillLoop.Stop();
         }
         float drillUntil;
         void DrillAt(Vector3 at)
