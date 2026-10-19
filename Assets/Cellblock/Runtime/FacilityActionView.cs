@@ -41,6 +41,7 @@ namespace Cellblock.Unity
             actionClock += dt;
             // A paused clock still evaluates its exact pose; it must not leave a newly observed restraint upright.
             float now = actionClock, blend = world.Data.Speed == 0 ? 1 : 1 - Mathf.Exp(-dt * 16);
+            RefreshActionChoreo(world);
             foreach (ActionBeat beat in world.ActionBeats)
                 if (seenBeats.Add(beat)) liveBeats.Add(new LiveBeat { Beat = beat, Start = now });
             liveBeats.RemoveAll(b => now - b.Start > BeatSeconds || (world.Data.Minute - b.Beat.Minute) * .2f > BeatSeconds);

@@ -1,0 +1,33 @@
+{
+    "passed": false,
+    "editor": "6000.3.24f1",
+    "errors": [
+        "Required ActionChoreo contact gates blocked: no registered consuming rig adapter.",
+        "CELLBLOCK_ACTION_CAPTURE_FAILED Required ActionChoreo contact gates blocked: no registered consuming rig adapter."
+    ],
+    "notes": [
+        "hints: Strike / Grab /  / Pat search on Amari Price",
+        "strike: Excessive force: Officer Dana Cross struck Amari Price without cause. A write-up was filed and residents trust staff less.",
+        "strike-side: explicit side-camera evidence, alongside the actual character-follow frame.",
+        "grab: Holding Amari Price. Grab again to cuff, Attack for a takedown.",
+        "hold-side: explicit side-camera evidence, alongside the actual character-follow frame.",
+        "cuff: Applying cuffs to Amari Price: first wrist, second wrist, then double lock.",
+        "escort distance 0.65 m, phase Cuffed",
+        "escort-side: explicit side-camera evidence, alongside the actual character-follow frame.",
+        "pad fits True",
+        "Paused action clock remains at 6.376",
+        "ActionChoreo contact gates NOT EXECUTED: Claude consumer version1 is not registered. No contact pass is claimed."
+    ],
+    "captures": [
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/actions/20261019-145543-689-c9b501/01-pad-target.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/actions/20261019-145543-689-c9b501/02-strike-contact.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/actions/20261019-145543-689-c9b501/03-strike-side.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/actions/20261019-145543-689-c9b501/04-strike-after.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/actions/20261019-145543-689-c9b501/05-hold.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/actions/20261019-145543-689-c9b501/06-hold-side.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/actions/20261019-145543-689-c9b501/07-cuffing.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/actions/20261019-145543-689-c9b501/08-escort.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/actions/20261019-145543-689-c9b501/09-escort-side.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/actions/20261019-145543-689-c9b501/10-paused-escort.png"
+    ]
+}

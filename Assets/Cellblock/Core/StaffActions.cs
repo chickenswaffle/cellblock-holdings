@@ -38,6 +38,8 @@ namespace Cellblock.Core
     {
         public string Kind = "", ActorId = "", TargetId = "";
         public int Minute, Variant;
+        public string ChoreoId = "";
+        public Point ActorGround, TargetGround; public float ActorYaw, TargetYaw;
         public bool Landed, Down, Power;
     }
 
@@ -101,9 +103,9 @@ namespace Cellblock.Core
             officer = ActingOfficer(); why = "";
             if (officer == null) { why = "Play as a staff member to act in person."; return false; }
             if (officer.Id != liveOfficer) TakeOverActions(officer.Id);
-            if (Data.Speed == 0) { why = "Paused: resume to act."; return false; }
             if (OfficerStaggered) { why = "Getting back on balance."; return false; }
             if (busyUntil > Data.Minute) { why = "Finishing the " + busyAction.ToLowerInvariant() + "."; return false; }
+            if (Data.Speed == 0) Data.Speed = 1; // An explicit committed action resumes direct-control time.
             return true;
         }
         // Residents this officer may act on: present, on site, not owned by an incident, an escape, intake or transport.
@@ -149,7 +151,7 @@ namespace Cellblock.Core
         int Experience(StaffMember officer) { PersonnelFile f = FileFor(officer); return f == null ? 0 : Math.Min(20, f.Experience); }
         void Beat(string kind, StaffMember officer, Resident target, bool landed = true, bool down = false, bool power = false)
         {
-            beats.Add(new ActionBeat { Kind = kind, ActorId = officer.Id, TargetId = target == null ? "" : target.Id, Minute = Data.Minute, Variant = StaffActions.Strikes % 2, Landed = landed, Down = down, Power = power });
+            beats.Add(new ActionBeat { ChoreoId = "staff:" + Data.Seed + ":" + (++actionChoreoSequence), ActorGround = officer.Position, TargetGround = target == null ? officer.Position + actionFacing : target.Position, ActorYaw = (float)(Math.Atan2(actionFacing.X, actionFacing.Y) * 180 / Math.PI), Kind = kind, ActorId = officer.Id, TargetId = target == null ? "" : target.Id, Minute = Data.Minute, Variant = StaffActions.Strikes % 2, Landed = landed, Down = down, Power = power });
             if (beats.Count > 16) beats.RemoveAt(0);
         }
         void LogForce(StaffMember officer, Resident target, string action, string ruling)
@@ -222,7 +224,7 @@ namespace Cellblock.Core
             {
                 if (holdPhase == "Cuffed") { Notice = "They are already cuffed."; return false; }
                 // A takedown from the hold: always lands; justified only against resistance or contraband.
-                downUntil[held.Id] = Data.Minute + 6; held.Health = Math.Max(0, held.Health - 4); held.Stress = Math.Min(100, held.Stress + 5);
+                downUntil[held.Id] = Data.Minute + ActionChoreo.GameMinutes(ChoreoAction.Takedown) + 2; held.Health = Math.Max(0, held.Health - 4); held.Stress = Math.Min(100, held.Stress + 5);
                 StaffActions.Takedowns++;
                 bool fair = ForceJustified(held);
                 if (fair) { StaffActions.Justified++; LogForce(officer, held, "Takedown", "Justified"); Notice = officer.Name + " took " + held.Name + " to the floor. Cuff them now."; }
@@ -281,13 +283,14 @@ namespace Cellblock.Core
                     Notice = held.Name + " twisted away from the cuffs. Take them down, or keep trying.";
                     return true;
                 }
-                holdPhase = "Cuffed"; busyAction = "Cuffing"; busyTarget = held.Id; busyUntil = Data.Minute + StaffActionRules.CuffMinutes;
+                holdPhase = "Applying cuffs"; busyAction = "Cuffing"; busyTarget = held.Id;
+                staffCuffChoreo = Downed(held) ? ChoreoAction.ProneCuff : staffKneelingCuffRequested ? ChoreoAction.KneelingCuff : ChoreoAction.StandingCuff;
+                busyUntil = Data.Minute + ActionChoreo.GameMinutes(staffCuffChoreo); staffCuffPending = true;
                 staffGroundedCuffed = Downed(held);
                 if (staffGroundedCuffed) downUntil[held.Id] = int.MaxValue; else downUntil.Remove(held.Id);
-                staffInteractionStart = Data.Minute; StaffActions.Cuffed++;
-                LogForce(officer, held, "Cuffed", ForceJustified(held) ? "Justified" : "Restraint");
+                staffInteractionStart = Data.Minute;
                 Beat("Cuff", officer, held);
-                Notice = held.Name + " is cuffed. Use Actions to search, release or confine; escort them to their bunk for confinement.";
+                Notice = "Applying cuffs to " + held.Name + ": first wrist, second wrist, then double lock.";
                 return true;
             }
             Resident target = ActionTarget(officer);
@@ -299,14 +302,17 @@ namespace Cellblock.Core
             bool hiding = ItemsOf(target).Any(i => i.Place == "Held" && ContrabandRules.Harmful(i.Kind));
             float fight = (target.Impulsivity - 30) / 120f + (target.Stress - 50) / 200f + (hiding ? 0.3f : 0) - (Downed(target) ? 1 : 0);
             if (Roll(officer, "resist") < fight) { resistUntil[target.Id] = Data.Minute + 15; Cause(target); }
-            Beat("Grab", officer, target);
+            Beat("Grab", officer, target); staffHoldChoreo = beats[beats.Count - 1];
             Notice = "Holding " + target.Name + (Resisting(target) ? ". They are resisting!" : ".") + " Grab again to cuff, Attack for a takedown.";
             return true;
         }
         void ReleaseHoldTarget(string notice)
         {
             Resident held = HeldResident();
+            if (staffCuffPending || staffSearchTarget != "" && staffSearchTarget == holdTarget)
+            { busyUntil = -1; staffSearchTarget = staffSearchMode = ""; }
             if (staffGroundedCuffed && holdTarget != "") downUntil.Remove(holdTarget);
+            staffCuffPending = false; staffHoldChoreo = null;
             staffGroundedCuffed = false; staffGroundCuffQueued = false;
             if (staffStandingTarget != "") { staffStandingTarget = ""; busyUntil = -1; }
             if (held != null) { held.NextDecisionMinute = Data.Minute; held.NextPlanMinute = Data.Minute; }
@@ -433,6 +439,23 @@ namespace Cellblock.Core
             if (!HeldByStaff(resident) || character == null || character.Staff == null) return;
             skip = true;
             StaffMember officer = character.Staff;
+            if (holdPhase == "Cuffed")
+            {
+                // The controlled officer guides from behind and beside the subject, with bounded, swept steps.
+                if (busyUntil > Data.Minute) return;
+                if (character.Intent.Length > .0001f) staffEscortFacing = character.Intent * (1 / character.Intent.Length);
+                Point goal = staffEscortAlignPending && character.Intent.Length > .0001f ? staffEscortPendingGoal : StaffEscortGoal(officer.Position, staffEscortFacing);
+                Point delta = goal - resident.Position;
+                if (!Routes.Clear(resident.Position, goal))
+                {
+                    List<Point> path = Routes.Find(resident.Position, goal);
+                    if (path == null) return;
+                    foreach (Point waypoint in path) if (Geometry.Distance(resident.Position, waypoint) > .04f) { delta = waypoint - resident.Position; break; }
+                }
+                Point next = resident.Position + delta * (Math.Min(.37f, delta.Length) / Math.Max(.0001f, delta.Length));
+                if (Routes.Clear(resident.Position, next) && Geometry.Distance(officer.Position, next) <= 1.2f) resident.Position = next;
+                return;
+            }
             if (escortTrail.Count == 0 || Geometry.Distance(escortTrail[escortTrail.Count - 1], officer.Position) > 0.04f) escortTrail.Add(officer.Position);
             // Stand this far back along the officer's own path; trim the path behind that point.
             float gap = holdPhase == "Cuffed" ? 0.55f : 0.62f, behind = 0;
@@ -457,6 +480,21 @@ namespace Cellblock.Core
             if (OfficerStaggered || busyUntil > Data.Minute || StaffGroundedRestraint) { speed = 0; return; }
             if (ActionRunning && holdTarget == "") speed *= StaffActionRules.RunFactor;
             if (holdTarget != "") speed *= StaffActionRules.EscortFactor;
+            Resident held = HeldResident(); staffEscortAlignPending = false;
+            if (holdPhase == "Cuffed" && held != null && character.Intent.Length > .0001f)
+            {
+                Point facing = character.Intent * (1 / character.Intent.Length);
+                Point nextOfficer = character.Staff.Position + character.Intent * speed;
+                Point nextSubject = StaffEscortGoal(nextOfficer, facing);
+                if (!Actionable(held) || Geometry.Distance(held.Position, nextSubject) > .3701f || !Routes.Clear(held.Position, nextSubject) || !Routes.Clear(nextOfficer, nextSubject))
+                {
+                    // Align the subject to the proposed formation while the officer waits. Using the old
+                    // formation here deadlocks sharp turns and inline-to-side doorway transitions.
+                    staffEscortAlignPending = Actionable(held) && Routes.Clear(character.Staff.Position, nextOfficer) && Routes.Clear(nextOfficer, nextSubject);
+                    staffEscortPendingGoal = nextSubject;
+                    speed = 0; characterControlBlocker = "Escort waiting for safe formation · turn or clear the route.";
+                }
+            }
         }
 
         // ---- inspection ----------------------------------------------------------------------------------

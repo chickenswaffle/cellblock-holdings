@@ -20,6 +20,8 @@ namespace Cellblock.Editor
     {
         const string StageKey = "Cellblock.Encounter.Stage", ActiveKey = "Cellblock.Encounter.Active", WaitKey = "Cellblock.Encounter.Wait";
         static string Output = "";
+        static ActionChoreoContactChecks contacts;
+        static bool requireContacts;
         internal static bool IsRunning { get { return SessionState.GetBool(ActiveKey, false); } }
         static int Width = 1600, Height = 900;
         static readonly List<string> errors = new List<string>(), notes = new List<string>();
@@ -38,11 +40,12 @@ namespace Cellblock.Editor
             };
         }
         public static void Run() { PresentationPreview.RequestFeatureReview("encounters"); }
-        internal static void BeginExisting()
+        internal static void BeginExisting(bool strictContacts = false)
         {
             if (!EditorApplication.isPlaying) throw new InvalidOperationException("Feature review requires the shared Play runner.");
             Output = Path.Combine("Temp/CellblockFeatureReviews", "encounters", DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N").Substring(0, 6));
             Directory.CreateDirectory(Output);
+            contacts?.Dispose(); contacts = null; requireContacts = strictContacts;
             errors.Clear(); notes.Clear(); shot = 0;
             SessionState.SetBool(ActiveKey, true); SessionState.SetInt(StageKey, 0);
             SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + 4);
@@ -77,7 +80,7 @@ namespace Cellblock.Editor
                         target.Position = officer.Position + new Point(0, .85f);
                         game.PreviewAdvance(1); game.PreviewControlDevice(ControlDevice.KeyboardMouse);
                         if (!game.StartCharacterPlay(officer.Id)) throw new InvalidOperationException(w.Notice);
-                        game.SetCharacterPerspective(true); w.Data.Speed = 0; Resize(game, 1600, 900); Next(1); return;
+                        game.SetCharacterPerspective(true); w.Data.Speed = 0; Resize(game, 1600, 900); contacts = new ActionChoreoContactChecks(game, errors, notes, requireContacts); Next(1); return;
                     }
                     case 2:
                     {
@@ -92,19 +95,21 @@ namespace Cellblock.Editor
                         if (w.Data.Speed != 1) errors.Add("Tray Resume did not resume time.");
                         int strikes = w.StaffActions.Strikes; game.ActionAttack();
                         if (w.StaffActions.Strikes != strikes) errors.Add("Field strike leaked through interaction menu.");
+                        w.Data.Speed = 0; // Committing through the actual paused tray must resume 1x.
                         game.GetComponentInChildren<GameHud>().PreviewStaffCommand(StaffInteraction.PatDown);
+                        if (w.Data.Speed != 1) errors.Add("Paused tray commit did not resume direct action time.");
                         if (w.BusyAction != "Pat search" || w.StaffActions.Searches != 0) errors.Add("Tray did not start deferred search: " + w.Notice);
                         w.Data.Speed = 0; game.PreviewAdvance(1); Next(.2f); return;
                     case 5:
                         Composite(game, "pat-down-first-person"); SideComposite(game, "pat-down-side");
-                        game.PreviewAdvance(2);
+                        game.PreviewAdvance(w.StaffBusyMinutes);
                         if (w.StaffActions.Searches != 1 || w.BusyAction != "") errors.Add("Search did not complete exactly once.");
                         PositionTarget(game); w.Data.Speed = 1;
                         if (!game.PerformStaffInteraction(targetId, StaffInteraction.GroundAndCuff)) errors.Add("Ground action failed: " + w.Notice);
-                        Next(.16f); return;
+                        Next(.50f); return;
                     case 6:
                         Composite(game, "takedown-first-person"); SideComposite(game, "takedown-side");
-                        w.Data.Speed = 0; game.PreviewAdvance(4); Next(.15f); return;
+                        w.Data.Speed = 0; game.PreviewAdvance(w.StaffBusyMinutes); Next(.15f); return;
                     case 7:
                         var pose = game.GetComponentInChildren<FacilityView>();
                         float pitch = pose.PreviewActionBodyPitch(targetId), pelvis = pose.PreviewActionPelvis(officerId);
@@ -112,14 +117,15 @@ namespace Cellblock.Editor
                         if (pitch < 70 || pelvis > .65f) errors.Add("Ground cuff render is upright or officer is not kneeling.");
                         pausedActionClock = pose.PreviewActionClock; pausedBodyPitch = pitch;
                         Composite(game, "ground-cuff-first-person"); SideComposite(game, "ground-cuff-side");
-                        game.PreviewAdvance(3);
-                        if (!w.StaffGroundedRestraint || w.HoldPhase != "Cuffed") errors.Add("Ground cuff not retained: " + w.Notice);
-                        game.PreviewControlDevice(ControlDevice.Touch); Resize(game, 900, 420); Next(.6f); return;
+                        game.PreviewControlDevice(ControlDevice.Touch); Resize(game, 900, 420);
+                        w.Data.Speed = 1; Next(w.StaffBusyMinutes * .2f + .4f); return;
                     case 8:
-                        var pausedPose = game.GetComponentInChildren<FacilityView>();
-                        if (Mathf.Abs(pausedPose.PreviewActionClock - pausedActionClock) > .0001f || Mathf.Abs(pausedPose.PreviewActionBodyPitch(targetId) - pausedBodyPitch) > .1f) errors.Add("Paused ground pose/clock advanced.");
+                        if (!w.StaffGroundedRestraint || w.HoldPhase != "Cuffed") errors.Add("Ground cuff not retained: " + w.Notice);
+                        w.Data.Speed = 0; var pausedPose = game.GetComponentInChildren<FacilityView>();
+                        pausedActionClock = pausedPose.PreviewActionClock; pausedBodyPitch = pausedPose.PreviewActionBodyPitch(targetId);
                         game.OpenStaffInteractions(); Next(.5f); return;
                     case 9:
+                        if (Mathf.Abs(game.GetComponentInChildren<FacilityView>().PreviewActionClock - pausedActionClock) > .0001f) errors.Add("Paused ground clock advanced.");
                         CheckTray(game, "phone-landscape"); Resize(game, 430, 932); Next(.6f); return;
                     case 10:
                         CheckTray(game, "phone-portrait");
@@ -127,7 +133,7 @@ namespace Cellblock.Editor
                         if (w.BusyAction != "Pocket search") errors.Add("Cuffed tray pocket search failed: " + w.Notice);
                         w.Data.Speed = 0; game.PreviewAdvance(2); Next(.2f); return;
                     case 11:
-                        Composite(game, "phone-search-progress"); game.PreviewAdvance(3);
+                        Composite(game, "phone-search-progress"); game.PreviewAdvance(w.StaffBusyMinutes);
                         if (w.StaffActions.Searches != 2 || !w.StaffGroundedRestraint) errors.Add("Cuffed search lost restraint or failed to finish.");
                         w.Data.Speed = 1;
                         if (!game.PerformStaffInteraction(targetId, StaffInteraction.Escort)) errors.Add("Stand and escort failed.");
@@ -227,6 +233,7 @@ namespace Cellblock.Editor
         }
         static void Finish(GameController game, bool passed)
         {
+            contacts?.Finish(true); contacts = null; passed &= errors.Count == 0;
             SessionState.SetBool(ActiveKey, false);
             if (game == null) game = UnityEngine.Object.FindFirstObjectByType<GameController>();
             if (game != null) game.PreviewUiTarget(null);

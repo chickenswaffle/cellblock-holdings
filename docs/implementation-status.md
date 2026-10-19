@@ -2,6 +2,12 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
+## October 19 joint ActionChoreo version1 handoff
+
+Merged published Claude human bodies7caacf1 (with material-slot recolor correction) and main5d4747f. Codex publishes [ActionChoreo version1](action-choreo-contract.md): paired phases/progress, relative/world roots, named hand/knee/look targets, grips, directional reactions and once-only impact/cuff/lift/fall cues. Covers both-side searches, standing/kneeling/prone cuffs, takedown, escort, strike/counter/shove/grab and assisted get-up. Cuffs settle after the authored track, paused commits resume1x, preparation can cancel safely, and release clears unfinished application. Tight corners use bounded re-position/regrip instead of opposed escort roots.
+
+**463 core checks and27 actual Unity captures pass**, with final source/evidence in [the review](reviews/2026-10-19-action-choreo/README.md). The independent critic accepts the final contract/rules. Contact accuracy is **not passed**: strict contact review correctly fails until Claude's consuming rig adapter registers version1. New assertions measure rendered hand≤3cm at cuff clicks and knee/root≤5cm through prone control/contact. Claude owns FacilityMotion.cs, rig/IK, first-person camera/arms, feedback and touch controls; those sources were not changed in the contract implementation. HUD redesign remains paused. This is the choreography handoff, with physical fidelity and native-device testing still pending joint integration.
+
 ## October 19 assisted custody recovery
 
 New six-game-minute Standing phase keeps custody/knockdown and both people stationary until assisted recovery completes. Repeated commands cannot reset it. Removal, authority loss and handback cancel safely, including cleanup of a removed subject's permanent down state. No save-schema or Claude model/quality changes.

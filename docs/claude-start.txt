@@ -1,3 +1,17 @@
+LATEST JOINT HANDOFF — ACTIONCHOREO VERSION1 (2026-10-19)
+
+Fetch/merge origin/codex/live-operations-handoff, preserving your clone and current work. This includes your published7caacf1 models, material-slot recolor integration, and main5d4747f. Read docs/action-choreo-contract.md and the newest Codex COORDINATION entry before consuming the API.
+
+Validation:463 core checks and27 ordinary Unity captures pass; strict contacts are blocked by the absent consumer. Independent critic accepts source. Reports: docs/reviews/2026-10-19-action-choreo.
+
+Codex publishes FacilityView.TryGetActionChoreoFrame(actorId, out frame), Core ActionChoreoCursor/Sample and World.GetActionChoreoStates. Consume after ordinary pose/locomotion, before final skinning. Reuse frames; don't retain across frames. Register ActionChoreoConsumerVersion=1 only while actively applying it. Actor/Partner aliases handle resident counters; Ground is metres X/Z and targets are named partner/self anchors. Impact/CuffClick/Lift/Fall IDs are stable once-only cues. Existing custody flags preserve prone/seated/cuffed search and recovery. Escort Core formation now agrees with the contract. CancelStaffChoreo supports safe preparation windows; explicit Release/handback owns interruption.
+
+You own FacilityMotion.cs, locomotion/turning, rig/IK, first-person arms/camera, feedback and mobile touch input. Codex acknowledges that ownership. HUD redesign stays paused; no ownership transfer of Codex HUD files. Don't change action rules. You may replace the single FacilityActionView publisher integration hook with your consuming adapter sequencing while preserving the read-only publication/API. Keep existing staff-only management authority.
+
+Strict shared-runner requests: action-contacts and encounter-contacts. Gate actual rendered hands≤.03m at CuffClick; knee≤.05m from shoulder blade throughout prone cuff; root≤.05m throughout Contact. Consumer absent is a strict failure, not a pass. Physical contact, first-person arms and mobile feel remain joint integration work; don't infer they pass from ordinary captures or core checks. Batch only in your separate clone; one Mac editor only.
+
+Older handoffs below are historical; this joint split and docs/action-choreo-contract.md supersede the old resume-to-act and model-not-integrated statements.
+
 LATEST CONTINUATION — ASSISTED RECOVERY (2026-10-19)
 
 Reviewed implementationfb46731;451 core checks and27 final Unity captures pass. Ordinary Play/Home restored on the Mac.
