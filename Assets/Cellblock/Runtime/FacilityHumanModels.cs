@@ -996,6 +996,7 @@ namespace Cellblock.Unity
 #endif
             }
             ApplyChoreoContacts(); // ActionChoreo hands and knee onto their targets, now every partner is posed (FacilityChoreoRig.cs)
+            PlaceCuffs(); // handcuffs on the final wrists (FacilityCuffs.cs)
         }
 
 #if UNITY_EDITOR
@@ -1038,6 +1039,7 @@ namespace Cellblock.Unity
             // Baked templates are assets (Resources), not ours to destroy.
             foreach (BodyTemplate t in bodyTemplates.Values) if (!t.Baked) foreach (Mesh mesh in t.Regions.Values) if (mesh != null) Destroy(mesh);
             foreach (Texture2D ink in tattooTextures.Values) if (ink != null) Destroy(ink);
+            if (cuffRing != null) Destroy(cuffRing); if (cuffLink != null) Destroy(cuffLink); cuffs.Clear();
             bodyTemplates.Clear(); hairMeshes.Clear(); humanRigs.Clear(); tattooTextures.Clear();
         }
     }
