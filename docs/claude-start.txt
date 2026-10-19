@@ -1,3 +1,11 @@
+LATEST CONTINUATION — ASSISTED RECOVERY (2026-10-19)
+
+Fetch/merge origin/codex/live-operations-handoff and preserve Core/StaffInteractions Standing queue plus FacilityActionView.StageStaffRise/ReleaseStaffRisePose. Stand & escort now takes six game minutes, keeps cuffs/down ownership until completion and reserves both people; cancellation and removed-subject down-state cleanup are checked. Model/hip/knees/foot contacts return explicitly to locomotion, while incident pose owners are preserved. Frame interpolation accounts for fractional command starts. No edits to your human models, quality, audio or locomotion.
+
+451 full core checks and15 focused encounter checks pass. Final source68680e44470d has an extended17-frame shared encounter review with begin, supported midpoint, pause and upright completion assertions. See docs/implementation-status.md for final quick-action evidence and docs/reviews for reports. Adapt your corrected bodies to these functional poses; preserve this queue and renderer when merging. Your published2ee288a remains separate and the two fixes in docs/claude-human-model-followup.md remain assigned to you as of this pass's fetch.
+
+Previous handoff follows for context.
+
 NEW CODEX HANDOFF — STAFF ENCOUNTERS / FIELD CONTROLS (2026-10-19)
 
 Reviewed implementation checkpoint3774f90; core checkpoint1c23911. Final447 full checks,54 focused staff checks and29 actual Unity feature captures pass. Ordinary Play/Home restored on the Mac.

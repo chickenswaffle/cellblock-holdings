@@ -306,8 +306,9 @@ namespace Cellblock.Core
         void ReleaseHoldTarget(string notice)
         {
             Resident held = HeldResident();
-            if (held != null && staffGroundedCuffed) downUntil.Remove(held.Id);
+            if (staffGroundedCuffed && holdTarget != "") downUntil.Remove(holdTarget);
             staffGroundedCuffed = false; staffGroundCuffQueued = false;
+            if (staffStandingTarget != "") { staffStandingTarget = ""; busyUntil = -1; }
             if (held != null) { held.NextDecisionMinute = Data.Minute; held.NextPlanMinute = Data.Minute; }
             holdTarget = holdPhase = ""; escortTrail.Clear();
             if (notice != "") Notice = notice;

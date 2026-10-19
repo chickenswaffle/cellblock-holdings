@@ -21,9 +21,10 @@ namespace Cellblock.Core
         public void SetStaffViewFacing(Point direction)
         { float length = direction.Length; if (length > .0001f && !float.IsInfinity(length) && !float.IsNaN(length)) actionFacing = direction * (1 / length); }
         internal void EndStaffManualSession() { ReleaseHoldTarget(""); ResetStaffEncounter(); busyUntil = -1; running = false; liveOfficer = ""; }
-        string explicitStaffTargetId, staffSearchTarget = "", staffSearchMode = "";
+        string explicitStaffTargetId, staffSearchTarget = "", staffSearchMode = "", staffStandingTarget = "";
         int staffAttackReadyMinute, staffInteractionStart;
         bool staffGroundCuffQueued, staffGroundedCuffed;
+        public bool StaffStandingUp { get { return staffStandingTarget != "" && busyUntil > Data.Minute; } }
         public bool StaffGroundedRestraint { get { return staffGroundedCuffed && holdPhase == "Cuffed"; } }
         public int StaffRecoveryMinutes { get { return Math.Max(0, staffAttackReadyMinute - Data.Minute); } }
         public int StaffBusyMinutes { get { return Math.Max(0, busyUntil - Data.Minute); } }
@@ -31,7 +32,7 @@ namespace Cellblock.Core
 
         void ResetStaffEncounter()
         {
-            staffFocusTargetId = ""; explicitStaffTargetId = null; staffSearchTarget = staffSearchMode = "";
+            staffFocusTargetId = ""; explicitStaffTargetId = null; staffSearchTarget = staffSearchMode = staffStandingTarget = "";
             staffGroundCuffQueued = staffGroundedCuffed = false; staffAttackReadyMinute = staffInteractionStart = 0;
         }
         public bool CanFocusStaffSubject(Resident resident) { return resident != null && Actionable(resident); }
@@ -158,6 +159,12 @@ namespace Cellblock.Core
                         if (holdTarget == "" && !ActGrab()) return false;
                         return ActGrab();
                     case StaffInteraction.Escort:
+                        if (staffGroundedCuffed)
+                        {
+                            staffStandingTarget = id; busyAction = "Standing"; busyTarget = id;
+                            staffInteractionStart = Data.Minute; busyUntil = Data.Minute + 6; running = false;
+                            Beat("Stand", officer, target); Notice = "Helping " + target.Name + " to their feet. Escort begins once they are standing."; return true;
+                        }
                         staffGroundedCuffed = false; downUntil.Remove(id); escortTrail.Clear(); escortTrail.Add(target.Position); escortTrail.Add(officer.Position);
                         Notice = "Escorting " + target.Name + ". Walk them to their bunk; use Actions to search, release or confine."; return true;
                     case StaffInteraction.Release: ReleaseHoldTarget("Released " + target.Name + "."); return true;
@@ -170,6 +177,18 @@ namespace Cellblock.Core
 
         void AdvanceStaffEncounter(StaffMember officer)
         {
+            if (staffStandingTarget != "")
+            {
+                string why; Resident target = ResolveStaffSubject(officer, staffStandingTarget, out why);
+                if (target == null || holdTarget != staffStandingTarget || holdPhase != "Cuffed" || officer.Role != "Officer")
+                {
+                    ReleaseHoldTarget("Assisted stand interrupted · " + (target == null ? why : "custody or authority changed.")); busyUntil = -1; return;
+                }
+                if (busyUntil > Data.Minute) return;
+                staffStandingTarget = ""; staffGroundedCuffed = false; downUntil.Remove(target.Id);
+                escortTrail.Clear(); escortTrail.Add(target.Position); escortTrail.Add(officer.Position);
+                Notice = target.Name + " is standing and ready to escort.";
+            }
             if (busyAction == "Speaking" && busyUntil > Data.Minute)
             {
                 string speechWhy;

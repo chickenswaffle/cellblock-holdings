@@ -2,6 +2,12 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
+## October 19 assisted custody recovery
+
+New six-game-minute Standing phase keeps custody/knockdown and both people stationary until assisted recovery completes. Repeated commands cannot reset it. Removal, authority loss and handback cancel safely, including cleanup of a removed subject's permanent down state. No save-schema or Claude model/quality changes.
+
+Final451/451 core checks and15 focused encounter checks pass. Unity6000.3.24f1 source `68680e44470d` passes the extended17-frame encounter review: prone start, supported seated midpoint, paused midpoint and restored upright hips/model at completion. Independent critic accepts source and actual poses; fractional starts are accounted for and incident pose owners are preserved. The final10-frame quick-action regression also passes:27 final captures with empty errors. Full frames: `Builds/StaffRecoveryReview/2026-10-19/final-68680e44470d`; reports/transcripts and a real midpoint image in `docs/reviews`. No physical-device or seamless-motion claim.
+
 ## October 19 explicit staff encounters and field controls
 
 Core checkpoint `1c23911` passes **447/447 core checks**, including11 new encounter checks. The final presentation source fingerprint is `0a78829f1538`. Staff aim now uses the visible body span and the closest-hit selection rule, commands retain their subject ID, searches reserve their subject and settle at completion, and ground/cuff/escort remains distinct. Ending control clears pending ownership immediately. Existing misconduct, incident authority, contraband and saved accounting remain authoritative. [Controls, state flow and research](staff-encounters.md).

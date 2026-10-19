@@ -74,7 +74,7 @@ namespace Cellblock.Unity
             CharacterBarKeys(); // Claude look pass: key hints on the top-bar buttons follow the device (exact exception, 2026-10-18)
             characterContext.text = world.CharacterControlBlocker != "" ? world.CharacterControlBlocker : game.CharacterCameraObstructed ? "Close quarters · camera moved to eye level to stay clear of walls. Step into an open area for the shoulder view." : game.CharacterInteractionHint;
             if (!world.InmateMode && game.CharacterDirect && world.CharacterControlBlocker == "" && !game.CharacterCameraObstructed)
-                characterContext.text = world.StaffGroundedRestraint ? "Actions · Stand & escort, search, or release the grounded person." :
+                characterContext.text = world.StaffStandingUp ? "Assisted recovery · wait until both people are standing before moving." : world.StaffGroundedRestraint ? "Actions · Stand & escort, search, or release the grounded person." :
                     game.StaffAimTarget != "" ? "Actions · " + game.StaffTargetLabel + " · choose a conversation, search or custody action." :
                     "Aim toward a person, then open Actions. Near an unoccupied bunk, Actions searches the bunk.";
         }

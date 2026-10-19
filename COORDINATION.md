@@ -36,6 +36,14 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 
 ## Codex log
 
+### 2026-10-19 — staged recovery from ground custody
+
+- Final core451/451 and15 focused encounter checks pass. New coverage checks no movement during recovery, repeat/release rejection, frozen pause, handback, subject removal and authority loss. Removing a roster entry no longer leaves its int.MaxValue down deadline cached. Source fingerprint68680e44470d; final17-frame shared encounter review passes actual begin/mid/pause/finish pose assertions with empty errors. Critic accepts fixed endpoints, fractional-start correction, interruption cleanup and ownership-aware pose release; actual images show improved support contact and no lingering crouch. Final10-frame quick-action regression also passes, including strike/cuff/escort and frozen clock. All27 final captures have empty errors. Reports/source manifest/transcripts and actual midpoint PNG are saved in docs/reviews; full images in Builds/StaffRecoveryReview/2026-10-19/final-68680e44470d. No new mesh/asset or device claims.
+
+- User asks to continue building. Codex claims game-core/game-runtime/character-experience/documentation and sole Unity runner for a bounded follow-up: six-minute authoritative Standing phase before grounded cuffs become a walking escort; deterministic get-up choreography and explicit pose release. Exact files: Core/StaffInteractions.cs and StaffActions.ReleaseHoldTarget cancellation, Tools/CoreChecks/StaffInteractionChecks.cs, Runtime/FacilityActionView.cs and existing shared Editor/StaffEncounterCapture.cs, plus one GameCharacterControlsHud.cs context-hint branch for the busy Standing phase and notes/evidence. No new human models, finger/uniform/quality/audio or character locomotion edits; Claude retains those files. Published Claude branch remains2ee288a on fetch, awaiting its two follow-up corrections.
+- Preserve live-only custody, incident authority, pause, roles, searches and saved accounting. Independent critic requires repeat-command/busy protection, interruption cleanup, no walking during recovery and complete model/hip/contact restoration before handing feet back. Prior user correctness request authorizes focused core and sole-editor Play checks for this continuation.
+
+
 ### 2026-10-19 — explicit staff encounters and desktop/touch first-person controls
 
 - Publication checkpoint: core1c23911 and reviewed implementation3774f90 are committed. Ordinary Play/Home restored in the sole editor (fresh CELLBLOCK_PLAY_MODE_READY). Only pre-existing recovery assets and duplicate ShaderGraph settings remain untracked. Releasing Codex six scopes before pushing the already-authorized handoff branch; no main push. Claude should fetch/merge the published branch and read docs/claude-start.txt plus the new2ee288a follow-up before continuing its model fixes.

@@ -50,7 +50,50 @@ static partial class Program
             Check(w.HoldPhase == "Holding" && w.Downed(target) && w.BusyAction == "Takedown" && w.StaffActions.Cuffed == 0, "Ground action skipped to cuffs");
             for (int i = 0; i < 7; i++) ActionMinute(w);
             Check(w.HoldPhase == "Cuffed" && w.StaffGroundedRestraint && w.Downed(target) && w.StaffActions.Cuffed == 1, "Ground cuff continuity failed: " + w.Notice);
-            Check(w.ActStaffInteraction(target.Id, StaffInteraction.Escort) && !w.Downed(target) && !w.StaffGroundedRestraint && w.HoldPhase == "Cuffed", "Escort did not bring the person up");
+            Check(w.ActStaffInteraction(target.Id, StaffInteraction.Escort) && w.StaffStandingUp && w.Downed(target) && w.StaffGroundedRestraint, "Escort skipped assisted recovery");
+            for (int i = 0; i < 6; i++) ActionMinute(w);
+            Check(!w.StaffStandingUp && !w.Downed(target) && !w.StaffGroundedRestraint && w.HoldPhase == "Cuffed", "Escort did not finish bringing the person up");
+        });
+        Test("staff encounters · standing reserves both people and repeat commands cannot restart it", () => {
+            StaffMember officer; Resident target; World w = ActionWorld(out officer, out target);
+            Check(w.ActStaffInteraction(target.Id, StaffInteraction.GroundAndCuff), w.Notice);
+            for (int i = 0; i < 7; i++) ActionMinute(w);
+            Check(w.ActStaffInteraction(target.Id, StaffInteraction.Escort), w.Notice);
+            Point a = officer.Position, b = target.Position; w.SetCharacterMoveIntent(new Point(1, 0));
+            ActionMinute(w); ActionMinute(w); int remaining = w.StaffBusyMinutes;
+            Check(!w.ActStaffInteraction(target.Id, StaffInteraction.Escort) && w.StaffBusyMinutes == remaining, "Repeated escort reset the timer");
+            Check(!w.ActStaffInteraction(target.Id, StaffInteraction.Release), "Release interrupted a busy assisted stand");
+            Check(Geometry.Distance(a, officer.Position) < .001f && Geometry.Distance(b, target.Position) < .001f, "People walked during recovery");
+            float progress = w.StaffInteractionProgress; w.Data.Speed = 0; ActionMinute(w);
+            Check(w.StaffInteractionProgress == progress && w.StaffStandingUp, "Paused recovery advanced");
+            w.Data.Speed = 1; for (int i = 0; i < 4; i++) ActionMinute(w);
+            Check(!w.StaffStandingUp && !w.Downed(target) && w.HeldResidentId == target.Id, "Recovery never handed custody to escort");
+            for (int i = 0; i < 3; i++) ActionMinute(w);
+            Check(Geometry.Distance(a, officer.Position) > .01f, "Officer remained frozen after recovery");
+        });
+        Test("staff encounters · handback cancels a pending stand even while paused", () => {
+            StaffMember officer; Resident target; World w = ActionWorld(out officer, out target);
+            Check(w.ActStaffInteraction(target.Id, StaffInteraction.GroundAndCuff), w.Notice);
+            for (int i = 0; i < 7; i++) ActionMinute(w);
+            Check(w.ActStaffInteraction(target.Id, StaffInteraction.Escort), w.Notice); ActionMinute(w);
+            w.Data.Speed = 0; w.EndCharacterControl();
+            Check(!w.StaffStandingUp && !w.Downed(target) && w.HeldResidentId == "" && w.BusyAction == "", "Handback stranded recovery/cuffs");
+        });
+        Test("staff encounters · departed standing subject leaves no queued recovery or permanent down state", () => {
+            StaffMember officer; Resident target; World w = ActionWorld(out officer, out target);
+            Check(w.ActStaffInteraction(target.Id, StaffInteraction.GroundAndCuff), w.Notice);
+            for (int i = 0; i < 7; i++) ActionMinute(w);
+            Check(w.ActStaffInteraction(target.Id, StaffInteraction.Escort), w.Notice);
+            w.Data.Residents.Remove(target); ActionMinute(w);
+            Check(!w.StaffStandingUp && !w.Downed(target) && w.HeldResidentId == "" && w.BusyAction == "", "Removed resident retained recovery/down state");
+        });
+        Test("staff encounters · officer losing authority cancels assisted recovery", () => {
+            StaffMember officer; Resident target; World w = ActionWorld(out officer, out target);
+            Check(w.ActStaffInteraction(target.Id, StaffInteraction.GroundAndCuff), w.Notice);
+            for (int i = 0; i < 7; i++) ActionMinute(w);
+            Check(w.ActStaffInteraction(target.Id, StaffInteraction.Escort), w.Notice);
+            officer.Role = "Caseworker"; ActionMinute(w);
+            Check(!w.StaffStandingUp && !w.Downed(target) && w.HeldResidentId == "" && w.BusyAction == "", "Lost authority retained custody");
         });
         Test("staff encounters · target departure cancels a search without confiscation", () => {
             StaffMember officer; Resident target; World w = ActionWorld(out officer, out target);

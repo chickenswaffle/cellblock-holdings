@@ -131,9 +131,25 @@ namespace Cellblock.Editor
                         if (w.StaffActions.Searches != 2 || !w.StaffGroundedRestraint) errors.Add("Cuffed search lost restraint or failed to finish.");
                         w.Data.Speed = 1;
                         if (!game.PerformStaffInteraction(targetId, StaffInteraction.Escort)) errors.Add("Stand and escort failed.");
-                        if (w.StaffGroundedRestraint) errors.Add("Escort stayed grounded.");
+                        if (!w.StaffStandingUp || !w.StaffGroundedRestraint) errors.Add("Escort skipped assisted recovery.");
                         w.Data.Speed = 0; Resize(game, 1600, 900); game.SetCharacterPerspective(false); Next(.6f); return;
                     case 12:
+                        if (game.GetComponentInChildren<FacilityView>().PreviewActionBodyPitch(targetId) < 80) errors.Add("Stand beginning skipped ground pose.");
+                        Composite(game, "stand-begin"); SideComposite(game, "stand-begin-side");
+                        game.PreviewAdvance(3); Next(.3f); return;
+                    case 13:
+                        var mid = game.GetComponentInChildren<FacilityView>();
+                        pausedBodyPitch = mid.PreviewActionBodyPitch(targetId); pausedActionClock = mid.PreviewActionClock;
+                        notes.Add("mid-rise pitch=" + pausedBodyPitch + ", centre=" + mid.PreviewActionCentre(targetId) + ", officer pelvis=" + mid.PreviewActionPelvis(officerId));
+                        if (!w.StaffStandingUp || pausedBodyPitch < 10 || pausedBodyPitch > 65 || mid.PreviewActionCentre(targetId) < .25f || mid.PreviewActionCentre(targetId) > .8f) errors.Add("Assisted recovery has no intermediate pose.");
+                        Composite(game, "stand-midpoint"); SideComposite(game, "stand-midpoint-side"); Next(.4f); return;
+                    case 14:
+                        var frozen = game.GetComponentInChildren<FacilityView>();
+                        if (Mathf.Abs(frozen.PreviewActionBodyPitch(targetId) - pausedBodyPitch) > .1f || Mathf.Abs(frozen.PreviewActionClock - pausedActionClock) > .0001f) errors.Add("Paused assisted recovery advanced.");
+                        Composite(game, "stand-paused"); game.PreviewAdvance(3); Next(.3f); return;
+                    case 15:
+                        var finished = game.GetComponentInChildren<FacilityView>();
+                        if (w.StaffStandingUp || w.StaffGroundedRestraint || w.Downed(w.Data.Residents.First(r => r.Id == targetId)) || finished.PreviewActionBodyPitch(targetId) > 1 || Mathf.Abs(finished.PreviewActionPelvis(officerId) - .9f) > .04f) errors.Add("Recovery did not hand upright bodies back to escort.");
                         Composite(game, "standing-escort"); SideComposite(game, "standing-escort-side");
                         game.EndCharacterView(false);
                         if (!game.PreviewStaffAimReleased) errors.Add("Aim cache retained a company or resident after handback.");
