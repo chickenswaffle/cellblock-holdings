@@ -809,6 +809,7 @@ namespace Cellblock.Unity
                 CreateBuilderKit(actor);
             }
             CreateCharacterNameTag(actor);
+            BuildHumanModel(actor, id, index, staff, role, uniformName, uniform, skin); // Claude: skinned human body (FacilityHumanModels.cs)
             actors.Add(id, actor); return actor;
         }
 

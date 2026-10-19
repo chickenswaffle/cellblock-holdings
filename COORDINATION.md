@@ -202,6 +202,13 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 
 ## Claude log
 
+### 2026-10-18 — skinned human models on the existing rig (user request: production characters)
+
+- New: `Resources/Characters/*` (Quaternius Universal Base Characters, CC0; 4.3 MB), `Editor/CharacterLibrary.cs` (readable meshes, no materials/avatars), `Runtime/FacilityHumanModels.cs` (partial FacilityView + `HumanRigDriver`), `Editor/HumanCapture.cs` (close-ups + walk frames → Builds/HumanReview).
+- How: at the end of `Person()` (**one-line Codex-file hook**, after `CreateCharacterNameTag`) the capsule body/face/limb renderers get `forceRenderingOff` (hats, badges, vests, tools, props, tag and marker kept) and a skinned body is parented under `actor.Model`. Clothing regions are clipped exactly on hem lines from the scan's rest pose (collar, sleeves long/short, belt band, ankles), relaxed with welded seams and pinned hems, then offset by layer. Top uses the uniform material and legs `trousers`, so FacilityLivesView's jumpsuit recolouring still applies. Head/eyes/brows/hair live under `actor.Head`, so first-person head hiding is unchanged. Each frame on `beginContextRendering` (after every animator), bones copy the pivots' model-space rotation deltas (spine split over three bones, neck half the head). Segment lengths are matched to the rig at bind. Staff body follows the first name (female list); residents male.
+- Evidence: HumanCapture front/side/back + 6 walk frames; regression feature reviews look/actions/yard/sanitation/inmate/pad all PASSED with the new bodies (frames inspected: strike, cuffing, escort, push-ups, sit-ups, shadow boxing, lock-in, first person).
+- For Codex: blink overlays are hidden with the old head (the model's eyes are static); face motion/gaze still turns the head. Arm swing sometimes flares outward — tune in a later pass. iPhone skinning cost unmeasured (overlay shows it).
+
 ### 2026-10-18 — device-test readiness: quality tiers, performance overlay, audio levels (user request)
 
 - User wants an iPhone test soon to judge next steps; asked for phone readiness, then production characters. Claude scope `presentation-assets` continues.

@@ -36,3 +36,9 @@ Recording numbers are in the script, next to each sound they make.
 | People | footsteps on concrete / plastic floor / gravel / grass, running, punches, body falls | 1318, 3440, 3202, 0854, 1319, 2459–2465, 2452–2454 |
 | Life | shower, flush, trays, weight plates, hammer, saw, drill, car passing, schedule chime | 0171, 0838, 0053, 1771/1772/1774, 0006, 0959, 0184, 2996, 1605/2881 |
 | Interface | thermostat tick, switch click, page turn, pencil signature, stapler, coin, drawers | 2191/2192, 0321, 2210–2212, 3236–3238, 0009, 0339, 0792, 0773 |
+
+## People — `Assets/Cellblock/Resources/Characters/`
+
+[Quaternius](https://quaternius.com) "Universal Base Characters" (Standard, CC0 1.0): the male and female bodies, eyes, brows and
+six rigged hairstyles, with textures downsized to 1K/512. `Runtime/FacilityHumanModels.cs` splits each body into skin, top,
+trousers, belt and shoes along exact hem lines, relaxes and offsets the cloth, and drives the bones from the game's own rig.
