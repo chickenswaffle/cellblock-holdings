@@ -71,8 +71,10 @@ namespace Cellblock.Unity
         // ---- voices ----------------------------------------------------------------------------------------------
         AudioSource Voice()
         {
-            foreach (AudioSource v in voices) if (!v.isPlaying) return v;
-            if (voices.Count >= PresentationQuality.VoiceLimit) return voices.OrderBy(v => v.time / Mathf.Max(.01f, v.clip == null ? 1 : v.clip.length)).Last();
+            // Only the first VoiceLimit voices are usable; a pool grown on a higher tier is trimmed in TrimVoices.
+            int limit = PresentationQuality.VoiceLimit;
+            for (int i = 0; i < voices.Count && i < limit; i++) if (!voices[i].isPlaying) return voices[i];
+            if (voices.Count >= limit) return voices.Take(limit).OrderBy(v => v.time / Mathf.Max(.01f, v.clip == null ? 1 : v.clip.length)).Last();
             var go = new GameObject("Sound voice"); go.transform.SetParent(transform, false);
             AudioSource s = go.AddComponent<AudioSource>(); s.playOnAwake = false; s.dopplerLevel = 0; s.spatialBlend = 1;
             s.rolloffMode = AudioRolloffMode.Logarithmic; s.minDistance = 2.5f; s.maxDistance = 90; s.spread = 30;
@@ -143,9 +145,21 @@ namespace Cellblock.Unity
         }
         bool Inside(World w, Point p) { foreach (List<Point> room in w.Rooms) if (Geometry.Contains(room, p)) return true; return false; }
 
+        // A lower quality tier retires surplus voices at once (stopped and destroyed), so the cap holds immediately.
+        void TrimVoices()
+        {
+            int limit = PresentationQuality.VoiceLimit;
+            for (int i = voices.Count - 1; i >= limit; i--) { if (voices[i] != null) { voices[i].Stop(); Destroy(voices[i].gameObject); } voices.RemoveAt(i); }
+        }
+#if UNITY_EDITOR
+        public static int VoicePool { get { return instance == null ? 0 : instance.voices.Count; } }
+        public static int VoicesPlaying { get { return instance == null ? 0 : instance.voices.Count(v => v != null && v.isPlaying); } }
+        public static void PreviewFillVoices(int count) { if (instance == null) return; for (int i = 0; i < count; i++) { var go = new GameObject("Sound voice"); go.transform.SetParent(instance.transform, false); var s = go.AddComponent<AudioSource>(); s.clip = instance.Pick("amb_hum"); s.loop = true; s.volume = 0; s.Play(); instance.voices.Add(s); } }
+#endif
         void Update()
         {
             if (game == null || ear == null) return;
+            if (voices.Count > PresentationQuality.VoiceLimit) TrimVoices();
             float dt = Mathf.Min(Time.unscaledDeltaTime, .1f);
             World w = game.World;
             Vector3 earAt = ear.transform.position; var ground = new Point(earAt.x, earAt.z);

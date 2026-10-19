@@ -27,6 +27,8 @@ namespace Cellblock.Editor
         static QualityCapture() { EditorApplication.update += Tick; }
         public static void Run()
         {
+            // Claude's clone only: never open scenes, delete output or enter Play in an interactive (shared) editor.
+            if (!Application.isBatchMode) { Debug.LogError("CELLBLOCK_QUALITY_CAPTURE refused: batch mode only (run from Claude's clone)."); return; }
             ProjectSetup.Validate(); SurfaceLibrary.Ensure(); LightingSetup.Ensure();
             EditorSceneManager.OpenScene("Assets/Cellblock/Scenes/Main.unity");
             Directory.CreateDirectory(Output); foreach (string f in Directory.GetFiles(Output, "*.png")) File.Delete(f);
@@ -69,22 +71,39 @@ namespace Cellblock.Editor
                         Next(1); return;
                     }
                     case 4:
+                        // A pool grown on High is trimmed to Low's cap at once.
+                        PresentationQuality.Apply(3); FacilitySoundscape.PreviewFillVoices(Mathf.Max(0, 22 - FacilitySoundscape.VoicePool));
+                        SessionState.SetInt("Cellblock.QualityCapture.Grown", FacilitySoundscape.VoicePool); PresentationQuality.Apply(1);
+                        Next(.5f); return;
+                    case 5:
+                    {
+                        int grown = SessionState.GetInt("Cellblock.QualityCapture.Grown", 0), pool = FacilitySoundscape.VoicePool, playing = FacilitySoundscape.VoicesPlaying;
+                        notes.Add("voices: grown " + grown + " on High, then pool " + pool + " / playing " + playing + " on Low (cap " + PresentationQuality.VoiceLimit + ")");
+                        Check(grown > PresentationQuality.VoiceLimit && pool <= PresentationQuality.VoiceLimit && playing <= PresentationQuality.VoiceLimit, "Low tier did not trim a grown voice pool");
+                        // An SSAO feature that starts disabled stays disabled across tiers and after restore.
+                        PresentationQuality.Restore(); SetSsao(pipeline, false);
+                        PresentationQuality.Apply(3); bool onHigh = Ssao(pipeline); PresentationQuality.Apply(1); PresentationQuality.Apply(3); PresentationQuality.Restore();
+                        bool afterRestore = Ssao(pipeline);
+                        notes.Add("SSAO initially off: High " + onHigh + ", after restore " + afterRestore);
+                        Check(!onHigh && !afterRestore, "A disabled SSAO feature was switched on by quality tiers or restore");
+                        SetSsao(pipeline, true); PresentationQuality.Restore();
                         PresentationQuality.Apply(0);
                         notes.Add("auto: " + PresentationQuality.Current + " (" + PresentationQuality.LastChange + ")");
                         Check(PresentationQuality.Automatic && PresentationQuality.Current == PresentationQuality.DeviceDefault, "Auto did not pick the device default");
                         game.PreviewSettingsPage("Display"); Next(1); return;
-                    case 5: game.PreviewRelayout(); Next(.6f); return;
-                    case 6: Composite(game, "settings-display"); game.PreviewSettingsPage("Audio"); Next(1); return;
-                    case 7: game.PreviewRelayout(); Next(.6f); return;
-                    case 8:
+                    }
+                    case 6: game.PreviewRelayout(); Next(.6f); return;
+                    case 7: Composite(game, "settings-display"); game.PreviewSettingsPage("Audio"); Next(1); return;
+                    case 8: game.PreviewRelayout(); Next(.6f); return;
+                    case 9:
                         Composite(game, "settings-audio");
                         Check(game.PreviewSettingsFit(), "A settings page does not fit the 1600x900 frame.");
                         game.PreviewCloseSettingsWithoutSaving(); PerformanceOverlay.Show(true); Next(1.5f); return;
-                    case 9:
+                    case 10:
                         game.PreviewRelayout(); notes.Add("overlay: " + PerformanceOverlay.Text.Replace("\n", " | "));
                         Check(PerformanceOverlay.Text.Contains("fps") && PerformanceOverlay.Text.Contains("Quality") && PerformanceOverlay.Text.Contains("Memory"), "Overlay text missing");
                         Next(.6f); return;
-                    case 10:
+                    case 11:
                         Check(PerformanceOverlay.Fits, "The performance overlay overlaps the header or leaves the screen.");
                         Frame(game); Composite(game, "performance-overlay");
                         PerformanceOverlay.Show(false); game.ApplyPreferences();
@@ -94,6 +113,11 @@ namespace Cellblock.Editor
             catch (Exception error) { errors.Add(error.ToString()); Finish(null); }
         }
 
+        static void SetSsao(UniversalRenderPipelineAsset pipeline, bool on)
+        {
+            var list = typeof(UniversalRenderPipelineAsset).GetField("m_RendererDataList", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(pipeline) as ScriptableRendererData[];
+            foreach (var f in list.Where(d => d != null).SelectMany(d => d.rendererFeatures).OfType<ScreenSpaceAmbientOcclusion>()) f.SetActive(on);
+        }
         static bool Ssao(UniversalRenderPipelineAsset pipeline)
         {
             var list = typeof(UniversalRenderPipelineAsset).GetField("m_RendererDataList", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(pipeline) as ScriptableRendererData[];

@@ -237,6 +237,18 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 
 ## Claude log
 
+### 2026-10-19 — human-model review fixes (baf7360 acknowledged)
+
+- Acknowledged Codex `59a6d94`/`baf7360` on `codex/claude-overload` (merges `4403313`, `a5038b7`); character development is Claude's. Codex's parked candidate untouched. Integration fixes from `8beb021` kept (texture separation, work-contact tool sounds, world-change voice cancel, ActionBeat identity, Prepare surface/Forward+). 436/436 core.
+- **P1 pelvis/joint origins:** each frame the pelvis follows the hip pivots' model-space shift, the spine base the waist pivot, and every limb joint sits on its pivot (shoulder, elbow, wrist point, hip, knee, ankle) before rotations; segment lengths matched at bind, grips/props unchanged. **Measured on the visible skeleton** (editor `HumanContact`, logged as `CELLBLOCK_HUMAN_CONTACT` by every review): knee/ankle/wrist error 0.0 mm across HumanCapture and the workshop, actions, yard, sanitation, inmate, look, pad and sound reviews (1.5k–50k samples each). **Visible planted sole** (baked shoe mesh, upright flat foot at standing ankle height): 5–95 % within −4…+2 mm, means −2.2…+0.3 mm; single-frame extremes to −104 mm occur at pitched heel-strike/toe-off. The scan's ankle-to-sole height was 15 mm deeper than the rig's; shoes are compressed below the ankle by that amount.
+- **P2 meshes:** `HumanRigDriver.OnDestroy` → `DisposeHumanModels` destroys generated region meshes and clears caches (imported eye/hair/FBX meshes and Resources textures untouched). HumanCapture builds a second view, destroys it: generated meshes 8 → 16 → 8.
+- **P2 fingers:** per-hand curl driven each frame — something rendered under the hand's grip → grip, recent Strike/Counter/Swing beat → fist, Grab/Shove/Reach/Cuff → open, else relaxed; ~0.14 s blends, held while paused. Curl axes from hand geometry (fingers toward palm, thumb across to the middle base). HumanCapture renders both hands at open/relaxed/grip/fist.
+- **P2 runners:** HumanCapture/QualityCapture refuse outside batch mode before any scene/output/Play mutation. ClaudeBatch now summarises Codex's `workshop` studio output (images present, no abort) and copies it out.
+- **P2 voices:** only the first VoiceLimit voices are usable; a lowered tier stops and destroys the surplus at once. QualityCapture: 22 grown on High → pool 12 / playing 12 on Low.
+- **P2 SSAO:** each feature's original state captured and restored exactly. QualityCapture: SSAO disabled beforehand stays off on High and after restore.
+- **Finishing:** crew-neck collar (lower front, neck column only), welded/pinned hems, shoe soles with a welt; unobstructed close-ups in open ground.
+- Evidence: Builds/HumanReview (front/side/back, hands, walk, report), Builds/QualityReview, review logs listed above, workshop pose images (hats seated, tools at grips). Limits: static eyes/no blink; superhero proportions (free pack); occasional outward arm flare; no device/population performance claim.
+
 ### 2026-10-18 — skinned human models on the existing rig (user request: production characters)
 
 - New: `Resources/Characters/*` (Quaternius Universal Base Characters, CC0; 4.3 MB), `Editor/CharacterLibrary.cs` (readable meshes, no materials/avatars), `Runtime/FacilityHumanModels.cs` (partial FacilityView + `HumanRigDriver`), `Editor/HumanCapture.cs` (close-ups + walk frames → Builds/HumanReview).

@@ -23,6 +23,7 @@ namespace Cellblock.Unity
         public static int VoiceLimit { get { return Current == Tier.High ? 24 : Current == Tier.Medium ? 16 : 12; } }
 
         static bool captured; static float renderScale; static int msaa, cascades, mipLimit;
+        static readonly System.Collections.Generic.Dictionary<ScriptableRendererFeature, bool> occlusionOriginal = new System.Collections.Generic.Dictionary<ScriptableRendererFeature, bool>();
         static float slowSince = -1, nextStep;
         static readonly float[] frames = new float[90]; static int frameIndex, frameCount;
 
@@ -68,7 +69,13 @@ namespace Cellblock.Unity
                 if (list == null) return;
                 foreach (ScriptableRendererData data in list)
                     if (data != null) foreach (ScriptableRendererFeature feature in data.rendererFeatures)
-                            if (feature is ScreenSpaceAmbientOcclusion && feature.isActive != on) feature.SetActive(on);
+                            if (feature is ScreenSpaceAmbientOcclusion)
+                            {
+                                if (!occlusionOriginal.ContainsKey(feature)) occlusionOriginal[feature] = feature.isActive;
+                                // A feature that started disabled stays disabled at every tier.
+                                bool want = on && occlusionOriginal[feature];
+                                if (feature.isActive != want) feature.SetActive(want);
+                            }
             }
             catch (System.Exception e) { Debug.LogWarning("Quality: SSAO toggle unavailable: " + e.Message); }
         }
@@ -97,7 +104,10 @@ namespace Cellblock.Unity
         public static void Restore()
         {
             var pipeline = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
-            if (pipeline != null && captured) { pipeline.renderScale = renderScale; pipeline.msaaSampleCount = msaa; pipeline.shadowCascadeCount = cascades; SetOcclusion(pipeline, true); }
+            if (pipeline != null && captured) { pipeline.renderScale = renderScale; pipeline.msaaSampleCount = msaa; pipeline.shadowCascadeCount = cascades; }
+            // Exactly the state each SSAO feature had before the first change, then forget it.
+            foreach (var pair in occlusionOriginal) if (pair.Key != null && pair.Key.isActive != pair.Value) pair.Key.SetActive(pair.Value);
+            occlusionOriginal.Clear();
             if (captured) QualitySettings.globalTextureMipmapLimit = mipLimit;
             captured = false; LastChange = ""; frameCount = 0; autoStepped = false;
         }

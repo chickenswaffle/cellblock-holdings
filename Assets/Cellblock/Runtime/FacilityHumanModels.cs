@@ -26,13 +26,23 @@ namespace Cellblock.Unity
         }
         sealed class HumanRig
         {
-            public Actor Actor; public Transform Instance;
-            public Transform[] Bones; public Transform[] Sources; public float[] Blend; public Quaternion[] SourceRest, BoneRest;
+            public Actor Actor; public string Id; public Transform Instance, Pelvis, Spine;
+            public Transform[] Bones; public Transform[] Sources; public float[] Blend; public bool[] Snap; public Quaternion[] SourceRest, BoneRest;
+            public Vector3 PelvisRest, HipMidRest, TorsoRest, SpineRest; // model space
+            public Transform[] KneeBones = new Transform[2], FootBones = new Transform[2], HandBones = new Transform[2], ElbowBones = new Transform[2];
+            public readonly List<Finger>[] Fingers = { new List<Finger>(), new List<Finger>() };
+            public readonly float[] Curl = { .25f, .25f };
+            public float SoleRest; // ankle pivot height (model space) when standing
         }
+        sealed class Finger { public Transform Bone; public Quaternion Rest; public Vector3 Axis; public float Max; public bool Thumb; }
         readonly Dictionary<string, BodyTemplate> bodyTemplates = new Dictionary<string, BodyTemplate>();
         readonly List<HumanRig> humanRigs = new List<HumanRig>();
         HumanRigDriver humanDriver;
         public static bool HumanModelsEnabled = true;
+#if UNITY_EDITOR
+        public static float PreviewCurl = -1; // review: force every hand to one curl (0 open, .25 relaxed, .82 grip, 1 fist)
+        public static int GeneratedHumanMeshes { get { return Resources.FindObjectsOfTypeAll<Mesh>().Count(m => m.name.StartsWith("Human ")); } }
+#endif
 
         static readonly string[] FemaleNames = { "Maya", "Elena", "Priya", "Tasha", "Hannah", "Grace", "Nadia", "Renee", "Imani", "Lena", "Bree", "Sofia", "Ines" };
 
@@ -71,14 +81,14 @@ namespace Cellblock.Unity
 
         // Geometric cut lines in the scan's rest pose (T-pose, metres): hems fall on the mesh's edge loops, so sleeves,
         // collar, waistband and shoe tops are clean rings rather than the zigzag a bone-weight split gives.
-        sealed class Cuts { public float Neck, BeltLow, BeltHigh, Ankle, Wrist, Elbow; }
+        sealed class Cuts { public float Neck, BeltLow, BeltHigh, Ankle, Wrist, Elbow; public Vector3 NeckAt; }
         static Cuts CutsFor(SkinnedMeshRenderer body)
         {
             Transform Bone(string n) { return body.bones.FirstOrDefault(b => b.name.ToLowerInvariant() == n); }
             Transform neck = Bone("neck_01"), pelvis = Bone("pelvis"), foot = Bone("foot_l"), hand = Bone("hand_l"), upper = Bone("upperarm_l"), lower = Bone("lowerarm_l");
             return new Cuts
             {
-                Neck = neck.position.y - .012f, BeltLow = pelvis.position.y + .02f, BeltHigh = pelvis.position.y + .075f,
+                Neck = neck.position.y - .012f, NeckAt = neck.position, BeltLow = pelvis.position.y + .02f, BeltHigh = pelvis.position.y + .075f,
                 Ankle = foot.position.y + .045f, Wrist = Mathf.Abs(hand.position.x) - .035f, Elbow = Mathf.Abs(lower.position.x) - .03f,
             };
         }
@@ -89,21 +99,40 @@ namespace Cellblock.Unity
         }
         // Each region is a band on one rest-pose axis: |x| along the T-posed arms, y on the torso and legs. Cloth bands
         // reach `Margin` into their neighbour (they lie over it), skin bands stop exactly on the hem.
-        const float Margin = .011f;
-        struct Band { public bool Arm; public bool UseX; public float Min, Max; public Band(bool arm, bool useX, float min, float max) { Arm = arm; UseX = useX; Min = min; Max = max; } }
+        const float Margin = .011f, SoleLift = .0156f;
+        // A band is the intersection of up to three conditions min <= field(p) <= max on rest-pose positions.
+        sealed class Band
+        {
+            public bool Arm; public readonly List<(System.Func<Vector3, float> field, float min, float max)> Conditions = new List<(System.Func<Vector3, float>, float, float)>();
+            public Band(bool arm) { Arm = arm; }
+            public Band Where(System.Func<Vector3, float> field, float min, float max) { Conditions.Add((field, min, max)); return this; }
+        }
+        static float AbsX(Vector3 p) { return Mathf.Abs(p.x); }
+        static float Y(Vector3 p) { return p.y; }
+        // Crew neck: the collar dips at the front (the scan faces -Z) and rises a little at the back; only the neck
+        // column (not the slope of the shoulders) belongs to the head region.
+        static System.Func<Vector3, float> Collar(Cuts c) { return p => p.y - (c.Neck + Mathf.Clamp((p.z - c.NeckAt.z) / .10f, -1, 1) * .022f); }
+        static System.Func<Vector3, float> NeckRadius(Cuts c) { return p => new Vector2(p.x - c.NeckAt.x, (p.z - c.NeckAt.z) * .85f).magnitude; }
         static Band[] BandsFor(string region, Cuts c)
         {
-            const float Far = 9;
+            const float Far = 9, Column = .095f, Shoulders = .05f;
+            var collar = Collar(c); var radius = NeckRadius(c);
+            float wrist = c.Wrist, elbow = c.Elbow;
             switch (region)
             {
-                case "skin": return new[] { new Band(true, true, c.Wrist, Far) };
-                case "skinshort": return new[] { new Band(true, true, c.Elbow, Far) };
-                case "top": return new[] { new Band(true, true, -Far, c.Wrist + Margin), new Band(false, false, c.BeltHigh - Margin, c.Neck + Margin) };
-                case "topshort": return new[] { new Band(true, true, -Far, c.Elbow + Margin), new Band(false, false, c.BeltHigh - Margin, c.Neck + Margin) };
-                case "head": return new[] { new Band(false, false, c.Neck, Far) };
-                case "belt": return new[] { new Band(false, false, c.BeltLow - Margin * .5f, c.BeltHigh + Margin * .5f) };
-                case "bottom": return new[] { new Band(false, false, c.Ankle - Margin, c.BeltHigh) };
-                case "shoes": return new[] { new Band(false, false, -Far, c.Ankle + Margin * .5f) };
+                case "skin": return new[] { new Band(true).Where(AbsX, wrist, Far) };
+                case "skinshort": return new[] { new Band(true).Where(AbsX, elbow, Far) };
+                case "top": case "topshort":
+                    float sleeve = region == "top" ? wrist : elbow;
+                    return new[] {
+                        new Band(true).Where(AbsX, -Far, sleeve + Margin),
+                        new Band(false).Where(Y, c.BeltHigh - Margin, Far).Where(collar, -Far, Margin),
+                        new Band(false).Where(collar, Margin, Far).Where(radius, Column - Margin, Far).Where(Y, -Far, c.Neck + Shoulders) };
+                // The neck column, and everything above the shoulder slope (the whole head and face).
+                case "head": return new[] { new Band(false).Where(collar, 0, Far).Where(radius, -Far, Column).Where(Y, -Far, c.Neck + Shoulders), new Band(false).Where(Y, c.Neck + Shoulders, Far) };
+                case "belt": return new[] { new Band(false).Where(Y, c.BeltLow - Margin * .5f, c.BeltHigh + Margin * .5f) };
+                case "bottom": return new[] { new Band(false).Where(Y, c.Ankle - Margin, c.BeltHigh) };
+                case "shoes": return new[] { new Band(false).Where(Y, -Far, c.Ankle + Margin * .5f) };
             }
             return new Band[0];
         }
@@ -116,14 +145,14 @@ namespace Cellblock.Unity
             foreach (var p in b.Weights) { float have; w.TryGetValue(p.Key, out have); w[p.Key] = have + p.Value * t; }
             return new Vert { Pos = Vector3.Lerp(a.Pos, b.Pos, t), Rest = Vector3.Lerp(a.Rest, b.Rest, t), Uv = Vector2.Lerp(a.Uv, b.Uv, t), Weights = w };
         }
-        // Sutherland–Hodgman against one side of an axis-aligned plane in rest space.
-        static List<Vert> Clip(List<Vert> poly, bool useX, float limit, bool keepBelow)
+        // Sutherland–Hodgman against one side of a rest-space scalar field (linear along each small edge).
+        static List<Vert> Clip(List<Vert> poly, System.Func<Vector3, float> field, float limit, bool keepBelow)
         {
             var output = new List<Vert>();
             for (int i = 0; i < poly.Count; i++)
             {
                 Vert a = poly[i], b = poly[(i + 1) % poly.Count];
-                float fa = (useX ? Mathf.Abs(a.Rest.x) : a.Rest.y) - limit, fb = (useX ? Mathf.Abs(b.Rest.x) : b.Rest.y) - limit;
+                float fa = field(a.Rest) - limit, fb = field(b.Rest) - limit;
                 bool ina = keepBelow ? fa <= 0 : fa >= 0, inb = keepBelow ? fb <= 0 : fb >= 0;
                 if (ina) output.Add(a);
                 if (ina != inb && Mathf.Abs(fa - fb) > 1e-7f) output.Add(Lerp(a, b, fa / (fa - fb)));
@@ -170,8 +199,13 @@ namespace Cellblock.Unity
                 {
                     if (band.Arm != arm) continue;
                     var poly = new List<Vert> { Source(tri[k]), Source(tri[k + 1]), Source(tri[k + 2]) };
-                    poly = Clip(poly, band.UseX, band.Min, false); if (poly.Count < 3) continue;
-                    poly = Clip(poly, band.UseX, band.Max, true); if (poly.Count < 3) continue;
+                    foreach (var cond in band.Conditions)
+                    {
+                        if (cond.min > -8) poly = Clip(poly, cond.field, cond.min, false);
+                        if (poly.Count >= 3 && cond.max < 8) poly = Clip(poly, cond.field, cond.max, true);
+                        if (poly.Count < 3) break;
+                    }
+                    if (poly.Count < 3) continue;
                     int first = Emit(poly[0]);
                     for (int j = 1; j < poly.Count - 1; j++) { tris.Add(first); tris.Add(Emit(poly[j])); tris.Add(Emit(poly[j + 1])); }
                 }
@@ -226,6 +260,25 @@ namespace Cellblock.Unity
                 // Outer layers push further, in the order they are worn: belt over shirt over trousers over shoes.
                 float push = kind == "top" ? .016f : kind == "bottom" ? .012f : kind == "belt" ? .022f : .009f;
                 for (int i = 0; i < pos.Length; i++) { int g = groupOf[i]; pos[i] = gp[g] + normal[g].normalized * push; }
+                if (kind == "shoes")
+                {
+                    // A shoe, not a foot: a flat sole at the ground with a small welt standing out around it.
+                    Matrix4x4 toRest = body.transform.localToWorldMatrix, toMesh = toRest.inverse;
+                    for (int i = 0; i < pos.Length; i++)
+                    {
+                        Vector3 r = toRest.MultiplyPoint3x4(pos[i]);
+                        // The scan's ankle sits higher above its sole than the rig's planted ankle: compress the shoe
+                        // below the ankle by that difference (measured by HumanCapture's planted-sole check) so a planted
+                        // sole meets the ground instead of sinking ~15 mm into it.
+                        if (r.y < cuts.Ankle) r.y += SoleLift * (1 - Mathf.Clamp01(r.y / cuts.Ankle));
+                        if (r.y > .055f + SoleLift) { pos[i] = toMesh.MultiplyPoint3x4(r); continue; }
+                        Vector3 side = toRest.MultiplyVector(normal[groupOf[i]]); side.y = 0;
+                        float welt = Mathf.InverseLerp(.055f + SoleLift, .015f + SoleLift, r.y);
+                        r += side.normalized * .007f * welt;
+                        if (r.y < .012f + SoleLift) r.y = Mathf.Lerp(r.y, SoleLift - .002f, .85f);
+                        pos[i] = toMesh.MultiplyPoint3x4(r);
+                    }
+                }
             }
             var mesh = new Mesh { name = "Human " + region };
             if (pos.Length > 65000) mesh.indexFormat = IndexFormat.UInt32;
@@ -408,12 +461,14 @@ namespace Cellblock.Unity
         void BindRig(Actor actor, Transform instance, Dictionary<string, Transform> b)
         {
             Transform model = actor.Model;
-            // Match segment lengths to the game rig so hands reach grips and feet land on planted contacts.
             for (int side = 0; side < 2; side++)
             {
                 string s = side == 0 ? "_l" : "_r";
+                // The joints start on the rig's own pivots, with the rig's segment lengths, so knees, ankles and grips are
+                // exactly where every planted-contact, prop and pose system puts them.
+                b["upperarm" + s].position = actor.Limbs[side].position; b["thigh" + s].position = actor.Limbs[2 + side].position;
                 Stretch(b["upperarm" + s], b["lowerarm" + s], Vector3.Distance(actor.Limbs[side].position, actor.Forearms[side].position));
-                Stretch(b["lowerarm" + s], b["hand" + s], Vector3.Distance(actor.Forearms[side].position, actor.Hands[side].position) * .92f);
+                Stretch(b["lowerarm" + s], b["hand" + s], Vector3.Distance(actor.Forearms[side].position, actor.Hands[side].position) * HandReach);
                 Stretch(b["thigh" + s], b["calf" + s], Vector3.Distance(actor.Limbs[2 + side].position, actor.Knees[side].position));
                 Stretch(b["calf" + s], b["foot" + s], Vector3.Distance(actor.Knees[side].position, actor.Feet[side].position));
                 // Arms hang like the rig's (the scan is in a T-pose); legs line up with the rig's hips and knees.
@@ -421,27 +476,60 @@ namespace Cellblock.Unity
                 Aim(b["lowerarm" + s], b["hand" + s], actor.Hands[side].position - actor.Forearms[side].position);
                 Aim(b["thigh" + s], b["calf" + s], actor.Knees[side].position - actor.Limbs[2 + side].position);
                 Aim(b["calf" + s], b["foot" + s], actor.Feet[side].position - actor.Knees[side].position);
-                // A relaxed hand: fingers curl a little toward the palm.
-                foreach (string finger in new[] { "index", "middle", "ring", "pinky" })
-                    for (int j = 1; j <= 3; j++) { Transform f; if (b.TryGetValue(finger + "_0" + j + s, out f)) f.localRotation *= Quaternion.Euler(0, 0, side == 0 ? -12 - j * 6 : 12 + j * 6); }
             }
-            var pairs = new List<(Transform bone, Transform source, float blend)>
+            var pairs = new List<(Transform bone, Transform source, float blend, bool snap)>
             {
-                (b["spine_01"], actor.Body, .34f), (b["spine_02"], actor.Body, .67f), (b["spine_03"], actor.Body, 1),
-                (b["neck_01"], actor.Head, .5f), (b["head"], actor.Head, 1),
+                (b["spine_01"], actor.Body, .34f, false), (b["spine_02"], actor.Body, .67f, false), (b["spine_03"], actor.Body, 1, false),
+                (b["neck_01"], actor.Head, .5f, false), (b["head"], actor.Head, 1, false),
             };
             for (int side = 0; side < 2; side++)
             {
                 string s = side == 0 ? "_l" : "_r";
-                pairs.Add((b["upperarm" + s], actor.Limbs[side], 1)); pairs.Add((b["lowerarm" + s], actor.Forearms[side], 1)); pairs.Add((b["hand" + s], actor.Forearms[side], 1));
-                pairs.Add((b["thigh" + s], actor.Limbs[2 + side], 1)); pairs.Add((b["calf" + s], actor.Knees[side], 1)); pairs.Add((b["foot" + s], actor.Feet[side], 1));
+                pairs.Add((b["upperarm" + s], actor.Limbs[side], 1, true)); pairs.Add((b["lowerarm" + s], actor.Forearms[side], 1, false)); pairs.Add((b["hand" + s], actor.Forearms[side], 1, false));
+                pairs.Add((b["thigh" + s], actor.Limbs[2 + side], 1, true)); pairs.Add((b["calf" + s], actor.Knees[side], 1, false)); pairs.Add((b["foot" + s], actor.Feet[side], 1, false));
             }
             Quaternion inverse = Quaternion.Inverse(model.rotation);
-            var rig = new HumanRig { Actor = actor, Instance = instance, Bones = pairs.Select(p => p.bone).ToArray(), Sources = pairs.Select(p => p.source).ToArray(), Blend = pairs.Select(p => p.blend).ToArray() };
-            rig.SourceRest = rig.Sources.Select(s => inverse * s.rotation).ToArray();
+            var rig = new HumanRig
+            {
+                Actor = actor, Id = actors.FirstOrDefault(p => p.Value == actor).Key ?? "", Instance = instance, Pelvis = b["pelvis"], Spine = b["spine_01"],
+                Bones = pairs.Select(p => p.bone).ToArray(), Sources = pairs.Select(p => p.source).ToArray(), Blend = pairs.Select(p => p.blend).ToArray(), Snap = pairs.Select(p => p.snap).ToArray(),
+            };
+            rig.SourceRest = rig.Sources.Select(x => inverse * x.rotation).ToArray();
             rig.BoneRest = rig.Bones.Select(x => inverse * x.rotation).ToArray();
+            rig.PelvisRest = model.InverseTransformPoint(rig.Pelvis.position); rig.SpineRest = model.InverseTransformPoint(rig.Spine.position);
+            rig.HipMidRest = model.InverseTransformPoint((actor.Limbs[2].position + actor.Limbs[3].position) * .5f);
+            rig.TorsoRest = model.InverseTransformPoint(actor.Body.position);
+            rig.SoleRest = actor.Root.InverseTransformPoint(actor.Feet[0].position).y;
+            for (int side = 0; side < 2; side++)
+            {
+                string s = side == 0 ? "_l" : "_r";
+                rig.KneeBones[side] = b["calf" + s]; rig.FootBones[side] = b["foot" + s]; rig.HandBones[side] = b["hand" + s]; rig.ElbowBones[side] = b["lowerarm" + s];
+                // Curl axes from the hand's own geometry: each finger bends toward the palm (the side the thumb's base
+                // is on gives the palm normal's sign), measured once in bind space.
+                Transform hand = b["hand" + s];
+                Transform index1, pinky1, middle1, thumb1;
+                if (!b.TryGetValue("index_01" + s, out index1) || !b.TryGetValue("pinky_01" + s, out pinky1) || !b.TryGetValue("middle_01" + s, out middle1) || !b.TryGetValue("thumb_01" + s, out thumb1)) continue;
+                Vector3 along = (middle1.position - hand.position).normalized, across = (index1.position - pinky1.position).normalized;
+                Vector3 palm = Vector3.Cross(along, across).normalized;
+                if (Vector3.Dot(palm, thumb1.position - middle1.position) < 0) palm = -palm; // palm faces the thumb's side of the hand
+                foreach (string finger in new[] { "index", "middle", "ring", "pinky", "thumb" })
+                    for (int j = 1; j <= 3; j++)
+                    {
+                        Transform f, child; if (!b.TryGetValue(finger + "_0" + j + s, out f)) continue;
+                        child = f.childCount > 0 ? f.GetChild(0) : null; if (child == null) continue;
+                        Vector3 dir = (child.position - f.position).normalized;
+                        // Fingers fold toward the palm; the thumb folds across it, toward the middle finger's base.
+                        Vector3 toward = finger == "thumb" ? (middle1.position - f.position).normalized : palm;
+                        Vector3 axis = Vector3.Cross(dir, toward).normalized;
+                        // Sign so a positive angle moves the tip toward the palm.
+                        Vector3 test = Quaternion.AngleAxis(10, axis) * dir; if (Vector3.Dot(test, toward) < Vector3.Dot(dir, toward)) axis = -axis;
+                        bool thumb = finger == "thumb";
+                        rig.Fingers[side].Add(new Finger { Bone = f, Rest = f.localRotation, Axis = f.InverseTransformDirection(axis), Max = thumb ? (j == 1 ? 25 : 40) : j == 1 ? 72 : j == 2 ? 95 : 62, Thumb = thumb });
+                    }
+            }
             humanRigs.Add(rig);
         }
+        const float HandReach = .92f;
         static void Stretch(Transform bone, Transform child, float length)
         {
             float current = Vector3.Distance(bone.position, child.position);
@@ -453,32 +541,151 @@ namespace Cellblock.Unity
             if (now.sqrMagnitude > 1e-6f && direction.sqrMagnitude > 1e-6f) bone.rotation = Quaternion.FromToRotation(now, direction) * bone.rotation;
         }
 
+        static readonly List<Renderer> gripBuffer = new List<Renderer>();
+        // Finger targets: something parented to the hand's grip → grip; a recent strike → fist; a grab/shove/reach → open.
+        float HandTarget(HumanRig rig, int side, World world)
+        {
+            Transform grip = rig.Actor.Hands[side];
+            if (grip != null)
+            {
+                grip.GetComponentsInChildren(false, gripBuffer);
+                foreach (Renderer r in gripBuffer) if (r.enabled && !r.forceRenderingOff) return .82f;
+            }
+            if (world != null && rig.Id != "")
+            {
+                IReadOnlyList<ActionBeat> beats = world.ActionBeats;
+                for (int i = beats.Count - 1; i >= 0 && i >= beats.Count - 6; i--)
+                {
+                    ActionBeat beat = beats[i];
+                    if (world.Data.Minute - beat.Minute > 1) break;
+                    if (beat.ActorId != rig.Id) continue;
+                    if (beat.Kind == "Strike" || beat.Kind == "Counter" || beat.Kind == "Swing") return 1;
+                    if (beat.Kind == "Grab" || beat.Kind == "Shove" || beat.Kind == "Reach" || beat.Kind == "Cuff") return 0;
+                }
+            }
+            return .25f; // relaxed
+        }
+
         // After every animator has written this frame's pose, before any camera renders.
         internal void ApplyHumanRigs()
         {
+            World world = presentedWorld; bool running = world != null && world.Data.Speed > 0;
+            float dt = Mathf.Min(Time.unscaledDeltaTime, .1f);
             for (int i = humanRigs.Count - 1; i >= 0; i--)
             {
                 HumanRig rig = humanRigs[i];
                 if (rig.Actor.Root == null || rig.Instance == null) { humanRigs.RemoveAt(i); continue; }
                 if (!rig.Actor.Root.gameObject.activeInHierarchy) continue;
-                Quaternion model = rig.Actor.Model.rotation, inverse = Quaternion.Inverse(model);
+                Transform modelT = rig.Actor.Model;
+                Quaternion model = modelT.rotation, inverse = Quaternion.Inverse(model);
+                // The pelvis rides with the hips (crouch, kneel, stance, gait bob); the spine base with the waist pivot.
+                Vector3 hipMid = modelT.InverseTransformPoint((rig.Actor.Limbs[2].position + rig.Actor.Limbs[3].position) * .5f);
+                Vector3 hipShift = hipMid - rig.HipMidRest;
+                rig.Pelvis.position = modelT.TransformPoint(rig.PelvisRest + hipShift);
+                Vector3 torsoShift = modelT.InverseTransformPoint(rig.Actor.Body.position) - rig.TorsoRest;
+                rig.Spine.position = modelT.TransformPoint(rig.SpineRest + torsoShift);
                 for (int k = 0; k < rig.Bones.Length; k++)
                 {
                     Transform source = rig.Sources[k]; if (source == null) continue;
+                    if (rig.Snap[k]) rig.Bones[k].position = source.position;
                     Quaternion delta = inverse * source.rotation * Quaternion.Inverse(rig.SourceRest[k]);
                     if (rig.Blend[k] < .999f) delta = Quaternion.Slerp(Quaternion.identity, delta, rig.Blend[k]);
                     rig.Bones[k].rotation = model * delta * rig.BoneRest[k];
                 }
+                // Poses also move joints (reach, grip and stance pivots), not only rotate them: every limb joint sits on its
+                // pivot, so the visible elbows, wrists, knees and ankles are exactly where contacts and props are.
+                for (int side = 0; side < 2; side++)
+                {
+                    Transform elbow = rig.Actor.Forearms[side], grip = rig.Actor.Hands[side];
+                    rig.ElbowBones[side].position = elbow.position;
+                    rig.HandBones[side].position = elbow.position + (grip.position - elbow.position) * HandReach;
+                    rig.KneeBones[side].position = rig.Actor.Knees[side].position;
+                    rig.FootBones[side].position = rig.Actor.Feet[side].position;
+                }
+                for (int side = 0; side < 2; side++)
+                {
+                    // Paused: hold the pose exactly. Otherwise ease toward the target (about a tenth of a second).
+                    if (running) rig.Curl[side] = Mathf.MoveTowards(rig.Curl[side], HandTarget(rig, side, world), dt * 7);
+#if UNITY_EDITOR
+                    if (PreviewCurl >= 0) rig.Curl[side] = PreviewCurl;
+#endif
+                    float curl = rig.Curl[side];
+                    foreach (Finger f in rig.Fingers[side]) f.Bone.localRotation = f.Rest * Quaternion.AngleAxis(f.Max * (f.Thumb ? Mathf.Min(curl, .7f) : curl), f.Axis);
+                }
+#if UNITY_EDITOR
+                if (HumanContact.SoleCheck && Time.frameCount % 7 == i % 7) HumanContact.Sole(rig.Actor.Root, rig.Instance, rig.Actor.Feet, rig.SoleRest);
+                HumanContact.Sample(rig.Actor.Knees, rig.KneeBones, rig.Actor.Feet, rig.FootBones, rig.Actor.Forearms, rig.Actor.Hands, rig.HandBones, HandReach);
+#endif
             }
         }
+
+        // Generated region meshes belong to this view; imported eye/hair/FBX meshes and Resources textures do not.
+        internal void DisposeHumanModels()
+        {
+            foreach (BodyTemplate t in bodyTemplates.Values) foreach (Mesh mesh in t.Regions.Values) if (mesh != null) Destroy(mesh);
+            bodyTemplates.Clear(); hairMeshes.Clear(); humanRigs.Clear();
+        }
     }
+
+#if UNITY_EDITOR
+    // Review only: distance between the visible skeleton's knees/ankles/hands and the rig pivots that contact, prop and
+    // pose systems use, over every driven frame. Bones carry the skin, so this is the visible joint error.
+    public static class HumanContact
+    {
+        public static int Frames; public static float Knee, Ankle, Hand; static double kneeSum, ankleSum, handSum;
+        public static void Reset() { Frames = 0; Knee = Ankle = Hand = 0; kneeSum = ankleSum = handSum = 0; Soles = 0; SoleMin = 9; SoleMax = -9; soleSum = 0; soleSamples.Clear(); }
+        // Lowest visible shoe point above the person's ground, sampled when a foot pivot is planted (within 1 cm of its
+        // standing height). Measures the skinned mesh itself, not the hidden rig.
+        public static bool SoleCheck = true; public static int Soles; public static float SoleMin = 9, SoleMax = -9; static double soleSum;
+        static readonly Mesh baked = new Mesh(); static readonly List<float> soleSamples = new List<float>();
+        static float Percentile(float p) { if (soleSamples.Count == 0) return 0; var sorted = soleSamples.OrderBy(x => x).ToList(); return sorted[Mathf.Clamp(Mathf.RoundToInt(p * (sorted.Count - 1)), 0, sorted.Count - 1)]; }
+        internal static void Sole(Transform root, Transform instance, Transform[] feet, float rest)
+        {
+            // Upright standing or walking only: kneeling, sitting, lying and falls legitimately put toes below the ankle.
+            if (Vector3.Dot(instance.up, Vector3.up) < .97f) return;
+            int planted = -1;
+            for (int s = 0; s < 2; s++)
+            {
+                Vector3 local = root.InverseTransformPoint(feet[s].position);
+                if (Mathf.Abs(local.y - rest) < .01f && Vector3.Dot(feet[s].up, root.up) > .9f) planted = s;
+            }
+            if (planted < 0) return;
+            SkinnedMeshRenderer shoes = instance.GetComponentsInChildren<SkinnedMeshRenderer>().FirstOrDefault(r => r.name == "Shoes");
+            if (shoes == null) return;
+            shoes.BakeMesh(baked, true); float lowest = float.MaxValue;
+            foreach (Vector3 v in baked.vertices) lowest = Mathf.Min(lowest, shoes.transform.TransformPoint(v).y);
+            float height = lowest - root.position.y;
+            Soles++; soleSum += height; SoleMin = Mathf.Min(SoleMin, height); SoleMax = Mathf.Max(SoleMax, height);
+            if (soleSamples.Count < 50000) soleSamples.Add(height);
+        }
+        internal static void Sample(Transform[] knees, Transform[] kneeBones, Transform[] feet, Transform[] footBones, Transform[] forearms, Transform[] hands, Transform[] handBones, float reach)
+        {
+            Frames++;
+            for (int s = 0; s < 2; s++)
+            {
+                float k = Vector3.Distance(knees[s].position, kneeBones[s].position), a = Vector3.Distance(feet[s].position, footBones[s].position);
+                Vector3 wrist = forearms[s].position + (hands[s].position - forearms[s].position) * reach;
+                float h = Vector3.Distance(wrist, handBones[s].position);
+                Knee = Mathf.Max(Knee, k); Ankle = Mathf.Max(Ankle, a); Hand = Mathf.Max(Hand, h); kneeSum += k; ankleSum += a; handSum += h;
+            }
+        }
+        public static string Report { get { int n = Mathf.Max(1, Frames * 2); return "samples " + Frames + " · knee max " + (Knee * 1000).ToString("0.0") + " mm (mean " + (kneeSum / n * 1000).ToString("0.00") + ") · ankle max " + (Ankle * 1000).ToString("0.0") + " mm (mean " + (ankleSum / n * 1000).ToString("0.00") + ") · wrist max " + (Hand * 1000).ToString("0.0") + " mm (mean " + (handSum / n * 1000).ToString("0.00") + ")" + (Soles > 0 ? " · planted sole " + (SoleMin * 1000).ToString("0") + "…" + (SoleMax * 1000).ToString("0") + " mm (mean " + (soleSum / Soles * 1000).ToString("0.0") + ", 5–95% " + (Percentile(.05f) * 1000).ToString("0") + "…" + (Percentile(.95f) * 1000).ToString("0") + " mm, " + Soles + " samples)" : ""); } }
+    }
+#endif
 
     // Owns the render-time hook for FacilityView's human rigs (FacilityView keeps its own OnDestroy).
     public sealed class HumanRigDriver : MonoBehaviour
     {
         internal FacilityView View;
         void OnEnable() { RenderPipelineManager.beginContextRendering += Apply; }
-        void OnDisable() { RenderPipelineManager.beginContextRendering -= Apply; }
+        void OnDisable()
+        {
+            RenderPipelineManager.beginContextRendering -= Apply;
+#if UNITY_EDITOR
+            if (HumanContact.Frames > 0) Debug.Log("CELLBLOCK_HUMAN_CONTACT " + HumanContact.Report);
+#endif
+        }
+        void OnDestroy() { if (View != null) View.DisposeHumanModels(); }
         void Apply(ScriptableRenderContext context, List<Camera> cameras) { if (View != null) View.ApplyHumanRigs(); }
     }
 }
