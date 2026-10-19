@@ -16,17 +16,31 @@ namespace Cellblock.Unity
             actionFeedbackUntil = Time.unscaledTime + (acted ? 4f : 2.5f);
             hud.Refresh(true);
         }
-        public void ActionAttack() { if (World != null && CharacterDirect) AfterAction(World.ActAttack()); }
-        public void ActionGrab() { if (World != null && CharacterDirect) AfterAction(World.ActGrab()); }
-        public void ActionPickUp() { if (World != null && CharacterDirect) AfterAction(World.ActPickUp()); }
+        bool FieldActionsAllowed { get { return World != null && CharacterDirect && hud != null && !hud.BlocksWorldInput && !appPaused && (!unfocused || presentationPreview); } }
+        public void ActionAttack()
+        {
+            if (!FieldActionsAllowed) return;
+            if (World.InmateMode) { AfterAction(World.ActAttack()); return; }
+            PrepareStaffControls(); RefreshStaffAim(true); AfterAction(World.ActStaffInteraction(staffAimTarget, World.HeldResidentId != "" ? StaffInteraction.GroundAndCuff : StaffInteraction.Punch));
+        }
+        public void ActionGrab()
+        {
+            if (!FieldActionsAllowed) return;
+            if (World.InmateMode) { AfterAction(World.ActGrab()); return; }
+            PrepareStaffControls(); RefreshStaffAim(true);
+            StaffInteraction command = World.HoldPhase == "Cuffed" ? StaffInteraction.Escort : World.HeldResidentId != "" ? StaffInteraction.Cuff : StaffInteraction.Grab;
+            AfterAction(World.ActStaffInteraction(staffAimTarget, command));
+        }
+        public void ActionPickUp() { if (FieldActionsAllowed) AfterAction(World.ActPickUp()); }
         // Use falls back to the ordinary interaction (duty brief, phone) when no physical action fits.
         public void ActionUse()
         {
-            if (World == null || !CharacterDirect) return;
+            if (!FieldActionsAllowed) return;
+            if (!World.InmateMode) { OpenStaffInteractions(); return; }
             if (World.StaffActionHints().CanUse) { AfterAction(World.ActUse()); return; }
             InteractWithCharacter();
         }
-        public void ToggleActionRun() { ActionRunToggle = !ActionRunToggle; hud.Refresh(true); }
+        public void ToggleActionRun() { if (!FieldActionsAllowed) return; ActionRunToggle = !ActionRunToggle; hud.Refresh(true); }
 #if UNITY_EDITOR
         public bool PreviewActionPadFits { get { return hud.PreviewActionPadFits; } }
 #endif
@@ -35,16 +49,12 @@ namespace Cellblock.Unity
         bool ActionKeys()
         {
             if (World == null || !CharacterDirect) { ActionRunToggle = false; return false; }
-            World.SetActionRunning(ActionRunToggle || GamepadRunHeld || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
-            // Standing still, the officer acts on whatever the camera faces; walking, the walking direction wins.
-            Vector3 forward = cameraRig == null ? Vector3.forward : cameraRig.transform.forward;
-            Vector2 flat = new Vector2(forward.x, forward.z);
-            if (flat.sqrMagnitude > 0.0001f) World.SetActionFacing(new Point(flat.x, flat.y));
+            PrepareStaffControls();
             if (Input.GetKeyDown(KeyCode.F)) { ActionAttack(); return true; }
             if (Input.GetKeyDown(KeyCode.R)) { ToggleActionRun(); return true; }
             if (Input.GetKeyDown(KeyCode.G)) { ActionGrab(); return true; }
             if (Input.GetKeyDown(KeyCode.Q)) { ActionPickUp(); return true; }
-            if (Input.GetKeyDown(KeyCode.E) && World.StaffActionHints().CanUse) { ClearCharacterInput(); ActionUse(); return true; }
+            if (Input.GetKeyDown(KeyCode.E) && (!World.InmateMode || World.StaffActionHints().CanUse)) { ClearCharacterInput(); ActionUse(); return true; }
             return false;
         }
     }

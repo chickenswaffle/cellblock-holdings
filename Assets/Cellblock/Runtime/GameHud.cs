@@ -55,7 +55,7 @@ namespace Cellblock.Unity
         object previousSelection;
         float nextRefresh;
         public bool BlocksSimulation { get { return InteractionModalOpen || guideOpen || inmateSheetOpen || (menu != null && menu.style.display.value != DisplayStyle.None); } }
-        public bool BlocksWorldInput { get { return BlocksSimulation || CharacterPhoneOpen || constructionDeskOpen; } }
+        public bool BlocksWorldInput { get { return BlocksSimulation || CharacterPhoneOpen || constructionDeskOpen || staffInteractionOpen; } }
         public Vector2 WorldViewCenter { get; private set; } = new Vector2(0.5f, 0.5f);
         public static string Money(long cents) { return "$" + (cents / 100d).ToString("N0", CultureInfo.InvariantCulture); }
 
@@ -702,10 +702,10 @@ namespace Cellblock.Unity
             if (person) { showStaff = game.SelectedStaff != null; ShowCompactCharacter(game.SelectedCharacterId); }
             Refresh(true);
         }
-        public void NavigateBack() { if (constructionDeskOpen) { CloseConstructionDesk(); return; } if (inmateSheetOpen) { CloseInmateSheet(); return; } if (CharacterPhoneOpen) { CloseCharacterPhone(); return; } if (settingsOpen) CloseSettings(); else if (modePickerOpen) HideModePicker(); else CloseOverlays(); }
+        public void NavigateBack() { if (staffInteractionOpen) { CloseStaffInteractions(); return; } if (constructionDeskOpen) { CloseConstructionDesk(); return; } if (inmateSheetOpen) { CloseInmateSheet(); return; } if (CharacterPhoneOpen) { CloseCharacterPhone(); return; } if (settingsOpen) CloseSettings(); else if (modePickerOpen) HideModePicker(); else CloseOverlays(); }
         public void CloseOverlays()
         {
-            CloseConstructionDesk(); CloseCharacterPhone(); CloseInteractionSheets();
+            CloseStaffInteractions(); CloseConstructionDesk(); CloseCharacterPhone(); CloseInteractionSheets();
             if (guideOpen) { CloseGuide(); return; }
             if (game.World != null && menu != null) menu.style.display = DisplayStyle.None;
             cameraOpen = false; Layout();
@@ -716,7 +716,7 @@ namespace Cellblock.Unity
         {
             if (!force && Time.unscaledTime < nextRefresh) return;
             nextRefresh = Time.unscaledTime + 0.35f;
-            World world = game.World; RefreshConstructionDesk(world); if (world == null) return;
+            World world = game.World; RefreshConstructionDesk(world); RefreshStaffInteractions(world); if (world == null) return;
             if (game.Draft != null && !hadDraft) { inspectorOpen = false; cameraOpen = false; }
             hadDraft = game.Draft != null;
             object selection = (object)game.SelectedResident ?? (object)game.SelectedStaff ?? (object)game.SelectedFixture ?? (object)game.SelectedWall ?? (game.SelectedCharacterId == "" ? null : (object)game.SelectedCharacterId);

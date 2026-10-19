@@ -109,6 +109,7 @@ namespace Cellblock.Editor
                         Composite(game, "pad-target");
                         game.ActionAttack();
                         notes.Add("strike: " + w.Notice);
+                        if (w.StaffActions.Strikes != 1 || !w.ActionBeats.Any(b => b.TargetId == targetId && (b.Kind == "Strike" || b.Kind == "Swing"))) errors.Add("Quick strike did not retain the aimed target: " + w.Notice);
                         Next(0.2f); return;
                     }
                     case 4: Composite(game, "strike-contact"); SideComposite(game, "strike-side"); Next(0.18f); return;
@@ -125,6 +126,7 @@ namespace Cellblock.Editor
                     case 8: Composite(game, "cuffing"); Next(1.2f); return;
                     case 9:
                     {
+                        if (w.StaffGroundedRestraint && !w.ActStaffInteraction(targetId, StaffInteraction.Escort)) errors.Add("Stand & escort failed: " + w.Notice);
                         Vector3 look = game.ArtCamera.transform.forward; Point ahead = new Point(look.x, look.z);
                         w.SetCharacterMoveIntent(ahead * (1 / Mathf.Max(0.001f, ahead.Length))); Next(2.5f); return;
                     }

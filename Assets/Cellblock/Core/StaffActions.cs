@@ -287,7 +287,7 @@ namespace Cellblock.Core
                 staffInteractionStart = Data.Minute; StaffActions.Cuffed++;
                 LogForce(officer, held, "Cuffed", ForceJustified(held) ? "Justified" : "Restraint");
                 Beat("Cuff", officer, held);
-                Notice = held.Name + " is cuffed. Walk them to their bunk and press Use to lock them in, or Grab to release.";
+                Notice = held.Name + " is cuffed. Use Actions to search, release or confine; escort them to their bunk for confinement.";
                 return true;
             }
             Resident target = ActionTarget(officer);

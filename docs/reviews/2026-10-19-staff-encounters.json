@@ -1,0 +1,30 @@
+{
+    "passed": true,
+    "editor": "6000.3.24f1",
+    "errors": [],
+    "notes": [
+        "desktop-paused: root=(x:0.00, y:0.00, width:1600.00, height:900.00) card=(x:440.00, y:125.00, width:720.00, height:650.00) scroll=(x:457.00, y:233.00, width:686.00, height:503.00)",
+        "pat-down-side: explicit side-camera evidence, alongside the actual character-follow frame.",
+        "takedown-side: explicit side-camera evidence, alongside the actual character-follow frame.",
+        "ground cuff rendered body pitch=90.00001, officer pelvis=0.5638",
+        "ground-cuff-side: explicit side-camera evidence, alongside the actual character-follow frame.",
+        "phone-landscape: root=(x:0.00, y:0.00, width:900.00, height:420.00) card=(x:60.00, y:12.00, width:780.00, height:396.00) scroll=(x:71.00, y:114.00, width:758.00, height:265.00)",
+        "phone-portrait: root=(x:0.00, y:0.00, width:430.00, height:932.00) card=(x:32.00, y:141.00, width:366.00, height:650.00) scroll=(x:49.00, y:249.00, width:332.00, height:488.00)",
+        "standing-escort-side: explicit side-camera evidence, alongside the actual character-follow frame.",
+        "Exact target tray, paused/live commands, deferred pat and cuffed pocket searches, ground/cuff/escort and immediate handback checked in Play. Phone layouts are editor render targets, not physical-device touch/performance."
+    ],
+    "captures": [
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/encounters/20261019-083756-223-d98a8a/01-desktop-paused.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/encounters/20261019-083756-223-d98a8a/02-pat-down-first-person.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/encounters/20261019-083756-223-d98a8a/03-pat-down-side.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/encounters/20261019-083756-223-d98a8a/04-takedown-first-person.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/encounters/20261019-083756-223-d98a8a/05-takedown-side.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/encounters/20261019-083756-223-d98a8a/06-ground-cuff-first-person.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/encounters/20261019-083756-223-d98a8a/07-ground-cuff-side.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/encounters/20261019-083756-223-d98a8a/08-phone-landscape.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/encounters/20261019-083756-223-d98a8a/09-phone-portrait.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/encounters/20261019-083756-223-d98a8a/10-phone-search-progress.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/encounters/20261019-083756-223-d98a8a/11-standing-escort.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/encounters/20261019-083756-223-d98a8a/12-standing-escort-side.png"
+    ]
+}

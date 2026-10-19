@@ -623,7 +623,7 @@ namespace Cellblock.Unity
         // renderer's person pick, else the nearest wall to the ground point. Selection and the controller reticle's
         // person lock both use this, so the reticle never locks onto someone a wall or fixture in front would take.
         struct PickHit { public Wall Wall; public Fixture Fixture; public Resident Resident; public StaffMember Staff; public string Crew; }
-        PickHit PickAt(Vector2 screen, Point ground, bool fallback = true)
+        PickHit PickAt(Vector2 screen, Point ground, bool fallback = true, string ignorePerson = "")
         {
             var pick = new PickHit { Crew = "" };
             Wall wall; float nearest; Point wallPoint; FindWall(screen, out wall, out nearest, out wallPoint);
@@ -638,6 +638,7 @@ namespace Cellblock.Unity
             }
             foreach (Resident resident in World.Data.Residents)
             {
+                if (resident.Id == ignorePerson || !World.IsPresent(resident)) continue;
                 float hit; Vector3 position;
                 if (!view.TryGetPersonPosition(resident.Id, out position)) position = FacilityView.V(resident.Position, 0.14f);
                 if (HitBox(ray, position + Vector3.up * 0.88f, Quaternion.identity, new Vector3(0.58f, 1.85f, 0.58f), out hit) && hit < nearest)
@@ -645,7 +646,7 @@ namespace Cellblock.Unity
             }
             foreach (StaffMember staff in World.Data.Staff)
             {
-                if (!staff.Arrived) continue;
+                if (!staff.Arrived || staff.Id == ignorePerson) continue;
                 float hit; Vector3 position;
                 if (!view.TryGetPersonPosition(staff.Id, out position)) position = FacilityView.V(staff.Position, 0.14f);
                 if (HitBox(ray, position + Vector3.up * 0.88f, Quaternion.identity, new Vector3(0.58f, 1.85f, 0.58f), out hit) && hit < nearest)

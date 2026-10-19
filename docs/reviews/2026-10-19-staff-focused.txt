@@ -1,0 +1,59 @@
+CSSM_ModuleLoad(): One or more parameters passed to a function were not valid.
+PASS staff stations cannot overlap furniture and legacy staff migrate around it
+PASS simultaneous crew and staff hires keep headway at a closed gate
+PASS pre-personnel saves gain staff files, a hiring pool and health without changing staff
+PASS staff misconduct becomes a write-up unless a compromised supervisor buries it
+PASS rest between shifts recovers pressure; a default county company keeps its opening staff for two weeks
+PASS each facility type shapes population, charges, courts and staff distinctly
+PASS the charter can change only before operations, and replaces rather than stacks staff
+OK social contact while away at court: no relationship change.
+PASS staff misconduct leaves absent people unchanged
+PASS intake programs scale from four basic steps to the full federal program, in order and with the right staff
+PASS a step needs its staff at the station; with no nurse, medical screening is skipped after an hour and audited
+PASS corrupt staff smuggle on shift change; staff screening catches most of it
+PASS a staffed kitchen line feeds its dining room faster and its cooks count as served
+PASS investigating a staff tip finds a corrupt officer and insults an honest one
+PASS trust in staff moves unrest both ways
+PASS staff actions · old saves gain empty records; live holds and knockdowns never survive a reload
+PASS staff actions · only a staff member under direct control acts, and never while paused
+PASS staff actions · striking a calm resident is excessive force: a write-up, a grievance, lost trust and an audit finding
+PASS staff actions · force against an armed or resisting resident is justified
+PASS staff actions · grab, cuff, walk them to their bunk and lock them in: six hours, arbitrary without cause
+PASS staff actions · a takedown from the hold puts them down, and cuffing a downed resident always works
+PASS staff actions · a pat search finds held contraband and makes restraint justified; a clean search costs a little trust
+PASS staff actions · a bunk search turns over the stash of the bunk within reach
+PASS staff actions · picking up a drone drop confiscates it before anyone collects it
+PASS staff actions · running is 65% faster and spends wind; escorting someone is slower
+PASS staff actions · residents owned by an escape or an incident are not targets
+PASS staff actions · riot ownership excludes manual attacks, restraint and searches
+PASS staff actions · a wound-up resident can swing back: the officer staggers and force becomes justified
+PASS prisoner mode · hitting staff brings the strongest response: a day locked in and five days added
+PASS staff character control is runtime only and preserves ordinary saved positions
+PASS staff character control normalizes finite input without diagonal boost or overflow
+PASS staff character consumes one step per explicit minute and none while paused
+PASS staff-only character entry rejects every resident and crew alias without stealing the current session
+PASS staff character collides with straight diagonal curved barriers and can walk around finite ends
+PASS staff character uses real straight and curved arc-length door openings
+PASS staff character releases for suspension absence and assigned intake authority
+PASS staff character keeps physical response and the established radio-before-lockdown interval
+PASS staff character control retains resident needs accounting and a single physical worker step
+PASS player character work phone actions require the controlled staff member and reject prisoner or crew callers
+PASS staff and crew have explicit work equipment; dispatch never raises alarms
+PASS dog detection requires nearby handler and dog rests without staffing
+PASS staff character control yields to restraint recovery and arrest escort, then becomes available again
+PASS an old struggle cannot hold staff when a different escape attempt by the same resident is loaded
+PASS resident and staff route cursors continue across a mid-walk save
+PASS staff encounters · pinned commands never substitute a nearby person
+PASS staff encounters · empty target punches air and recovery rejects same-minute spam
+PASS staff encounters · pat-down reserves the subject and settles only at completion
+PASS staff encounters · cuffed pocket search is possible and keeps the restraint
+PASS staff encounters · ground and cuff is staged and stays grounded until escort
+PASS staff encounters · target departure cancels a search without confiscation
+PASS staff encounters · pause and control handback clear live ownership safely
+PASS staff encounters · grounded custody blocks walking and displaced release is safe
+PASS staff encounters · conversation reserves subject and handback cancels immediately
+PASS staff encounters · explicit bunk search never substitutes a nearby resident
+PASS staff encounters · ordinary staff cannot cuff and choices do not change saved state
+Filtered checks: staff
+
+54 passed, 0 failed. These checks exercise the C# core; they do not run Unity.

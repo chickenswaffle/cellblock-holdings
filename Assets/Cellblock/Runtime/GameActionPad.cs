@@ -9,7 +9,7 @@ namespace Cellblock.Unity
     // sits beside the look stick; on desktop it shows the keys. Built once; refresh changes only text, classes and state.
     public sealed partial class GameHud
     {
-        VisualElement actionPad, actionGrid, actionWindTrack, actionWindFill, actionCrosshair;
+        VisualElement actionPad, actionGrid, actionWindTrack, actionWindFill, actionCrosshair, actionBusyTrack, actionBusyFill;
         Button actionAttack, actionGrab, actionPickUp, actionUse, actionRun;
         Label actionTarget, actionFeedback;
 
@@ -23,13 +23,15 @@ namespace Cellblock.Unity
             actionFeedback = Text("", "action-feedback"); actionPad.Add(actionFeedback);
             actionTarget = Text("", "action-target"); actionPad.Add(actionTarget);
             actionWindTrack = Element("action-wind"); actionWindFill = Element("action-wind-fill"); actionWindTrack.Add(actionWindFill); actionPad.Add(actionWindTrack);
+            actionBusyTrack = Element("action-wind"); actionBusyFill = Element("action-wind-fill"); actionBusyTrack.Add(actionBusyFill); actionPad.Add(actionBusyTrack);
+            actionBusyTrack.name = "action-progress";
             actionGrid = Element("action-grid"); actionPad.Add(actionGrid);
             actionGrab = ActionButton("GRAB", "G", "action-grab", () => game.ActionGrab());
             actionPickUp = ActionButton("PICK UP", "Q", "action-pickup", () => game.ActionPickUp());
             actionAttack = ActionButton("STRIKE", "F", "action-attack", () => game.ActionAttack());
             actionUse = ActionButton("USE", "E", "action-use", () => game.ActionUse());
             actionRun = ActionButton("RUN", "SHIFT", "action-run", () => game.ToggleActionRun());
-            actionRun.AddToClassList("action-run-toggle"); actionPad.Add(actionRun);
+            actionRun.AddToClassList("action-run-toggle"); actionPad.Add(actionRun); BuildStaffInteractions();
         }
         Button ActionButton(string label, string key, string className, System.Action act)
         {
@@ -70,24 +72,29 @@ namespace Cellblock.Unity
         {
             if (actionPad == null) return;
             bool direct = game.CharacterDirect && world != null;
-            actionPad.style.display = direct && !CharacterPhoneOpen ? DisplayStyle.Flex : DisplayStyle.None;
-            actionCrosshair.style.display = direct && !CharacterPhoneOpen && !BlocksSimulation && game.CharacterEyeView ? DisplayStyle.Flex : DisplayStyle.None;
+            actionPad.style.display = direct && !CharacterPhoneOpen && !BlocksWorldInput ? DisplayStyle.Flex : DisplayStyle.None;
+            actionCrosshair.style.display = direct && !CharacterPhoneOpen && !BlocksWorldInput && game.CharacterEyeView ? DisplayStyle.Flex : DisplayStyle.None;
             if (!direct) return;
-            ActionHints h = world.StaffActionHints();
+            ActionHints h = game.StaffControlHints;
             bool inmate = world.InmateMode;
-            ActionLabel(actionAttack, h.Attack == "" ? (inmate ? "Punch" : "Strike") : h.Attack, h.CanAttack);
-            ActionLabel(actionGrab, h.Grab == "" ? (inmate ? "Shove" : "Grab") : h.Grab, h.CanGrab);
+            ActionLabel(actionAttack, !inmate && world.HeldResidentId != "" && world.HoldPhase != "Cuffed" ? "Ground & cuff" : h.Attack == "" ? (inmate ? "Punch" : "Strike") : h.Attack, h.CanAttack);
+            ActionLabel(actionGrab, !inmate && world.HoldPhase == "Cuffed" ? "Escort" : h.Grab == "" ? (inmate ? "Shove" : "Grab") : h.Grab, h.CanGrab);
             ActionLabel(actionPickUp, h.CanPickUp ? "Pick up" : "Pick up", h.CanPickUp);
-            ActionLabel(actionUse, h.Use == "" ? "Use" : h.Use, true);
+            ActionLabel(actionUse, inmate ? h.Use == "" ? "Use" : h.Use : "Actions", true);
             actionPickUp.tooltip = h.PickUp;
             actionGrab.EnableInClassList("action-holding", world.HeldResidentId != "");
             string busy = world.BusyAction, phase = world.HoldPhase;
             actionTarget.text = busy != "" ? busy.ToUpperInvariant() + "…" : phase == "Cuffed" ? "ESCORTING · " + h.TargetName.ToUpperInvariant() :
                 phase == "Holding" ? "HOLDING · " + h.TargetName.ToUpperInvariant() + (world.Resisting(world.Data.Residents.Find(r => r.Id == world.HeldResidentId)) ? " · RESISTING" : "") :
                 h.TargetName != "" ? "TARGET · " + h.TargetName.ToUpperInvariant() : h.CanPickUp ? h.PickUp.ToUpperInvariant() : "NOBODY IN REACH";
+            if (world.StaffGroundedRestraint && busy == "") actionTarget.text = "CUFFED ON GROUND · " + h.TargetName.ToUpperInvariant();
             actionTarget.EnableInClassList("action-target-live", h.TargetName != "" || busy != "");
             actionWindFill.style.width = Length.Percent(Mathf.Clamp(world.ActionWind, 0, 100));
             actionWindFill.EnableInClassList("low", world.ActionWind < 30);
+            if (!inmate && world.HeldResidentId == "" && busy == "") actionTarget.text = game.StaffTargetLabel;
+            if (!inmate && world.StaffRecoveryMinutes > 0 && busy == "") actionTarget.text = "RECOVERING · " + game.StaffTargetLabel;
+            actionBusyTrack.style.display = !inmate && world.StaffBusyMinutes > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            actionBusyFill.style.width = Length.Percent(world.StaffInteractionProgress * 100);
             string feedback = game.ActionFeedback;
             actionFeedback.text = feedback; actionFeedback.style.display = feedback == "" ? DisplayStyle.None : DisplayStyle.Flex;
             actionCrosshair.EnableInClassList("action-crosshair-live", h.TargetName != "");
@@ -105,7 +112,7 @@ namespace Cellblock.Unity
         float LayoutActionPad(float right, float bottom, bool active, bool sticks)
         {
             if (actionPad == null) return 0;
-            bool show = active && game.CharacterDirect && !CharacterPhoneOpen && !BlocksSimulation;
+            bool show = active && game.CharacterDirect && !CharacterPhoneOpen && !BlocksWorldInput;
             actionPad.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
             if (!show) return 0;
             float offset = right + 14 + (sticks ? 112 + 12 : 0);
