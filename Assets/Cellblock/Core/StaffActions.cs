@@ -37,7 +37,7 @@ namespace Cellblock.Core
     public sealed class ActionBeat
     {
         public string Kind = "", ActorId = "", TargetId = "";
-        public int Minute;
+        public int Minute, Variant;
         public bool Landed, Down, Power;
     }
 
@@ -83,7 +83,7 @@ namespace Cellblock.Core
         public Point ActionFacing { get { return actionFacing; } }
         public bool Downed(Resident r) { int until; return r != null && downUntil.TryGetValue(r.Id, out until) && until > Data.Minute; }
         public bool Resisting(Resident r) { int until; return r != null && resistUntil.TryGetValue(r.Id, out until) && until > Data.Minute; }
-        public bool HeldByStaff(Resident r) { return r != null && holdTarget == r.Id; }
+        public bool HeldByStaff(Resident r) { return r != null && (holdTarget == r.Id || (staffSearchTarget == r.Id || busyAction == "Speaking" && busyTarget == r.Id) && busyUntil > Data.Minute); }
 
         StaffMember ActingOfficer()
         {
@@ -94,7 +94,7 @@ namespace Cellblock.Core
         void TakeOverActions(string officerId)
         {
             if (holdTarget != "") ReleaseHoldTarget("");
-            liveOfficer = officerId; officerWind = 100; running = false; busyUntil = -1; officerStaggeredUntil = -1;
+            ResetStaffEncounter(); liveOfficer = officerId; officerWind = 100; running = false; busyUntil = -1; officerStaggeredUntil = -1;
         }
         bool CanAct(out StaffMember officer, out string why)
         {
@@ -118,6 +118,7 @@ namespace Cellblock.Core
         // The resident in front: nearest within reach inside the facing cone, else anyone touching close.
         Resident ActionTarget(StaffMember officer)
         {
+            if (explicitStaffTargetId != null) return ResolveStaffSubject(officer, explicitStaffTargetId, out _);
             Resident best = null; float bestScore = float.MaxValue;
             foreach (Resident r in Data.Residents)
             {
@@ -148,7 +149,7 @@ namespace Cellblock.Core
         int Experience(StaffMember officer) { PersonnelFile f = FileFor(officer); return f == null ? 0 : Math.Min(20, f.Experience); }
         void Beat(string kind, StaffMember officer, Resident target, bool landed = true, bool down = false, bool power = false)
         {
-            beats.Add(new ActionBeat { Kind = kind, ActorId = officer.Id, TargetId = target == null ? "" : target.Id, Minute = Data.Minute, Landed = landed, Down = down, Power = power });
+            beats.Add(new ActionBeat { Kind = kind, ActorId = officer.Id, TargetId = target == null ? "" : target.Id, Minute = Data.Minute, Variant = StaffActions.Strikes % 2, Landed = landed, Down = down, Power = power });
             if (beats.Count > 16) beats.RemoveAt(0);
         }
         void LogForce(StaffMember officer, Resident target, string action, string ruling)
@@ -214,6 +215,8 @@ namespace Cellblock.Core
             if (InmateActing) return InmateAttack();
             StaffMember officer; string why;
             if (!CanAct(out officer, out why)) { Notice = why; return false; }
+            if (staffAttackReadyMinute > Data.Minute) { Notice = "Recovering from the last strike."; return false; }
+            staffAttackReadyMinute = Data.Minute + 3;
             Resident held = HeldResident();
             if (held != null)
             {
@@ -279,7 +282,9 @@ namespace Cellblock.Core
                     return true;
                 }
                 holdPhase = "Cuffed"; busyAction = "Cuffing"; busyTarget = held.Id; busyUntil = Data.Minute + StaffActionRules.CuffMinutes;
-                downUntil.Remove(held.Id); StaffActions.Cuffed++;
+                staffGroundedCuffed = Downed(held);
+                if (staffGroundedCuffed) downUntil[held.Id] = int.MaxValue; else downUntil.Remove(held.Id);
+                staffInteractionStart = Data.Minute; StaffActions.Cuffed++;
                 LogForce(officer, held, "Cuffed", ForceJustified(held) ? "Justified" : "Restraint");
                 Beat("Cuff", officer, held);
                 Notice = held.Name + " is cuffed. Walk them to their bunk and press Use to lock them in, or Grab to release.";
@@ -301,6 +306,8 @@ namespace Cellblock.Core
         void ReleaseHoldTarget(string notice)
         {
             Resident held = HeldResident();
+            if (held != null && staffGroundedCuffed) downUntil.Remove(held.Id);
+            staffGroundedCuffed = false; staffGroundCuffQueued = false;
             if (held != null) { held.NextDecisionMinute = Data.Minute; held.NextPlanMinute = Data.Minute; }
             holdTarget = holdPhase = ""; escortTrail.Clear();
             if (notice != "") Notice = notice;
@@ -350,14 +357,7 @@ namespace Cellblock.Core
             if (target != null)
             {
                 if (Resisting(target)) { Notice = target.Name + " will not stand for a search. Grab and cuff them first."; return false; }
-                busyAction = "Pat search"; busyTarget = target.Id; busyUntil = Data.Minute + StaffActionRules.SearchMinutes;
-                StaffActions.Searches++;
-                int found = Search(officer, target, ItemsOf(target).Where(i => i.Place == "Held").ToList(), 0.6f);
-                target.Stress = Math.Min(100, target.Stress + (found > 0 ? 4 : 3));
-                if (found == 0 && Data.IntelWork != null) IntelWork.Trust = Math.Max(0, IntelWork.Trust - 0.5f);
-                Beat("Search", officer, target, found > 0);
-                Notice = found > 0 ? "Pat search: found " + found + " item" + (found == 1 ? "" : "s") + " on " + target.Name + ". Cuffing or confining them is justified now." : "Pat search: " + target.Name + " is clean.";
-                return true;
+                return ActStaffInteraction(target.Id, StaffInteraction.PatDown);
             }
             Resident bunk = BunkOwner(officer);
             if (bunk != null)
@@ -406,6 +406,7 @@ namespace Cellblock.Core
             // Control ended or changed hands: the hold ends and the next officer starts rested.
             if ((officer == null ? "" : officer.Id) != liveOfficer) TakeOverActions(officer == null ? "" : officer.Id);
             if (officer == null) return;
+            AdvanceStaffEncounter(officer);
             if (character.Intent.Length > 0.0001f) actionFacing = character.Intent * (1 / character.Intent.Length);
             bool moving = character.Intent.Length > 0.0001f && Data.Speed > 0;
             officerWind = running && moving ? Math.Max(0, officerWind - 2) : Math.Min(100, officerWind + (moving ? 0.6f : 1.5f));
@@ -426,6 +427,7 @@ namespace Cellblock.Core
         // Movement hook: a held resident walks with the officer; a downed one stays down. Their own plans wait.
         void StaffActionMovement(Resident resident, ref bool skip)
         {
+            if ((staffSearchTarget == resident.Id || busyAction == "Speaking" && busyTarget == resident.Id) && busyUntil > Data.Minute) { skip = true; return; }
             if (Downed(resident)) { skip = true; return; }
             if (!HeldByStaff(resident) || character == null || character.Staff == null) return;
             skip = true;
@@ -451,7 +453,7 @@ namespace Cellblock.Core
         {
             InmateSpeed(ref speed);
             if (character == null || character.Staff == null) return;
-            if (OfficerStaggered || busyUntil > Data.Minute) { speed = 0; return; }
+            if (OfficerStaggered || busyUntil > Data.Minute || StaffGroundedRestraint) { speed = 0; return; }
             if (ActionRunning && holdTarget == "") speed *= StaffActionRules.RunFactor;
             if (holdTarget != "") speed *= StaffActionRules.EscortFactor;
         }
