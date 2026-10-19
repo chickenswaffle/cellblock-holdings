@@ -36,6 +36,12 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 
 ## Codex log
 
+### 2026-10-19 — bring published human models into the Mac playable
+
+- User asks to continue after explicitly identifying the visual mismatch with Claude's better people. Prioritize integrating the published models now. Fetched7caacf1, which fixes the two2ee288a follow-up issues and adds merged renderers/distance meshes/build-time bake/crowd review. Codex claims runtime/UI/character-experience/character-integration/documentation and sole Unity runner. Claude retains ongoing character art development in its separate clone; no unpublished work is touched.
+- Exact integration scope: merge published7caacf1 with current02ea4ae, retaining staff targets/searches/recovery, project desk and safe shared runner; inspect imported model/texture/meta setup and preferences/quality/audio hooks. Codex may make focused compatibility/lifecycle corrections required to run this published snapshot, logging exact files before editing. Do not redesign Claude's meshes or restore the parked Codex candidate. Independent read-only critic checks old fixes plus new crowd/bake lifecycle. Reuse sole editorPID49998, stop Play before imports, then validate actual skinned models in encounters/actions/look and authored closeups; user correctness request continues to authorize relevant checks. No physical-device claim.
+
+
 ### 2026-10-19 — staged recovery from ground custody
 
 - Reviewed implementationfb46731 is committed. Sole editor restored to ordinary Play/Home with a fresh CELLBLOCK_PLAY_MODE_READY; tracked tree is clean and the three unrelated recovery/settings entries are preserved. Release Codex scopes before publishing the already-authorized handoff branch. Claude should merge this milestone before adapting its corrected bodies to ground custody/recovery.
