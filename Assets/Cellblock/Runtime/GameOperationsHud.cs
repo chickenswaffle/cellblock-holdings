@@ -78,6 +78,7 @@ namespace Cellblock.Unity
             staffCost = Text("", "muted"); controlPane.Add(staffCost);
             controlPane.Add(Text("Officers patrol and perform welfare checks. Caseworkers relieve stress in nearby consultations. Technicians service CCTV. Duties and staffing effects require arrival, a reachable position and an active shift.", "body"));
             controlPane.Add(Text("ARRIVALS / CREW TRANSPORT", "section-label"));
+            controlPane.Add(Action("Projects & crews", ShowConstructionDesk, "primary"));
             controlPane.Add(Action("Hire construction crew · $500", () => { game.HireConstructionCrew(); Refresh(true); }, "primary"));
             arrivalStatus = Text("", "body"); controlPane.Add(arrivalStatus);
             crewRoster = Element("crew-roster"); controlPane.Add(crewRoster);

@@ -2,6 +2,20 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
+## October 19 explicit staff encounters and field controls
+
+Core checkpoint `1c23911` passes **447/447 core checks**, including11 new encounter checks. The final presentation source fingerprint is `0a78829f1538`. Staff aim now uses the visible body span and the closest-hit selection rule, commands retain their subject ID, searches reserve their subject and settle at completion, and ground/cuff/escort remains distinct. Ending control clears pending ownership immediately. Existing misconduct, incident authority, contraband and saved accounting remain authoritative. [Controls, state flow and research](staff-encounters.md).
+
+The actual shared Unity6000.3.24f1 runner imports/typechecks and renders a12-frame encounter review at1600×900,900×420 and430×932. It submits actual menu buttons, checks Resume and blocked field input, searches including cuffed pockets, cancellation/handback, frozen pause poses, and rendered ground-cuff pitch/kneeling. Final pitch90° / officer pelvis0.5638m are asserted. Earlier upright captures were rejected and corrected; they are not passing visual evidence. Independent critic accepts current source and final trays/grounded/standing custody images. Procedural hand contact and standing recovery can still be refined with Claude's corrected models; no seamless/motion-capture claim.
+
+Final7-frame desktop/virtual-controller look and10-frame quick-strike/cuff/escort regressions accompany this review:29 final feature captures pass with empty errors. The final54-check staff regression also passes. Reports, source manifest and core transcript are in `docs/reviews`; full captures remain in ignored `Builds/StaffEncounterReview/2026-10-19/final-0a78829f1538`. These are editor checks; physical multitouch, native-player performance and device quality are unmeasured. Claude's corrected2ee288a arrived at publication. Independent follow-up accepts the previous pelvis/disposal/quality fixes, but two remaining issues prevent import: missing rig identity for incident fingers and default-on expensive Editor mesh diagnostics. See [focused follow-up](claude-human-model-followup.md).
+
+## October19 live construction project desk
+
+**Facility → Projects & crews** and the same entry in Control open a full approved-work queue with Active/Needs attention/Completed filters. One selected project shows four stage bars, precise blocker/prerequisite guidance, material spending, remaining scheduled effort and actual crew assignments. View buttons frame the site or crew; prerequisite navigation changes the selection without reordering work. Pause/resume, hiring with inline result feedback and safe World-boundary cleanup are included.
+
+Desktop uses two scrolling panes, portrait stacks them, and short landscape puts actions ahead of the detail text. Construction remains authoritative in the existing core; no scheduler/save schema/character/quality/audio changes. Independent critic reviewed source and actual authored desktop/phone/portrait views and corrections. Actual installed Unity import/typechecking and final9-frame authored UI gallery completed with empty errors; source fingerprint eef5adf847cb. No new automated tests were added or run; prior436 core checks are historical evidence for the unchanged core. Native controls, device performance, prolonged live transitions and actual parking/hiring gameplay remain unmeasured in this pass. [Player guide and implementation](construction-project-desk.md).
+
 ## October 19 construction and published asset integration
 
 Claude's published fb173ff surfaces, shadows, room lighting, audio, controller and development prisoner fixes are integrated with Codex construction6a13236. User redirected character development to Claude; Codex's unfinished uniform/finger/shoe candidate is preserved outside active Assets. Its27-character/945-motion reports are candidate evidence only, not the final integration.

@@ -42,7 +42,7 @@ namespace Cellblock.Unity
 
     // Easier looking around in direct control (Claude, 2026-10-18), for every way of playing:
     //   Mouse and keyboard: the mouse looks without holding a button (the cursor is captured while you play). Left click
-    //     strikes, right click grabs, Esc or holding Alt frees the cursor for the buttons, and a click on the world takes it back.
+    //     strikes, right click opens staff actions (shove in prisoner mode), Esc or holding Alt frees the cursor for the buttons, and a click on the world takes it back.
     //   Controller: left stick moves, right stick looks (dead zone and curve), face buttons are the action pad, LB turns
     //     you to face the nearest prisoner, R3 puts the camera behind you, RB swaps first/third person.
     //   Touch: swipes are measured in points so phones and tablets feel alike; the LOOK stick has the same curve; a
@@ -52,6 +52,7 @@ namespace Cellblock.Unity
         ControlDevice controlDevice = Application.isMobilePlatform ? ControlDevice.Touch : ControlDevice.KeyboardMouse;
         bool mouseLookWanted, mouseLookLocked, gamepadRunToggle;
         string mouseLookSession = "";
+        int mouseCaptureFrame = -1;
         float lastManualLook = -10, lastLookTap = -10, lookTapStart, recenterUntil;
         Vector2 lookTapFrom;
         string faceTargetId = "";
@@ -86,7 +87,7 @@ namespace Cellblock.Unity
             bool lockIt = MouseLookCaptured;
             if (lockIt != mouseLookLocked || lockIt && Cursor.lockState != CursorLockMode.Locked)
             {
-                mouseLookLocked = lockIt;
+                mouseLookLocked = lockIt; if (lockIt) mouseCaptureFrame = Time.frameCount;
                 Cursor.lockState = lockIt ? CursorLockMode.Locked : CursorLockMode.None; Cursor.visible = !lockIt;
             }
         }
@@ -201,9 +202,10 @@ namespace Cellblock.Unity
             if (!CharacterDirect || Application.isMobilePlatform) return false;
             if (MouseLookCaptured)
             {
+                if (Time.frameCount == mouseCaptureFrame) return true;
                 look += new Vector2(Input.GetAxisRaw("Mouse X"), -Input.GetAxisRaw("Mouse Y") * LookInvert) * (1.7f * CharacterLookSensitivity);
                 if (Input.GetMouseButtonDown(0)) { ActionAttack(); return true; }
-                if (Input.GetMouseButtonDown(1)) { ActionGrab(); return true; }
+                if (Input.GetMouseButtonDown(1)) { if (World.InmateMode) ActionGrab(); else OpenStaffInteractions(); return true; }
                 return true;
             }
             if ((Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)) && !CharacterPointOwned(cursor) && !Input.GetKey(KeyCode.LeftAlt) && !Input.GetKey(KeyCode.RightAlt))
@@ -308,12 +310,12 @@ namespace Cellblock.Unity
                 "FOLLOWING · People continue their own routines · drag to look · Esc management";
             if (world.Data.Speed == 0) return controlDevice == ControlDevice.Gamepad ? "PAUSED · Start resumes" : "PAUSED · Resume to walk or make a call";
             if (controlDevice == ControlDevice.Gamepad)
-                return GamepadPlayStation ? "L stick move · R stick look · Square strike · Circle grab · Triangle pick up · Cross use · L1 face nearest · R3 behind you · R1 view · Options pause"
-                    : "L stick move · R stick look · X strike · B grab · Y pick up · A use · LB face nearest · R3 behind you · RB view · Start pause";
+                return GamepadPlayStation ? "L stick move · R stick look · Square strike · Circle grab · Triangle pick up · Cross actions · L1 face nearest · R3 behind you · R1 view · Options pause"
+                    : "L stick move · R stick look · X strike · B grab · Y pick up · A actions · LB face nearest · R3 behind you · RB view · Start pause";
             if (controlDevice == ControlDevice.Touch)
                 return "Left stick moves · swipe right side or LOOK stick to look · double-tap to look ahead · buttons act";
-            return MouseLookCaptured ? "WASD move · mouse looks · click strike · right-click grab · E use · Q pick up · Shift run · V view · Esc frees the cursor"
-                : "WASD move · click the world to look with the mouse · E use · V view · P phone · Esc management";
+            return MouseLookCaptured ? "WASD move · mouse looks · click strike · right-click actions · E actions · Q pick up · Shift run · V view · Esc frees the cursor"
+                : "WASD move · click the world to look with the mouse · E actions · V view · P phone · Esc management";
         }
         // The same pad as staff, with a prisoner's words; Esc and Start open the menu (there is no management view).
         string InmateHelp(World world)

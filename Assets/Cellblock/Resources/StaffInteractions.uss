@@ -1,0 +1,26 @@
+.staff-interaction-overlay { position: absolute; align-items: center; justify-content: center; background-color: rgba(4,12,16,0.72); padding: 12px; }
+.staff-interaction-card { width: 96%; max-width: 720px; height: 94%; max-height: 650px; background-color: rgb(18,32,38); border-width: 1px; border-color: rgb(77,108,116); border-top-width: 3px; border-top-color: rgb(208,182,130); border-radius: 9px; padding: 16px; }
+.staff-interaction-head { flex-direction: row; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.staff-interaction-head Button { min-height: 44px; }
+.staff-interaction-heading { flex-grow: 1; flex-shrink: 1; }
+.staff-interaction-kicker { color: rgb(207,181,131); font-size: 11px; margin-bottom: 4px; }
+.staff-interaction-name { color: rgb(239,237,223); font-size: 23px; -unity-font-style: bold; white-space: normal; }
+.staff-interaction-status { color: rgb(161,203,192); font-size: 12px; white-space: normal; margin-top: 7px; margin-bottom: 7px; flex-shrink: 0; }
+.staff-interaction-track { height: 4px; background-color: rgb(34,57,62); border-radius: 2px; margin-bottom: 8px; flex-shrink: 0; }
+.staff-interaction-fill { height: 100%; background-color: rgb(77,175,147); border-radius: 2px; }
+.staff-interaction-scroll { flex-grow: 1; min-height: 0; }
+.staff-interaction-grid { flex-direction: row; flex-wrap: wrap; }
+.staff-interaction-choice { width: 48%; min-height: 76px; height: auto; margin-right: 1%; margin-left: 1%; margin-bottom: 8px; padding: 10px; align-items: stretch; background-color: rgb(30,49,56); border-color: rgb(66,92,99); -unity-text-align: middle-left; }
+.staff-choice-title { white-space: normal; color: rgb(239,233,213); font-size: 15px; -unity-font-style: bold; margin-bottom: 4px; }
+.staff-choice-detail { white-space: normal; color: rgb(168,194,194); font-size: 12px; }
+.staff-interaction-choice:disabled { opacity: 0.65; }
+.staff-interaction-feedback { white-space: normal; color: rgb(202,189,155); font-size: 12px; margin-top: 7px; flex-shrink: 0; }
+.staff-interaction-short { padding: 0; }
+.staff-interaction-short .staff-interaction-card { height: 100%; padding: 10px; max-width: 780px; }
+.staff-interaction-short .staff-interaction-name { font-size: 18px; }
+.staff-interaction-short .staff-interaction-kicker { display: none; }
+.staff-interaction-short .staff-interaction-choice { min-height: 68px; padding: 8px; }
+.staff-interaction-short .staff-interaction-feedback { font-size: 11px; margin-top: 4px; }
+.staff-interaction-narrow .staff-interaction-choice { width: 98%; min-height: 68px; }
+
+.staff-choice-force { border-left-width: 3px; border-left-color: rgb(177,112,92); }

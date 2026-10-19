@@ -132,7 +132,7 @@ namespace Cellblock.Unity
             World.ReleaseRole();
             if (role == "Prisoner" || role == "Officer" || role == "Warden" || role == "Cook") World.TakeRole(canonical);
             SelectCharacterForView(canonical); ApplyCharacterHeight(); ClearCharacterInput(); accumulator = 0;
-            Message("Playing as " + label + ". " + (controlDevice == ControlDevice.Gamepad ? "Sticks move and look · face buttons act · RB view · Select phone · D-pad ← returns." : controlDevice == ControlDevice.Touch ? "Left stick moves · swipe to look · buttons act." : "WASD moves · the mouse looks · click strikes · E uses · V view · P phone · Esc frees the cursor.") + (World.Data.Speed == 0 ? " Paused: press Space or Resume to walk." : ""));
+            Message("Playing as " + label + ". " + (controlDevice == ControlDevice.Gamepad ? "Sticks move and look · face buttons act · RB view · Select phone · D-pad ← returns." : controlDevice == ControlDevice.Touch ? "Left stick moves · swipe to look · buttons act." : "WASD moves · the mouse looks · click strikes · right click / E opens actions · V view · P phone · Esc frees the cursor.") + (World.Data.Speed == 0 ? " Paused: press Space or Resume to walk." : ""));
             hud.Refresh(true); return true;
         }
 
@@ -170,6 +170,7 @@ namespace Cellblock.Unity
 
         public void EndCharacterView(bool feedback = true)
         {
+            ResetStaffAim();
             if (!CharacterViewActive && characterSnapshot == null) return;
             ClearCharacterInput();
             if (characterViewWorld != null) characterViewWorld.EndCharacterControl();
@@ -291,6 +292,7 @@ namespace Cellblock.Unity
             if (Input.GetKeyDown(KeyCode.Space)) { World.Data.Speed = World.Data.Speed == 0 ? 1 : 0; accumulator = 0; ClearCharacterInput(); return true; }
             if (Input.GetKeyDown(KeyCode.V)) { ToggleCharacterPerspective(); return true; }
             if (Input.GetKeyDown(KeyCode.C)) { RecenterCharacterCamera(); return true; } // Claude look pass (exact exception, 2026-10-18)
+            if (CharacterDirect) PrepareStaffControls();
             if (GamepadButtons()) return true;
             if (CharacterDirect && ActionKeys()) return true; // Claude's staff actions: F, G, Q, E, Shift (exact exception, 2026-10-18)
             if (CharacterDirect && Input.GetKeyDown(KeyCode.E)) { ClearCharacterInput(); InteractWithCharacter(); return true; }

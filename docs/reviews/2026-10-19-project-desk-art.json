@@ -1,0 +1,20 @@
+{
+    "passed": true,
+    "editor": "6000.3.24f1",
+    "errors": [],
+    "notes": [
+        "Authored construction desk gallery. Inspect actual PNGs; no automated gameplay assertions.",
+        "Runtime project data and crews are staged in a disposable preview company; simulation is paused."
+    ],
+    "captures": [
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockConstructionDeskArt/20261019-024645-794d37/01-desktop-no-crew.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockConstructionDeskArt/20261019-024645-794d37/02-desktop-build-and-crew.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockConstructionDeskArt/20261019-024645-794d37/03-desktop-attention.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockConstructionDeskArt/20261019-024645-794d37/04-desktop-completed.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockConstructionDeskArt/20261019-024645-794d37/05-phone-projects.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockConstructionDeskArt/20261019-024645-794d37/06-phone-attention.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockConstructionDeskArt/20261019-024645-794d37/07-portrait-projects.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockConstructionDeskArt/20261019-024645-794d37/08-portrait-completed.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockConstructionDeskArt/20261019-024645-794d37/09-desktop-handover-prerequisite.png"
+    ]
+}

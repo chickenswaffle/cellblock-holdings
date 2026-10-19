@@ -91,19 +91,22 @@ static partial class Program
             StaffMember o; Resident t; World w = ActionWorld(out o, out t);
             w.ActGrab(); Check(w.ActAttack() && w.Downed(t) && w.StaffActions.Takedowns == 1, "Takedown: " + w.Notice);
             Check(w.StaffActions.Excessive == 1, "An unprovoked takedown was not excessive");
-            Check(w.ActGrab() && w.HoldPhase == "Cuffed" && !w.Downed(t), "Cuffing a downed resident failed: " + w.Notice);
+            Check(w.ActGrab() && w.HoldPhase == "Cuffed" && w.Downed(t) && w.StaffGroundedRestraint, "Ground restraint was lost while cuffing: " + w.Notice);
         });
         Test("staff actions · a pat search finds held contraband and makes restraint justified; a clean search costs a little trust", () => {
             StaffMember o; Resident t; World w = ActionWorld(out o, out t);
             w.Data.Upgrades.Owned.Add(new OwnedUpgrade { Id = "search-tools", Level = 2 });
             float trust = w.IntelWork.Trust;
-            Check(w.ActUse() && w.BusyAction == "Pat search" && w.StaffActions.Searches == 1 && w.StaffActions.Finds == 0, "Clean search: " + w.Notice);
+            Check(w.ActUse() && w.BusyAction == "Pat search" && w.StaffActions.Searches == 0 && w.StaffActions.Finds == 0, "Search must start without instant findings: " + w.Notice);
+            for (int i = 0; i < 3; i++) ActionMinute(w);
             Check(Math.Abs(w.IntelWork.Trust - (trust - 0.5f)) < 0.01f, "Clean search trust");
             for (int i = 0; i < 3; i++) ActionMinute(w);
             int seized = w.Contraband.Seized;
             w.Contraband.Items.Add(new ContrabandItem { Id = "pills-1", Kind = "Pills", HolderId = t.Id, Place = "Held", Position = t.Position, ArrivedMinute = w.Data.Minute });
             t.Position = o.Position + new Point(0, 0.7f);
-            Check(w.ActUse() && w.StaffActions.Finds == 1 && w.Contraband.Seized == seized + 1 && !w.Contraband.Items.Any(i => i.Id == "pills-1"), "Search with tools did not find the pills: " + w.Notice);
+            Check(w.ActUse(), w.Notice);
+            for (int i = 0; i < 3; i++) ActionMinute(w);
+            Check(w.StaffActions.Finds == 1 && w.Contraband.Seized == seized + 1 && !w.Contraband.Items.Any(i => i.Id == "pills-1"), "Search with tools did not find the pills: " + w.Notice);
             Check(WriteUps(w, t.Id, "Contraband found in a search") == 1, "No resident write-up");
             for (int i = 0; i < 3; i++) ActionMinute(w);
             t.Position = o.Position + new Point(0, 0.7f);

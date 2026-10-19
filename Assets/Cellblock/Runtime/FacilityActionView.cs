@@ -20,6 +20,8 @@ namespace Cellblock.Unity
         float actionClock;
 #if UNITY_EDITOR
         public float PreviewActionClock { get { return actionClock; } }
+        public float PreviewActionBodyPitch(string id) { Actor a = Live(id); return a == null ? 0 : Vector3.Angle(a.Model.up, a.Root.up); }
+        public float PreviewActionPelvis(string id) { Actor a = Live(id); return a == null ? 10 : a.Body.localPosition.y; }
 #endif
         void ResetActionPresentation()
         {
@@ -34,10 +36,11 @@ namespace Cellblock.Unity
             if (!ReferenceEquals(world, actionWorld)) { actionWorld = world; actionClock = 0; liveBeats.Clear(); seenBeats.Clear(); fellAt.Clear(); }
             float dt = Mathf.Min(SceneFrameDelta, .05f) * Mathf.Max(0, world.Data.Speed);
             actionClock += dt;
-            float now = actionClock, blend = 1 - Mathf.Exp(-dt * 16);
+            // A paused clock still evaluates its exact pose; it must not leave a newly observed restraint upright.
+            float now = actionClock, blend = world.Data.Speed == 0 ? 1 : 1 - Mathf.Exp(-dt * 16);
             foreach (ActionBeat beat in world.ActionBeats)
                 if (seenBeats.Add(beat)) liveBeats.Add(new LiveBeat { Beat = beat, Start = now });
-            liveBeats.RemoveAll(b => now - b.Start > BeatSeconds);
+            liveBeats.RemoveAll(b => now - b.Start > BeatSeconds || (world.Data.Minute - b.Beat.Minute) * .2f > BeatSeconds);
             if (seenBeats.Count > 64) seenBeats.IntersectWith(world.ActionBeats);
 
             Actor officer = world.CharacterKind == "Staff" ? Live(world.CharacterId) : null;
@@ -51,8 +54,17 @@ namespace Cellblock.Unity
                 Actor down = Live(r.Id);
                 if (down == null || heldThisFrame.Contains(down) && r.Id != world.HeldResidentId) continue;
                 float fell; if (!fellAt.TryGetValue(r.Id, out fell)) fellAt[r.Id] = fell = now;
+                float elapsed = now - fell;
+                // Reconcile missed/explicit game-clock steps even if a previous frame already started the fall.
+                // Both clocks remain fixed during an ordinary pause.
+                for (int i = world.ActionBeats.Count - 1; i >= 0; i--)
+                {
+                    ActionBeat beat = world.ActionBeats[i];
+                    if (beat.TargetId != r.Id || !beat.Down) continue;
+                    elapsed = Mathf.Max(elapsed, Mathf.Clamp((world.Data.Minute - beat.Minute) * .2f, 0, .35f)); break;
+                }
                 Take(down, Hold.Body); down.PoseArms = true; incidentPoseCount++;
-                float t = Mathf.Clamp01((now - fell) / 0.35f);
+                float t = Mathf.Clamp01(elapsed / .35f);
                 Lay(down, -90 * Smooth01(t), Mathf.Lerp(0.95f, 0.16f, Smooth01(t)), Vector3.zero, t < 1 ? 1 : blend);
                 for (int arm = 0; arm < 2; arm++) { Joint(down.Limbs[arm], new Vector3(-20, 0, arm == 0 ? 40 : -40), blend); Joint(down.Forearms[arm], new Vector3(-30, 0, 0), blend); }
             }
@@ -61,7 +73,7 @@ namespace Cellblock.Unity
             Resident heldResident = world.Data.Residents.FirstOrDefault(r => r.Id == world.HeldResidentId);
             Actor held = heldResident == null ? null : Live(heldResident.Id);
             string busy = world.BusyAction;
-            if (held != null && !world.Downed(heldResident))
+            if (held != null && (!world.Downed(heldResident) || busy == "Cuffing" || world.StaffGroundedRestraint))
             {
                 if (world.HoldPhase == "Holding")
                 {
@@ -83,23 +95,41 @@ namespace Cellblock.Unity
                 }
                 else if (busy == "Cuffing")
                 {
-                    Take(officer, Hold.Upper); Take(held, Hold.Upper); officer.PoseArms = held.PoseArms = true; incidentPoseCount += 2;
+                    Take(officer, world.Downed(heldResident) ? Hold.Body : Hold.Upper); Take(held, Hold.Upper); officer.PoseArms = held.PoseArms = true; incidentPoseCount += 2;
                     Turn(officer, Yaw(held.Root.position - officer.Root.position), 720);
+                    if (world.Downed(heldResident))
+                    {
+                        KneelBoth(officer, .82f, blend); Torso(officer, 24, 0, 0, blend);
+                        BehindBack(held, blend);
+                        for (int arm = 0; arm < 2; arm++) ArmPose(officer, arm, officer.Model.InverseTransformPoint(held.Hands[arm].position), blend);
+                    }
+                    else
+                    {
                     BehindBack(held, blend); Torso(held, 18, 0, 0, blend);
                     for (int arm = 0; arm < 2; arm++) ArmPose(officer, arm, officer.Model.InverseTransformPoint(held.Body.position + Vector3.up * 0.18f - held.Root.forward * 0.18f + held.Root.right * (arm == 0 ? -0.06f : 0.06f)), blend);
                     Torso(officer, 14, 0, 0, blend);
+                    }
                 }
-                else if (world.HoldPhase == "Cuffed") { Take(officer, Hold.Upper); Take(held, Hold.Upper); EscortScene(officer, held); }
+                else if (world.HoldPhase == "Cuffed")
+                {
+                    Take(officer, world.StaffGroundedRestraint ? Hold.Body : Hold.Upper); Take(held, Hold.Upper);
+                    if (world.StaffGroundedRestraint) { BehindBack(held, blend); KneelBoth(officer, .82f, blend); Torso(officer, 20, 0, 0, blend); }
+                    else EscortScene(officer, held);
+                }
             }
-            Resident searched = busy == "Pat search" ? world.Data.Residents.FirstOrDefault(r => r.Id == world.BusyTarget) : null;
+            Resident searched = (busy == "Pat search" || busy == "Pocket search") ? world.Data.Residents.FirstOrDefault(r => r.Id == world.BusyTarget) : null;
             Actor subject = searched == null ? null : Live(searched.Id);
             if (subject != null)
             {
                 // Hands on the wall: the subject faces away with arms out; the officer pats from shoulders to waist.
-                Take(officer, Hold.Upper); Take(subject, Hold.Upper); officer.PoseArms = subject.PoseArms = true; incidentPoseCount += 2;
+                Take(officer, world.Downed(searched) ? Hold.Body : Hold.Upper); Take(subject, Hold.Upper); officer.PoseArms = subject.PoseArms = true; incidentPoseCount += 2;
                 Turn(officer, Yaw(subject.Root.position - officer.Root.position), 720); Turn(subject, Yaw(subject.Root.position - officer.Root.position), 360);
-                for (int arm = 0; arm < 2; arm++) { Joint(subject.Limbs[arm], new Vector3(-95, 0, arm == 0 ? 25 : -25), blend); Joint(subject.Forearms[arm], new Vector3(-10, 0, 0), blend); }
-                float pat = 1.25f - Mathf.PingPong(now * 1.6f, 0.55f);
+                bool grounded = world.Downed(searched), cuffed = world.HeldResidentId == searched.Id && world.HoldPhase == "Cuffed";
+                if (grounded) KneelBoth(officer, .8f, blend);
+                if (!cuffed && !grounded)
+                    for (int arm = 0; arm < 2; arm++) { Joint(subject.Limbs[arm], new Vector3(-95, 0, arm == 0 ? 25 : -25), blend); Joint(subject.Forearms[arm], new Vector3(-10, 0, 0), blend); }
+                else BehindBack(subject, blend);
+                float pat = busy == "Pocket search" ? .99f + Mathf.Sin(now * 4) * .08f : 1.25f - Mathf.PingPong(now * 1.6f, 0.55f);
                 for (int arm = 0; arm < 2; arm++) ArmPose(officer, arm, officer.Model.InverseTransformPoint(subject.Body.position + Vector3.up * (pat - 0.8f) + subject.Root.right * (arm == 0 ? -0.2f : 0.2f)), blend);
                 Torso(officer, 16, 0, 0, blend);
             }
@@ -120,7 +150,7 @@ namespace Cellblock.Unity
         {
             ActionBeat beat = live.Beat;
             if (officer == null) return;
-            float t = Mathf.Clamp01((now - live.Start) / StrikeSeconds);
+            float t = Mathf.Clamp01(Mathf.Max(now - live.Start, (world.Data.Minute - beat.Minute) * .2f) / StrikeSeconds);
             Actor target = Live(beat.TargetId);
             switch (beat.Kind)
             {
@@ -137,7 +167,6 @@ namespace Cellblock.Unity
                 }
                 case "Strike":
                 case "Swing":
-                case "Takedown":
                 {
                     if (heldThisFrame.Contains(officer) && beat.Kind != "Takedown") { /* the hold owns the body; the punch still reads on the arm */ }
                     Take(officer, Hold.Upper); officer.PoseArms = true; incidentPoseCount++;
@@ -145,11 +174,12 @@ namespace Cellblock.Unity
                     // A quick wind-up, a fast extension, a held moment at full reach (contact), then the recovery.
                     float wind = Window(t, 0, 0.18f), extend = Window(t, 0.18f, 0.32f), back = Window(t, 0.62f, 1f);
                     Vector3 aim = target != null ? target.Head != null ? target.Head.position : target.Body.position + Vector3.up * 0.5f : officer.Body.position + officer.Root.forward * 0.8f + Vector3.up * 0.5f;
-                    Vector3 guard = new Vector3(0.18f, 1.32f, 0.12f), reach = officer.Model.InverseTransformPoint(aim);
-                    Vector3 fist = Vector3.Lerp(Vector3.Lerp(new Vector3(0.22f, 1.25f, -0.05f), guard, wind), reach, extend * (1 - back));
-                    ArmPose(officer, 1, fist, 1);
-                    ArmPose(officer, 0, new Vector3(-0.16f, 1.34f, 0.16f), blend);
-                    float twist = Mathf.Lerp(-18 * wind, 24, extend) * (1 - back);
+                    int strikeArm = beat.Variant % 2; float side = strikeArm == 0 ? -1 : 1;
+                    Vector3 guard = new Vector3(side * .18f, 1.32f, .12f), reach = officer.Model.InverseTransformPoint(aim);
+                    Vector3 fist = Vector3.Lerp(Vector3.Lerp(new Vector3(side * .22f, 1.25f, -.05f), guard, wind), reach, extend * (1 - back));
+                    ArmPose(officer, strikeArm, fist, 1);
+                    ArmPose(officer, 1 - strikeArm, new Vector3(-side * .16f, 1.34f, .16f), blend);
+                    float twist = Mathf.Lerp(-18 * wind, 24, extend) * (1 - back) * side;
                     Torso(officer, beat.Power ? 24 * extend * (1 - back) : 6 + 6 * extend, twist, 0, 1);
                     if (beat.Power) Offset(officer, Vector3.zero, new Vector3(0, 0, 0.35f * extend * (1 - back)), Quaternion.identity, 1);
                     if (!live.Hit && t >= 0.32f && beat.Landed && target != null)
@@ -167,6 +197,20 @@ namespace Cellblock.Unity
                         Torso(target, -16 * recoil, 14 * recoil, 0, 1);
                         if (target.Head != null) Joint(target.Head, new Vector3(-22 * recoil, 18 * recoil, 0), 1);
                     }
+                    break;
+                }
+                case "Takedown":
+                {
+                    if (target == null) break;
+                    Take(officer, Hold.Body); officer.PoseArms = true; incidentPoseCount++;
+                    Turn(officer, Yaw(target.Root.position - officer.Root.position), 720);
+                    float lower = Smooth01(Mathf.Clamp01(t / .65f));
+                    Stance(officer, Mathf.Lerp(.88f, .60f, lower), .18f, -.12f, blend);
+                    Torso(officer, 14 + lower * 20, lower * 12, 0, blend);
+                    for (int arm = 0; arm < 2; arm++)
+                        ArmPose(officer, arm, officer.Model.InverseTransformPoint(target.Body.position + target.Root.right * (arm == 0 ? -.17f : .17f) + Vector3.up * .18f), blend);
+                    if (!live.Hit && t >= .55f)
+                    { live.Hit = true; Impact(target.Body.position, .45f, false, .1f); }
                     break;
                 }
                 case "Counter":
@@ -213,7 +257,7 @@ namespace Cellblock.Unity
         // An amber ring on the ground under the person the pad would act on (or under the prisoner while holding).
         void RefreshActionRing(World world, Actor officer)
         {
-            string id = officer == null ? "" : world.HeldResidentId != "" ? world.HeldResidentId : world.StaffActionHints().TargetId;
+            string id = officer == null ? "" : world.HeldResidentId != "" ? world.HeldResidentId : world.InmateMode ? world.StaffActionHints().TargetId : world.StaffHintsFor(world.StaffFocusTargetId).TargetId;
             Actor target = Live(id);
             if (target == null) { if (actionRing != null) actionRing.gameObject.SetActive(false); return; }
             if (actionRing == null)

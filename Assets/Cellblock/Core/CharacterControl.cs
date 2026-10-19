@@ -134,6 +134,7 @@ namespace Cellblock.Core
         {
             if (character == null) return;
             CharacterSession old = character;
+            if (old.Staff != null) EndStaffManualSession();
             character = null;
             InvalidateCharacterRoute(old);
             if (old.Resident != null && Data.Residents.Contains(old.Resident))
