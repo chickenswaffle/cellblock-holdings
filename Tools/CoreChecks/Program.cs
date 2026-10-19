@@ -528,6 +528,7 @@ static partial class Program
             Check(resumed.Data.Crews[0].WorkPhase == "Carrying" && resumed.Data.Crews[0].SupplyLoadMinutes == 3, "Loading discarded a delivered supply batch after handover");
         });
         RunJusticeChecks(); RunIntegrationChecks(); RunLivesChecks(); RunRoutineChecks(); RunCharacterControlChecks(); RunCharacterPhoneChecks(); RunCharacterInteractionChecks(); RunSecurityChecks(); RunFacilityStoryChecks(); RunIncidentChecks(); RunEscapeChecks(); RunModeStartChecks();RunDirectDoorChecks();RunMealFlowChecks();RunMovementMemoryChecks();
+        RunRearrangementChecks();
         if (selectedChecks != "") Console.WriteLine("Filtered checks: " + selectedChecks);
         Console.WriteLine("\n" + passed + " passed, " + failed + " failed. These checks exercise the C# core; they do not run Unity.");
         Environment.ExitCode = failed == 0 ? 0 : 1;

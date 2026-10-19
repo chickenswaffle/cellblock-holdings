@@ -17,7 +17,7 @@ New installation, upgrades, structural changes and demolition still use approved
 
 ## Texture and sound continuation for Claude
 
-Claude owns the active texture/audio work in its clone. This pass changes no texture assets, material pipeline, sound assets or alarm audio.
+Claude's published texture/audio snapshot fb173ff is integrated. Codex corrects generated-resource ownership, linear normal-map import and generated Forward+/shadow setup. Source recordings and texture images are preserved. Work sounds now follow visible tool contact cycles; world changes clear queued old sounds, rolling action beats remain audible and pause/stand-down stops drilling. Claude owns current character visual development.
 
 Priorities from the inspected implementation:
 
@@ -29,4 +29,4 @@ Priorities from the inspected implementation:
 
 ## Evidence boundaries
 
-Independent source critic reviewed relocation invariants, removal migration/logistics, paused posing and contact reach. The user did not request automated tests for this pass; no test suite or new automated gameplay checks were added. Installed-editor compilation and staged art inspection are recorded in COORDINATION.md when complete. The construction contact sheet deliberately stages poses; it does not establish natural project completion, save roundtrips, controller feel or native-device performance.
+Independent source critic reviewed relocation invariants, removal migration/logistics, paused posing and contact reach. Following the user's later request to verify correctness, five focused core checks were added; all436 combined checks pass, including relocation identity/assignments/save roundtrip, pending reservations, atomic rejection and long-demolition reload. Installed-editor compilation and final staged art/audio evidence are recorded separately. The construction contact sheet deliberately stages poses; it does not establish natural project completion, save roundtrips, controller feel or native-device performance.

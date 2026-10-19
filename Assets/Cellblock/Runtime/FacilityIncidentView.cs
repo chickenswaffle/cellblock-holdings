@@ -69,6 +69,8 @@ namespace Cellblock.Unity
             if (world.Data.Speed > 0 && radioKey != heardRadio && (world.IncidentReport.Phase == "Radioing control" || world.IncidentReport.Phase == "Broadcast"))
             {
                 heardRadio = radioKey;
+                // A recorded radio burst from the soundscape when available (Claude); the synthesized click otherwise.
+                if (FacilitySoundscape.TryPlay2D("radio", .4f)) return;
                 if (incidentAudio == null)
                 {
                     incidentAudio = gameObject.AddComponent<AudioSource>(); incidentAudio.playOnAwake = false; incidentAudio.volume = .14f; incidentAudio.spatialBlend = 0;

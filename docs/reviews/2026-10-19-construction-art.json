@@ -1,0 +1,75 @@
+{
+  "editor": "6000.3.24f1",
+  "kind": "authored-renderer-contact-sheet",
+  "frameCount": 12,
+  "runtimeFingerprint": "fe1814154f2f",
+  "reviewedBy": "Codex root; earlier independent critic reviewed construction source and prior art, not this asset integration",
+  "inspected": [
+    "Hammer-1",
+    "Drill-2",
+    "Demolish-1",
+    "Demolish-2",
+    "Saw-2"
+  ],
+  "observations": [
+    "Distinct hammer, drill, saw and pry tools/poses retained.",
+    "Saw station timber, helper clipboard and demolition scoring/debris visible.",
+    "Demolition wall remains authoritative before handover.",
+    "Side camera angle is needed to see contact behind a full-height wall."
+  ],
+  "limits": [
+    "Authored poses do not prove naturally completed projects or sound synchronization by ear.",
+    "No new critic review of this final integration; critic follow-up unavailable due usage limit.",
+    "No native-device performance or controls verification."
+  ],
+  "captures": [
+    {
+      "name": "Demolish-0.png",
+      "sha256": "ebae3eb75bcc0d829e298352b0b655c0573872f6c45c5c06fe9588a270e3db6b"
+    },
+    {
+      "name": "Demolish-1.png",
+      "sha256": "2856f0e4a85640a0e0a04f4adecb4090890b52b68ab60a27459b5e4a552e2f18"
+    },
+    {
+      "name": "Demolish-2.png",
+      "sha256": "20a1bf1d9d360198798403d02ef5eeef5fb5d745b8d83629a71e13efd392bee2"
+    },
+    {
+      "name": "Drill-0.png",
+      "sha256": "6c8ef33b8bceffb9d8bef53e4e378a0b5431e37afe935cff42b64cb06966e43c"
+    },
+    {
+      "name": "Drill-1.png",
+      "sha256": "b415f599e5bd8141509620ab9313a6bbdf283249fd66870dc80f6b7dd492be70"
+    },
+    {
+      "name": "Drill-2.png",
+      "sha256": "4210b53149728cc1ca5ded7b4d46a7552c38acdceedb48bffddb9f85ef8cdd80"
+    },
+    {
+      "name": "Hammer-0.png",
+      "sha256": "1ec968d3b8dfeef5a8b75bb6d6c0f55f62615bc6517c4cc3e60912b26d16fb67"
+    },
+    {
+      "name": "Hammer-1.png",
+      "sha256": "bf4fc338c23ce9f4f5f7f998bff9b9a69ef3e48a6db94af03261c94019d387b9"
+    },
+    {
+      "name": "Hammer-2.png",
+      "sha256": "94af228307c20b09eeff3f6d42f7a71df272696a79acd09bb7a954b7132728b9"
+    },
+    {
+      "name": "Saw-0.png",
+      "sha256": "fc067cf44c187297634f6ad831fce0646cadc659672e519081a6189d511edb9d"
+    },
+    {
+      "name": "Saw-1.png",
+      "sha256": "8a90743d27af030c5221b3ec15c6e2a9b27b8540f0ad544c61e9004b57a9aa7f"
+    },
+    {
+      "name": "Saw-2.png",
+      "sha256": "f5ee5fa245192adf88f0fbdbdaabec198009ae362a056a6ae9fa1deb7f568b24"
+    }
+  ]
+}

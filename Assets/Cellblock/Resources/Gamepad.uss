@@ -1,0 +1,8 @@
+/* Controller highlight and management reticle (Claude, GameGamepad.cs). Positioned from code; never takes input. */
+.pad-focus { position: absolute; border-width: 3px; border-radius: 9px; border-color: rgb(244, 196, 92); background-color: rgba(244, 196, 92, 0.10); }
+.pad-reticle { position: absolute; width: 0; height: 0; overflow: visible; align-items: center; }
+.pad-reticle-mark { position: absolute; left: -17px; top: -17px; width: 34px; height: 34px; border-radius: 17px; border-width: 2px; border-color: rgba(242, 234, 215, 0.85); align-items: center; justify-content: center; }
+.pad-reticle-mark.locked { left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 22px; border-width: 3px; border-color: rgb(244, 196, 92); }
+.pad-reticle-dot { width: 4px; height: 4px; border-radius: 2px; background-color: rgb(242, 234, 215); }
+.pad-caption-band { position: absolute; top: 30px; left: -340px; width: 680px; flex-direction: row; justify-content: center; }
+.pad-caption { font-size: 13px; color: rgb(242, 234, 215); white-space: nowrap; padding: 4px 10px; border-radius: 6px; background-color: rgba(12, 19, 23, 0.8); }

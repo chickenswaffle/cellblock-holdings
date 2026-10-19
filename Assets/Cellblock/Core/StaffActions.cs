@@ -77,8 +77,8 @@ namespace Cellblock.Core
         public string HoldPhase { get { return holdPhase; } }
         public string BusyAction { get { return busyUntil > Data.Minute ? busyAction : ""; } }
         public string BusyTarget { get { return busyUntil > Data.Minute ? busyTarget : ""; } }
-        public float ActionWind { get { return officerWind; } }
-        public bool ActionRunning { get { return running && officerWind > 0; } }
+        public float ActionWind { get { return InmateActing ? inmateWind : officerWind; } }
+        public bool ActionRunning { get { return running && ActionWind > 0; } }
         public bool OfficerStaggered { get { return officerStaggeredUntil > Data.Minute; } }
         public Point ActionFacing { get { return actionFacing; } }
         public bool Downed(Resident r) { int until; return r != null && downUntil.TryGetValue(r.Id, out until) && until > Data.Minute; }
@@ -179,6 +179,7 @@ namespace Cellblock.Core
         // ---- the buttons ------------------------------------------------------------------------------
         public ActionHints StaffActionHints()
         {
+            if (InmateActing) return InmateHints(); // prisoner mode: the same pad, a prisoner's actions
             var h = new ActionHints();
             StaffMember officer = ActingOfficer();
             if (officer == null) return h;
@@ -210,6 +211,7 @@ namespace Cellblock.Core
 
         public bool ActAttack()
         {
+            if (InmateActing) return InmateAttack();
             StaffMember officer; string why;
             if (!CanAct(out officer, out why)) { Notice = why; return false; }
             Resident held = HeldResident();
@@ -261,6 +263,7 @@ namespace Cellblock.Core
 
         public bool ActGrab()
         {
+            if (InmateActing) return InmateShove();
             StaffMember officer; string why;
             if (!CanAct(out officer, out why)) { Notice = why; return false; }
             Resident held = HeldResident();
@@ -305,6 +308,7 @@ namespace Cellblock.Core
 
         public bool ActPickUp()
         {
+            if (InmateActing) return InmatePickUp();
             StaffMember officer; string why;
             if (!CanAct(out officer, out why)) { Notice = why; return false; }
             ContrabandItem item = LooseItem(officer);
@@ -319,6 +323,7 @@ namespace Cellblock.Core
 
         public bool ActUse()
         {
+            if (InmateActing) return InmateUse();
             StaffMember officer; string why;
             if (!CanAct(out officer, out why)) { Notice = why; return false; }
             Resident held = HeldResident();
@@ -396,6 +401,7 @@ namespace Cellblock.Core
         // ---- the minute -------------------------------------------------------------------------------
         void AdvanceStaffActions()
         {
+            AdvanceInmate();
             StaffMember officer = character == null ? null : character.Staff;
             // Control ended or changed hands: the hold ends and the next officer starts rested.
             if ((officer == null ? "" : officer.Id) != liveOfficer) TakeOverActions(officer == null ? "" : officer.Id);
@@ -443,6 +449,7 @@ namespace Cellblock.Core
         // Speed hook for the controlled staff member: running, escorting and staggering.
         void StaffActionSpeed(ref float speed)
         {
+            InmateSpeed(ref speed);
             if (character == null || character.Staff == null) return;
             if (OfficerStaggered || busyUntil > Data.Minute) { speed = 0; return; }
             if (ActionRunning && holdTarget == "") speed *= StaffActionRules.RunFactor;

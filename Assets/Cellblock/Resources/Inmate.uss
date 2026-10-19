@@ -1,0 +1,39 @@
+/* Prisoner mode (Claude, GameInmate.cs): the status card under the character bar, and the pause / journal sheet. */
+.inmate-mode .character-control-exit { display: none; }
+.inmate-card { position: absolute; width: 300px; padding: 10px 12px; border-radius: 10px; background-color: rgba(17, 24, 28, 0.92); border-width: 1px; border-color: rgb(96, 84, 64); border-left-width: 3px; border-left-color: rgb(214, 132, 60); }
+.inmate-head { flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.inmate-name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -unity-font-style: bold; color: rgb(242, 234, 215); }
+.inmate-day { font-size: 11px; margin-top: 1px; color: rgb(226, 203, 166); -unity-font-style: bold; }
+.inmate-meter { flex-direction: row; align-items: center; margin-bottom: 4px; }
+.inmate-meter-label { width: 64px; font-size: 10px; color: rgb(170, 180, 176); }
+.inmate-meter-track { flex-grow: 1; height: 7px; border-radius: 4px; background-color: rgba(255, 255, 255, 0.10); overflow: hidden; }
+.inmate-meter-fill { height: 100%; border-radius: 4px; background-color: rgb(120, 190, 140); }
+.inmate-respect .inmate-meter-fill { background-color: rgb(226, 190, 110); }
+.inmate-heat .inmate-meter-fill { background-color: rgb(224, 96, 72); }
+.inmate-schedule { font-size: 12px; color: rgb(220, 226, 220); white-space: normal; margin-top: 4px; }
+.inmate-alert { font-size: 12px; color: rgb(244, 196, 92); white-space: normal; margin-top: 5px; -unity-font-style: bold; }
+.inmate-alert-danger { color: rgb(255, 120, 96); }
+.inmate-who { flex-grow: 1; flex-shrink: 1; margin-right: 8px; }
+.inmate-button { min-height: 44px; min-width: 76px; margin: 0; font-size: 13px; }
+.inmate-wait { margin-top: 6px; align-self: flex-end; min-width: 150px; }
+.inmate-sheet { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background-color: rgba(8, 12, 14, 0.82); align-items: center; justify-content: center; }
+.inmate-sheet-card { width: 620px; max-width: 94%; max-height: 92%; padding: 24px; border-radius: 10px; background-color: rgb(24, 33, 38); border-width: 1px; border-color: rgb(96, 84, 64); border-top-width: 3px; border-top-color: rgb(214, 132, 60); }
+.inmate-sheet-title { font-size: 30px; -unity-font-style: bold; color: rgb(242, 234, 215); }
+.inmate-sheet-text { font-size: 15px; color: rgb(226, 203, 166); white-space: normal; margin: 4px 0 10px 0; }
+.inmate-sheet-stats { font-size: 13px; color: rgb(205, 212, 206); white-space: normal; margin-bottom: 12px; }
+.inmate-sheet-label { font-size: 11px; color: rgb(170, 180, 176); margin-bottom: 4px; }
+.inmate-journal { flex-shrink: 1; max-height: 230px; margin-bottom: 14px; }
+.inmate-journal-line { font-size: 13px; color: rgb(220, 226, 220); white-space: normal; margin-bottom: 4px; }
+.inmate-sheet-actions { flex-direction: row; }
+.inmate-sheet-actions Button { min-height: 46px; min-width: 160px; margin-right: 10px; }
+.mode-do-time { flex-direction: row; flex-wrap: wrap; align-items: center; margin-top: 10px; padding-top: 10px; border-top-width: 1px; border-top-color: rgba(255, 255, 255, 0.12); }
+.mode-do-time-label { font-size: 11px; color: rgb(226, 203, 166); margin-right: 10px; -unity-font-style: bold; }
+.mode-do-time Button { min-height: 44px; min-width: 90px; margin-right: 6px; }
+.compact .inmate-card { width: 250px; padding: 6px 10px; }
+.compact .inmate-head { margin-bottom: 3px; }
+.compact .inmate-meters { flex-direction: row; }
+.compact .inmate-meter { flex-grow: 1; flex-basis: 0; margin: 0 4px 2px 0; }
+.compact .inmate-meter-label { width: auto; margin-right: 4px; font-size: 9px; }
+.compact .inmate-schedule { font-size: 11px; margin-top: 2px; }
+.compact .inmate-alert { font-size: 11px; margin-top: 2px; }
+.compact .inmate-sheet-card { padding: 16px; }

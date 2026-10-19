@@ -45,7 +45,7 @@ namespace Cellblock.Editor
 
         public static void Run()
         {
-            ProjectSetup.Validate();
+            ProjectSetup.Validate(); SurfaceLibrary.Ensure(); LightingSetup.Ensure();
             EditorSceneManager.OpenScene("Assets/Cellblock/Scenes/Main.unity");
             Directory.CreateDirectory(Output);
             SessionState.SetBool(ActiveKey, true); SessionState.SetInt(StageKey, 0);

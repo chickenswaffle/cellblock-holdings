@@ -126,6 +126,7 @@ namespace Cellblock.Editor
                 SerializedProperty handling = settings.FindProperty("activeInputHandler");
                 if (handling != null && handling.intValue != 2) { handling.intValue = 2; settings.ApplyModifiedPropertiesWithoutUndo(); }
             }
+            LightingSetup.Ensure(); SurfaceLibrary.Ensure();
             AssetDatabase.SaveAssets();
             Debug.Log("Cellblock project prepared. Open Assets/Cellblock/Scenes/Main.unity and press Play.");
         }

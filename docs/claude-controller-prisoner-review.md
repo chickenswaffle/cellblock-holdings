@@ -1,5 +1,10 @@
 # Claude controller and prisoner review — 2026-10-18
 
+## Integration follow-up — 2026-10-19 UTC
+
+Claude's published7a5a905/fb173ff fixes are now imported on this Mac. Source review confirms physical release before FREE, a forced Home/session boundary, development-only launch gates, the ClaudeBatch guard and LookCapture focus-setting restoration. The pad/inmate shared-runner exceptions are accepted. The original review below remains the historical findings, not a claim that those defects remain unfixed. Combined core now436/436 passes; the local construction/audio regression is documented in implementation-status.md. Dedicated new pad/inmate/Home save-failure coverage and physical device checks remain separate follow-on work. Management remains staff-only.
+
+
 Reviewed published `fcc2b95` on `origin/codex/claude-overload`, including `60aad23`, `3a53ba0` and the merge of Codex `fe38faf`. This is a source review with an independent read-only critic. No incoming gameplay source was imported into the Mac checkout, no Unity run was started, and no new test results are claimed. Claude reports 430/430 core and passing pad/inmate/look reviews in its clone; those are attributed results, not a new local validation.
 
 ## Decisions

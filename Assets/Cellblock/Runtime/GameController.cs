@@ -88,6 +88,7 @@ namespace Cellblock.Unity
             sanitationView = new GameObject("Sanitation presentation").AddComponent<FacilitySanitationView>(); sanitationView.transform.SetParent(transform); sanitationView.Initialize();
             guides = new GameObject("Construction measurements").AddComponent<ConstructionGuides>(); guides.transform.SetParent(transform); guides.Initialize(cameraRig);
             hud = new GameObject("Management interface").AddComponent<GameHud>(); hud.transform.SetParent(transform); hud.Initialize(this); ApplyPreferences();
+            FacilitySoundscape.Create(this, cameraRig);
             view.Refresh(Cellblock.Core.World.Start(Cellblock.Core.World.Offers[0].Id), true);
             SetTool(BuildTool.Inspect); CameraPosition(true); hud.ShowMenu();
         }
@@ -172,9 +173,9 @@ namespace Cellblock.Unity
             bool blocked = World == null || hud == null || hud.BlocksWorldInput || appPaused || unfocused;
             if (blocked || nativeInputWasBlocked) magnification = 0;
             nativeInputWasBlocked = blocked;
-            UpdateControlDevice();
+            UpdateControlDevice(); GamepadInterfaceUpdate();
             if (World == null) return;
-            UpdateCharacterSession();
+            UpdateCharacterSession(); InmateUpdate();
             if (!appPaused && (!unfocused || presentationPreview) && !hud.BlocksSimulation && World.Data.Speed > 0)
             {
                 accumulator += Mathf.Min(SimulationFrameDelta, 0.1f) * World.Data.Speed;
@@ -186,10 +187,10 @@ namespace Cellblock.Unity
 #if UNITY_EDITOR
             view.PreviewFixedFrameDelta = presentationPreview && Time.captureDeltaTime > 0 ? Time.captureDeltaTime : 0;
 #endif
-            if (!CharacterInputUpdate(magnification)) InputUpdate(magnification); view.ReducedMotion = Preferences.ReducedMotion; view.Refresh(World); view.RefreshCharacterPhones(World, hud.CharacterPhoneOpen ? CharacterPhoneSubjectId : ""); view.SetWatchedCamera(WatchedCamera); pressureView.Refresh(World, Time.unscaledDeltaTime); sanitationView.Refresh(World, Time.unscaledDeltaTime); UpdateRideAlong(); if (!CharacterViewActive) UpdateIncidentCamera(); hud.Refresh();
+            if (!InmateInput() && !CharacterInputUpdate(magnification) && !InmateMode) InputUpdate(magnification); view.ReducedMotion = Preferences.ReducedMotion; view.Refresh(World); view.RefreshCharacterPhones(World, hud.CharacterPhoneOpen ? CharacterPhoneSubjectId : ""); view.SetWatchedCamera(WatchedCamera); pressureView.Refresh(World, Time.unscaledDeltaTime); sanitationView.Refresh(World, Time.unscaledDeltaTime); UpdateRideAlong(); if (!CharacterViewActive) UpdateIncidentCamera(); hud.Refresh();
             TickAutosave();
         }
-        void LateUpdate() { if (cameraRig != null) { if (CharacterViewActive) CharacterCamera(); else if (RideAlongActive) RideAlongCamera(); else CameraPosition(); } RefreshCameraFeed(); RefreshBodyCam(); }
+        void LateUpdate() { if (cameraRig != null) { if (CharacterViewActive) CharacterCamera(); else if (RideAlongActive) RideAlongCamera(); else CameraPosition(); } RefreshCameraFeed(); RefreshBodyCam(); PresentationShadows.Fit(displayedDistance > 0 ? displayedDistance : distance, CharacterViewActive); }
         void CameraPosition(bool immediate = false)
         {
             // Following an incident, the camera eases more gently so a chase does not jerk it around.
@@ -272,7 +273,7 @@ namespace Cellblock.Unity
             var request = new UnityEngine.Rendering.Universal.UniversalRenderPipeline.SingleCameraRequest { destination = cctvTexture };
             UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(cctvCamera, request);
         }
-        void OnDestroy() { EndCharacterView(false); DisposeDoorPreview();if (cctvTexture != null) { cctvTexture.Release(); Destroy(cctvTexture); } ReleaseBodyCam(); }
+        void OnDestroy() { PresentationShadows.Restore(); EndCharacterView(false); DisposeDoorPreview();if (cctvTexture != null) { cctvTexture.Release(); Destroy(cctvTexture); } ReleaseBodyCam(); }
         public void Orbit(float horizontalDegrees, float verticalDegrees)
         { yaw += horizontalDegrees; pitch = Mathf.Clamp(pitch + verticalDegrees, 28, 78); }
         public void Zoom(float amount) { distance = Mathf.Clamp(distance * Mathf.Exp(-amount * 0.12f), 11, 85); }
@@ -333,6 +334,7 @@ namespace Cellblock.Unity
                 if (Input.GetKeyDown(KeyCode.Escape)) hud.NavigateBack();
                 return;
             }
+            if (GamepadManagement()) return;
             if (Input.touchCount > 0)
             {
                 if (Input.touchCount >= 2)
@@ -617,24 +619,29 @@ namespace Cellblock.Unity
                     { selected = wall; distance = hit; Vector3 position = ray.GetPoint(hit); point = new Point(position.x, position.z); }
                 }
         }
-        void SelectComponent(Vector2 screen, Point ground)
+        // What a tap at this screen point lands on: the closest hit among walls, furnishings and people, else the
+        // renderer's person pick, else the nearest wall to the ground point. Selection and the controller reticle's
+        // person lock both use this, so the reticle never locks onto someone a wall or fixture in front would take.
+        struct PickHit { public Wall Wall; public Fixture Fixture; public Resident Resident; public StaffMember Staff; public string Crew; }
+        PickHit PickAt(Vector2 screen, Point ground, bool fallback = true)
         {
+            var pick = new PickHit { Crew = "" };
             Wall wall; float nearest; Point wallPoint; FindWall(screen, out wall, out nearest, out wallPoint);
-            selectedCrewCharacter = ""; SelectedWall = wall; SelectedFixture = null; SelectedResident = null; SelectedStaff = null; Ray ray = cameraRig.ScreenPointToRay(screen);
+            pick.Wall = wall; Ray ray = cameraRig.ScreenPointToRay(screen);
             foreach (Fixture fixture in World.Data.Fixtures)
             {
                 float hit;
                 FixtureDefinition definition = FixtureCatalog.Get(fixture.Kind);
                 Vector3 size = new Vector3(definition.Width, definition.Height, definition.Depth);
                 if (HitBox(ray, FacilityView.V(fixture.Position, size.y * 0.5f + 0.13f), Quaternion.Euler(0, fixture.Rotation, 0), size, out hit) && hit < nearest)
-                { SelectedFixture = fixture; SelectedWall = null; nearest = hit; }
+                { pick = new PickHit { Fixture = fixture, Crew = "" }; nearest = hit; }
             }
             foreach (Resident resident in World.Data.Residents)
             {
                 float hit; Vector3 position;
                 if (!view.TryGetPersonPosition(resident.Id, out position)) position = FacilityView.V(resident.Position, 0.14f);
                 if (HitBox(ray, position + Vector3.up * 0.88f, Quaternion.identity, new Vector3(0.58f, 1.85f, 0.58f), out hit) && hit < nearest)
-                { SelectedResident = resident; SelectedFixture = null; SelectedWall = null; nearest = hit; }
+                { pick = new PickHit { Resident = resident, Crew = "" }; nearest = hit; }
             }
             foreach (StaffMember staff in World.Data.Staff)
             {
@@ -642,7 +649,7 @@ namespace Cellblock.Unity
                 float hit; Vector3 position;
                 if (!view.TryGetPersonPosition(staff.Id, out position)) position = FacilityView.V(staff.Position, 0.14f);
                 if (HitBox(ray, position + Vector3.up * 0.88f, Quaternion.identity, new Vector3(0.58f, 1.85f, 0.58f), out hit) && hit < nearest)
-                { SelectedStaff = staff; SelectedResident = null; SelectedFixture = null; SelectedWall = null; nearest = hit; }
+                { pick = new PickHit { Staff = staff, Crew = "" }; nearest = hit; }
             }
             foreach (Crew crew in World.Data.Crews.Where(c => c.Arrived))
                 for (int builder = 0; builder < 2; builder++)
@@ -650,14 +657,20 @@ namespace Cellblock.Unity
                     string id = crew.Id + "/builder-" + builder; float hit; Vector3 position;
                     if (!view.TryGetPersonPosition(id, out position)) continue;
                     if (HitBox(ray, position + Vector3.up * .88f, Quaternion.identity, new Vector3(.58f, 1.85f, .58f), out hit) && hit < nearest)
-                    { selectedCrewCharacter = id; SelectedStaff = null; SelectedResident = null; SelectedFixture = null; SelectedWall = null; nearest = hit; }
+                    { pick = new PickHit { Crew = id }; nearest = hit; }
                 }
-            if (selectedCrewCharacter == "" && SelectedResident == null && SelectedStaff == null && SelectedFixture == null && SelectedWall == null)
+            if (fallback && pick.Crew == "" && pick.Resident == null && pick.Staff == null && pick.Fixture == null && pick.Wall == null)
             {
                 string person = view.PickResident(cameraRig, screen);
-                if (person != null) SelectedResident = World.Data.Residents.FirstOrDefault(r => r.Id == person);
-                else SelectedWall = NearestWall(ground);
+                if (person != null) pick.Resident = World.Data.Residents.FirstOrDefault(r => r.Id == person);
+                else pick.Wall = NearestWall(ground);
             }
+            return pick;
+        }
+        void SelectComponent(Vector2 screen, Point ground)
+        {
+            PickHit pick = PickAt(screen, ground);
+            selectedCrewCharacter = pick.Crew; SelectedWall = pick.Wall; SelectedFixture = pick.Fixture; SelectedResident = pick.Resident; SelectedStaff = pick.Staff;
         }
         void Replace(Wall old, Wall changed, string name)
         {
@@ -757,7 +770,7 @@ namespace Cellblock.Unity
         // Places the camera like the management rig does (focus, distance, yaw, pitch) without the interface offset.
         public void FrameArt(Vector3 artFocus, float artDistance, float artYaw, float artPitch)
         {
-            planView = false; cameraRig.orthographic = false;
+            planView = false; cameraRig.orthographic = false; PresentationShadows.Fit(artDistance, false);
             Quaternion rotation = Quaternion.Euler(artPitch, artYaw, 0);
             cameraRig.transform.position = artFocus + rotation * new Vector3(0, 0, -artDistance * 1.55f); cameraRig.transform.rotation = rotation;
         }

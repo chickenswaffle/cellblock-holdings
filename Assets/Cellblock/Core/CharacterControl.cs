@@ -111,7 +111,7 @@ namespace Cellblock.Core
         public bool BeginCharacterControl(string id)
         {
             CharacterSession next = ResolveCharacter(id);
-            if (next != null && next.Staff == null) { Notice = "Direct control is available for staff only. Residents and construction crews can be inspected or followed."; return false; }
+            if (next != null && next.Staff == null && !InmateMayControl(next.Id)) { Notice = "Direct control is available for staff only. Residents and construction crews can be inspected or followed."; return false; }
             string blocker = next == null ? "Choose a person who is on site." : CharacterInterruption(next);
             if (blocker != "") { Notice = blocker; return false; }
             if (IsCharacterControlled(id)) return true;

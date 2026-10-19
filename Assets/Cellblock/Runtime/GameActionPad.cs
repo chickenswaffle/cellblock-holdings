@@ -74,8 +74,9 @@ namespace Cellblock.Unity
             actionCrosshair.style.display = direct && !CharacterPhoneOpen && !BlocksSimulation && game.CharacterEyeView ? DisplayStyle.Flex : DisplayStyle.None;
             if (!direct) return;
             ActionHints h = world.StaffActionHints();
-            ActionLabel(actionAttack, h.Attack == "" ? "Strike" : h.Attack, h.CanAttack);
-            ActionLabel(actionGrab, h.Grab == "" ? "Grab" : h.Grab, h.CanGrab);
+            bool inmate = world.InmateMode;
+            ActionLabel(actionAttack, h.Attack == "" ? (inmate ? "Punch" : "Strike") : h.Attack, h.CanAttack);
+            ActionLabel(actionGrab, h.Grab == "" ? (inmate ? "Shove" : "Grab") : h.Grab, h.CanGrab);
             ActionLabel(actionPickUp, h.CanPickUp ? "Pick up" : "Pick up", h.CanPickUp);
             ActionLabel(actionUse, h.Use == "" ? "Use" : h.Use, true);
             actionPickUp.tooltip = h.PickUp;

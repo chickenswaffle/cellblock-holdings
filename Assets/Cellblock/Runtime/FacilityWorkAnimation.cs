@@ -183,6 +183,10 @@ namespace Cellblock.Unity
             tool.rotation = actor.Root.rotation * Quaternion.Euler(toolAngle);
             Vector3 tip = tool.TransformPoint(toolIndex == 4 ? new Vector3(0, -.04f, .45f) : new Vector3(0, 0, .27f));
             bool touching = toolIndex == 1 || Vector3.Distance(tip, V(focus, 1.12f)) < .25f;
+            int impact = Mathf.FloorToInt(t * (toolIndex == 0 ? 1.15f : toolIndex == 4 ? .48f : .85f) - (toolIndex == 0 ? .65f : toolIndex == 4 ? .63f : .18f));
+            if (partner == 0 && actor.BuilderSoundTask == crew.WorkId && actor.BuilderSoundTool == toolIndex && impact > actor.LastBuilderImpact && world.Data.Speed > 0 && touching && toolIndex != 3)
+                FacilitySoundscape.BuilderContact(task, tip);
+            actor.BuilderSoundTask = crew.WorkId; actor.BuilderSoundTool = toolIndex; actor.LastBuilderImpact = impact;
             if (!ReducedMotion && touching && partner == 0 && contact >= 0 && (toolIndex == 0 || toolIndex == 1 || toolIndex == 4))
             {
                 Vector3 origin = toolIndex == 1 ? actor.Root.TransformPoint(new Vector3(.18f, 1.13f, .60f)) : V(focus, 1.12f);

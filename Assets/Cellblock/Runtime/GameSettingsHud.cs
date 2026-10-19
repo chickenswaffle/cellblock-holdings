@@ -64,7 +64,7 @@ namespace Cellblock.Unity
                 settingsContent.Add(Text("Move with confidence.", "settings-page-title"));
                 SettingChoices(settingsContent, "Keyboard & orbit speed", "Adjust keyboard panning and mouse-drag orbit speed. Pinch stays anchored to your fingers.", new[] { "Gentle", "Standard", "Fast" }, p.CameraSensitivity < .9f ? 0 : p.CameraSensitivity > 1.1f ? 2 : 1, i => p.CameraSensitivity = new[] { .65f, 1f, 1.5f }[i]);
                 SettingChoices(settingsContent, "Camera easing", "Smooth the management camera between positions.", new[] { "Direct", "Smooth" }, p.SmoothCamera ? 1 : 0, i => p.SmoothCamera = i == 1);
-                settingsContent.Add(Text("DRAG / ARROWS / WASD  ·  Move\nRIGHT DRAG / Q E  ·  Orbit\nPINCH / SCROLL  ·  Zoom\nR F  ·  Tilt   |   HOME  ·  Center   |   SPACE  ·  Pause\nTouch: drag to pan; two fingers to pan, pinch and twist.", "controls-reference"));
+                settingsContent.Add(Text("DRAG / ARROWS / WASD  ·  Move\nRIGHT DRAG / Q E  ·  Orbit\nPINCH / SCROLL  ·  Zoom\nR F  ·  Tilt   |   HOME  ·  Center   |   SPACE  ·  Pause\nTouch: drag to pan; two fingers to pan, pinch and twist.\nController: left stick move · right stick orbit · LT RT zoom · A select at the reticle · D-pad into the buttons · B back.", "controls-reference"));
                 settingsContent.Add(Action("Center the camera", () => game.Recenter(), "quiet"));
                 // Playing as a staff member (Claude look pass, exact exception 2026-10-18).
                 var staffTitle = Text("Playing as staff", "settings-page-title"); staffTitle.style.marginTop = 22; settingsContent.Add(staffTitle);

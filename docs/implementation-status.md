@@ -2,13 +2,21 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
+## October 19 construction and published asset integration
+
+Claude's published fb173ff surfaces, shadows, room lighting, audio, controller and development prisoner fixes are integrated with Codex construction6a13236. User redirected character development to Claude; Codex's unfinished uniform/finger/shoe candidate is preserved outside active Assets. Its27-character/945-motion reports are candidate evidence only, not the final integration.
+
+All436 core checks pass, including five new relocation/removal checks authorized by the user's later correctness request. Actual Unity6000.3.24f1 imports and project validation pass. Five actual listener recordings pass sample/silence/clipping checks, with57seconds of mixed output and empty audio-report errors. The final12-frame authored construction gallery is preserved and visually inspected; it shows tools/contact, helper inspection and demolition progress. The final25-frame Home/save/settings/placement regression passes with empty errors, including an actual projected-pointer bed move without a quote, charge or project. The superseded24-frame failure was an outdated quote assertion; its report is preserved locally. Core verification does not prove natural end-to-end project completion, sound aesthetics or actual device controls/performance.
+
+Resource cleanup preserves imported textures; normal maps use linear import; generated settings explicitly apply Forward+ and budgeted room shadows. Builder sounds follow work contact cycles; queued old-world audio is stopped and rolling action logs remain audible. See [construction](rearrangement-and-construction.md), [core evidence](reviews/2026-10-19-construction-core.txt), [audio](reviews/2026-10-19-construction-sound.json), [construction art](reviews/2026-10-19-construction-art.json), [frontend](reviews/2026-10-19-construction-frontend.json) and [source fingerprint](reviews/2026-10-19-construction-source.json).
+
 ## October 18 furniture rearrangement and construction presentation
 
 Installed items now move/rotate directly without a crew, purchase or project. Validation preserves identity, assigned bed homes, dining designation, clear routes and each pending construction stage. New installation, upgrades and demolition retain approved crew work. Removal tasks target individual assets, bypass fresh-material delivery and complete before replacement installation. Legacy aggregate removal preserves total work/progress when split on load.
 
 Builders have distinct hammer lift/strike/recoil, drill set/press/withdraw, saw strokes on timber and pry lever/reset poses; helpers inspect. Demolition progress adds shallow scoring, debris and salvage trays. Tool chips are pooled, proximity-gated and suppressed by reduced motion. Actual usable geometry still changes at safe handover. [Implementation and texture/audio continuation](rearrangement-and-construction.md).
 
-Evidence for this pass: installed Unity 6000.3.24f1 source import/API compilation, authored renderer contact sheets and independent source/visual critic. No automated tests were added or run for this request. The earlier 420-check full regression below belongs to `8507b82`, not this changed source. Natural project completion, relocation save roundtrips, device performance and long-run simulation have not been newly verified here. Claude's texture/audio assets remain in its separate scope; reviewed controller/prisoner follow-on remains unimported on this Mac.
+Historical checkpoint6a13236: installed Unity6000.3.24f1 import/API compilation, authored contact sheets and independent source/visual review. No automated tests were added at that first checkpoint. The later authorized436-check regression and fb173ff asset/controller integration supersede that checkpoint's validation limits; see October19 above. Natural end-to-end project completion, device performance and long-run balance remain unverified.
 
 ## October 18 reviewed Claude services and staff input
 

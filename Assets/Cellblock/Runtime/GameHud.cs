@@ -54,7 +54,7 @@ namespace Cellblock.Unity
         bool inspectorOpen = true, cameraOpen, compact, layoutReady, guideOpen, hadDraft;
         object previousSelection;
         float nextRefresh;
-        public bool BlocksSimulation { get { return InteractionModalOpen || guideOpen || (menu != null && menu.style.display.value != DisplayStyle.None); } }
+        public bool BlocksSimulation { get { return InteractionModalOpen || guideOpen || inmateSheetOpen || (menu != null && menu.style.display.value != DisplayStyle.None); } }
         public bool BlocksWorldInput { get { return BlocksSimulation || CharacterPhoneOpen; } }
         public Vector2 WorldViewCenter { get; private set; } = new Vector2(0.5f, 0.5f);
         public static string Money(long cents) { return "$" + (cents / 100d).ToString("N0", CultureInfo.InvariantCulture); }
@@ -68,6 +68,7 @@ namespace Cellblock.Unity
             settings.themeStyleSheet = Resources.Load<ThemeStyleSheet>("CellblockTheme");
             UIDocument document = gameObject.AddComponent<UIDocument>(); document.panelSettings = settings;
             root = document.rootVisualElement; root.name = "world-overlay"; root.pickingMode = PickingMode.Ignore;
+            FacilitySoundscape.BindInterface(root);
             root.style.flexGrow = 1;
             root.style.unityFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             root.styleSheets.Add(Resources.Load<StyleSheet>("Cellblock"));
@@ -101,7 +102,7 @@ namespace Cellblock.Unity
             guide = Panel("guide-overlay"); guide.style.display = DisplayStyle.None;
             BuildFrontend(); BuildHomePresentation();
             facilityPane.Add(Action("Goals & facility journal", ShowFacilityEvents, "primary"));
-            BuildCharacterInspector(); BuildCharacterPhone();
+            BuildCharacterInspector(); BuildCharacterPhone(); BuildInmate(); BuildGamepad();
             root.RegisterCallback<GeometryChangedEvent>(e => Layout()); Layout();
         }
 
@@ -666,7 +667,13 @@ namespace Cellblock.Unity
             touch.Add(ControlRow("One finger drag", "Move the view in Select / Inspect mode"));
             touch.Add(ControlRow("Two fingers", "Move, pinch to zoom, twist to orbit"));
             touch.Add(ControlRow("Camera button", "Tilt, orbit, zoom, and switch 3D / plan"));
-            touch.Add(ControlRow("Build → choose a tool", "Tap the ground, review, then approve")); columns.Add(touch); scroll.Add(columns);
+            touch.Add(ControlRow("Build → choose a tool", "Tap the ground, review, then approve")); columns.Add(touch);
+            var pad = Element("guide-column"); pad.Add(Text("CONTROLLER", "section-label"));
+            pad.Add(ControlRow("Left stick / right stick", "Move the view / orbit and tilt"));
+            pad.Add(ControlRow("LT RT / LB RB", "Zoom / game speed"));
+            pad.Add(ControlRow("A / B", "Select or place at the reticle / cancel"));
+            pad.Add(ControlRow("D-pad", "Step into the buttons; A presses, B returns"));
+            pad.Add(ControlRow("Y on an officer", "Play as them")); columns.Add(pad); scroll.Add(columns);
             scroll.Add(Text("YOUR FIRST IMPROVEMENT", "section-label"));
             scroll.Add(Text("1  Inspect the facility and meet people in the People tab.\n2  Open Facility and hire a construction crew.\n3  Open Build, choose a category and item, then review the quote.\n4  Run time to let crews work and relationships develop.", "body"));
             var actions = Element("guide-actions"); actions.Add(Action("Got it · explore", () => CloseGuide(), "primary"));
@@ -693,7 +700,7 @@ namespace Cellblock.Unity
             if (person) { showStaff = game.SelectedStaff != null; ShowCompactCharacter(game.SelectedCharacterId); }
             Refresh(true);
         }
-        public void NavigateBack() { if (CharacterPhoneOpen) { CloseCharacterPhone(); return; } if (settingsOpen) CloseSettings(); else if (modePickerOpen) HideModePicker(); else CloseOverlays(); }
+        public void NavigateBack() { if (inmateSheetOpen) { CloseInmateSheet(); return; } if (CharacterPhoneOpen) { CloseCharacterPhone(); return; } if (settingsOpen) CloseSettings(); else if (modePickerOpen) HideModePicker(); else CloseOverlays(); }
         public void CloseOverlays()
         {
             CloseCharacterPhone(); CloseInteractionSheets();
@@ -743,7 +750,8 @@ namespace Cellblock.Unity
             instruction.text = game.Tool == BuildTool.Inspect
                 ? "Drag to pan  ·  Drag a selected item to move it  ·  Arrows / WASD  ·  Right drag to orbit  ·  Pinch / scroll to zoom"
                 : game.Instruction;
-            if (Application.isMobilePlatform && game.Tool == BuildTool.Inspect) instruction.text = "Drag to pan  ·  Drag a selected item to move it  ·  Pinch to zoom  ·  Twist to orbit";
+            if ((Application.isMobilePlatform || game.ActiveControlDevice == ControlDevice.Touch) && game.Tool == BuildTool.Inspect) instruction.text = "Drag to pan  ·  Drag a selected item to move it  ·  Pinch to zoom  ·  Twist to orbit";
+            if (game.ActiveControlDevice == ControlDevice.Gamepad && game.Tool == BuildTool.Inspect) instruction.text = "L stick move  ·  R stick orbit  ·  LT / RT zoom  ·  LB / RB speed  ·  D-pad buttons  ·  Start pause  ·  Select Holdings";
             placement.text = game.PlacementSummary; placement.style.display = string.IsNullOrEmpty(game.PlacementSummary) ? DisplayStyle.None : DisplayStyle.Flex;
             notice.text = world.Notice; notice.style.display = string.IsNullOrEmpty(world.Notice) ? DisplayStyle.None : DisplayStyle.Flex;
             bool company = workspace == Workspace.Company;
@@ -816,7 +824,7 @@ namespace Cellblock.Unity
                 quoteCost.EnableInClassList("negative", q != null && !q.Valid); approve.SetEnabled(q != null && q.Valid);
             }
             RefreshSecurity(world); RefreshCommandHud(world);
-            RefreshCharacterInspector(world); RefreshCharacterControls(world); RefreshCharacterPhone(world);
+            RefreshCharacterInspector(world); RefreshCharacterControls(world); RefreshCharacterPhone(world); RefreshInmate(world);
             Layout();
         }
 

@@ -1,0 +1,18 @@
+{
+    "passed": true,
+    "editor": "6000.3.24f1",
+    "errors": [],
+    "notes": [
+        "01-overview-morning mid: amb_day=0.03 amb_dawn=0.29 amb_night=0.08 amb_crickets=0.01 amb_road=0.22 amb_crowd=0.08 | chime_2",
+        "01-overview-morning: 12.1 s, rms -32.7 dBFS, peak -13.1 dBFS, clock 7:39  mix: amb_day=0.07 amb_dawn=0.15 amb_night=0.10 amb_crickets=0.01 amb_road=0.22 amb_crowd=0.08 | car_pass_1",
+        "02-officer-midday mid: amb_day=0.16 amb_road=0.06 amb_hvac=0.44 amb_hum=0.11 amb_crowd=0.23 amb_yard=0.05 | step_gravel_2,chime_2,step_gravel_6",
+        "02-officer-midday: 14.0 s, rms -30.4 dBFS, peak -10.4 dBFS, clock 12:59  mix: amb_day=0.16 amb_night=0.00 amb_road=0.06 amb_hvac=0.44 amb_hum=0.11 amb_crowd=0.23 amb_yard=0.04 | gate_clank_1",
+        "03-officer-lights-out mid: amb_night=0.66 amb_crickets=0.29 amb_road=0.12 amb_hvac=0.07 amb_crowd=0.01 | step_concrete_10,step_run_3,gate_clank_2,door_strike_1",
+        "03-officer-lights-out: 12.0 s, rms -27.8 dBFS, peak -7.7 dBFS, clock 22:57  mix: amb_night=0.66 amb_crickets=0.29 amb_road=0.12 amb_hvac=0.07 amb_crowd=0.01 | ",
+        "04-alarm mid: amb_day=0.50 amb_night=0.03 amb_crickets=0.00 amb_road=0.22 amb_hvac=0.07 amb_crowd=0.10 loop_alarm_bell=0.92 | gate_clank_1",
+        "04-alarm: 9.0 s, rms -30.0 dBFS, peak -10.5 dBFS, clock 14:44  mix: amb_day=0.46 amb_night=0.04 amb_crickets=0.01 amb_road=0.22 amb_hvac=0.07 amb_crowd=0.10 loop_alarm_bell=0.92 | ",
+        "05-close-night mid: amb_night=0.66 amb_crickets=0.29 amb_road=0.12 amb_hvac=0.07 amb_crowd=0.01 | ",
+        "05-close-night: 10.0 s, rms -29.3 dBFS, peak -8.3 dBFS, clock 2:49  mix: amb_night=0.66 amb_crickets=0.29 amb_road=0.12 amb_hvac=0.07 amb_crowd=0.01 | "
+    ],
+    "captures": []
+}

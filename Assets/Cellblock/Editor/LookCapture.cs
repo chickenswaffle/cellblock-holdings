@@ -29,6 +29,20 @@ namespace Cellblock.Editor
         static RenderTexture hud;
         static Gamepad pad;
         static GamepadState padState;
+        // The review changes two global Input System settings; snapshot them and restore on finish and abort (as PadCapture).
+        static InputSettings.BackgroundBehavior savedBackground;
+        static InputSettings.EditorInputBehaviorInPlayMode savedEditorInput;
+        static bool inputSaved;
+        static void SaveInputSettings()
+        {
+            if (inputSaved) return;
+            savedBackground = InputSystem.settings.backgroundBehavior; savedEditorInput = InputSystem.settings.editorInputBehaviorInPlayMode; inputSaved = true;
+        }
+        static void RestoreInputSettings()
+        {
+            if (!inputSaved) return;
+            InputSystem.settings.backgroundBehavior = savedBackground; InputSystem.settings.editorInputBehaviorInPlayMode = savedEditorInput; inputSaved = false;
+        }
         static string officerId = "", targetId = "", notice = "", faceSeen = "";
         static float yawBefore; static double holdUntil, heldFrom;
         static Point startAt;
@@ -118,7 +132,8 @@ namespace Cellblock.Editor
                         string state = game.PreviewLookHud; notes.Add("keyboard 1P: " + state);
                         Check(state.Contains("crosshair=1"), "No aiming dot in first person: " + state);
                         Composite(game, "keyboard-first-person");
-                        // A batch editor may not have focus; let the virtual controller reach the game regardless (not saved).
+                        // A batch editor may not have focus; let the virtual controller reach the game regardless (restored in Finish).
+                        SaveInputSettings();
                         InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
                         InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
                         pad = InputSystem.AddDevice<Gamepad>("Look review pad"); padState = new GamepadState();
@@ -262,9 +277,11 @@ namespace Cellblock.Editor
         {
             SessionState.SetBool(ActiveKey, false);
             if (pad != null) { InputSystem.RemoveDevice(pad); pad = null; }
+            RestoreInputSettings();
             if (game == null) game = UnityEngine.Object.FindFirstObjectByType<GameController>();
             if (game != null) game.PreviewUiTarget(null);
             if (hud != null) { hud.Release(); UnityEngine.Object.DestroyImmediate(hud); hud = null; }
+            notes.Add("input settings restored: background=" + InputSystem.settings.backgroundBehavior + " editor=" + InputSystem.settings.editorInputBehaviorInPlayMode);
             File.WriteAllText(Path.Combine(Output, "report.txt"), (passed ? "PASSED" : "FAILED") + "\n\nNotes:\n" + string.Join("\n", notes) + "\n\nErrors:\n" + string.Join("\n", errors));
             if (passed) Debug.Log("CELLBLOCK_LOOK_CAPTURE_PASSED " + Path.GetFullPath(Output));
             else Debug.LogError("CELLBLOCK_LOOK_CAPTURE_FAILED " + string.Join(" | ", errors.Take(5)));

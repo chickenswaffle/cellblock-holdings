@@ -258,6 +258,7 @@ namespace Cellblock.Core
             CharacterPhoneRules.Hydrate(state);
             SanitationRules.Hydrate(state);
             StaffActionRules.Hydrate(state);
+            InmateRules.Hydrate(state);
         }
 
         partial void AdvancePressure()
@@ -290,6 +291,7 @@ namespace Cellblock.Core
         {
             if (InIntake(resident)) { skip = true; return; }
             StaffActionMovement(resident, ref skip);
+            if (!skip) InmateMovement(resident, ref skip);
         }
         partial void PressureTarget(Resident resident, ref Point target)
         {
