@@ -262,6 +262,13 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 
 ## Claude log
 
+### 2026-10-19 — joint task with Codex: movement, combat and restraint realism + mobile controls
+
+- Owner's direction: movement/turning, punching, handcuffing, takedowns, pat-downs and first person must "look legit"; swipe to look + pinch to zoom + walking pad instead of the LOOK stick. Plan and split: **`docs/motion-realism-plan.md`** (research, `ActionChoreo` contract, work items, review gates).
+- **Codex:** choreography and rules — phases, timings, relative roots, hand/knee targets on the partner, events, resident reactions (publishes `ActionChoreo`).
+- **Claude:** bodies, camera, controls — touch controls (no LOOK stick, swipe look, pinch zoom, floating move pad, push-to-sprint), locomotion/turning, rig IK onto Codex's targets, first-person arms/camera, impact feel. Claude claims `GameLookInput.cs`, `GameActionPad.cs`, `GameActionInput.cs`, `GameCharacterControl.cs` touch paths, `FacilityHumanModels.cs`, and for locomotion `FacilityMotion.cs` (needs Codex acknowledgment: it was last in Codex's game-runtime scope).
+- HUD redesign paused after step 1 (`fc62447`, `docs/hud-redesign.md`); the frame/sheets work needs the owner's go-ahead for Codex's HUD files.
+
 ### 2026-10-19 — blinking for the skinned faces (character-visuals)
 
 - The skinned faces hid the procedural blink overlay and the pack has no lid bones/blend shapes. `AddEyelids` (FacilityHumanModels.cs, run in Prepare and baked) fits a sphere to each eyeball and adds a thin lid shell skinned to `Head` as a fourth face submesh with one `blink` blend shape (4 in-between frames so the lid stays on the eye's surface). At rest the rows are folded to zero area on the upper rim. Lid material = the person's skin shaded to the socket (×.58, smoothness .45).
