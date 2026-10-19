@@ -163,7 +163,8 @@ namespace Cellblock.Core
             Resident resident = ResolveStaffSubject(officer, residentId, out why);
             if (resident == null || officer.Role != "Officer" || !CanEngageStaffCombatTarget(residentId) || holdTarget != "" && holdTarget != residentId) { Notice = resident == null ? why : "Officer role required."; return false; }
             StaffFight fight = EnsureStaffFight(resident);
-            if (fight.Disposition != StaffCombatDisposition.Fight || fight.Stamina < 35 || fight.Balance < 35 || resident.Health < 40)
+            bool supported = BackupSupporting(resident.Id) && (fight.Stamina < 65 || fight.Balance < 65);
+            if (fight.Disposition != StaffCombatDisposition.Fight || fight.Stamina < 35 || fight.Balance < 35 || resident.Health < 40 || supported)
             {
                 BeginStaffCompliance(resident); fight.Outcome = "Complying · take hold and apply cuffs.";
             }

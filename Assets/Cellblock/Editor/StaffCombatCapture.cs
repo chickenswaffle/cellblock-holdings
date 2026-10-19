@@ -17,7 +17,8 @@ namespace Cellblock.Editor
     {
         const string ActiveKey = "Cellblock.StaffCombat.Active", StageKey = "Cellblock.StaffCombat.Stage", WaitKey = "Cellblock.StaffCombat.Wait";
         const int Width = 1600, Height = 900;
-        static string Output = "", officerId = "", targetId = "";
+        static string Output = "", officerId = "", targetId = "", backupId = "";
+        static Point backupStart;
         static RenderTexture hud; static int shot, pausedMinute;
         static float initialHealth, guardedHealth;
         static readonly List<string> errors = new List<string>(), notes = new List<string>();
@@ -135,8 +136,46 @@ namespace Cellblock.Editor
                         float health = w.GetStaffCombatHealth(officerId); game.EndCharacterView(false);
                         Require(w.GetStaffCombatHealth(officerId) == health, "Handback healed an injury.");
                         notes.Add("Live rules/actual menu dispatch, windup pause, guarded repeated retaliation, swept shove/balance, takedown-to-cuffs and saved injury ownership reviewed. Rig/IK contact fidelity and native device feel are separate Claude gates; no contact pass claimed.");
-                        Finish(game); return;
+                        game.StartArtPreview("county-maximum", "briar-county", 630); Next(2); return;
                     }
+                    case 13:
+                    {
+                        StaffMember officer = w.Data.Staff.First(s => s.Role == "Officer" && s.Arrived); officerId = officer.Id;
+                        StaffMember helper = w.Data.Staff.First(s => s.Role == "Officer" && s.Arrived && s.Id != officerId); backupId = helper.Id;
+                        foreach (StaffMember other in w.Data.Staff.Where(s => s.Role == "Officer")) other.ShiftStart = 20;
+                        officer.ShiftStart = helper.ShiftStart = 8; officer.Position = w.Data.Yard + new Point(0, -3);
+                        helper.Position = officer.Position + new Point(5, 0); helper.SecurityRole = helper.SecurityPostId = ""; w.FileFor(helper).Post = w.FileFor(helper).Duty = "";
+                        helper.Destination = helper.Position; helper.NextDutyMinute = int.MaxValue / 2; backupStart = helper.Position;
+                        Resident target = w.Data.Residents.First(r => w.IsPresent(r) && !w.InIntake(r)); targetId = target.Id;
+                        target.Position = officer.Position + new Point(0, .8f); target.Impulsivity = target.Stress = 0; target.Patience = 100; target.NextPlanMinute = int.MaxValue / 2;
+                        game.PreviewAdvance(0); Require(game.StartCharacterPlay(officerId), w.Notice); w.Data.Speed = 0;
+                        Require(w.OrderStaffCompliance(targetId), w.Notice); w.Data.Speed = 0;
+                        game.GetComponentInChildren<GameHud>().ShowStaffInteractions(w, officerId, targetId); Next(); return;
+                    }
+                    case 14:
+                        Composite(game, "backup-command");
+                        game.GetComponentInChildren<GameHud>().PreviewStaffCommand(StaffInteraction.Backup); w.Data.Speed = 0;
+                        Require(w.StaffBackup.Active && w.StaffBackup.OfficerId == backupId && !w.StaffBackup.Supporting, "Backup button did not assign an available officer."); Next(); return;
+                    case 15:
+                        Require(w.StaffBackup.RadioMinutesLeft == 3, "Paused radio progressed."); Composite(game, "backup-radio-paused");
+                        game.PreviewAdvance(2); Require(Geometry.Distance(backupStart, w.Data.Staff.First(s => s.Id == backupId).Position) < .001f, "Backup moved before radio dispatch.");
+                        game.PreviewAdvance(1); Next(); return;
+                    case 16:
+                    {
+                        SideComposite(game, "backup-en-route"); int limit = 60;
+                        while (!w.StaffBackup.Supporting && w.StaffBackup.Active && limit-- > 0)
+                        {
+                            StaffMember helper = w.Data.Staff.First(s => s.Id == backupId); Point previous = helper.Position; game.PreviewAdvance(1);
+                            Require(Geometry.Distance(previous, helper.Position) <= .561f, "Backup moved twice or teleported.");
+                        }
+                        Require(w.StaffBackup.Supporting && w.HoldPhase == "", "Backup never arrived or remotely arrested the target.");
+                        SideComposite(game, "backup-supporting-side"); notes.Add("Backup actual menu request: paused3-minute radio, single bounded routed movement, physical supporting officer, no automatic arrest.");
+                        game.GetComponentInChildren<GameHud>().ShowStaffInteractions(w, officerId, targetId); Next(); return;
+                    }
+                    case 17:
+                        Composite(game, "backup-arrived-menu"); game.GetComponentInChildren<GameHud>().PreviewStaffCommand(StaffInteraction.DismissBackup); w.Data.Speed = 0;
+                        Require(!w.StaffBackup.Active && w.Data.Staff.First(s => s.Id == backupId).NextDutyMinute == w.Data.Minute, "Dismiss did not release the real responder.");
+                        game.EndCharacterView(false); Finish(game); return;
                 }
             }
             catch (Exception error) { errors.Add(error.ToString()); Finish(null); }

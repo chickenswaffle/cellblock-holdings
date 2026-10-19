@@ -36,7 +36,8 @@ namespace Cellblock.Unity
             var grid = Element("staff-interaction-grid"); scroll.Add(grid);
             foreach (StaffInteraction command in new[] { StaffInteraction.Talk, StaffInteraction.PatDown, StaffInteraction.PocketSearch,
                 StaffInteraction.Grab, StaffInteraction.Cuff, StaffInteraction.GroundAndCuff, StaffInteraction.Escort,
-                StaffInteraction.Confine, StaffInteraction.Release, StaffInteraction.Punch, StaffInteraction.Guard, StaffInteraction.Shove, StaffInteraction.Compliance })
+                StaffInteraction.Confine, StaffInteraction.Release, StaffInteraction.Punch, StaffInteraction.Guard, StaffInteraction.Shove, StaffInteraction.Compliance,
+                StaffInteraction.Backup, StaffInteraction.DismissBackup })
             {
                 StaffInteraction selected = command;
                 Button button = Action("", () => ChooseStaffInteraction(selected), "staff-interaction-choice");
@@ -86,6 +87,7 @@ namespace Cellblock.Unity
             staffInteractionName.text = target == null ? "Person unavailable" : target.Name;
             staffInteractionStatus.text = world.BusyAction != "" ? world.BusyAction.ToUpperInvariant() + " · in progress" : world.StaffGroundedRestraint ? "CUFFED ON THE GROUND" : world.HoldPhase == "Cuffed" ? "CUFFED · ESCORT READY" : world.StaffCombat.Active ? world.StaffCombat.Phase.ToUpperInvariant() + " · health " + world.StaffCombat.OfficerHealth.ToString("0") + " · stamina " + world.StaffCombat.OfficerStamina.ToString("0") + " · balance " + world.StaffCombat.OfficerBalance.ToString("0") : "Choose your next action";
             staffInteractionFill.style.width = Length.Percent(world.StaffInteractionProgress * 100);
+            if (world.StaffBackup.Active) staffInteractionStatus.text += " · BACKUP " + world.StaffBackup.Phase.ToUpperInvariant();
             foreach (Button button in staffInteractionButtons.Values) button.style.display = DisplayStyle.None;
             foreach (StaffInteractionOption option in world.StaffInteractionOptions(staffInteractionTarget))
             {

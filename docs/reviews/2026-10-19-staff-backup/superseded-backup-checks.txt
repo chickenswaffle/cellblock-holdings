@@ -1,0 +1,12 @@
+CSSM_ModuleLoad(): One or more parameters passed to a function were not valid.
+OK social contact while away at court: no relationship change.
+PASS staff backup · radio is delayed and the responder walks once per tick before support
+PASS staff backup · unavailable posts, watch assignments and injuries cannot be recruited
+PASS staff backup · custody and handback release the responder and live dispatch does not load
+PASS staff backup · actual support improves compliance only after lost balance
+FAIL staff backup · suspension and incident takeover revoke support without erasing their route: Radio incident did not reclaim officer
+PASS staff backup · pause and read-only snapshots cannot advance radio or movement
+PASS staff backup · dismiss works after losing reach and the responder resumes duty
+Filtered checks: staff backup
+
+6 passed, 1 failed. These checks exercise the C# core; they do not run Unity.

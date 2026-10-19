@@ -1,0 +1,21 @@
+{
+  "sha256": "7e61952db02d0d1afb52784d7056bad0aac7cf4498efd3d8805c55014db0eef9",
+  "files": {
+    "Assets/Cellblock/Core/StaffBackup.cs": "e5d31873c6218748227059cedb3134f926fdef4c7ab3ea785563b6d59aa6c706",
+    "Assets/Cellblock/Core/StaffCombat.cs": "c08a27e125e17fbbe7dcde30de640e4225dbaf5e1c6ced5ce18be60106e12472",
+    "Assets/Cellblock/Core/StaffActions.cs": "422cfccfb47507d507976f5fba376615b03e3abc9c674a9e797e5a3411b5d2d9",
+    "Assets/Cellblock/Core/StaffInteractions.cs": "50036f8b21e413b19388dad460a342e2d35e6464d26b62e041cc9c1ce8de531b",
+    "Assets/Cellblock/Core/IncidentScenes.cs": "2be3fce01816790cd71a2d675712c6266c47ca4dcd450dda49f419310cf85f37",
+    "Assets/Cellblock/Runtime/GameStaffInteractionsHud.cs": "4ee433a8ec04139863eb3d158ed00f8f5dd09a8dbc6569bb11e8b6cb9bafcf04",
+    "Assets/Cellblock/Editor/StaffCombatCapture.cs": "a1215b710334ca3c9a9a698a320b6f2baea38f3325ebd1a50b27f32ba71c36fa",
+    "Tools/CoreChecks/StaffCombatChecks.cs": "045c8f918adcc11dc1820144198f1bfb589cee2376724f4ac843127482cf0ec7"
+  },
+  "editor": "6000.3.24f1",
+  "runs": {
+    "combat": "combat/20261019-162537-905-94c9a4",
+    "encounters": "encounters/20261019-162630-840-1d1e8d",
+    "actions": "actions/20261019-162758-033-9063d9"
+  },
+  "contactGates": "NOT PASSED: Claude consumer absent",
+  "critic": "Source + final combat report and selected backup arrival/menu images reviewed read-only. No remaining gameplay blocker; facing/radio gesture/contact visuals outstanding."
+}

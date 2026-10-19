@@ -34,6 +34,10 @@ These values are tuning data, not claims of biomechanical realism. This is deter
 
 The live encounter has one opponent. Switching opponents is blocked during active resistance; distance, withdrawal, compliance, custody, incident ownership, departure, handback and incapacitation bound its lifetime. Routine movement cannot drag the fighting resident toward a scheduled activity.
 
+## Calling for assistance
+
+**Actions → Call backup** assigns one available line officer through a short dispatch and physical walk. Arrival improves compliance/restraint opportunities; the player retains the encounter. The helper respects existing posts and incident authority. **Dismiss backup** returns them to duty. [Rules, eligibility and save lifecycle](staff-backup.md).
+
 ## Consequences and persistence
 
 Attempted unjustified strikes retain existing conduct consequences even when contact misses. Resident assault records settle at actual contact. Health damage and pressure affect the officer. At health ≤20, direct control ends and the player must switch staff and arrange recovery.

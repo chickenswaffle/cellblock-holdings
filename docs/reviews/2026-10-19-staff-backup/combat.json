@@ -1,0 +1,39 @@
+{
+    "passed": true,
+    "editor": "6000.3.24f1",
+    "errors": [],
+    "notes": [
+        "player-contact-side: explicit side-camera evidence, alongside the actual character-follow frame.",
+        "Guarded first counter: health=98.8, blocks=1, wind=90.8",
+        "guarded-counter-side: explicit side-camera evidence, alongside the actual character-follow frame.",
+        "shove-side: explicit side-camera evidence, alongside the actual character-follow frame.",
+        "Before takedown: resident health=86.12001, balance=35, stamina=48.00002",
+        "controlled-takedown-side: explicit side-camera evidence, alongside the actual character-follow frame.",
+        "restrained-side: explicit side-camera evidence, alongside the actual character-follow frame.",
+        "Live rules/actual menu dispatch, windup pause, guarded repeated retaliation, swept shove/balance, takedown-to-cuffs and saved injury ownership reviewed. Rig/IK contact fidelity and native device feel are separate Claude gates; no contact pass claimed.",
+        "backup-en-route: explicit side-camera evidence, alongside the actual character-follow frame.",
+        "backup-supporting-side: explicit side-camera evidence, alongside the actual character-follow frame.",
+        "Backup actual menu request: paused3-minute radio, single bounded routed movement, physical supporting officer, no automatic arrest."
+    ],
+    "captures": [
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/01-paused-player-windup.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/02-player-contact.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/03-player-contact-side.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/04-resident-windup.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/05-combat-actions.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/06-guarded-counter.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/07-guarded-counter-side.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/08-guard-first-person.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/09-shove-balance-break.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/10-shove-side.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/11-controlled-takedown.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/12-controlled-takedown-side.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/13-restrained-after-fight.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/14-restrained-side.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/15-backup-command.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/16-backup-radio-paused.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/17-backup-en-route.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/18-backup-supporting-side.png",
+        "/Users/trading/Documents/ChatGPT/Cellblock Holdings/Temp/CellblockFeatureReviews/combat/20261019-162537-905-94c9a4/19-backup-arrived-menu.png"
+    ]
+}
