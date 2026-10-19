@@ -16,6 +16,11 @@ namespace Cellblock.Unity
         public int CharacterCamera;
         public bool CharacterCameraFollows { get { return CharacterCamera == 0; } }
         public bool Shadows = true, SmoothCamera = true, ReducedMotion;
+        // Claude, 2026-10-18 (exact exception, presentation pass): graphics quality 0 Auto / 1 Low / 2 Medium / 3 High,
+        // the performance overlay, and per-category audio levels under the master volume.
+        public int GraphicsQuality;
+        public bool PerformanceOverlay;
+        public float AmbienceVolume = 1, EffectsVolume = 1, InterfaceVolume = 1;
         public void Normalize()
         {
             Version = 1;
@@ -25,6 +30,8 @@ namespace Cellblock.Unity
             CameraSensitivity = Finite(CameraSensitivity, 1, .5f, 1.75f);
             CharacterLookSpeed = CharacterLookSpeed <= 0 ? 1 : Finite(CharacterLookSpeed, 1, .5f, 2f);
             if (CharacterCamera != 0 && CharacterCamera != 1) CharacterCamera = 0;
+            if (GraphicsQuality < 0 || GraphicsQuality > 3) GraphicsQuality = 0;
+            AmbienceVolume = Finite(AmbienceVolume, 1, 0, 1); EffectsVolume = Finite(EffectsVolume, 1, 0, 1); InterfaceVolume = Finite(InterfaceVolume, 1, 0, 1);
         }
         static float Finite(float value, float fallback, float min, float max) { return float.IsNaN(value) || float.IsInfinity(value) ? fallback : Mathf.Clamp(value, min, max); }
         internal static GamePreferences Read(string path)

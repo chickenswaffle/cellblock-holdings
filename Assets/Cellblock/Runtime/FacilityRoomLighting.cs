@@ -152,7 +152,7 @@ namespace Cellblock.Unity
         public static void Assign(IList<Light> lights, Camera camera, bool close)
         {
             if (camera == null) return;
-            int budget = close ? (Application.isMobilePlatform ? 3 : 6) : 0;
+            int budget = close ? PresentationQuality.LightShadowBudget : 0;
             Vector3 eye = camera.transform.position;
             var ranked = lights.Where(l => l != null && l.enabled).OrderBy(l => (l.transform.position - eye).sqrMagnitude).ToList();
             for (int i = 0; i < ranked.Count; i++)

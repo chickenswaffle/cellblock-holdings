@@ -202,6 +202,13 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 
 ## Claude log
 
+### 2026-10-18 — device-test readiness: quality tiers, performance overlay, audio levels (user request)
+
+- User wants an iPhone test soon to judge next steps; asked for phone readiness, then production characters. Claude scope `presentation-assets` continues.
+- New: `Runtime/PresentationQuality.cs` (Auto/Low/Medium/High: render scale, MSAA, cascades, SSAO via the renderer feature, texture mip limit, room-light shadow budget 6/3/0, sun shadow cap 110/80/50 m, sound voices 24/16/12; Auto = Medium on phones, High on Mac; players only step down after 4 s over 1.3× the frame budget, 20 s cooldown; never in the editor), `Runtime/PerformanceOverlay.cs` (fps, avg/worst ms, tier, render size, lights/shadowed, sounds, draw calls/SetPass/tris, memory, population; anchored under the header; F3), `Editor/QualityCapture.cs` (asserts each tier's live pipeline values, renders tiers, Display/Audio pages and overlay with a fit check). Soundscape: Ambience/Effects/Interface levels; AudioListener pauses with the app.
+- **Exact Codex-file exceptions:** `GamePreferences` fields `GraphicsQuality`, `PerformanceOverlay`, `AmbienceVolume/EffectsVolume/InterfaceVolume` + Normalize; `GameSettingsHud` two Display rows, three Audio sliders + `LevelSlider` helper; `GameSaveFlow.ApplyPreferences` three calls. Claude-owned: GameController update hooks (sample/overlay/F3) and editor preview passthroughs in GameInmate.cs.
+- Evidence: QualityCapture PASSED (High 1.0/MSAA2/SSAO on; Medium .85; Low .7/MSAA1/1 cascade/SSAO off/half textures; Auto=High on Mac; overlay fits). Builds/QualityReview.
+
 ### 2026-10-18 — premium textures, room lighting and soundscape (user request)
 
 - User: "focus on adding new sounds and textures, make things look better ... more realistic ... more premium", then "instead of the lights hovering above the room, corner lights and wall lights, strategically designed so the shadows make sense". Claude scope `presentation-assets`: new files only, plus the exact existing-file hooks below.

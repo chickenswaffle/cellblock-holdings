@@ -44,6 +44,8 @@ namespace Cellblock.Unity
             if (cameraRig != null) cameraRig.GetUniversalAdditionalCameraData().renderShadows = Preferences.Shadows;
             if (view != null) { view.ReducedMotion = Preferences.ReducedMotion; view.ContactShadowsEnabled = Preferences.Shadows; }
             if (hud != null) hud.ApplyInterfacePreferences();
+            PresentationQuality.Apply(Preferences.GraphicsQuality); PerformanceOverlay.Show(Preferences.PerformanceOverlay);
+            FacilitySoundscape.Levels(Preferences.AmbienceVolume, Preferences.EffectsVolume, Preferences.InterfaceVolume);
         }
         public bool SavePreferences()
         {

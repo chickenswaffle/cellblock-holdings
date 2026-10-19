@@ -22,6 +22,12 @@ namespace Cellblock.Unity
         static FacilitySoundscape instance;
         // Mix trims measured with Editor/SoundCapture (output RMS around -28 dBFS at the default 65% master).
         const float BedGain = 2.2f, SpotGain = 1.5f;
+        // Settings → Audio: ambience (beds and positional loops), effects (one-shots), interface (button sounds).
+        static float ambience = 1, effects = 1, interfaceLevel = 1;
+        public static void Levels(float ambienceVolume, float effectsVolume, float interfaceVolume) { ambience = ambienceVolume; effects = effectsVolume; interfaceLevel = interfaceVolume; }
+        public static int Playing { get { return instance == null ? 0 : instance.voices.Count(v => v.isPlaying) + instance.beds.Values.Count(b => b.Source != null && b.Source.isPlaying); } }
+        // Backgrounded (phone call, home screen): silence at once and resume where it was, rather than buzzing on.
+        void OnApplicationPause(bool paused) { AudioListener.pause = paused; }
         GameController game; Camera ear;
 
         sealed class Bed { public AudioSource Source; public AudioLowPassFilter Filter; public float Level; }
@@ -65,7 +71,7 @@ namespace Cellblock.Unity
         AudioSource Voice()
         {
             foreach (AudioSource v in voices) if (!v.isPlaying) return v;
-            if (voices.Count >= 24) return voices.OrderBy(v => v.time / Mathf.Max(.01f, v.clip == null ? 1 : v.clip.length)).Last();
+            if (voices.Count >= PresentationQuality.VoiceLimit) return voices.OrderBy(v => v.time / Mathf.Max(.01f, v.clip == null ? 1 : v.clip.length)).Last();
             var go = new GameObject("Sound voice"); go.transform.SetParent(transform, false);
             AudioSource s = go.AddComponent<AudioSource>(); s.playOnAwake = false; s.dopplerLevel = 0; s.spatialBlend = 1;
             s.rolloffMode = AudioRolloffMode.Logarithmic; s.minDistance = 2.5f; s.maxDistance = 90; s.spread = 30;
@@ -78,16 +84,17 @@ namespace Cellblock.Unity
             if (gap > 0 && quietUntil.TryGetValue(name, out until) && Time.unscaledTime < until) return false;
             AudioClip clip = Pick(name); if (clip == null) return false;
             AudioSource v = Voice(); v.transform.position = at; v.spatialBlend = 1; v.minDistance = minDistance;
-            v.clip = clip; v.volume = Mathf.Min(1, volume * SpotGain * Range(.86f, 1f)); v.pitch = Range(1 - pitchSpread, 1 + pitchSpread); v.Play();
+            v.clip = clip; v.volume = Mathf.Min(1, volume * SpotGain * effects * Range(.86f, 1f)); v.pitch = Range(1 - pitchSpread, 1 + pitchSpread); v.Play();
             if (gap > 0) quietUntil[name] = Time.unscaledTime + gap;
             return true;
         }
+        bool interfaceSound;
         bool Play2D(string name, float volume, float gap = 0)
         {
             float until;
             if (gap > 0 && quietUntil.TryGetValue(name, out until) && Time.unscaledTime < until) return false;
             AudioClip clip = Pick(name); if (clip == null) return false;
-            AudioSource v = Voice(); v.spatialBlend = 0; v.clip = clip; v.volume = Mathf.Min(1, volume * SpotGain); v.pitch = Range(.98f, 1.02f); v.Play();
+            AudioSource v = Voice(); v.spatialBlend = 0; v.clip = clip; v.volume = Mathf.Min(1, volume * SpotGain * (interfaceSound ? interfaceLevel : effects)); v.pitch = Range(.98f, 1.02f); v.Play();
             if (gap > 0) quietUntil[name] = Time.unscaledTime + gap;
             return true;
         }
@@ -112,7 +119,7 @@ namespace Cellblock.Unity
         void Mix(string name, float level, float cutoff, float dt, bool filtered = false)
         {
             Bed bed = BedFor(name, filtered); if (bed.Source == null) return;
-            bed.Level = Mathf.MoveTowards(bed.Level, Mathf.Min(1, level * BedGain), dt * .9f);
+            bed.Level = Mathf.MoveTowards(bed.Level, Mathf.Min(1, level * BedGain * ambience), dt * .9f);
             bed.Source.volume = bed.Level;
             if (bed.Filter != null) bed.Filter.cutoffFrequency = Mathf.Lerp(bed.Filter.cutoffFrequency, cutoff, Mathf.Clamp01(dt * 3));
             if (bed.Level > .0005f && !bed.Source.isPlaying) { bed.Source.time = Range(0, bed.Source.clip.length * .9f); bed.Source.Play(); }
@@ -388,7 +395,7 @@ namespace Cellblock.Unity
                 source.rolloffMode = AudioRolloffMode.Logarithmic; source.minDistance = minDistance; source.maxDistance = 80; source.volume = 0;
             }
             if (on) { source.transform.position = at; if (!source.isPlaying) { source.volume = 0; source.Play(); } }
-            source.volume = Mathf.MoveTowards(source.volume, on ? Mathf.Min(1, volume * SpotGain) : 0, dt * 1.5f);
+            source.volume = Mathf.MoveTowards(source.volume, on ? Mathf.Min(1, volume * SpotGain * ambience) : 0, dt * 1.5f);
             if (!on && source.volume <= 0 && source.isPlaying) source.Stop();
             return source;
         }
@@ -406,12 +413,12 @@ namespace Cellblock.Unity
                     if (button != null)
                     {
                         string text = button.text ?? "";
-                        if (text.StartsWith("Approve") || text.StartsWith("Sign") || text.Contains("Accept")) instance.Play2D("sign", .32f, .3f);
-                        else if (text.StartsWith("Hire")) instance.Play2D("stapler", .3f, .2f);
-                        else instance.Play2D("ui_tick", .22f, .04f);
+                        if (text.StartsWith("Approve") || text.StartsWith("Sign") || text.Contains("Accept")) instance.UiSound("sign", .32f, .3f);
+                        else if (text.StartsWith("Hire")) instance.UiSound("stapler", .3f, .2f);
+                        else instance.UiSound("ui_tick", .22f, .04f);
                         return;
                     }
-                    if (el is Toggle || el is Slider) { instance.Play2D("ui_click", .2f, .04f); return; }
+                    if (el is Toggle || el is Slider) { instance.UiSound("ui_click", .2f, .04f); return; }
                 }
             }, TrickleDown.TrickleDown);
         }
@@ -429,6 +436,7 @@ namespace Cellblock.Unity
             }
         }
 #endif
+        void UiSound(string name, float volume, float gap) { interfaceSound = true; Play2D(name, volume, gap); interfaceSound = false; }
         void OnDestroy() { if (instance == this) instance = null; }
     }
 }

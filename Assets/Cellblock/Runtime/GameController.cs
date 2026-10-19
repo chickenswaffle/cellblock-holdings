@@ -174,6 +174,8 @@ namespace Cellblock.Unity
             if (blocked || nativeInputWasBlocked) magnification = 0;
             nativeInputWasBlocked = blocked;
             UpdateControlDevice(); GamepadInterfaceUpdate();
+            PresentationQuality.Sample(Time.unscaledDeltaTime, Application.targetFrameRate > 0 ? Application.targetFrameRate : 60); PerformanceOverlay.Tick(this);
+            if (Input.GetKeyDown(KeyCode.F3)) { Preferences.PerformanceOverlay = !PerformanceOverlay.Visible; SavePreferences(); }
             if (World == null) return;
             UpdateCharacterSession(); InmateUpdate();
             if (!appPaused && (!unfocused || presentationPreview) && !hud.BlocksSimulation && World.Data.Speed > 0)
@@ -273,7 +275,7 @@ namespace Cellblock.Unity
             var request = new UnityEngine.Rendering.Universal.UniversalRenderPipeline.SingleCameraRequest { destination = cctvTexture };
             UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(cctvCamera, request);
         }
-        void OnDestroy() { PresentationShadows.Restore(); EndCharacterView(false); DisposeDoorPreview();if (cctvTexture != null) { cctvTexture.Release(); Destroy(cctvTexture); } ReleaseBodyCam(); }
+        void OnDestroy() { PresentationShadows.Restore(); PresentationQuality.Restore(); EndCharacterView(false); DisposeDoorPreview();if (cctvTexture != null) { cctvTexture.Release(); Destroy(cctvTexture); } ReleaseBodyCam(); }
         public void Orbit(float horizontalDegrees, float verticalDegrees)
         { yaw += horizontalDegrees; pitch = Mathf.Clamp(pitch + verticalDegrees, 28, 78); }
         public void Zoom(float amount) { distance = Mathf.Clamp(distance * Mathf.Exp(-amount * 0.12f), 11, 85); }

@@ -58,6 +58,9 @@ namespace Cellblock.Unity
                 SettingChoices(settingsContent, "Frame-rate limit", "Choose 30 fps to reduce power use, or 60 fps for smoother motion.", new[] { "30 fps", "60 fps" }, p.FrameRate == 30 ? 0 : 1, i => p.FrameRate = i == 0 ? 30 : 60);
                 SettingChoices(settingsContent, "Cast shadows", "Show architectural and character shadows in the main view.", new[] { "Off", "On" }, p.Shadows ? 1 : 0, i => p.Shadows = i == 1);
                 SettingChoices(settingsContent, "Reduced motion", "Removes HUD meter transitions and camera easing. Character activity remains visible.", new[] { "Off", "On" }, p.ReducedMotion ? 1 : 0, i => p.ReducedMotion = i == 1);
+                // Claude presentation pass (exact exception 2026-10-18): quality tiers and the device-test overlay.
+                SettingChoices(settingsContent, "Graphics quality", "Auto starts at what this device should hold and steps down if the frame rate drops. Low, Medium and High fix resolution, shadows, lighting detail and ambient occlusion.  Now: " + PresentationQuality.Current + (PresentationQuality.Automatic ? " (Auto)" : ""), new[] { "Auto", "Low", "Medium", "High" }, p.GraphicsQuality, i => p.GraphicsQuality = i);
+                SettingChoices(settingsContent, "Performance overlay", "Shows frame rate, frame time, quality, lights, sounds and memory in the corner. F3 toggles it on a keyboard.", new[] { "Off", "On" }, p.PerformanceOverlay ? 1 : 0, i => p.PerformanceOverlay = i == 1);
             }
             if (settingsPage == "Controls")
             {
@@ -80,7 +83,22 @@ namespace Cellblock.Unity
                 var value = Text(Mathf.RoundToInt(p.MasterVolume * 100) + "%", "setting-help"); settingsContent.Add(value);
                 slider.RegisterValueChangedCallback(e => { p.MasterVolume = e.newValue; value.text = Mathf.RoundToInt(e.newValue * 100) + "%"; AudioListener.volume = p.MasterVolume; int sequence = ++volumeSaveSequence; settingsOverlay.schedule.Execute(() => { if (sequence == volumeSaveSequence && settingsOpen) PreferencesChanged(); }).StartingIn(250); });
                 settingsContent.Add(Text("Controls game audio, including alarms. Zero mutes audio without changing the facility's alarm state.", "setting-help"));
+                // Claude presentation pass (exact exception 2026-10-18): the soundscape's three groups under the master.
+                LevelSlider("Ambience", "Building hum, voices, weather and the time of day.", p.AmbienceVolume, v => p.AmbienceVolume = v);
+                LevelSlider("Effects", "Footsteps, doors, cuffs, fights, crews, chimes and the alarm bell.", p.EffectsVolume, v => p.EffectsVolume = v);
+                LevelSlider("Interface", "Button ticks and signatures.", p.InterfaceVolume, v => p.InterfaceVolume = v);
             }
+        }
+        void LevelSlider(string title, string help, float current, System.Action<float> set)
+        {
+            var slider = new Slider(title, 0, 1) { value = current }; slider.AddToClassList("settings-slider"); settingsContent.Add(slider);
+            var value = Text(Mathf.RoundToInt(current * 100) + "%  ·  " + help, "setting-help"); settingsContent.Add(value);
+            slider.RegisterValueChangedCallback(e =>
+            {
+                set(e.newValue); value.text = Mathf.RoundToInt(e.newValue * 100) + "%  ·  " + help;
+                FacilitySoundscape.Levels(game.Preferences.AmbienceVolume, game.Preferences.EffectsVolume, game.Preferences.InterfaceVolume);
+                int sequence = ++volumeSaveSequence; settingsOverlay.schedule.Execute(() => { if (sequence == volumeSaveSequence && settingsOpen) PreferencesChanged(); }).StartingIn(250);
+            });
         }
         public void ApplyInterfacePreferences() { if (root == null) return; root.EnableInClassList("reduced-motion", game.Preferences.ReducedMotion); float before = panelSettings.scale; UpdatePanelScale(); if (!Mathf.Approximately(before, panelSettings.scale)) Layout(); }
 #if UNITY_EDITOR
