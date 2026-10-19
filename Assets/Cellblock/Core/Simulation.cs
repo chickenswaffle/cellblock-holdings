@@ -87,6 +87,7 @@ namespace Cellblock.Core
         public float Remaining, Required;
         public int WorkFronts = 1;
         public string TaskId = "", Kind = "";
+        public string RemovedWallId = "", RemovedFixtureId = "";
         public Point Site;
         public bool HasSite;
     }
@@ -353,20 +354,20 @@ namespace Cellblock.Core
             Notice = description;
             return true;
         }
-        List<Wall> FutureWalls()
+        List<Wall> FutureWalls(int limit = int.MaxValue)
         {
             var walls = Data.Walls.Select(w => w.Copy()).ToList();
-            foreach (Project p in Data.Projects.Where(p => !p.Completed))
+            foreach (Project p in Data.Projects.Where(p => !p.Completed).Take(limit))
             {
                 walls.RemoveAll(w => p.RemoveWalls.Contains(w.Id));
                 walls.AddRange(p.Work.Where(w => w.Wall != null).Select(w => w.Wall));
             }
             return walls;
         }
-        List<Fixture> FutureFixtures()
+        List<Fixture> FutureFixtures(int limit = int.MaxValue)
         {
             var fixtures = Data.Fixtures.Select(f => f.Copy()).ToList();
-            foreach (Project project in Data.Projects.Where(p => !p.Completed))
+            foreach (Project project in Data.Projects.Where(p => !p.Completed).Take(limit))
             {
                 fixtures.RemoveAll(f => project.RemoveFixtures.Contains(f.Id));
                 fixtures.AddRange(project.Work.Where(w => w.Fixture != null).Select(w => w.Fixture));
@@ -638,7 +639,9 @@ namespace Cellblock.Core
             fitKey = key; fitResult = best;
             return best;
         }
-        public Quote Quote(Plan request)
+        public Quote Quote(Plan request) { return QuoteLayout(request, false, false); }
+        // Rearrangement shares the full spatial validator, with no purchase/labour requirement.
+        Quote QuoteLayout(Plan request, bool rearrange, bool currentOnly, int projectLimit = int.MaxValue)
         {
             var result = new Quote();
             if (request == null) { result.Message = "Create a plan first."; return result; }
@@ -650,8 +653,8 @@ namespace Cellblock.Core
             if (request.Fixtures.Where(f => f != null && plan.RemoveFixtures.Contains(f.Id)).GroupBy(f => f.Id).Any(g => g.Count() > 1) ||
                 plan.UpgradeIds.Any(id => !plan.RemoveFixtures.Contains(id) || request.Fixtures.Count(f => f != null && f.Id == id) != 1))
             { result.Message = "An upgrade needs one existing asset and one replacement."; return result; }
-            var future = FutureWalls();
-            var futureFixtures = FutureFixtures();
+            var future = currentOnly ? Data.Walls.ToList() : FutureWalls(projectLimit);
+            var futureFixtures = currentOnly ? Data.Fixtures.ToList() : FutureFixtures(projectLimit);
             futureFixtures.RemoveAll(f => plan.RemoveFixtures.Contains(f.Id));
             foreach (string id in plan.RemoveWalls)
             {
@@ -747,8 +750,8 @@ namespace Cellblock.Core
             }
             if (plan.Walls.Count + plan.Fixtures.Count + plan.RemoveWalls.Count + plan.RemoveFixtures.Count == 0)
             { result.Message = "That structure already exists. Shared walls are retained without another charge."; return result; }
-            var futureMoves = Data.Projects.Where(p => !p.Completed).SelectMany(p => p.HomeMoves).Concat(plan.HomeMoves).ToList();
-            Project priorDining = Data.Projects.LastOrDefault(p => !p.Completed && p.RelocatesDining);
+            var futureMoves = (currentOnly ? Enumerable.Empty<HomeMove>() : Data.Projects.Where(p => !p.Completed).Take(projectLimit).SelectMany(p => p.HomeMoves)).Concat(plan.HomeMoves).ToList();
+            Project priorDining = currentOnly ? null : Data.Projects.Where(p => !p.Completed).Take(projectLimit).LastOrDefault(p => p.RelocatesDining);
             Point finalDining = plan.RelocatesDining ? plan.Dining : priorDining != null ? priorDining.Dining : Data.Dining;
             var futureRoutes = new Navigation(future, futureFixtures);
             // A post must stay clear; nothing is installed directly on top of someone on duty. Passing near a person is fine.
@@ -769,7 +772,8 @@ namespace Cellblock.Core
             }
             string blocked = CheckRoutes(future, futureMoves, finalDining, futureFixtures);
             if (blocked != "") { result.Message = blocked; return result; }
-            if (result.MaterialCents > Data.CashCents) { result.Message = "The materials and disposal quote exceeds available cash."; return result; }
+            if (rearrange) { result.MaterialCents = 0; result.CrewMinutes = -25; }
+            if (!rearrange && result.MaterialCents > Data.CashCents) { result.Message = "The materials and disposal quote exceeds available cash."; return result; }
             result.Plan = plan; result.CrewMinutes += 25; result.Valid = true;
             result.Message = "Materials and disposal are paid on approval. Hired crews are billed separately by game time.";
             return result;
@@ -796,11 +800,14 @@ namespace Cellblock.Core
             }
             foreach (string id in plan.RemoveWalls)
             {
-                float work = Geometry.Length(Data.Walls.First(w => w.Id == id)) * 8;
-                project.Work.Add(new WorkItem { TaskId = Id(), Site = Geometry.OnLength(Data.Walls.First(w => w.Id == id), 0.5f), HasSite = true, Kind = "Removal", Required = work, Remaining = work });
+                Wall old = Data.Walls.First(w => w.Id == id);
+                float work = Geometry.Length(old) * 8;
+                project.Work.Add(new WorkItem { TaskId = Id(), Site = Geometry.OnLength(old, .5f), HasSite = true, Kind = "Removal", RemovedWallId = id, Required = work, Remaining = work });
             }
-            if (plan.RemoveFixtures.Count > 0)
-                project.Work.Add(new WorkItem { TaskId = Id(), Site = Data.Fixtures.First(f => plan.RemoveFixtures.Contains(f.Id)).Position, HasSite = true, Kind = "Removal", Required = plan.RemoveFixtures.Count * 20, Remaining = plan.RemoveFixtures.Count * 20 });
+            foreach (string id in plan.RemoveFixtures)
+                project.Work.Add(new WorkItem { TaskId = Id(), Site = Data.Fixtures.First(f => f.Id == id).Position, HasSite = true, Kind = "Removal", RemovedFixtureId = id, Required = 20, Remaining = 20 });
+            // Clear the existing work before fitting replacements; actual geometry changes only at handover.
+            project.Work = project.Work.OrderBy(w => w.Kind == "Removal" ? 0 : 1).ToList();
             Book(-quote.MaterialCents, "materials", project.Name + " / " + project.Id);
             Data.Projects.Add(project);
             Notice = Data.Crews.Count == 0 ? "Project approved. Hire a construction crew to begin." : "Project approved. Crews will begin preparation.";
@@ -841,14 +848,16 @@ namespace Cellblock.Core
                         project.Status = "Preparing site"; crew.Activity = project.Name + ": preparation"; break;
                     }
                     WorkItem item = project.Work.FirstOrDefault(w => w.Remaining > 0 &&
-                        (!assignments.ContainsKey(w) || assignments[w] < w.WorkFronts));
+                        (!assignments.ContainsKey(w) || assignments[w] < w.WorkFronts) &&
+                        (w.Kind == "Removal" || !project.Work.Any(r => r.Kind == "Removal" && r.Remaining > 0)));
                     if (item != null)
                     {
                         assignments[item] = assignments.ContainsKey(item) ? assignments[item] + 1 : 1;
                         if (!ReachWork(crew, project, item)) break;
                         crew.Working = true;
-                        item.Remaining = Math.Max(0, item.Remaining - 1); crew.SuppliesUsed++;
-                        project.Status = "Construction"; crew.Activity = project.Name + ": " + crew.WorkKind.ToLowerInvariant(); break;
+                        item.Remaining = Math.Max(0, item.Remaining - 1);
+                        if (item.Kind != "Removal") crew.SuppliesUsed++;
+                        project.Status = item.Kind == "Removal" ? "Dismantling and clearing" : "Construction"; crew.Activity = project.Name + ": " + crew.WorkKind.ToLowerInvariant(); break;
                     }
                     if (project.Work.Any(w => w.Remaining > 0)) continue;
                     if (project.DependsOn.Any(id => Data.Projects.Any(p => p.Id == id && !p.Completed)))

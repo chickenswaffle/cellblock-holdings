@@ -127,7 +127,7 @@ namespace Cellblock.Unity
                 case BuildTool.Meals: Instruction = "MEAL SERVICE · Tap an installed table to move meal service and compare travel times."; break;
                 case BuildTool.MoveStart: case BuildTool.MoveEnd: Instruction = "WALL EDIT · Tap the new endpoint position."; break;
                 case BuildTool.Bend: Instruction = "WALL EDIT · Tap the bend position. Straight walls can become curves."; break;
-                case BuildTool.MoveFixture: Instruction = "MOVE FURNISHING · Tap its new position."; break;
+                case BuildTool.MoveFixture: Instruction = "MOVE FURNISHING · Tap its new position. Moves immediately · no crew or charge."; break;
                 default: Instruction = "Drag to pan · Drag a selected item to move it · Right-drag to orbit · Scroll to zoom · Tap a component to edit"; break;
             }
             PlacementSummary = "";
@@ -453,10 +453,10 @@ namespace Cellblock.Unity
         {
             fixtureDragging = true; SetTool(BuildTool.MoveFixture);
             if (Tool != BuildTool.MoveFixture) { fixtureDragging = false; return; }
-            Instruction = "MOVE FURNISHING · Drag to the new position and let go to review the move.";
+            Instruction = "MOVE FURNISHING · Drag and release to move immediately. No crew or charge.";
             previewTime = 0; hud.Refresh(true);
         }
-        // Letting go over the floor proposes the move with its quote; letting go over the interface cancels it.
+        // Releasing an existing item moves it immediately; the interface cancels the drag.
         // New placements: a drag shows the item where it would go and letting go asks for the quote. On touch the item
         // sits a little above the finger, so the finger never hides what it places; a plain tap still places exactly.
         bool PlacementTool { get { return Tool == BuildTool.Bed || Tool == BuildTool.Table || Tool == BuildTool.Furnishing || Tool == BuildTool.Wing; } }
@@ -482,7 +482,6 @@ namespace Cellblock.Unity
             fixtureDragging = false; fixtureGrab = false;
             if (hud.IsOverUI(screen)) { SetTool(BuildTool.Inspect); return; }
             Tap(screen);
-            if (Draft == null && Tool == BuildTool.MoveFixture) SetTool(BuildTool.Inspect);
         }
         void PreviewAt(Vector2 screen)
         {
@@ -513,7 +512,7 @@ namespace Cellblock.Unity
             }
             if (Tool == BuildTool.MoveFixture && SelectedFixture != null)
             {
-                Fixture changed = SelectedFixture.Copy(); changed.Position = p; preview = new Plan(); preview.Fixtures.Add(changed);
+                Fixture changed = SelectedFixture.Copy(); changed.Position = p; preview = new Plan(); preview.RemoveFixtures.Add(changed.Id); preview.Fixtures.Add(changed);
             }
             Wall measured = preview != null && preview.Walls.Count > 0 ? preview.Walls[0] : null;
             if (measured != null)
@@ -525,7 +524,13 @@ namespace Cellblock.Unity
             else if (preview != null && preview.Fixtures.Count > 0)
             {
                 PlacementSummary = FixtureCatalog.Get(preview.Fixtures[0].Kind).Name + " · " + (Snapping ? "0.5 m snap" : "free placement") + (placingDrag || fixtureDragging ? " · let go to review" : " · tap or drag to place");
-                guides.ShowFixture(preview.Fixtures[0]);
+                if (Tool == BuildTool.MoveFixture)
+                {
+                    Fixture item = preview.Fixtures[0]; Quote move = World.PreviewFixtureMove(item.Id, item.Position, item.Rotation);
+                    PlacementSummary = move.Valid ? "Release to move · no crew or charge" : move.Message;
+                    guides.ShowFixture(item, !move.Valid);
+                }
+                else guides.ShowFixture(preview.Fixtures[0]);
             }
             else if (Tool != BuildTool.Inspect) { PlacementSummary = hasStart ? "Choose the next point" : "Tap to begin · drag with two fingers to move"; guides.Show(null); }
             if (Tool != BuildTool.Inspect) view.Preview(preview, SelectedWall, SelectedFixture);
@@ -660,7 +665,8 @@ namespace Cellblock.Unity
         }
         void ReplaceFixture(Fixture changed, string name)
         {
-            var plan = new Plan { Name = name }; plan.RemoveFixtures.Add(SelectedFixture.Id); plan.Fixtures.Add(changed); SetDraft(plan);
+            if (!World.MoveFixtureNow(SelectedFixture.Id, changed.Position, changed.Rotation)) { Message(World.Notice); return; }
+            view.Refresh(World, true); SetTool(BuildTool.Inspect); Save(false); Message(World.Notice);
         }
         public void ChangeFinish()
         {

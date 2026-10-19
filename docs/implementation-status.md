@@ -2,6 +2,14 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
+## October 18 furniture rearrangement and construction presentation
+
+Installed items now move/rotate directly without a crew, purchase or project. Validation preserves identity, assigned bed homes, dining designation, clear routes and each pending construction stage. New installation, upgrades and demolition retain approved crew work. Removal tasks target individual assets, bypass fresh-material delivery and complete before replacement installation. Legacy aggregate removal preserves total work/progress when split on load.
+
+Builders have distinct hammer lift/strike/recoil, drill set/press/withdraw, saw strokes on timber and pry lever/reset poses; helpers inspect. Demolition progress adds shallow scoring, debris and salvage trays. Tool chips are pooled, proximity-gated and suppressed by reduced motion. Actual usable geometry still changes at safe handover. [Implementation and texture/audio continuation](rearrangement-and-construction.md).
+
+Evidence for this pass: installed Unity 6000.3.24f1 source import/API compilation, authored renderer contact sheets and independent source/visual critic. No automated tests were added or run for this request. The earlier 420-check full regression below belongs to `8507b82`, not this changed source. Natural project completion, relocation save roundtrips, device performance and long-run simulation have not been newly verified here. Claude's texture/audio assets remain in its separate scope; reviewed controller/prisoner follow-on remains unimported on this Mac.
+
 ## October 18 reviewed Claude services and staff input
 
 Implementation merge **`8507b82`**, final source fingerprint **`cff62f41`**, combines natural motion`42c1796` with Claude's published **`bb9d3f6`** sanitation, yard life, staff actions and device look controls. **420 core checks pass /0 failures.** All final Unity reports have empty error arrays.

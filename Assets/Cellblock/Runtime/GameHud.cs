@@ -775,7 +775,7 @@ namespace Cellblock.Unity
             fixturePane.style.display = game.SelectedFixture != null ? DisplayStyle.Flex : DisplayStyle.None;
             selectionEmpty.style.display = selection == null ? DisplayStyle.Flex : DisplayStyle.None;
             if (game.SelectedWall != null) wallInfo.text = (game.SelectedWall.Curved ? "Curved wall" : "Straight wall") + "  /  " + Geometry.Length(game.SelectedWall).ToString("0.0") + " m\nEdit the shape or material. Changes are reviewed as a construction project.";
-            if (game.SelectedFixture != null) fixtureInfo.text = "Installed " + (selectedFixture != null ? selectedFixture.Name.ToLowerInvariant() : game.SelectedFixture.Kind.ToLowerInvariant()) + ". Move, rotate, or remove it through a reviewed project." + (selectedFixture != null ? "\nFootprint: " + selectedFixture.Width.ToString("0.##") + " × " + selectedFixture.Depth.ToString("0.##") + " m" : "");
+            if (game.SelectedFixture != null) fixtureInfo.text = "Installed " + (selectedFixture != null ? selectedFixture.Name.ToLowerInvariant() : game.SelectedFixture.Kind.ToLowerInvariant()) + ". Move or rotate immediately · no crew or charge. Removal needs a crew project." + (selectedFixture != null ? "\nFootprint: " + selectedFixture.Width.ToString("0.##") + " × " + selectedFixture.Depth.ToString("0.##") + " m" : "");
             crewInfo.text = world.Data.Crews.Count + " crew" + (world.Data.Crews.Count == 1 ? "" : "s") + " hired  /  " + Money(crewWages) + " per day";
             hire.SetEnabled(world.Data.CashCents >= 50000); release.SetEnabled(world.Data.Crews.Count > 0);
             for (int i = 0; i < crewRows.Length; i++)

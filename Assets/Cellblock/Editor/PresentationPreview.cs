@@ -32,18 +32,19 @@ namespace Cellblock.Editor
         public static void Capture() { RequestRun("capture"); }
         internal static void RequestEscapeReview() { RequestRun("escape"); }
         internal static void RequestFeatureReview(string mode) { RequestRun(mode); }
-        static bool FeatureMode(string mode) { return mode == "yard" || mode == "actions" || mode == "sanitation" || mode == "look"; }
+        static bool FeatureMode(string mode) { return mode == "yard" || mode == "actions" || mode == "sanitation" || mode == "look" || mode == "workshop"; }
         static void BeginFeature(string mode)
         {
             if (mode == "yard") YardCapture.BeginExisting();
             else if (mode == "actions") ActionCapture.BeginExisting();
             else if (mode == "sanitation") SanitationCapture.BeginExisting();
+            else if (mode == "workshop") ConstructionStudio.BeginExisting();
             else LookCapture.BeginExisting();
         }
         static bool FeatureRunning(string mode)
         {
             return mode == "yard" ? YardCapture.IsRunning : mode == "actions" ? ActionCapture.IsRunning :
-                mode == "sanitation" ? SanitationCapture.IsRunning : LookCapture.IsRunning;
+                mode == "sanitation" ? SanitationCapture.IsRunning : mode == "workshop" ? ConstructionStudio.IsRunning : LookCapture.IsRunning;
         }
         static void AbortFeature(string mode, string reason)
         {
@@ -51,6 +52,7 @@ namespace Cellblock.Editor
             else if (mode == "actions") ActionCapture.Abort(reason);
             else if (mode == "sanitation") SanitationCapture.Abort(reason);
             else if (mode == "look") LookCapture.Abort(reason);
+            else if (mode == "workshop") ConstructionStudio.Abort(reason);
         }
         [Serializable] sealed class FeatureReport { public bool passed; public string editor; public string[] errors, notes, captures; }
         internal static void WriteFeatureEvidence(string output, bool passed, string[] errors, string[] notes)

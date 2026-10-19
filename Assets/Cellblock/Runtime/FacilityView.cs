@@ -28,7 +28,7 @@ namespace Cellblock.Unity
             public bool Staff, Seen, PoseArms;
             public Resident Motion;
             public Transform WorkTool, Cargo, Workbench;
-            public Transform[] Forearms, Hands, Tools, Knees, Feet;
+            public Transform[] Forearms, Hands, Tools, Knees, Feet, WorkChips;
             public float PoseClock;
         }
         readonly Dictionary<string, Actor> actors = new Dictionary<string, Actor>();
