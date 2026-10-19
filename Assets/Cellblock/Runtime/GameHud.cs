@@ -68,6 +68,7 @@ namespace Cellblock.Unity
             settings.themeStyleSheet = Resources.Load<ThemeStyleSheet>("CellblockTheme");
             UIDocument document = gameObject.AddComponent<UIDocument>(); document.panelSettings = settings;
             root = document.rootVisualElement; root.name = "world-overlay"; root.pickingMode = PickingMode.Ignore;
+            FacilitySoundscape.BindInterface(root);
             root.style.flexGrow = 1;
             root.style.unityFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             root.styleSheets.Add(Resources.Load<StyleSheet>("Cellblock"));

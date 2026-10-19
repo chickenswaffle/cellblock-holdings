@@ -19,10 +19,11 @@ namespace Cellblock.Unity
         // Pending design approval (docs/prisoner-mode-plan.md), prisoner play exists only in the editor and development
         // builds; release players never offer or start it.
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        public const bool InmateModeAvailable = true;
+        public static readonly bool InmateModeAvailable = true;
 #else
-        public const bool InmateModeAvailable = false;
+        public static readonly bool InmateModeAvailable = false;
 #endif
+        public bool HomeShown { get { return hud != null && hud.HomeShown; } }
         public bool InmateMode { get { return World != null && World.InmateMode; } }
         public bool InmateFastForward { get { return inmateFastForward; } }
         public void ToggleInmateFastForward() { inmateFastForward = !inmateFastForward; hud.Refresh(true); }

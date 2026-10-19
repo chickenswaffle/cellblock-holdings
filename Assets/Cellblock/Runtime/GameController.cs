@@ -88,6 +88,7 @@ namespace Cellblock.Unity
             sanitationView = new GameObject("Sanitation presentation").AddComponent<FacilitySanitationView>(); sanitationView.transform.SetParent(transform); sanitationView.Initialize();
             guides = new GameObject("Construction measurements").AddComponent<ConstructionGuides>(); guides.transform.SetParent(transform); guides.Initialize(cameraRig);
             hud = new GameObject("Management interface").AddComponent<GameHud>(); hud.transform.SetParent(transform); hud.Initialize(this); ApplyPreferences();
+            FacilitySoundscape.Create(this, cameraRig);
             view.Refresh(Cellblock.Core.World.Start(Cellblock.Core.World.Offers[0].Id), true);
             SetTool(BuildTool.Inspect); CameraPosition(true); hud.ShowMenu();
         }

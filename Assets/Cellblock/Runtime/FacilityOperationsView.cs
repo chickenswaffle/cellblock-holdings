@@ -240,18 +240,14 @@ namespace Cellblock.Unity
             RenderSettings.ambientEquatorColor = Color.Lerp(new Color(0.085f, 0.105f, 0.15f), new Color(0.43f, 0.48f, 0.50f), daylight);
             RenderSettings.ambientGroundColor = Color.Lerp(new Color(0.040f, 0.05f, 0.07f), new Color(0.24f, 0.27f, 0.24f), daylight);
             RenderSettings.ambientSkyColor = Color.Lerp(new Color(0.12f, 0.16f, 0.26f), new Color(0.69f, 0.76f, 0.80f), daylight);
-            if (force || lightingRevision != world.GeometryRevision)
+            if (force || lightingRevision != world.GeometryRevision || RoomLightingStale)
             {
                 if (lightRoot == null) lightRoot = Root("Facility luminaires"); Clear(lightRoot); facilityLights.Clear(); luminaireMeshes.Clear(); lightingRevision = world.GeometryRevision;
-                foreach (List<Point> room in world.Rooms)
-                {
-                    Point center = room.Aggregate(new Point(), (sum, p) => sum + p) * (1f / room.Count);
-                    Transform housing = Box(lightRoot, "Ceiling luminaire", V(center, 2.9f), new Vector3(1.2f, 0.08f, 0.18f), "ceiling-on", new Color(0.91f, 0.87f, 0.73f));
-                    luminaireMeshes.Add(housing.GetComponent<Renderer>());
-                    var lamp = new GameObject("Interior light").AddComponent<Light>(); lamp.transform.SetParent(lightRoot, false); lamp.transform.position = V(center, 2.6f);
-                    lamp.type = LightType.Point; lamp.range = 10; lamp.intensity = 3; lamp.color = new Color(1, 0.89f, 0.70f); lamp.shadows = LightShadows.None; facilityLights.Add(lamp);
-                }
+                // Wall packs and corner luminaires with their lights inside them (Claude, FacilityRoomLighting.cs);
+                // one lens renderer per light, so the on/off material pairing below is unchanged.
+                BuildRoomLighting(world, lightRoot, facilityLights, luminaireMeshes);
             }
+            Camera eye = Camera.main; RoomLightShadows.Assign(facilityLights, eye, eye != null && eye.transform.position.y < 18);
             for (int i = 0; i < facilityLights.Count; i++)
                 facilityLights[i].enabled = world.Data.Operations.Lights && world.PowerAt(new Point(facilityLights[i].transform.position.x, facilityLights[i].transform.position.z));
             Material luminaireOn = Material("ceiling-on", new Color(0.91f, 0.87f, 0.73f));
@@ -270,7 +266,8 @@ namespace Cellblock.Unity
             }
             bool alarm = world.Data.Operations.Alarm; alarmLight.enabled = alarm;
             alarmLight.intensity = alarm ? 1.5f + Mathf.Sin(Time.unscaledTime * 7) * 1.2f : 0;
-            if (alarm && world.Data.Speed > 0 && Application.isFocused) { if (!siren.isPlaying) siren.Play(); } else if (siren.isPlaying) siren.Stop();
+            // The soundscape's recorded alarm bell replaces this synthesized tone when its library is present (Claude).
+            if (alarm && world.Data.Speed > 0 && Application.isFocused && !FacilitySoundscape.ProvidesAlarm) { if (!siren.isPlaying) siren.Play(); } else if (siren.isPlaying) siren.Stop();
         }
         void RefreshCoverage(World world)
         {
