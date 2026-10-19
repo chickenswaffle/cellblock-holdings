@@ -56,6 +56,7 @@ namespace Cellblock.Unity
             commandSaveButton.text = game.SaveProblem != "" ? "Retry save" : "Save";
             commandSaveButton.EnableInClassList("danger", game.SaveProblem != "");
             RefreshIncidentHud(world);
+            RefreshPhoneHud(world); // phone stat chip (Claude, GamePhoneHud.cs)
         }
         static float CapacityScore(int present, int beds) { return beds <= 0 ? present > 0 ? 101 : 0 : 100f * present / beds; }
         void LayoutCommandHud(float left, float right, float top, float bottom, bool menuOpen)
@@ -87,6 +88,7 @@ namespace Cellblock.Unity
             WorldViewCenter = new Vector2((worldLeft + Mathf.Max(0, worldRight - worldLeft) * .5f) / width,
                 (bottom + 80 + Mathf.Max(0, height - top - bottom - 168) * .5f) / height);
             LayoutPressure(left, right, top + 88, menuOpen);
+            LayoutPhoneHud(left, right, top, bottom, menuOpen); // phone frame (Claude, GamePhoneHud.cs)
         }
         sealed class CommandIcon : VisualElement
         {

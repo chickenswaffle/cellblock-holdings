@@ -126,6 +126,10 @@ namespace Cellblock.Unity
             staffInteractionOverlay.style.top = top; staffInteractionOverlay.style.bottom = bottom;
             staffInteractionOverlay.EnableInClassList("staff-interaction-short", root.resolvedStyle.height < 600);
             staffInteractionOverlay.EnableInClassList("staff-interaction-narrow", root.resolvedStyle.width < 600);
+            // Phones (Claude, 2026-10-19): a sheet on the right, so the person being acted on stays in view.
+            bool side = compact && root.resolvedStyle.width >= 600;
+            staffInteractionOverlay.EnableInClassList("staff-interaction-side", side);
+            if (side) staffInteractionOverlay.style.left = Mathf.Max(left, root.resolvedStyle.width - right - Mathf.Min(380, root.resolvedStyle.width * .46f));
         }
     }
 }

@@ -1,0 +1,33 @@
+/* Phone management frame (Claude, 2026-10-19): GamePhoneHud.cs. Applies only under .phone-hud (compact screens). */
+.phone-hud .header { padding: 2px 6px; border-radius: 24px; justify-content: flex-start; }
+.phone-hud .header .identity, .phone-hud .header .occupancy, .phone-hud .header .metric-label,
+.phone-hud .header .command-save-stamp, .phone-hud .header .phone-hide { display: none; }
+.phone-hud .header .balance { min-width: 0; margin: 0 10px 0 8px; }
+.phone-hud .header .cash { font-size: 17px; }
+.phone-hud .header .time-control { flex-direction: row; margin-right: 6px; }
+.phone-hud .header .clock { margin: 0 8px 0 0; font-size: 11px; }
+.phone-hud .header Button.speed-button { min-width: 44px; min-height: 44px; padding: 0 6px; }
+.phone-hud .header .header-actions Button { min-width: 44px; min-height: 44px; font-size: 11px; padding: 0 8px; }
+
+/* Worst-meter chip */
+.phone-stat { position: absolute; height: 40px; padding: 0 14px; border-radius: 20px; -unity-text-align: middle-center;
+  background-color: rgba(18, 30, 34, 0.92); border-width: 1px; border-color: rgb(69, 96, 98); color: rgb(214, 228, 220); font-size: 12px; }
+.phone-stat.phone-stat-caution { border-color: rgb(214, 170, 92); color: rgb(244, 214, 150); }
+.phone-stat.phone-stat-danger { border-color: rgb(222, 112, 92); color: rgb(250, 182, 166); background-color: rgba(60, 24, 20, 0.92); }
+
+/* Pressure alert as a chip */
+.phone-hud .pressure-alert { border-radius: 20px; padding: 6px 12px; min-height: 40px; justify-content: center; }
+.phone-hud .pressure-alert-text { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Icon dock */
+.phone-hud .navigation.command-navigation { padding: 2px 4px; border-radius: 27px; }
+.phone-hud Button.command-tab { height: 50px; min-height: 50px; min-width: 52px; margin: 0 2px; padding: 2px 4px; border-radius: 22px; }
+.phone-hud .command-tab-label { display: none; }
+.phone-hud .command-tab.selected .command-tab-label { display: flex; font-size: 9px; }
+
+/* Officer Actions as a right-hand sheet on phones (GameStaffInteractionsHud) */
+.staff-interaction-side { background-color: rgba(0, 0, 0, 0); padding: 0; align-items: stretch; justify-content: flex-start; }
+.staff-interaction-side .staff-interaction-card { width: 100%; max-width: none; height: 100%; max-height: none; padding: 10px; border-radius: 12px; }
+.staff-interaction-side .staff-interaction-choice { width: 98%; min-height: 50px; padding: 6px 10px; margin-bottom: 5px; }
+.staff-interaction-side .staff-interaction-name { font-size: 17px; }
+.staff-interaction-side .staff-interaction-kicker { display: none; }
