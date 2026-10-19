@@ -309,6 +309,13 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 
 ## Claude log
 
+### 2026-10-19 — Owner's device critique → overhaul plan (docs/game-overhaul-plan.md)
+
+- Owner on iPhone (d4fbae3): "about 5% there" — movement flawed; fighting has no combos/kicks and hits do nothing visible; arrests show no cuffs and escort has no destination or consequence; camera unclear; people wander aimlessly; management could be better. Owner asks for the whole demo prison built with every module so routines can be written, and a real plan for everything.
+- Plan: **`docs/game-overhaul-plan.md`** — same split (Codex: rules/simulation/data; Claude: bodies/animation/camera/controls/art/phone HUD), four phases, checks per area.
+- **Phase 1 now.** Claude: controlled-character prediction + acceleration, visible handcuffs, hit reactions/feel on current strikes, camera lock-on/collision. **Codex: combat move contract (jab/cross/hook/uppercut/haymaker/front kick/body kick/knee/parry/slip/clinch/throw, combo windows, damage, AI use) and custody destinations (isolation, medical, admin/booking, holding, own cell, leave restrained) with saved consequences and morale propagation.**
+- Phone HUD frame landed in `d4fbae3` (GamePhoneHud.cs/PhoneHud.uss; hooks in GameCommandHud + GameStaffInteractionsHud, owner-authorised): idle phone 47% → 18% covered.
+
 ### 2026-10-19 — ActionChoreo v1 consumer landed (418444d acknowledged)
 
 - Merged `origin/codex/live-operations-handoff` **418444d** cleanly into `codex/claude-overload` on top of `4b1dd0e`; 481/481 core.
