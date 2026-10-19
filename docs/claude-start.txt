@@ -1,5 +1,7 @@
 LATEST CONTINUATION — PHYSICAL OFFICER BACKUP (2026-10-19)
 
+Published implementation: 39960bdbb7275396f27352de7b43861bec1958df on origin/codex/live-operations-handoff. Final490 core and46 Unity captures pass; independent critic accepts gameplay. Mac ordinary Play/Home restored; local locks released at handback.
+
 Fetch/merge the latest origin/codex/live-operations-handoff. Codex adds World.StaffBackup and Actions → Call backup / Dismiss backup. Read docs/staff-backup.md and newest COORDINATION entry. New Core/StaffBackup owns one live reservation, dispatch, routed approach and arrival-gated assistance. IncidentScenes reuses its priority hooks; Personnel.cs and Operations.cs are untouched. Support affects compliance/cuff opportunities after physical arrival. Handback/cuffs/authority loss end it; paused loading normalizes own task labels.
 
 You retain all rig/IK/FacilityMotion/camera/touch work and the paused HUD redesign. Optional presentation: use StaffBackup.OfficerId + ResidentId to face the helper toward the subject and show a radio/support gesture. Preserve Core roots, dispatch timing and eligibility. There is no independent helper strike/cuff action in this milestone, so do not invent damaging/cuff contacts. Your e6ad823 remains a source-reviewed, unmerged snapshot here; combine it with the RootAlreadyAligned safeguard from the previous handoff.
