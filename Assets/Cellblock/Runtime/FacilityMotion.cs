@@ -167,7 +167,7 @@ namespace Cellblock.Unity
             float yaw = actor.Root.eulerAngles.y, yawRate = dt > 0 ? Mathf.DeltaAngle(stride.LastYaw, yaw) / dt : 0; stride.LastYaw = yaw;
 
             // Distance drives stride phase; world contact anchors below enforce stance through turns.
-            float walkStep = Mathf.Lerp(0.56f, 0.70f, Mathf.Clamp01((stride.Pace - 0.9f) / 1.1f)), runStep = Mathf.Lerp(0.95f, 1.30f, sprint);
+            float walkStep = Mathf.Lerp(0.63f, 0.79f, Mathf.Clamp01((stride.Pace - 0.9f) / 1.1f)), runStep = Mathf.Lerp(0.95f, 1.30f, sprint);
             // Age (Claude, 2026-10-19): from 60 the step shortens, the back stoops and the arms swing less.
             float aged = Mathf.Clamp01((actor.Age - 58) / 20f);
             float step = Mathf.Lerp(walkStep, runStep, run) * (.95f + IdentitySeed(stride.Id) % 7 * .016f) * (style == GaitStyle.Sneak ? 0.85f : style == GaitStyle.Cuffed ? 0.8f : 1) * (1 - .22f * aged);
@@ -186,7 +186,8 @@ namespace Cellblock.Unity
             float crouchTarget = (Mathf.Lerp(0.012f, Mathf.Lerp(0.045f, 0.065f, sprint), run) + (style == GaitStyle.Sneak ? 0.05f : style == GaitStyle.Winded ? 0.03f : 0)) * g;
             stride.Crouch = Mathf.MoveTowards(stride.Crouch, crouchTarget, dt * 0.4f);
             // Rise smoothly back to a standing pelvis after a kneel or a fall that some scene held; the stride bob rides on top.
-            stride.PelvisBase = Mathf.Lerp(stride.PelvisBase, HipHeight - stride.Crouch, 1 - Mathf.Exp(-dt * 6));
+            // Walking stands tall: the stance leg nearly straightens at mid-stride (a crouched walk reads as shuffling).
+            stride.PelvisBase = Mathf.Lerp(stride.PelvisBase, HipHeight - stride.Crouch + .03f * g * (1 - run), 1 - Mathf.Exp(-dt * 6));
             float pelvis = stride.PelvisBase + bob;
             bool contacts = !RoutineOwnsFeet(actor);
             if (contacts) pelvis = PlanFootContacts(actor, stride, world, cycle, duty, reach, lift, movement / Mathf.Max(.001f, dt), pelvis, moving, dt);
@@ -214,7 +215,7 @@ namespace Cellblock.Unity
 
             // Lean into speed and acceleration (a spring, so starts tip forward and stops rock back), bank into turns.
             float accel = dt > 0 ? (stride.Pace - stride.LastIntent) / dt : 0; stride.LastIntent = stride.Pace;
-            float leanTarget = Mathf.Lerp(3.5f, Mathf.Lerp(9, 17, sprint), run) * g + Mathf.Clamp(accel * 1.6f, -6, 7) +
+            float leanTarget = Mathf.Lerp(2f, Mathf.Lerp(9, 17, sprint), run) * g + Mathf.Clamp(accel * 1.6f, -6, 7) +
                 (style == GaitStyle.Sneak ? 10 : style == GaitStyle.Winded ? 20 : style == GaitStyle.Cuffed ? 8 : 0) + aged * 13;
             stride.Lean = Spring(stride.Lean, ref stride.LeanVelocity, leanTarget, 2.2f, dt);
             float bankTarget = Mathf.Clamp(-(yawRate / rate) * Mathf.Min(speed / rate, 6) * 0.012f, -11, 11) * (moving ? 1 : 0);

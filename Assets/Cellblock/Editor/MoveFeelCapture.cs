@@ -21,7 +21,7 @@ namespace Cellblock.Editor
         const string Output = "Builds/MoveFeelReview";
         static readonly List<string> notes = new List<string>(), errors = new List<string>();
         static string officerId; static double phaseStart; static int phase; // 0 rest, 1 forward, 2 released, 3 back, 4 done
-        static Vector3 startAt, lastAt, releaseAt; static bool moved; static double moveDelay, settleTime; static float maxJump, maxStray, slide; static double lastTime;
+        static Vector3 startAt, lastAt, releaseAt; static bool moved; static double moveDelay, settleTime; static float maxJump, maxStray, slide; static double lastTime, lastShot; static int shots;
         static readonly Dictionary<bool, string> results = new Dictionary<bool, string>();
         static MoveFeelCapture() { EditorApplication.update += Tick; }
         public static void Run()
@@ -29,7 +29,7 @@ namespace Cellblock.Editor
             if (!Application.isBatchMode) { Debug.LogError("CELLBLOCK_MOVE_FEEL refused: batch mode only."); return; }
             ProjectSetup.Validate(); SurfaceLibrary.Ensure(); LightingSetup.Ensure();
             EditorSceneManager.OpenScene("Assets/Cellblock/Scenes/Main.unity");
-            Directory.CreateDirectory(Output); notes.Clear(); errors.Clear(); results.Clear();
+            Directory.CreateDirectory(Output); notes.Clear(); errors.Clear(); results.Clear(); shots = 0; lastShot = 0;
             SessionState.SetBool(ActiveKey, true); SessionState.SetInt(StageKey, 0); SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + 4);
             EditorApplication.EnterPlaymode();
         }
@@ -78,6 +78,14 @@ namespace Cellblock.Editor
             if (phase == 0 && t > .8) { hud.PreviewMoveStick(new Vector2(0, 1)); phase = 1; phaseStart = now; startAt = at; return; }
             if (phase == 1)
             {
+                // Film the walk (prediction on): side then front, following the walker.
+                if (prediction && t > .45 && now - lastShot > .07 && shots < 22)
+                {
+                    lastShot = now; shots++;
+                    bool side = shots <= 14;
+                    game.FrameArt(at + Vector3.up * .9f, side ? 3.0f : 3.4f, root.eulerAngles.y + (side ? 90 : 180), 4);
+                    Shoot(game.ArtCamera, (side ? "walk-side-" : "walk-front-") + (side ? shots : shots - 14).ToString("00"));
+                }
                 if (!moved && Vector2.Distance(new Vector2(at.x, at.z), new Vector2(startAt.x, startAt.z)) > .01f) { moved = true; moveDelay = t; }
                 if (t > 1.6) { hud.PreviewMoveStick(Vector2.zero); phase = 2; phaseStart = now; releaseAt = at; }
                 return;
@@ -105,6 +113,18 @@ namespace Cellblock.Editor
                 }
                 else { Begin(true); SessionState.SetInt(StageKey, 3); }
             }
+        }
+        static void Shoot(Camera camera, string name)
+        {
+            var target = new RenderTexture(640, 640, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 }; target.Create();
+            float aspect = camera.aspect; camera.aspect = 1;
+            try
+            {
+                UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(camera, new UnityEngine.Rendering.Universal.UniversalRenderPipeline.SingleCameraRequest { destination = target });
+                RenderTexture.active = target; var img = new Texture2D(640, 640, TextureFormat.RGB24, false); img.ReadPixels(new Rect(0, 0, 640, 640), 0, 0); img.Apply(); RenderTexture.active = null;
+                File.WriteAllBytes(Path.Combine(Output, name + ".png"), img.EncodeToPNG()); UnityEngine.Object.DestroyImmediate(img);
+            }
+            finally { camera.aspect = aspect; camera.ResetAspect(); target.Release(); UnityEngine.Object.DestroyImmediate(target); }
         }
         static void Finish()
         {

@@ -102,10 +102,17 @@ namespace Cellblock.Editor
                     game.FrameArt(root.position + root.forward * .42f + Vector3.up * 1.2f, 2.4f, root.eulerAngles.y + 90, 6); Render(game.ArtCamera, "punch-" + punch.ToString("00"));
                     Next(.05f); return;
                 }
+                // Walk film: stick held forward; side view then front view, following the walker.
+                int walk = punch - 10; GameHud hud = UnityEngine.Object.FindFirstObjectByType<GameHud>();
+                if (walk == 0) { w.Data.Residents.ForEach(r => { if (r.Id == punchTarget) r.Position = new Point(20, 20); }); officer0().Position = w.Data.Yard + new Point(-3.5f, 0); game.PreviewAdvance(0); hud.PreviewMoveStick(new Vector2(0, 1)); Next(.9f); return; }
+                if (walk <= 16) { game.FrameArt(root.position + Vector3.up * .9f, 3.0f, root.eulerAngles.y + 90, 4); Render(game.ArtCamera, "walk-side-" + walk.ToString("00")); Next(.07f); return; }
+                if (walk <= 24) { game.FrameArt(root.position + Vector3.up * .9f, 3.4f, root.eulerAngles.y + 180, 4); Render(game.ArtCamera, "walk-front-" + (walk - 16).ToString("00")); Next(.07f); return; }
+                hud.PreviewMoveStick(Vector2.zero);
                 Finish();
             }
             catch (Exception e) { errors.Add(e.ToString()); Finish(); }
         }
+        static StaffMember officer0() { return UnityEngine.Object.FindFirstObjectByType<GameController>().World.Data.Staff.First(s => s.Id == officerId); }
         static Transform Root() { var go = GameObject.Find("Officer · " + officerId); if (go == null) throw new InvalidOperationException("No officer actor."); return go.transform; }
         static Transform Bone(Transform root, string name)
         {
