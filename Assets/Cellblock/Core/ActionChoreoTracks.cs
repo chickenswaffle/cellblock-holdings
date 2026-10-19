@@ -92,6 +92,15 @@ namespace Cellblock.Core
                 Step("assist upright", .35f, ChoreoPhase.Apply, ResidentActionPhase.Rise, ChoreoPoint.ElbowL, ChoreoPoint.SmallOfBack, false, .25f),
                 Step("escort ready", .15f, ChoreoPhase.Recover, ResidentActionPhase.Escorted, ChoreoPoint.ElbowL, ChoreoPoint.WristL)
             }, Cue(ChoreoEventKind.Lift, .45f));
+            result[ChoreoAction.Guard] = Make(ChoreoAction.Guard, new[] { Step("forearms guard, face the threat", 1, ChoreoPhase.Control, ResidentActionPhase.Brace) });
+            result[ChoreoAction.Compliance] = Make(ChoreoAction.Compliance, new[] { Step("complying, hands visible", 1, ChoreoPhase.Control, ResidentActionPhase.HandsOnHead) });
+            result[ChoreoAction.RecoverFromFall] = Make(ChoreoAction.RecoverFromFall, new[] {
+                Step("roll onto side", .2f, ChoreoPhase.Setup, ResidentActionPhase.SideLying),
+                Step("brace and sit", .25f, ChoreoPhase.Control, ResidentActionPhase.Seated),
+                Step("gather knees", .25f, ChoreoPhase.Control, ResidentActionPhase.Kneel),
+                Step("push upright", .35f, ChoreoPhase.Apply, ResidentActionPhase.Rise),
+                Step("regain stance", .15f, ChoreoPhase.Recover, ResidentActionPhase.Brace)
+            }, Cue(ChoreoEventKind.Lift, .45f));
             return result;
         }
     }

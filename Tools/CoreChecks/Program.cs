@@ -531,6 +531,7 @@ static partial class Program
         RunRearrangementChecks();
         RunStaffInteractionChecks();
         RunActionChoreoChecks();
+        RunStaffCombatChecks();
         if (selectedChecks != "") Console.WriteLine("Filtered checks: " + selectedChecks);
         Console.WriteLine("\n" + passed + " passed, " + failed + " failed. These checks exercise the C# core; they do not run Unity.");
         Environment.ExitCode = failed == 0 ? 0 : 1;

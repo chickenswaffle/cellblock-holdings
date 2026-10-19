@@ -36,7 +36,7 @@ namespace Cellblock.Unity
             var grid = Element("staff-interaction-grid"); scroll.Add(grid);
             foreach (StaffInteraction command in new[] { StaffInteraction.Talk, StaffInteraction.PatDown, StaffInteraction.PocketSearch,
                 StaffInteraction.Grab, StaffInteraction.Cuff, StaffInteraction.GroundAndCuff, StaffInteraction.Escort,
-                StaffInteraction.Confine, StaffInteraction.Release, StaffInteraction.Punch })
+                StaffInteraction.Confine, StaffInteraction.Release, StaffInteraction.Punch, StaffInteraction.Guard, StaffInteraction.Shove, StaffInteraction.Compliance })
             {
                 StaffInteraction selected = command;
                 Button button = Action("", () => ChooseStaffInteraction(selected), "staff-interaction-choice");
@@ -84,7 +84,7 @@ namespace Cellblock.Unity
             staffInteractionClock.text = world.Data.Speed == 0 ? "Resume · 1×" : "Pause";
             Resident target = world.Data.Residents.Find(r => r.Id == staffInteractionTarget);
             staffInteractionName.text = target == null ? "Person unavailable" : target.Name;
-            staffInteractionStatus.text = world.BusyAction != "" ? world.BusyAction.ToUpperInvariant() + " · in progress" : world.StaffGroundedRestraint ? "CUFFED ON THE GROUND" : world.HoldPhase == "Cuffed" ? "CUFFED · ESCORT READY" : "Choose your next action";
+            staffInteractionStatus.text = world.BusyAction != "" ? world.BusyAction.ToUpperInvariant() + " · in progress" : world.StaffGroundedRestraint ? "CUFFED ON THE GROUND" : world.HoldPhase == "Cuffed" ? "CUFFED · ESCORT READY" : world.StaffCombat.Active ? world.StaffCombat.Phase.ToUpperInvariant() + " · health " + world.StaffCombat.OfficerHealth.ToString("0") + " · stamina " + world.StaffCombat.OfficerStamina.ToString("0") + " · balance " + world.StaffCombat.OfficerBalance.ToString("0") : "Choose your next action";
             staffInteractionFill.style.width = Length.Percent(world.StaffInteractionProgress * 100);
             foreach (Button button in staffInteractionButtons.Values) button.style.display = DisplayStyle.None;
             foreach (StaffInteractionOption option in world.StaffInteractionOptions(staffInteractionTarget))

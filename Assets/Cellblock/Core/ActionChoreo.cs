@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Cellblock.Core
 {
-    public enum ChoreoAction { PatDown, PocketSearch, StandingCuff, KneelingCuff, ProneCuff, Takedown, Escort, Strike, Counter, Shove, Grab, GetUp }
+    public enum ChoreoAction { PatDown, PocketSearch, StandingCuff, KneelingCuff, ProneCuff, Takedown, Escort, Strike, Counter, Shove, Grab, GetUp, Guard, Compliance, RecoverFromFall }
     public enum ChoreoPhase { Approach, Setup, Windup, Contact, Control, Apply, Sweep, DoubleLock, Release, Recover, Complete }
     public enum ResidentActionPhase { Brace, Flinch, Stagger, Fall, Prone, Kneel, HandsOnHead, Interlace, Cuffed, Rise, Escorted, Resist, PresentWrists, SideLying, Seated }
     public enum ChoreoPoint { None, WristL, WristR, ElbowL, ElbowR, ShoulderBlade, SmallOfBack, WaistL, WaistR, PocketL, PocketR, AnkleL, AnkleR, Head, Jaw, Chest, CollarL, CollarR, UpperArmL, UpperArmR, ArmpitL, ArmpitR, GroinL, GroinR, ThighL, ThighR, KneeL, KneeR, InterlacedHands }
@@ -76,7 +76,7 @@ namespace Cellblock.Core
         public ChoreoAction Action;
         public Point OfficerGround, ResidentGround;
         public float OfficerYaw, ResidentYaw;
-        public bool Resisting, Landed, ActorIsResident, PartnerGrounded, PartnerCuffed, PartnerHeadingKnown, Holding, NarrowEscort, EscortContact;
+        public bool Resisting, Landed, ActorIsResident, PartnerGrounded, PartnerCuffed, PartnerHeadingKnown, Holding, NarrowEscort, EscortContact, ContactPending, PartnerGuarding, PartnerFreeMovement, ActorFreeMovement, RootAlreadyAligned;
         public ChoreoReaction Reaction;
         public ChoreoVector HitDirection;
         public ChoreoPoint HitPart;
@@ -115,9 +115,10 @@ namespace Cellblock.Core
         {
             if (actionId != context.ActionId || action != context.Action)
             { actionId = context.ActionId; action = context.Action; fired = 0; previous = -1; }
-            ActionChoreo.Sample(context, elapsed, previous, output);
+            float sampleTime = ActionChoreo.PresentationSeconds(context, elapsed);
+            ActionChoreo.Sample(context, sampleTime, previous, output);
             Filter(output.Officer.Events); Filter(output.Resident.Events);
-            previous = Math.Max(previous, Math.Max(0, elapsed));
+            previous = Math.Max(previous, Math.Max(0, sampleTime));
         }
         void Filter(List<ChoreoEvent> events)
         {
@@ -150,10 +151,15 @@ namespace Cellblock.Core
             }
             int index = (int)p; return index < 0 || index >= anchorNames.Length ? "" : anchorNames[index];
         }
+        public static float PresentationSeconds(ActionChoreoContext context, float seconds)
+        {
+            if (float.IsNaN(seconds) || float.IsInfinity(seconds)) return 0;
+            return context.ContactPending ? Math.Min(Math.Max(0, seconds), Track(context.Action).Steps[0].End - .0001f) : Math.Max(0, seconds);
+        }
         public static void Sample(ActionChoreoContext c, float seconds, float previousSeconds, ActionChoreoPair output)
         {
             if (output == null) throw new ArgumentNullException(nameof(output));
-            if (float.IsNaN(seconds) || float.IsInfinity(seconds)) seconds = 0;
+            seconds = PresentationSeconds(c, seconds);
             ChoreoTrack track = Track(c.Action); float t = Math.Max(0, Math.Min(track.Duration, seconds));
             ChoreoStep step = track.Steps[track.Steps.Length - 1];
             foreach (ChoreoStep candidate in track.Steps) if (t < candidate.End) { step = candidate; break; }
@@ -175,16 +181,21 @@ namespace Cellblock.Core
                 goal = c.OfficerGround + toward * (Math.Min(.35f, Math.Max(0, distance - .60f)) / Math.Max(.0001f, distance));
             }
             // Core owns the swept two-body escort formation, including safe doorway compression.
-            if (c.Action == ChoreoAction.Escort && c.PartnerHeadingKnown) goal = c.OfficerGround;
+            if (c.RootAlreadyAligned || c.Action == ChoreoAction.RecoverFromFall || c.Action == ChoreoAction.Compliance || c.Action == ChoreoAction.Guard || c.ActorFreeMovement || c.Action == ChoreoAction.Escort && c.PartnerHeadingKnown) goal = c.OfficerGround;
             offset = Rotate(goal - c.ResidentGround, -c.ResidentYaw);
             output.Officer.Root = new ChoreoRoot { Ground = goal, PartnerId = c.ResidentId, PartnerOffset = offset, RelativeYaw = rear ? 0 : Bearing(c.ResidentGround - goal) - c.ResidentYaw,
                 Yaw = rear ? c.ResidentYaw : Bearing(c.ResidentGround - goal), Weight = 1, MaxStepIn = strike || c.Action == ChoreoAction.Grab ? .35f : 0, ConstrainToNavigation = true, HoldFeet = c.Action != ChoreoAction.Escort && step.Phase != ChoreoPhase.Approach && step.Phase != ChoreoPhase.Setup };
             output.Resident.Root = new ChoreoRoot { Ground = c.ResidentGround, Yaw = c.ResidentYaw, PartnerId = c.OfficerId, PartnerOffset = Rotate(c.ResidentGround - goal, -output.Officer.Root.Yaw), RelativeYaw = c.ResidentYaw - output.Officer.Root.Yaw, Weight = 1, ConstrainToNavigation = true, HoldFeet = c.Action != ChoreoAction.Escort && step.Phase != ChoreoPhase.Approach && step.Phase != ChoreoPhase.Setup };
+            if (c.ActorFreeMovement) { output.Officer.Root.Weight = 0; output.Officer.Root.HoldFeet = false; }
+            if (c.PartnerFreeMovement) { output.Resident.Root.Weight = 0; output.Resident.Root.HoldFeet = false; }
+            if (c.Action == ChoreoAction.Guard) { output.Resident.Root.PartnerOffset = Rotate(c.ResidentGround - goal, -c.OfficerYaw); output.Resident.Root.RelativeYaw = c.ResidentYaw - c.OfficerYaw; output.Officer.Root.Yaw = c.OfficerYaw; output.Officer.Root.RelativeYaw = c.OfficerYaw - c.ResidentYaw; output.Officer.Root.HoldFeet = false; }
+            if (c.Action == ChoreoAction.RecoverFromFall || c.Action == ChoreoAction.Compliance) { output.Officer.Root.Weight = 0; output.Officer.Root.HoldFeet = false; }
             output.Officer.HandTargets[0] = Target(c.ResidentId, step.Left, step.LeftGrip);
             output.Officer.HandTargets[1] = Target(c.ResidentId, step.Right, step.RightGrip);
             output.Officer.KneeTarget = step.Knee ? Target(c.ResidentId, ChoreoPoint.ShoulderBlade, 0) : default(ChoreoTarget);
             output.Officer.LookTarget = Target(c.ResidentId, step.Knee ? ChoreoPoint.SmallOfBack : ChoreoPoint.Chest, 0);
             output.Resident.LookTarget = Target(c.OfficerId, ChoreoPoint.Head, 0);
+            if (c.Action == ChoreoAction.RecoverFromFall || c.Action == ChoreoAction.Compliance || c.Action == ChoreoAction.Guard || c.ActorFreeMovement) output.Officer.LookTarget.Weight = 0;
             int cuffs = 0; foreach (ChoreoEvent cue in track.Cues) if (cue.Kind == ChoreoEventKind.CuffClick && cue.Time <= t) cuffs++;
             output.Officer.CuffsApplied = output.Resident.CuffsApplied = cuffs;
             if (cuffs < 2 && (c.Action == ChoreoAction.StandingCuff || c.Action == ChoreoAction.KneelingCuff || c.Action == ChoreoAction.ProneCuff) && output.Resident.ResidentPhase == ResidentActionPhase.Cuffed) output.Resident.ResidentPhase = ResidentActionPhase.PresentWrists;
@@ -200,6 +211,12 @@ namespace Cellblock.Core
                         output.Officer.HandTargets[arm] = Target(c.ResidentId, arm == 0 ? ChoreoPoint.WristL : ChoreoPoint.WristR, .3f);
             }
             ResidentHands(output.Resident, c.ResidentId);
+            if (c.Action == ChoreoAction.RecoverFromFall)
+            {
+                for (int arm = 0; arm < 2; arm++)
+                    output.Resident.HandTargets[arm] = step.Resident == ResidentActionPhase.Rise || step.Resident == ResidentActionPhase.Brace ? default(ChoreoTarget) :
+                        new ChoreoTarget { IsWorld = true, World = new ChoreoVector(c.ResidentGround.X + (arm == 0 ? -.20f : .20f), .05f, c.ResidentGround.Y + .10f), Weight = 1, Grip = 0 };
+            }
             if (c.Action == ChoreoAction.KneelingCuff && t >= 1.1f)
             {
                 SetRearHands(output.Resident, c.ResidentId);
@@ -236,6 +253,28 @@ namespace Cellblock.Core
             {
                 output.Officer.Phase = ChoreoPhase.Setup; output.Officer.StepName = "reposition before elbow contact";
                 output.Officer.HandTargets[0].Weight = output.Officer.HandTargets[1].Weight = 0;
+            }
+            if (c.Action == ChoreoAction.Guard)
+            {
+                for (int arm = 0; arm < 2; arm++)
+                {
+                    output.Officer.HandTargets[arm] = Target(c.OfficerId, ChoreoPoint.Chest, .5f);
+                    output.Officer.HandTargets[arm].Offset = new ChoreoVector(arm == 0 ? -.18f : .18f, .25f, .15f);
+                }
+            }
+            if (strike && !c.Landed && !c.ContactPending && step.Phase == ChoreoPhase.Contact)
+            {
+                int lead = c.LeadHand == 1 ? 1 : 0;
+                output.Officer.HandTargets[lead].IsWorld = true;
+                output.Officer.HandTargets[lead].World = new ChoreoVector(c.ResidentGround.X, 1.5f, c.ResidentGround.Y);
+            }
+            if (c.PartnerGuarding && !c.PartnerGrounded && !c.PartnerCuffed)
+            {
+                for (int arm = 0; arm < 2; arm++)
+                {
+                    output.Resident.HandTargets[arm] = Target(c.ResidentId, ChoreoPoint.Chest, .5f);
+                    output.Resident.HandTargets[arm].Offset = new ChoreoVector(arm == 0 ? -.15f : .15f, .25f, .15f);
+                }
             }
             if (c.ResidentId == "")
                 for (int arm = 0; arm < 2; arm++)

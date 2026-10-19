@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace Cellblock.Core
 {
-    public enum StaffInteraction { Talk, Punch, PatDown, PocketSearch, Grab, GroundAndCuff, Cuff, Escort, Release, Confine }
+    public enum StaffInteraction { Talk, Punch, PatDown, PocketSearch, Grab, GroundAndCuff, Cuff, Escort, Release, Confine, Guard, Shove, Compliance }
     public sealed class StaffInteractionOption
     {
         public StaffInteraction Command;
@@ -20,7 +20,7 @@ namespace Cellblock.Core
         public void SetStaffFocusTarget(string id) { staffFocusTargetId = id ?? ""; }
         public void SetStaffViewFacing(Point direction)
         { float length = direction.Length; if (length > .0001f && !float.IsInfinity(length) && !float.IsNaN(length)) actionFacing = direction * (1 / length); }
-        internal void EndStaffManualSession() { ReleaseHoldTarget(""); ResetStaffEncounter(); busyUntil = -1; running = false; liveOfficer = ""; }
+        internal void EndStaffManualSession() { ReleaseHoldTarget(""); ClearStaffCombat(); ResetStaffEncounter(); busyUntil = -1; running = false; liveOfficer = ""; }
         string explicitStaffTargetId, staffSearchTarget = "", staffSearchMode = "", staffStandingTarget = "";
         int staffAttackReadyMinute, staffInteractionStart;
         bool staffGroundCuffQueued, staffGroundedCuffed;
@@ -90,12 +90,19 @@ namespace Cellblock.Core
             string physical; Resident target = ResolveStaffSubject(officer, id, out physical);
             string common = StaffCommandBlocker(); if (common == "") common = physical;
             if (common == "" && holdTarget != "" && holdTarget != id) common = "Finish with the person already in your custody.";
+            if (common == "" && !CanEngageStaffCombatTarget(id)) common = "Disengage from the current opponent before switching targets.";
             bool held = holdTarget != "" && holdTarget == id, cuffed = held && holdPhase == "Cuffed";
             bool officerRole = officer != null && officer.Role == "Officer";
             void Add(StaffInteraction command, string label, string detail, string blocked = "", bool needsOfficer = false)
             {
                 choices.Add(new StaffInteractionOption { Command = command, Label = label, Detail = detail,
                     Blocker = command == StaffInteraction.Release && held && !StaffStandingUp && officer != null && officer.Id == liveOfficer ? "" : common != "" ? common : needsOfficer && !officerRole ? "Officer role required." : blocked });
+            }
+            Add(StaffInteraction.Guard, staffCombatGuard ? "Lower guard" : "Raise guard", "Face incoming strikes. Guard costs stamina; it cannot stop attacks from behind.", held && !staffCombatGuard ? "Release custody before raising both forearms." : "");
+            if (!cuffed)
+            {
+                Add(StaffInteraction.Shove, "Shove / break balance", "Create space and reduce balance. Uses stamina; unjustified force still counts.", StaffRecoveryMinutes > 0 ? "Recovering from the last strike." : "", true);
+                Add(StaffInteraction.Compliance, "Order compliance", "Exhausted or willing people can surrender without being knocked unconscious.", "", true);
             }
             Add(StaffInteraction.Talk, "Speak / identify", "Face the selected person and address them.");
             string searchBlock = target != null && Resisting(target) && !cuffed ? "Restrain the resisting person first." : "";
@@ -143,6 +150,9 @@ namespace Cellblock.Core
                 switch (command)
                 {
                     case StaffInteraction.Punch: return ActAttack();
+                    case StaffInteraction.Guard: return SetStaffCombatGuard(!staffCombatGuard, id);
+                    case StaffInteraction.Shove: return ActStaffShove(id);
+                    case StaffInteraction.Compliance: return OrderStaffCompliance(id);
                     case StaffInteraction.Grab: return ActGrab();
                     case StaffInteraction.Talk:
                         EndActivity(target); RemoveResidentPath(target);
@@ -157,6 +167,7 @@ namespace Cellblock.Core
                         Beat("Search", officer, target); Notice = "Starting " + staffSearchMode.ToLowerInvariant() + " of " + target.Name + "."; return true;
                     case StaffInteraction.GroundAndCuff:
                         if (holdTarget == "" && !ActGrab()) return false;
+                        if (Downed(target)) return ActGrab();
                         if (!ActAttack()) return false;
                         staffGroundCuffQueued = true; busyAction = "Takedown"; busyTarget = id;
                         staffInteractionStart = Data.Minute; busyUntil = Data.Minute + ActionChoreo.GameMinutes(ChoreoAction.Takedown); return true;

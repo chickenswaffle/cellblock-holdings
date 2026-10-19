@@ -1,0 +1,23 @@
+{
+  "sha256": "abfe1cf6c75b20f7f3089d6e245254f42ba1be8b869c8b5dcc1dff68d8a171f4",
+  "files": {
+    "Assets/Cellblock/Core/StaffCombat.cs": "32f4e2aeb1fe79ebcdddf91071dbb077a5f5294ed0f3db69be07e23a78a079b3",
+    "Assets/Cellblock/Core/StaffActions.cs": "2d0ef05179b8c3464ba48548f4d286cb72a61c28a2ccd9065fbb5dc281a64604",
+    "Assets/Cellblock/Core/StaffInteractions.cs": "5406ed6dcc2061b4dd1574180dd7a742e83b1efc241ad3a388a0f3100467bf9a",
+    "Assets/Cellblock/Core/ActionChoreo.cs": "d78a873795798607a9ec8c63a147ef78f4cfaca0eab84cad1a211894965515d4",
+    "Assets/Cellblock/Core/ActionChoreoTracks.cs": "2a80f8eaaad843ab87d1cf0b8d53e8c0df7167394212b0d3a10f4c9c90d9fbe4",
+    "Assets/Cellblock/Core/WorldActionChoreo.cs": "8f8f7a142fbdd8730d690924a01a0776d1117449e0e572facddc5a1b1c22a3a0",
+    "Assets/Cellblock/Runtime/FacilityActionChoreo.cs": "ea25c1a4b3325b1b8273eb34f4ad009d8a999e6e8bf821b22c596f1666a4111d",
+    "Assets/Cellblock/Runtime/GameStaffInteractionsHud.cs": "d55842f45708178338d9bec59c51eec06dc711fb607276c284c536d40bd9ac37",
+    "Assets/Cellblock/Editor/StaffCombatCapture.cs": "ddb49083f4624b403cdbd2174d26565e969c36a4cd6f7d234b8156ab6caee912",
+    "Assets/Cellblock/Editor/PresentationPreview.cs": "96918e34c0096a8d7433465637ef91e4949326d10262e3d29bc10c40a977b520"
+  },
+  "editor": "6000.3.24f1",
+  "runs": {
+    "combat": "combat/20261019-154330-449-33794b",
+    "actions": "actions/20261019-154419-385-04aa5c",
+    "encounters": "encounters/20261019-154508-927-e89f01"
+  },
+  "contactGates": "NOT PASSED: consumer absent",
+  "critic": "Read-only source + combat report and selected images. No remaining rules blocker; visual guard/contact work outstanding."
+}

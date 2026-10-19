@@ -46,6 +46,14 @@ namespace Cellblock.Unity
                     else if (subject != null) slot.Context.ResidentYaw = subject.Root.eulerAngles.y;
                     choreoSlots.Add(key, slot);
                 }
+                if (state.Context.RootAlreadyAligned && !slot.Context.RootAlreadyAligned)
+                { slot.Context.OfficerGround = state.Context.OfficerGround; slot.Context.ResidentGround = state.Context.ResidentGround; }
+                slot.Context.RootAlreadyAligned = state.Context.RootAlreadyAligned;
+                slot.Context.PartnerFreeMovement = state.Context.PartnerFreeMovement; slot.Context.ActorFreeMovement = state.Context.ActorFreeMovement;
+                if (state.Context.PartnerFreeMovement) slot.Context.ResidentGround = state.Context.ResidentGround;
+                if (state.Context.ActorFreeMovement) slot.Context.OfficerGround = state.Context.OfficerGround;
+                slot.Context.ContactPending = state.Context.ContactPending; slot.Context.PartnerGuarding = state.Context.PartnerGuarding;
+                slot.Context.Landed = state.Context.Landed; slot.Context.Reaction = state.Context.Reaction; slot.Context.Strength = state.Context.Strength;
                 slot.Seen = true; slot.Context.Resisting = state.Context.Resisting;
                 slot.Context.NarrowEscort = state.Context.NarrowEscort; slot.Context.EscortContact = state.Context.EscortContact;
                 slot.Context.PartnerGrounded = state.Context.PartnerGrounded; slot.Context.PartnerCuffed = state.Context.PartnerCuffed;
@@ -63,6 +71,7 @@ namespace Cellblock.Unity
                 {
                     float hold = slot.Context.Action == ChoreoAction.Escort ? 0 : ActionChoreo.Track(ChoreoAction.Grab).Steps[0].End + .01f;
                     ActionChoreo.Sample(slot.Context, hold, hold, slot.Pair);
+                    if (slot.Context.Action == ChoreoAction.Guard) slot.Pair.Officer.Phase = ChoreoPhase.Control;
                     if (slot.Context.Action == ChoreoAction.Grab) { slot.Pair.Officer.Phase = ChoreoPhase.Control; slot.Pair.Resident.ResidentPhase = slot.Context.PartnerGrounded ? ResidentActionPhase.Prone : slot.Context.Resisting ? ResidentActionPhase.Resist : ResidentActionPhase.Brace; }
                 }
                 else slot.Cursor.Sample(slot.Context, elapsed, slot.Pair);

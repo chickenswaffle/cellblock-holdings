@@ -25,7 +25,7 @@ static partial class Program
                         Point relative = frame.Root.PartnerOffset;
                         Point rebuilt = partner.Root.Ground + new Point((float)(relative.X * Math.Cos(yaw) + relative.Y * Math.Sin(yaw)), (float)(-relative.X * Math.Sin(yaw) + relative.Y * Math.Cos(yaw)));
                         Check(Geometry.Distance(frame.Root.Ground, rebuilt) < .001f, "Relative root contradicts world root");
-                        foreach (var hand in frame.HandTargets) if (hand.Active) Check(hand.Name != "" && hand.ActorId != "" && hand.Weight <= 1 && hand.Grip <= 1, "Unresolved named target");
+                        foreach (var hand in frame.HandTargets) if (hand.Active) Check((hand.IsWorld ? !float.IsNaN(hand.World.Y) : hand.Name != "" && hand.ActorId != "") && hand.Weight <= 1 && hand.Grip <= 1, "Unresolved named target");
                     }
                 }
             }

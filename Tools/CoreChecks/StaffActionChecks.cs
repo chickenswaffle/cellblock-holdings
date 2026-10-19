@@ -174,11 +174,12 @@ static partial class Program
             {
                 t.Impulsivity = 100; t.Stress = 100; t.Health = 92; t.Position = o.Position + new Point(0, 0.7f);
                 w.ActAttack();
-                countered = w.Resisting(t);
                 for (int m = 0; m < 4; m++) ActionMinute(w);
+                countered = w.Resisting(t) && WriteUps(w, t.Id, "Assault on staff") > 0;
             }
             Check(countered && WriteUps(w, t.Id, "Assault on staff") >= 1, "Nobody swung back in twelve tries");
             t.Position = o.Position + new Point(0, 0.7f);
+            while (w.OfficerStaggered) ActionMinute(w);
             int justified = w.StaffActions.Justified; w.ActAttack();
             Check(w.StaffActions.Justified == justified + 1, "Force on a resisting resident was not justified");
         });

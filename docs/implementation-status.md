@@ -2,6 +2,12 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
+## October 19 sustained staff fights and authored contact physics
+
+Staff play now supports repeated resident retaliation, delayed/revalidated hits, directional guard, stamina/balance, shoves, compliance and restraint without a knockout. Swept bounded kinematic impulses use authoritative navigation. Officer injuries persist across control/reload, connect to shift recovery and real nearby nursing care, and can require switching staff. Existing conduct/write-up consequences remain active. [Rules, controls and physics](staff-combat.md).
+
+**481 core checks and41 actual Unity captures pass**; independent critic found no remaining rules blocker. [Evidence and limits](reviews/2026-10-19-staff-combat/README.md), source fingerprint abfe1cf6c75b. Claude retains rig/IK/locomotion/camera/touch. Its e6ad823 was fetched and reviewed, not merged into this rules checkpoint. Guard's visual two-arm pose and exact contact fidelity still need its adapter; strict contacts are not passed. HUD redesign remains paused.
+
 ## October 19 joint ActionChoreo version1 handoff
 
 Merged published Claude human bodies7caacf1 (with material-slot recolor correction) and main5d4747f. Codex publishes [ActionChoreo version1](action-choreo-contract.md): paired phases/progress, relative/world roots, named hand/knee/look targets, grips, directional reactions and once-only impact/cuff/lift/fall cues. Covers both-side searches, standing/kneeling/prone cuffs, takedown, escort, strike/counter/shove/grab and assisted get-up. Cuffs settle after the authored track, paused commits resume1x, preparation can cancel safely, and release clears unfinished application. Tight corners use bounded re-position/regrip instead of opposed escort roots.

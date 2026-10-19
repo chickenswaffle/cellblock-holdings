@@ -1,0 +1,16 @@
+PASSED
+
+Notes:
+hints: Strike / Grab /  / Pat search on Amari Price
+strike: Excessive force: Officer Dana Cross swung at Amari Price without cause. A write-up was filed and residents trust staff less.
+strike-side: explicit side-camera evidence, alongside the actual character-follow frame.
+grab: Holding Amari Price. Grab again to cuff, Attack for a takedown.
+hold-side: explicit side-camera evidence, alongside the actual character-follow frame.
+cuff: Applying cuffs to Amari Price: first wrist, second wrist, then double lock.
+escort distance 0.65 m, phase Cuffed
+escort-side: explicit side-camera evidence, alongside the actual character-follow frame.
+pad fits True
+Paused action clock remains at 6.382
+ActionChoreo contact gates NOT EXECUTED: Claude consumer version1 is not registered. No contact pass is claimed.
+
+Errors:

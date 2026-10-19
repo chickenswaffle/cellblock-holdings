@@ -32,10 +32,11 @@ namespace Cellblock.Editor
         public static void Capture() { RequestRun("capture"); }
         internal static void RequestEscapeReview() { RequestRun("escape"); }
         internal static void RequestFeatureReview(string mode) { RequestRun(mode); }
-        static bool FeatureMode(string mode) { return mode == "yard" || mode == "actions" || mode == "sanitation" || mode == "look" || mode == "workshop" || mode == "pad" || mode == "inmate" || mode == "sound" || mode == "projects" || mode == "encounters" || mode == "encounter-contacts" || mode == "action-contacts"; }
+        static bool FeatureMode(string mode) { return mode == "combat" || mode == "yard" || mode == "actions" || mode == "sanitation" || mode == "look" || mode == "workshop" || mode == "pad" || mode == "inmate" || mode == "sound" || mode == "projects" || mode == "encounters" || mode == "encounter-contacts" || mode == "action-contacts"; }
         static void BeginFeature(string mode)
         {
-            if (mode == "encounter-contacts") StaffEncounterCapture.BeginExisting(true);
+            if (mode == "combat") StaffCombatCapture.BeginExisting();
+            else if (mode == "encounter-contacts") StaffEncounterCapture.BeginExisting(true);
             else if (mode == "action-contacts") ActionCapture.BeginExisting(true);
             else if (mode == "yard") YardCapture.BeginExisting();
             else if (mode == "actions") ActionCapture.BeginExisting();
@@ -50,13 +51,14 @@ namespace Cellblock.Editor
         }
         static bool FeatureRunning(string mode)
         {
-            return mode == "encounter-contacts" ? StaffEncounterCapture.IsRunning : mode == "action-contacts" ? ActionCapture.IsRunning : mode == "yard" ? YardCapture.IsRunning : mode == "actions" ? ActionCapture.IsRunning :
+            return mode == "combat" ? StaffCombatCapture.IsRunning : mode == "encounter-contacts" ? StaffEncounterCapture.IsRunning : mode == "action-contacts" ? ActionCapture.IsRunning : mode == "yard" ? YardCapture.IsRunning : mode == "actions" ? ActionCapture.IsRunning :
                 mode == "sanitation" ? SanitationCapture.IsRunning : mode == "workshop" ? ConstructionStudio.IsRunning :
                 mode == "pad" ? PadCapture.IsRunning : mode == "inmate" ? InmateCapture.IsRunning : mode == "sound" ? SoundCapture.IsRunning : mode == "projects" ? constructionDeskArtActive : mode == "encounters" ? StaffEncounterCapture.IsRunning : LookCapture.IsRunning;
         }
         static void AbortFeature(string mode, string reason)
         {
-            if (mode == "encounter-contacts") StaffEncounterCapture.Abort(reason);
+            if (mode == "combat") StaffCombatCapture.Abort(reason);
+            else if (mode == "encounter-contacts") StaffEncounterCapture.Abort(reason);
             else if (mode == "action-contacts") ActionCapture.Abort(reason);
             else if (mode == "yard") YardCapture.Abort(reason);
             else if (mode == "actions") ActionCapture.Abort(reason);

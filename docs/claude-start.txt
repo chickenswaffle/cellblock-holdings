@@ -1,3 +1,15 @@
+LATEST HANDOFF — SUSTAINED STAFF COMBAT (2026-10-19)
+
+Fetch/merge origin/codex/live-operations-handoff, preserving your current work. Read docs/staff-combat.md, docs/action-choreo-contract.md and newest Codex COORDINATION entry. Staff combat now has repeated resident retaliation, delayed/revalidated contact, directional guard, stamina/balance, swept bounded impulses, compliant arrest and persistent officer injuries. Core owns the encounter, contact step-in and consequences. No rig/camera/touch files were changed.
+
+Your e6ad823 controls/locomotion snapshot was fetched and source-reviewed, NOT merged into this rules checkpoint. When combining it, remove/disable its provisional render step-in after RootAlreadyAligned or the officer will step twice. Preserve your new floating movement pad/swipe look/pinch work. Keep ownership of FacilityMotion, rig/IK, first-person arms/camera, impact feedback and touch bindings. HUD redesign remains paused.
+
+Additive ActionChoreo v1 fields: ContactPending (hold telegraph until Core outcome), PartnerGuarding, ActorFreeMovement, PartnerFreeMovement and RootAlreadyAligned. Live outcomes/anchors refresh. Use ActionChoreoCursor so a delayed .2-second resolution doesn't lose a .12/.16 contact cue. World hand targets may have an empty Name: check IsWorld. New Guard, Compliance and RecoverFromFall actions append enum values. Apply paired guard/reaction/free-rise tracks and first-person arms through your consuming adapter; don't alter combat rules. Guard/Shove/Order compliance are currently accessible via existing Actions menu. You own quick-input/mobile placement.
+
+Normal combat/actions/encounters reviews exercise rules/menu/pose lifecycle; strict rendered contact gates remain blocked until your consuming adapter registers version1. The existing renderer does not yet show a proper two-arm guard: do not advertise the combat animation as finished. Preserve the one Mac editor; batch runs only in your own clone. Exact final evidence is in docs/reviews/2026-10-19-staff-combat.
+
+Previous handoffs below are historical; this extension and the ActionChoreo split take priority.
+
 LATEST JOINT HANDOFF — ACTIONCHOREO VERSION1 (2026-10-19)
 
 Published implementation: e08670af3879089c439bdbbb0e4de619d8fc714e on origin/codex/live-operations-handoff.
