@@ -24,8 +24,8 @@ namespace Cellblock.Editor
         // Module, centre (x, y), camera distance.
         static readonly (string name, float x, float y, float d)[] Stops = {
             ("holding-booking", -10, -5, 9), ("lobby-visitation", -2, -5, 8), ("admin-control", 10, -5, 11), ("staff-infirmary", 22, -5, 11),
-            ("dining-kitchen", -5, 5.5f, 13), ("unit-a", -4.5f, 15.5f, 15), ("unit-b", 18, 16, 15), ("segregation", 12, 6, 9),
-            ("workshop-classroom-chapel", 22, 6, 12), ("yard", -20, 1, 14) };
+            ("unit-a", -4.5f, 16, 14), ("unit-b", -4.5f, 6.5f, 14), ("kitchen-workshop", 14, 6.5f, 12), ("classroom-chapel", 24, 6.5f, 10),
+            ("segregation", 11.5f, 17, 9), ("gym", 21.5f, 17, 11), ("yard", -20, 11.5f, 14) };
         static PrisonTourCapture() { EditorApplication.update += Tick; }
         public static void Run()
         {
@@ -74,9 +74,9 @@ namespace Cellblock.Editor
             if (y < -2) return x < -10 ? "holding" : x < -6 ? "booking" : x < 2 ? "lobby" : x < 10 ? "admin" : x < 16 ? "control" : x < 22 ? "staff room" : "infirmary";
             if (y < 1) return "front corridor";
             if (x >= 5 && x <= 8) return "spine corridor";
-            if (x < 5) return y < 10 ? (x < -2 ? "dining" : "kitchen") : y < 18.5f ? "unit A dayroom" : "unit A cells";
-            if (y < 12) return x < 16 ? "segregation" : x < 22 ? "workshop" : y < 6.5f ? "classroom" : "chapel";
-            return y < 18.5f ? "unit B dayroom" : "unit B cells";
+            if (x < 5) return y < 4.5f ? "unit B cells" : y < 12 ? "unit B dayroom" : y < 18.5f ? "unit A dayroom" : "unit A cells";
+            if (y < 12) return x < 14 ? "kitchen" : x < 20 ? "workshop" : y < 6.5f ? "classroom" : "chapel";
+            return x < 15 ? "segregation" : "gym";
         }
         static void Render(Camera camera, string name, int width, int height)
         {

@@ -22,7 +22,9 @@ static partial class Program
             foreach (Resident r in w.Data.Residents)
                 Check(w.Routes.Find(r.Home, w.ServiceDestination(w.Data.Residents.IndexOf(r), true)) != null && w.Routes.Find(r.Home, yard) != null, "Unreachable home " + r.Home);
             int seats = Enumerable.Range(0, 40).Select(i => w.ServiceDestination(i, true)).Distinct().Count();
-            Check(seats >= 30, "The dining hall seats only " + seats);
+            Check(seats >= DemoPrison.Type.Residents, "The unit serveries seat only " + seats);
+            // Meals are on the unit: every resident's place is in their own unit's dayroom.
+            foreach (Resident r in w.Data.Residents) Check((r.Home.Y > 12) == (w.ServiceDestination(w.Data.Residents.IndexOf(r), true).Y > 12), "A resident eats in the other unit: " + r.Home);
             Check(w.JobSlots().Any(s => s.Job == "kitchen") && w.JobSlots().Count(s => s.Job == "library") == 3, "Missing kitchen or library jobs");
             Check(w.IntakeStations().Count >= 1, "No intake lane");
             foreach (string id in new[] { "kitchen", "laundry", "commissary", "phones" }) Check(w.UpgradeLevel(id) > 0, "Service not owned: " + id);
