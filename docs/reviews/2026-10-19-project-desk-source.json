@@ -1,0 +1,15 @@
+{
+  "base": "baf7360",
+  "sha256": "eef5adf847cbfd305eaefcd4d15f50bfaf18e460973aae20f8398eb4f39d1353",
+  "coreChanged": false,
+  "automatedTestsAddedOrRun": false,
+  "description": "Construction desk UI and authored visual review only; no imported Claude human/quality source.",
+  "files": {
+    "Assets/Cellblock/Runtime/GameConstructionHud.cs": "2a8efa556bbb3a4279c566325246af7aa40a633414aca98403f4c695c006a6fe",
+    "Assets/Cellblock/Runtime/GameHud.cs": "2e77409b13cd0f5d0b77e826ee704ec7d314e59d48e0b31b40c11e60b126eda5",
+    "Assets/Cellblock/Runtime/GameOperationsHud.cs": "74544be4f1a1d049f51d43c70bf989331e5b239a1f160246b0409f63d16d1a03",
+    "Assets/Cellblock/Resources/ConstructionDesk.uss": "dd3a309704fd3eae43b3aaf75660b32594ee2e0785883cccaa1537e0f5f25079",
+    "Assets/Cellblock/Editor/ConstructionDeskPreview.cs": "ecdf15de99e02d82e3b1fba7b3277979e58eb617ff89965969997f3ae80bef47",
+    "Assets/Cellblock/Editor/PresentationPreview.cs": "d13127447b3baa9757293eacb3b82168c55c56e1cbbe332ca992afe031261e50"
+  }
+}

@@ -32,7 +32,7 @@ namespace Cellblock.Editor
         public static void Capture() { RequestRun("capture"); }
         internal static void RequestEscapeReview() { RequestRun("escape"); }
         internal static void RequestFeatureReview(string mode) { RequestRun(mode); }
-        static bool FeatureMode(string mode) { return mode == "yard" || mode == "actions" || mode == "sanitation" || mode == "look" || mode == "workshop" || mode == "pad" || mode == "inmate" || mode == "sound"; }
+        static bool FeatureMode(string mode) { return mode == "yard" || mode == "actions" || mode == "sanitation" || mode == "look" || mode == "workshop" || mode == "pad" || mode == "inmate" || mode == "sound" || mode == "projects"; }
         static void BeginFeature(string mode)
         {
             if (mode == "yard") YardCapture.BeginExisting();
@@ -42,13 +42,14 @@ namespace Cellblock.Editor
             else if (mode == "pad") PadCapture.BeginExisting();
             else if (mode == "inmate") InmateCapture.BeginExisting();
             else if (mode == "sound") SoundCapture.BeginExisting();
+            else if (mode == "projects") BeginConstructionDeskArt();
             else LookCapture.BeginExisting();
         }
         static bool FeatureRunning(string mode)
         {
             return mode == "yard" ? YardCapture.IsRunning : mode == "actions" ? ActionCapture.IsRunning :
                 mode == "sanitation" ? SanitationCapture.IsRunning : mode == "workshop" ? ConstructionStudio.IsRunning :
-                mode == "pad" ? PadCapture.IsRunning : mode == "inmate" ? InmateCapture.IsRunning : mode == "sound" ? SoundCapture.IsRunning : LookCapture.IsRunning;
+                mode == "pad" ? PadCapture.IsRunning : mode == "inmate" ? InmateCapture.IsRunning : mode == "sound" ? SoundCapture.IsRunning : mode == "projects" ? constructionDeskArtActive : LookCapture.IsRunning;
         }
         static void AbortFeature(string mode, string reason)
         {
@@ -60,6 +61,7 @@ namespace Cellblock.Editor
             else if (mode == "pad") PadCapture.Abort(reason);
             else if (mode == "inmate") InmateCapture.Abort(reason);
             else if (mode == "sound") SoundCapture.Abort(reason);
+            else if (mode == "projects") FinishConstructionDeskArt(reason);
         }
         [Serializable] sealed class FeatureReport { public bool passed; public string editor; public string[] errors, notes, captures; }
         internal static void WriteFeatureEvidence(string output, bool passed, string[] errors, string[] notes)

@@ -2,6 +2,12 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
+## October19 live construction project desk
+
+**Facility → Projects & crews** and the same entry in Control open a full approved-work queue with Active/Needs attention/Completed filters. One selected project shows four stage bars, precise blocker/prerequisite guidance, material spending, remaining scheduled effort and actual crew assignments. View buttons frame the site or crew; prerequisite navigation changes the selection without reordering work. Pause/resume, hiring with inline result feedback and safe World-boundary cleanup are included.
+
+Desktop uses two scrolling panes, portrait stacks them, and short landscape puts actions ahead of the detail text. Construction remains authoritative in the existing core; no scheduler/save schema/character/quality/audio changes. Independent critic reviewed source and actual authored desktop/phone/portrait views and corrections. Actual installed Unity import/typechecking and final9-frame authored UI gallery completed with empty errors; source fingerprint eef5adf847cb. No new automated tests were added or run; prior436 core checks are historical evidence for the unchanged core. Native controls, device performance, prolonged live transitions and actual parking/hiring gameplay remain unmeasured in this pass. [Player guide and implementation](construction-project-desk.md).
+
 ## October 19 construction and published asset integration
 
 Claude's published fb173ff surfaces, shadows, room lighting, audio, controller and development prisoner fixes are integrated with Codex construction6a13236. User redirected character development to Claude; Codex's unfinished uniform/finger/shoe candidate is preserved outside active Assets. Its27-character/945-motion reports are candidate evidence only, not the final integration.

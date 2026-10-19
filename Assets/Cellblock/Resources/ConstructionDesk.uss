@@ -1,0 +1,72 @@
+.construction-desk { position: absolute; padding: 20px; background-color: rgb(14,25,30); border-width: 1px; border-color: rgb(82,111,117); border-top-width: 3px; border-top-color: rgb(207,180,126); border-radius: 10px; }
+.construction-head { flex-direction: row; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.construction-heading { flex-grow: 1; flex-shrink: 1; }
+.construction-kicker { font-size: 11px; color: rgb(207,180,126); margin-bottom: 5px; margin-top: 8px; white-space: normal; }
+.construction-title { font-size: 27px; color: rgb(243,237,220); -unity-font-style: bold; white-space: normal; }
+.construction-summary { font-size: 13px; color: rgb(172,196,196); margin-top: 8px; margin-bottom: 10px; flex-shrink: 0; white-space: normal; }
+.construction-filters { flex-direction: row; margin-bottom: 12px; flex-shrink: 0; }
+.construction-filters Button { margin-right: 6px; min-height: 44px; padding-left: 16px; padding-right: 16px; }
+.construction-desk Button.selected { background-color: rgb(59,86,87); border-color: rgb(207,180,126); color: rgb(249,235,199); }
+.construction-body { flex-direction: row; flex-grow: 1; min-height: 0; }
+.construction-queue { width: 36%; min-width: 260px; margin-right: 18px; }
+.construction-detail-scroll { flex-grow: 1; flex-basis: 0; min-width: 0; padding-left: 16px; border-left-width: 1px; border-left-color: rgb(59,81,87); }
+.construction-detail { padding-right: 8px; padding-bottom: 10px; }
+.construction-empty { white-space: normal; font-size: 14px; color: rgb(173,194,192); padding: 18px; }
+.construction-project { min-height: 100px; height: auto; flex-shrink: 0; align-items: stretch; -unity-text-align: middle-left; margin-bottom: 9px; padding: 13px; background-color: rgb(27,43,49); border-width: 1px; border-color: rgb(57,79,86); border-radius: 6px; }
+.construction-project-name { white-space: normal; font-size: 16px; -unity-font-style: bold; color: rgb(234,233,221); margin-bottom: 8px; }
+.construction-project-caption { flex-direction: row; justify-content: space-between; margin-bottom: 8px; }
+.construction-project-state { flex-shrink: 1; white-space: normal; font-size: 12px; color: rgb(170,193,194); }
+.construction-project-percent { margin-left: 8px; font-size: 13px; color: rgb(223,210,173); }
+.construction-track { height: 7px; background-color: rgb(36,58,64); border-radius: 3px; overflow: hidden; }
+.construction-fill { height: 100%; background-color: rgb(66,165,139); border-radius: 3px; }
+.construction-project.needs-attention { border-left-width: 3px; border-left-color: rgb(222,166,86); }
+.construction-project.needs-attention .construction-fill { background-color: rgb(210,164,83); }
+.construction-detail-title { font-size: 24px; -unity-font-style: bold; white-space: normal; color: rgb(243,237,220); margin-bottom: 8px; }
+.construction-state { color: rgb(127,208,178); font-size: 12px; margin-bottom: 8px; white-space: normal; }
+.construction-reason { white-space: normal; font-size: 14px; padding: 12px; background-color: rgb(25,44,48); border-radius: 5px; color: rgb(202,219,214); margin-bottom: 10px; }
+.construction-reason.needs-attention { background-color: rgb(58,45,27); color: rgb(238,207,156); }
+.construction-actions { flex-direction: row; flex-wrap: wrap; margin-bottom: 10px; }
+.construction-actions Button { min-height: 44px; margin-right: 8px; margin-bottom: 6px; }
+.construction-phase { margin-bottom: 12px; }
+.construction-phase-heading { flex-direction: row; justify-content: space-between; margin-bottom: 6px; }
+.construction-phase-name { flex-shrink: 1; white-space: normal; font-size: 13px; color: rgb(205,219,216); }
+.construction-phase-value { margin-left: 10px; font-size: 12px; color: rgb(170,194,189); }
+.construction-note { white-space: normal; font-size: 13px; color: rgb(165,188,187); margin-top: 6px; margin-bottom: 7px; }
+.construction-crew { min-height: 52px; white-space: normal; -unity-text-align: middle-left; margin-bottom: 7px; padding: 9px; }
+.construction-footer { flex-direction: row; align-items: center; flex-shrink: 0; margin-top: 12px; padding-top: 10px; border-top-width: 1px; border-top-color: rgb(57,79,86); }
+.construction-footer Button { min-height: 44px; margin-right: 8px; }
+.construction-footer-note { flex-shrink: 1; white-space: normal; font-size: 12px; color: rgb(169,192,187); }
+.construction-compact { padding: 12px; }
+.construction-compact .construction-title { font-size: 21px; }
+.construction-compact .construction-summary { font-size: 12px; margin-top: 4px; margin-bottom: 6px; }
+.construction-compact .construction-filters { margin-bottom: 8px; }
+.construction-compact .construction-filters Button { padding-left: 9px; padding-right: 9px; }
+.construction-compact .construction-queue { min-width: 0; width: 39%; margin-right: 10px; }
+.construction-compact .construction-detail-scroll { padding-left: 10px; }
+.construction-compact .construction-project { min-height: 100px; padding: 9px; }
+.construction-compact .construction-project-name { font-size: 13px; }
+.construction-compact .construction-project-state { font-size: 11px; }
+.construction-compact .construction-detail-title { font-size: 19px; }
+.construction-compact .construction-footer { margin-top: 6px; padding-top: 6px; }
+
+.construction-feedback { white-space: normal; color: rgb(236,205,154); font-size: 12px; flex-shrink: 0; margin-top: 4px; }
+
+.construction-portrait .construction-body { flex-direction: column; }
+.construction-portrait .construction-queue { width: 100%; height: 155px; flex-shrink: 0; margin-right: 0; margin-bottom: 12px; }
+.construction-portrait .construction-detail-scroll { border-left-width: 0; border-top-width: 1px; border-top-color: rgb(59,81,87); padding-left: 0; padding-top: 10px; }
+.construction-portrait .construction-footer { flex-wrap: wrap; }
+.construction-portrait .construction-footer-note { width: 100%; margin-top: 6px; }
+
+.construction-short { padding: 10px; }
+.construction-short .construction-heading > .construction-kicker { display: none; }
+.construction-short .construction-title { font-size: 20px; }
+.construction-short .construction-head { min-height: 44px; }
+.construction-short .construction-summary { font-size: 11px; margin-top: 2px; margin-bottom: 4px; }
+.construction-short .construction-filters { margin-bottom: 6px; }
+.construction-short .construction-project { min-height: 92px; }
+.construction-short .construction-detail-title { font-size: 18px; margin-bottom: 4px; }
+.construction-short .construction-state { margin-bottom: 4px; font-size: 11px; }
+.construction-short .construction-actions { margin-bottom: 2px; }
+.construction-short .construction-actions Button { margin-bottom: 4px; }
+.construction-short .construction-reason { font-size: 12px; padding: 8px; margin-bottom: 8px; }
+.construction-short .construction-footer { margin-top: 6px; padding-top: 6px; }

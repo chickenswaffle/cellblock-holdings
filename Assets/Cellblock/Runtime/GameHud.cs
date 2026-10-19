@@ -55,7 +55,7 @@ namespace Cellblock.Unity
         object previousSelection;
         float nextRefresh;
         public bool BlocksSimulation { get { return InteractionModalOpen || guideOpen || inmateSheetOpen || (menu != null && menu.style.display.value != DisplayStyle.None); } }
-        public bool BlocksWorldInput { get { return BlocksSimulation || CharacterPhoneOpen; } }
+        public bool BlocksWorldInput { get { return BlocksSimulation || CharacterPhoneOpen || constructionDeskOpen; } }
         public Vector2 WorldViewCenter { get; private set; } = new Vector2(0.5f, 0.5f);
         public static string Money(long cents) { return "$" + (cents / 100d).ToString("N0", CultureInfo.InvariantCulture); }
 
@@ -102,7 +102,7 @@ namespace Cellblock.Unity
             guide = Panel("guide-overlay"); guide.style.display = DisplayStyle.None;
             BuildFrontend(); BuildHomePresentation();
             facilityPane.Add(Action("Goals & facility journal", ShowFacilityEvents, "primary"));
-            BuildCharacterInspector(); BuildCharacterPhone(); BuildInmate(); BuildGamepad();
+            BuildCharacterInspector(); BuildCharacterPhone(); BuildInmate(); BuildGamepad(); BuildConstructionDesk();
             root.RegisterCallback<GeometryChangedEvent>(e => Layout()); Layout();
         }
 
@@ -463,6 +463,7 @@ namespace Cellblock.Unity
             facilityPane.Add(Text("Each crew costs $800 per game day, including idle time.", "muted"));
             for (int i = 0; i < crewRows.Length; i++) { crewRows[i] = Text("", "crew-line"); facilityPane.Add(crewRows[i]); }
             facilityPane.Add(Text("ACTIVE PROJECTS", "section-label"));
+            facilityPane.Add(Action("Projects & crews", ShowConstructionDesk, "primary"));
             projectEmpty = Text("No active construction. Choose Build to plan an improvement.", "muted"); facilityPane.Add(projectEmpty);
             for (int i = 0; i < projectRows.Length; i++)
             {
@@ -603,6 +604,7 @@ namespace Cellblock.Unity
             LayoutFrontend(left, right, top, bottom, menuOpen);
             LayoutCharacterInspector(left, right, top, bottom, menuOpen);
             LayoutCharacterPhone(left, right, top, bottom);
+            LayoutConstructionDesk(left, right, top, bottom);
             LayoutIncidentHud(left, right, top, bottom, menuOpen || InteractionModalOpen || guideOpen || game.CharacterViewActive || game.RideAlongActive || game.Draft != null || (compact && inspectorOpen));
         }
 
@@ -700,10 +702,10 @@ namespace Cellblock.Unity
             if (person) { showStaff = game.SelectedStaff != null; ShowCompactCharacter(game.SelectedCharacterId); }
             Refresh(true);
         }
-        public void NavigateBack() { if (inmateSheetOpen) { CloseInmateSheet(); return; } if (CharacterPhoneOpen) { CloseCharacterPhone(); return; } if (settingsOpen) CloseSettings(); else if (modePickerOpen) HideModePicker(); else CloseOverlays(); }
+        public void NavigateBack() { if (constructionDeskOpen) { CloseConstructionDesk(); return; } if (inmateSheetOpen) { CloseInmateSheet(); return; } if (CharacterPhoneOpen) { CloseCharacterPhone(); return; } if (settingsOpen) CloseSettings(); else if (modePickerOpen) HideModePicker(); else CloseOverlays(); }
         public void CloseOverlays()
         {
-            CloseCharacterPhone(); CloseInteractionSheets();
+            CloseConstructionDesk(); CloseCharacterPhone(); CloseInteractionSheets();
             if (guideOpen) { CloseGuide(); return; }
             if (game.World != null && menu != null) menu.style.display = DisplayStyle.None;
             cameraOpen = false; Layout();
@@ -714,7 +716,7 @@ namespace Cellblock.Unity
         {
             if (!force && Time.unscaledTime < nextRefresh) return;
             nextRefresh = Time.unscaledTime + 0.35f;
-            World world = game.World; if (world == null) return;
+            World world = game.World; RefreshConstructionDesk(world); if (world == null) return;
             if (game.Draft != null && !hadDraft) { inspectorOpen = false; cameraOpen = false; }
             hadDraft = game.Draft != null;
             object selection = (object)game.SelectedResident ?? (object)game.SelectedStaff ?? (object)game.SelectedFixture ?? (object)game.SelectedWall ?? (game.SelectedCharacterId == "" ? null : (object)game.SelectedCharacterId);
