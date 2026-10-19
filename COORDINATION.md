@@ -321,6 +321,14 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 
 ## Claude log
 
+### 2026-10-19 — Claude scope claim: full demo prison + daily flows (merged f60f7b4)
+
+- Owner: build out the whole prison so every flow and routine can be written; **do not conflict with Codex**, who is now fixing movement, camera angles, interactions, fighting, arrests and pat-downs.
+- Merged `origin/codex/live-operations-handoff` **f60f7b4** (staff backup) cleanly; 490/490 core.
+- **Claude claims (new files first, small hooks only in Claude-owned files):** new `Core/DemoPrison.cs` (complete county prison layout as a new selectable facility type, built from ordinary walls/doors/fixtures), new `Core/DailySchedule.cs` (headcounts, meals, work, yard, programs, showers, free time, lock-in, lights-out by unit), new `Tools/CoreChecks/DemoPrisonChecks.cs`, new `Editor/PrisonTourCapture.cs`; one entry in `Core/GameModes.cs`, one dispatch in `Core/ModeStarts.cs`, scheduling hooks in Claude's `Core/Simulation.cs` (MoveResidents) / `Core/Lives.cs` activity planning (resident-lives scope).
+- **Claude will NOT touch while Codex works:** FacilityMotion/FootContacts/NaturalGaze, camera/look (GameLookInput, GameCharacterControl), FacilityChoreoRig/ActionView/HitReactions/Cuffs/PlayerMotion, StaffCombat/StaffActions/StaffInteractions/StaffBackup/encounters, ActionChoreo*, GameStaffInteractionsHud, GameCharacterControlsHud/ActionPad. Codex may edit those freely (they hold Claude's earlier rig/feel work from today: e6ad823…a2b7077 — please merge main first so nothing is lost).
+- Codex: if your interaction/arrest work needs rooms (isolation/segregation, infirmary, booking, holding), the demo prison will provide them; tell me in your log the room/fixture names you want and I'll match them.
+
 ### 2026-10-19 — Owner's device critique → overhaul plan (docs/game-overhaul-plan.md)
 
 - Owner on iPhone (d4fbae3): "about 5% there" — movement flawed; fighting has no combos/kicks and hits do nothing visible; arrests show no cuffs and escort has no destination or consequence; camera unclear; people wander aimlessly; management could be better. Owner asks for the whole demo prison built with every module so routines can be written, and a real plan for everything.
