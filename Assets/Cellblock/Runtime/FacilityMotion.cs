@@ -149,7 +149,7 @@ namespace Cellblock.Unity
             // The escape scene poses the whole body of anyone it holds this frame (FacilityEscapeView.cs).
             if (SceneHoldsBody(stride, world))
             {
-                ResetFootContacts(actor);
+                ResetFootContacts(actor); if (actor.Walker != null) actor.Walker.gameObject.SetActive(false);
                 foreach (Transform ankle in actor.Feet) ankle.localRotation = Quaternion.identity;
                 stride.LastYaw = actor.Root.eulerAngles.y; stride.PelvisBase = actor.Body.localPosition.y; return;
             }
@@ -166,7 +166,9 @@ namespace Cellblock.Unity
 
             // Distance drives stride phase; world contact anchors below enforce stance through turns.
             float walkStep = Mathf.Lerp(0.56f, 0.70f, Mathf.Clamp01((stride.Pace - 0.9f) / 1.1f)), runStep = Mathf.Lerp(0.95f, 1.30f, sprint);
-            float step = Mathf.Lerp(walkStep, runStep, run) * (.95f + IdentitySeed(stride.Id) % 7 * .016f) * (style == GaitStyle.Sneak ? 0.85f : style == GaitStyle.Cuffed ? 0.8f : 1);
+            // Age (Claude, 2026-10-19): from 60 the step shortens, the back stoops and the arms swing less.
+            float aged = Mathf.Clamp01((actor.Age - 58) / 20f);
+            float step = Mathf.Lerp(walkStep, runStep, run) * (.95f + IdentitySeed(stride.Id) % 7 * .016f) * (style == GaitStyle.Sneak ? 0.85f : style == GaitStyle.Cuffed ? 0.8f : 1) * (1 - .22f * aged);
             float duty = Mathf.Lerp(.60f, .36f, run);
             // A contact must fit the rig's front/back reach. Long sprint strides with a
             // capped reach otherwise demand a second recovery step before every toe-off.
@@ -211,7 +213,7 @@ namespace Cellblock.Unity
             // Lean into speed and acceleration (a spring, so starts tip forward and stops rock back), bank into turns.
             float accel = dt > 0 ? (stride.Pace - stride.LastIntent) / dt : 0; stride.LastIntent = stride.Pace;
             float leanTarget = Mathf.Lerp(3.5f, Mathf.Lerp(9, 17, sprint), run) * g + Mathf.Clamp(accel * 1.6f, -6, 7) +
-                (style == GaitStyle.Sneak ? 10 : style == GaitStyle.Winded ? 20 : style == GaitStyle.Cuffed ? 8 : 0);
+                (style == GaitStyle.Sneak ? 10 : style == GaitStyle.Winded ? 20 : style == GaitStyle.Cuffed ? 8 : 0) + aged * 13;
             stride.Lean = Spring(stride.Lean, ref stride.LeanVelocity, leanTarget, 2.2f, dt);
             float bankTarget = Mathf.Clamp(-(yawRate / rate) * Mathf.Min(speed / rate, 6) * 0.012f, -11, 11) * (moving ? 1 : 0);
             stride.Bank = Spring(stride.Bank, ref stride.BankVelocity, bankTarget, 1.8f, dt);
@@ -222,7 +224,7 @@ namespace Cellblock.Unity
                 actor.Body.localRotation = Quaternion.Slerp(actor.Body.localRotation, Quaternion.Euler(stride.Lean + breathe, twist, stride.Bank), blend);
                 // Walking arms hang with a soft elbow and swing from the shoulder; running arms pump from about the hip to
                 // the chest, elbows near 80°, centred slightly behind the body so the hands never ride up in front.
-                float armAmplitude = Mathf.Lerp(22, Mathf.Lerp(34, 50, sprint), run) * g * (style == GaitStyle.Winded ? 0.6f : 1);
+                float armAmplitude = Mathf.Lerp(22, Mathf.Lerp(34, 50, sprint), run) * g * (style == GaitStyle.Winded ? 0.6f : 1) * (1 - .45f * aged);
                 float armBase = Mathf.Lerp(2, Mathf.Lerp(8, 6, sprint), run);
                 float elbowBase = -Mathf.Lerp(16, Mathf.Lerp(72, 84, sprint), run);
                 for (int arm = 0; arm < 2; arm++)
@@ -237,6 +239,7 @@ namespace Cellblock.Unity
                     actor.Forearms[arm].localRotation = Quaternion.Slerp(actor.Forearms[arm].localRotation, Quaternion.Euler(elbow, 0, 0), blend);
                 }
             }
+            HoldWalker(actor, !actor.PoseArms && !RoutineOwnsFeet(actor), blend); // FacilityWalkerView.cs
             AnimateNaturalGaze(actor, resident, world, stride, moving, dt);
 
         }

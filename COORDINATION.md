@@ -262,6 +262,14 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 
 ## Claude log
 
+### 2026-10-19 — Claude progress: touch controls, turning, punches, no walking through people, a varied population
+
+Owner gave Claude broad permission today ("do whatever you need to make this game great"); exact files below, all reviewed in Claude's clone (batch, muted).
+- **Touch officer controls** (`bbfafd0`): floating MOVE zone (left ~42%) with push-past-the-ring sprint (RUN hidden on touch), swipe anywhere free to look (LOOK stick hidden), pinch with any two free fingers, pinch-through between shoulder view and first person, chip-style top bar with ⋯ overflow, transient hint chip, unavailable action buttons invisible in fixed slots. Files: GameCharacterControlsHud.cs, GameActionPad.cs, GameLookInput.cs, GameCharacterControl.cs, ActionPad.uss, LookCapture.cs.
+- **Motion** (`e6ad823`): head-led standing turns with stepping feet (FacilityMotion.StandingTurn + one hook each in FacilityNaturalGaze/FacilityFootContacts), step-out when a planted foot is turned across the midline, softer walk / hip-to-chest run arms; punches aim at the face, step in up to 0.3 m, head snaps away from the fist (FacilityActionView). New TurnCapture (turn + punch film). BatchMute mutes every batch editor (restores the preference on quit).
+- **People don't walk through each other**: the controlled character is blocked by bodies in the simulation (new Core/Crowding.cs + 3 lines in CharacterControl.CharacterStepAllowed; escorting exempt). NPC routines/timings are untouched in Core (447/447): the renderer steers bodies (oncoming veer right, follower spacing) and resolves contacts after each MoveActor (new FacilityCrowdView.cs + hooks in FacilityView.MoveActor). Crowd review A/B (alternating, 96 residents, clock running): walkers closer than 30 cm 3.03 → 0.26 pairs/frame. Codex: `RefreshStaffAim` reads rendered positions; contact offsets are ≤ 0.25 m and scenes/held people are exempt.
+- **Population**: body builds baked from the pack's sculpt (average/slim/heavy + original, `Reshape`, HumanBakeVersion 3), per-build shoulder width (pivots 0.19–0.23), presentation ages (old-timers: grey hair, stoop, shorter steps, some with a walking frame — FacilityWalkerView.cs), 8 skin tones (FacilityView.SkinTones), tattoos for most gang members and ~1 in 5 others (FacilityTattoos.cs, URP detail albedo). New PeopleCapture line-up review.
+
 ### 2026-10-19 — joint task with Codex: movement, combat and restraint realism + mobile controls
 
 - Owner's direction: movement/turning, punching, handcuffing, takedowns, pat-downs and first person must "look legit"; swipe to look + pinch to zoom + walking pad instead of the LOOK stick. Plan and split: **`docs/motion-realism-plan.md`** (research, `ActionChoreo` contract, work items, review gates).

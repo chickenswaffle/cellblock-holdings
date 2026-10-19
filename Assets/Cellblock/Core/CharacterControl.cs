@@ -217,6 +217,10 @@ namespace Cellblock.Core
         {
             blocker = "A wall, furnishing or site boundary blocks that direction.";
             if (!Routes.Clear(from, to)) return false;
+            // Bodies block like walls (personal space, Crowding.cs); the axis slide below steps around them.
+            if (crowdMinute != Data.Minute) GatherCrowd();
+            if (HeldResidentId == "" && Crowded(session.Key, from, to)) { blocker = "Someone is in the way."; return false; } // an escort walks the scene's own path
+            CrowdMoved(session.Key, to);
             if (session.Resident == null) { blocker = ""; return true; }
             EnsureCharacterAccess(session);
             // Inspect the whole swept segment so a narrow forbidden corner cannot be cut between legal endpoints.

@@ -55,7 +55,7 @@ namespace Cellblock.Editor
                 if (stage == 0) { FacilityView.UseBakedHumans = true; FacilityView.TemplateMilliseconds = 0; view.PreviewResetHumanTemplates(); game.StartArtPreview("county-maximum", "briar-county", 15 * 60); PresentationQuality.Apply(3); Next(2); return; }
                 // Two stages per size: grow and build, then measure once the people have settled.
                 int size = (stage - 1) / 2;
-                if (size >= Sizes.Length) { Finish(); return; }
+                if (size >= Sizes.Length) { if (Overlaps(game, view, stage - 1 - Sizes.Length * 2)) return; Finish(); return; }
                 var w = game.World;
                 if ((stage - 1) % 2 == 0)
                 {
@@ -69,6 +69,27 @@ namespace Cellblock.Editor
                 Next(.5f);
             }
             catch (Exception e) { errors.Add(e.ToString()); Finish(); }
+        }
+
+        // People walking through each other: with the clock running at a busy hour, sample how often two free-moving
+        // bodies are closer than 30 cm on screen, with the renderer's steering off and then on.
+        static int overlapSamples, overlapCount; static double overlapsOff, overlapsOn; static int samplesOff, samplesOn;
+        static bool Overlaps(GameController game, FacilityView view, int step)
+        {
+            // Alternate steering off and on every 15 samples (1.5 s) through the same busy stretch; count the last 10 of each.
+            if (step == 0 && overlapSamples == 0 && overlapCount == 0) { game.World.Data.Speed = 2; overlapsOff = overlapsOn = 0; samplesOff = samplesOn = 0; }
+            if (overlapCount < 16 * 15)
+            {
+                bool on = overlapCount / 15 % 2 == 1; FacilityView.PreviewCrowdAvoidance = on;
+                if (overlapCount % 15 >= 5) { double n = view.PreviewOverlaps(game.World, .3f, true); if (on) { overlapsOn += n; samplesOn++; } else { overlapsOff += n; samplesOff++; } }
+                overlapCount++; SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + .1f); return true;
+            }
+            FacilityView.PreviewCrowdAvoidance = true;
+            double off = overlapsOff / Math.Max(1, samplesOff), onRate = overlapsOn / Math.Max(1, samplesOn);
+            notes.Add("overlapping pairs (last frame): " + view.PreviewOverlapDetail);
+            notes.Add("walkers passing closer than 30 cm (pairs per frame, both moving, 96 residents, clock running, alternating): steering off " + off.ToString("0.00") + " → on " + onRate.ToString("0.00"));
+            Check(onRate < off * .6 + .2, "Steering did not keep walkers apart: " + onRate.ToString("0.00") + " vs " + off.ToString("0.00") + " pairs per frame.");
+            game.World.Data.Speed = 0; return false;
         }
 
         // Extra residents beside existing ones, through the same hydration a transfer arrival uses.

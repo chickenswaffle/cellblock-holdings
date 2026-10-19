@@ -109,15 +109,104 @@ namespace Cellblock.Unity
                 t.HasEyes = t.Eyes != null; t.HasBrows = t.Brows != null;
                 if (t.HasEyes) t.HasLids = AddEyelids(t.Regions["face"], 1, System.Array.IndexOf(t.FaceBones, "Head"), body.transform.InverseTransformDirection(Vector3.up).normalized);
                 foreach (string region in new[] { "head", "skin", "top", "topshort", "skinshort", "bottom", "belt", "shoes" }) { Release(t.Regions[region]); t.Regions.Remove(region); }
+                // Ordinary bodies: the pack's sculpt is a bodybuilder; most people are average, slim or heavy (Reshape).
+                Vector3 upAxis = body.transform.InverseTransformDirection(Vector3.up).normalized, ahead = FaceForward(t.Regions["face"], upAxis, t.HasEyes);
+                foreach (string build in BodyBuilds) if (build != "")
+                    foreach (string sleeve in new[] { "body", "bodyshort" }) t.Regions[sleeve + "_" + build] = Reshape(t.Regions[sleeve], t.BoneNames, build, upAxis, ahead);
                 // Distance versions (about a third of the triangles) for people who are small on screen.
                 var reduceTimer = System.Diagnostics.Stopwatch.StartNew();
-                foreach (string key2 in new[] { "body", "bodyshort", "face" }) t.Regions[key2 + "-far"] = HumanMeshReduce.Reduce(t.Regions[key2], key2 == "face" ? FaceFarKeep : FarKeep, t.Regions[key2].name + " far");
+                foreach (string key2 in BodyMeshKeys().Concat(new[] { "face" })) t.Regions[key2 + "-far"] = HumanMeshReduce.Reduce(t.Regions[key2], key2 == "face" ? FaceFarKeep : FarKeep, t.Regions[key2].name + " far");
 #if UNITY_EDITOR
-                foreach (string key2 in new[] { "body", "bodyshort", "face" }) Debug.Log("CELLBLOCK_HUMAN_LOD " + key + " " + key2 + " " + t.Regions[key2].vertexCount + " → " + t.Regions[key2 + "-far"].vertexCount + " vertices, " + t.Regions[key2].triangles.Length / 3 + " → " + t.Regions[key2 + "-far"].triangles.Length / 3 + " triangles (reduce " + reduceTimer.ElapsedMilliseconds + " ms total)");
+                foreach (string key2 in new[] { "body", "bodyshort", "body_slim", "face" }) Debug.Log("CELLBLOCK_HUMAN_LOD " + key + " " + key2 + " " + t.Regions[key2].vertexCount + " → " + t.Regions[key2 + "-far"].vertexCount + " vertices, " + t.Regions[key2].triangles.Length / 3 + " → " + t.Regions[key2 + "-far"].triangles.Length / 3 + " triangles (reduce " + reduceTimer.ElapsedMilliseconds + " ms total)");
 #endif
             }
             finally { Release(probe); }
         }
+        // ---- body builds ----------------------------------------------------------------------------------------------
+        // "" is the pack's muscular sculpt; the others are reshaped from it at preparation time (and baked for players).
+        static readonly string[] BodyBuilds = { "", "average", "slim", "heavy" };
+        // Presentation age from identity (saves carry staff ages in personnel files; residents have none yet).
+        static int PresentedAge(int seed, bool staff)
+        {
+            int roll = (seed / 7) % 100, spread = (seed / 101) % 100;
+            if (staff) return 24 + spread * 36 / 100;
+            if (roll < 9) return 60 + spread * 18 / 100;      // old-timers
+            if (roll < 30) return 40 + spread * 20 / 100;
+            return 19 + spread * 21 / 100;
+        }
+        static IEnumerable<string> BodyMeshKeys() { foreach (string sleeve in new[] { "body", "bodyshort" }) foreach (string build in BodyBuilds) yield return build == "" ? sleeve : sleeve + "_" + build; }
+        // Mostly ordinary people: staff skew average and heavy, residents average and slim; a few of each are built.
+        static string BuildFor(int seed, bool staff, bool old)
+        {
+            int roll = (seed / 13) % 100;
+            if (old) return roll < 55 ? "slim" : roll < 80 ? "heavy" : "average";
+            if (staff) return roll < 45 ? "average" : roll < 72 ? "heavy" : roll < 85 ? "slim" : "";
+            return roll < 38 ? "average" : roll < 68 ? "slim" : roll < 84 ? "heavy" : "";
+        }
+        static Vector3 FaceForward(Mesh face, Vector3 up, bool eyes)
+        {
+            Vector3[] v = face.vertices;
+            Vector3 head = Average(face.GetTriangles(0).Distinct().Select(i => v[i]));
+            Vector3 front = eyes && face.subMeshCount > 1 ? Average(face.GetTriangles(1).Distinct().Select(i => v[i])) : head;
+            Vector3 f = Vector3.ProjectOnPlane(front - head, up);
+            return f.sqrMagnitude > 1e-8f ? f.normalized : Vector3.Cross(up, Vector3.right).normalized;
+        }
+        // Each vertex moves relative to the bones it is skinned to: radial distance from a limb's bone segment (or, for the
+        // torso, horizontal distance from the spine) is scaled per region, and the heavy build gains a forward belly. The
+        // neck fades back to the original so the separate head mesh still meets it exactly.
+        static Mesh Reshape(Mesh source, string[] boneNames, string build, Vector3 up, Vector3 forward)
+        {
+            Matrix4x4[] bind = source.bindposes; int n = Mathf.Min(bind.Length, boneNames.Length);
+            var at = new Vector3[n]; var index = new Dictionary<string, int>();
+            for (int b = 0; b < n; b++) { at[b] = bind[b].inverse.MultiplyPoint3x4(Vector3.zero); index[boneNames[b]] = b; }
+            int Bone(string name) { int i; return index.TryGetValue(name, out i) ? i : -1; }
+            var child = new int[n]; for (int b = 0; b < n; b++) child[b] = -1;
+            foreach (var (a, c) in new[] { ("pelvis", "spine_01"), ("spine_01", "spine_02"), ("spine_02", "spine_03"), ("spine_03", "neck_01"), ("neck_01", "Head"),
+                ("clavicle_l", "upperarm_l"), ("clavicle_r", "upperarm_r"), ("upperarm_l", "lowerarm_l"), ("upperarm_r", "lowerarm_r"), ("lowerarm_l", "hand_l"), ("lowerarm_r", "hand_r"),
+                ("thigh_l", "calf_l"), ("thigh_r", "calf_r"), ("calf_l", "foot_l"), ("calf_r", "foot_r") })
+            { int i = Bone(a), j = Bone(c); if (i >= 0 && j >= 0) child[i] = j; }
+            var factor = new float[n]; var belly = new float[n]; var torso = new bool[n];
+            for (int b = 0; b < n; b++)
+            {
+                string name = boneNames[b]; factor[b] = 1;
+                bool arm = name.StartsWith("upperarm") || name.StartsWith("lowerarm"), thigh = name.StartsWith("thigh"), calf = name.StartsWith("calf");
+                torso[b] = name.StartsWith("spine") || name == "pelvis" || name.StartsWith("clavicle");
+                switch (build)
+                {
+                    case "average": factor[b] = arm ? (name.StartsWith("upperarm") ? .72f : .82f) : name.StartsWith("clavicle") ? .74f : name == "spine_03" ? .84f : name == "spine_02" ? .92f : thigh ? .88f : calf ? .92f : 1; break;
+                    case "slim": factor[b] = arm ? (name.StartsWith("upperarm") ? .64f : .76f) : name.StartsWith("clavicle") ? .68f : name == "spine_03" ? .78f : name == "spine_02" ? .85f : name == "spine_01" ? .9f : thigh ? .82f : calf ? .87f : name == "pelvis" ? .94f : 1; break;
+                    case "heavy": factor[b] = arm ? .86f : name.StartsWith("clavicle") ? .84f : name == "spine_03" ? .98f : name == "spine_02" ? 1.12f : name == "spine_01" ? 1.16f : name == "pelvis" ? 1.08f : thigh ? 1.02f : 1;
+                        belly[b] = name == "spine_01" ? .5f : name == "spine_02" ? .38f : name == "pelvis" ? .22f : 0; break;
+                }
+            }
+            float neckY = Bone("neck_01") >= 0 ? Vector3.Dot(at[Bone("neck_01")], up) : float.MaxValue;
+            float span = Bone("Head") >= 0 && Bone("pelvis") >= 0 ? Mathf.Abs(Vector3.Dot(at[Bone("Head")] - at[Bone("pelvis")], up)) : 1;
+            Vector3[] v = source.vertices; BoneWeight[] w = source.boneWeights;
+            Vector3 Shift(int b, Vector3 p)
+            {
+                if (b < 0 || b >= n || (factor[b] == 1 && belly[b] == 0)) return Vector3.zero;
+                Vector3 c = at[b];
+                if (child[b] >= 0) { Vector3 e = at[child[b]] - at[b]; float t = Mathf.Clamp01(Vector3.Dot(p - at[b], e) / Mathf.Max(1e-8f, e.sqrMagnitude)); c = at[b] + e * t; }
+                Vector3 r = p - c; if (torso[b]) r = Vector3.ProjectOnPlane(r, up);
+                Vector3 d = r * (factor[b] - 1);
+                float front = Vector3.Dot(r, forward);
+                if (belly[b] > 0 && front > 0) d += forward * front * belly[b];
+                if (build != "heavy" && boneNames[b] == "spine_03" && front > 0) d -= forward * front * .08f; // flatter chest
+                return d;
+            }
+            var result = new Vector3[v.Length];
+            for (int i = 0; i < v.Length; i++)
+            {
+                BoneWeight bw = w[i]; Vector3 p = v[i];
+                Vector3 d = Shift(bw.boneIndex0, p) * bw.weight0 + Shift(bw.boneIndex1, p) * bw.weight1 + Shift(bw.boneIndex2, p) * bw.weight2 + Shift(bw.boneIndex3, p) * bw.weight3;
+                float y = Vector3.Dot(p, up), fade = 1 - Mathf.SmoothStep(0, 1, Mathf.InverseLerp(neckY - .12f * span, neckY - .03f * span, y));
+                result[i] = p + d * fade;
+            }
+            Mesh mesh = Object.Instantiate(source); mesh.name = source.name + " " + build;
+            mesh.vertices = result; mesh.RecalculateBounds();
+            return mesh;
+        }
+
         static void Release(Object o) { if (Application.isPlaying) Destroy(o); else DestroyImmediate(o); }
 
         // ---- baked templates -----------------------------------------------------------------------------------------
@@ -128,8 +217,8 @@ namespace Cellblock.Unity
 #else
         public static bool UseBakedHumans = true;
 #endif
-        const int HumanBakeVersion = 2;
-        static readonly string[] BakedMeshes = { "body", "bodyshort", "face", "body-far", "bodyshort-far", "face-far" };
+        const int HumanBakeVersion = 3;
+        static readonly string[] BakedMeshes = BodyMeshKeys().Concat(new[] { "face" }).SelectMany(k => new[] { k, k + "-far" }).ToArray();
         static bool LoadBaked(BodyTemplate t, string key)
         {
             TextAsset meta = Resources.Load<TextAsset>("Characters/Baked/" + key);
@@ -536,9 +625,9 @@ namespace Cellblock.Unity
         }
 
         // ---- materials ----------------------------------------------------------------------------------------------
-        Material SkinMaterial(bool female, Color tone)
+        Material SkinMaterial(bool female, Color tone, BodyTemplate t = null, int tattoo = -1)
         {
-            string name = "skin-model-" + (female ? "f" : "m") + "-" + ColorUtility.ToHtmlStringRGB(tone);
+            string name = "skin-model-" + (female ? "f" : "m") + "-" + ColorUtility.ToHtmlStringRGB(tone) + (tattoo >= 0 ? "-ink" + tattoo : "");
             Material value; if (materials.TryGetValue(name, out value)) return value;
             Material template = Resources.Load<Material>("SurfaceMaterial") ?? Resources.Load<Material>("DetailedBuildingMaterial");
             value = new Material(template) { name = name, enableInstancing = true };
@@ -550,6 +639,12 @@ namespace Cellblock.Unity
             if (normal != null) { value.SetTexture("_BumpMap", normal); value.SetFloat("_BumpScale", .8f); value.EnableKeyword("_NORMALMAP"); }
             if (mask != null) { value.SetTexture("_MetallicGlossMap", mask); value.SetTexture("_OcclusionMap", mask); value.SetFloat("_Smoothness", 1); value.EnableKeyword("_METALLICSPECGLOSSMAP"); value.EnableKeyword("_OCCLUSIONMAP"); }
             value.SetFloat("_DetailAlbedoMapScale", 0);
+            if (tattoo >= 0 && t != null)
+            {
+                // Ink through the detail albedo slot (×2 around grey), on the same UVs as the skin (FacilityTattoos.cs).
+                value.SetTexture("_DetailAlbedoMap", TattooTexture(t, tattoo)); value.SetTextureScale("_DetailAlbedoMap", Vector2.one);
+                value.SetFloat("_DetailAlbedoMapScale", 1); value.EnableKeyword("_DETAIL_MULX2");
+            }
             materials[name] = value; return value;
         }
         // The lids sample one skin texel, so they miss the occlusion the mask paints into the socket around them and
@@ -607,17 +702,35 @@ namespace Cellblock.Unity
             // Clothes. Officers and other staff wear short sleeves about half the time; residents' jumpsuits too.
             bool shortSleeves = seed % 2 == 0;
             Material top = Material(uniformName, uniform), trousers = Material("trousers", new Color(0.30f, 0.34f, 0.33f));
-            Material shoes = Material("rubber", new Color(.10f, .12f, .12f)), skinMaterial = SkinMaterial(female, skin);
-            string bodyKey = shortSleeves ? "bodyshort" : "body";
+            // Ink: most gang members and about one in five other residents; staff rarely (sleeves under the uniform).
+            int tattoo = -1;
+            if (!staff)
+            {
+                Resident inked = presentedWorld == null ? null : presentedWorld.Data.Residents.FirstOrDefault(r => r.Id == id);
+                bool gang = inked != null && !string.IsNullOrEmpty(inked.Gang) && inked.Gang != "Unaffiliated";
+                if (gang ? seed % 5 != 0 : seed % 5 == 2) tattoo = (seed / 17) % TattooStyles;
+            }
+            Material shoes = Material("rubber", new Color(.10f, .12f, .12f)), skinMaterial = SkinMaterial(female, skin, t, tattoo);
+            // Who this is: an age (residents 19 to the 70s, a few old-timers), and an ordinary build for most people.
+            int age = PresentedAge(seed, staff); bool old = age >= 60;
+            string build = BuildFor(seed, staff, old);
+            string bodyKey = (shortSleeves ? "bodyshort" : "body") + (build == "" ? "" : "_" + build);
+            if (!t.Regions.ContainsKey(bodyKey)) bodyKey = shortSleeves ? "bodyshort" : "body";
+            actor.Age = age;
+            // Shoulder width follows the build: the rig pins the skeleton's shoulders to these pivots (0.23 suited only the
+            // bodybuilder). Poses and reaches are solved from the pivots, so hands still land where they did.
+            float shoulder = build == "slim" ? .19f : build == "average" ? .2f : build == "heavy" ? .21f : .23f;
+            for (int arm = 0; arm < 2; arm++) { Vector3 p = actor.Limbs[arm].localPosition; actor.Limbs[arm].localPosition = new Vector3((arm == 0 ? -1 : 1) * shoulder, p.y, p.z); }
             SkinnedMeshRenderer bodyRenderer = Skin(instance.transform, "Body", t.Regions[bodyKey], skeleton, pelvis, top, trousers, staff ? shoes : trousers, shoes, skinMaterial);
             // The head (and hair, eyes, brows) live under the gaze pivot so first person hides them from your own eyes.
-            Color hairColor = seed % 5 == 0 ? new Color(.30f, .29f, .27f) : seed % 3 == 0 ? new Color(.17f, .12f, .08f) : new Color(.07f, .06f, .055f);
+            Color hairColor = old ? (seed % 2 == 0 ? new Color(.72f, .71f, .69f) : new Color(.48f, .47f, .45f)) : age > 45 && seed % 3 == 0 ? new Color(.30f, .29f, .27f) :
+                seed % 5 == 0 ? new Color(.30f, .29f, .27f) : seed % 3 == 0 ? new Color(.17f, .12f, .08f) : new Color(.07f, .06f, .055f);
             var faceMaterials = new List<Material> { skinMaterial }; if (t.HasEyes) faceMaterials.Add(EyeMaterial()); if (t.HasBrows) faceMaterials.Add(HairMaterial(1, hairColor)); if (t.HasLids) faceMaterials.Add(LidMaterial(skinMaterial));
             SkinnedMeshRenderer faceRenderer = Skin(actor.Head, "Head", t.Regions["face"], t.FaceBones.Select(n => bones.ContainsKey(n) ? bones[n] : null).ToArray(), pelvis, faceMaterials.ToArray());
             string[] styles = female ? new[] { "Hair_Buns", "Hair_Long", "Hair_BuzzedFemale" } : staff ? new[] { "Hair_SimpleParted", "Hair_Buzzed", "Hair_SimpleParted", "" } : new[] { "Hair_Buzzed", "Hair_Buzzed", "Hair_SimpleParted", "", "Hair_Buzzed" };
             string style = styles[seed / 7 % styles.Length];
             if (style != "") Hair(actor.Head, style, bones, pelvis, HairMaterial(style == "Hair_Long" || style == "Hair_Buns" ? 2 : 1, hairColor));
-            if (!female && seed % 6 == 1) Hair(actor.Head, "Hair_Beard", bones, pelvis, HairMaterial(1, hairColor));
+            if (!female && (seed % 6 == 1 || old && seed % 3 == 0)) Hair(actor.Head, "Hair_Beard", bones, pelvis, HairMaterial(1, hairColor));
 
             // Hide the capsule body, face and limbs; keep hats, badges, vests, tools, the name tag and selection ring.
             foreach (Renderer r in existing)
@@ -635,6 +748,7 @@ namespace Cellblock.Unity
                 rig.Face = faceRenderer; rig.FaceNear = t.Regions["face"]; rig.FaceFar = t.Regions["face-far"]; rig.Lids = t.HasLids;
             }
             RefitHeadwear(actor, bones["head"]);
+            if (!staff && age >= 68 && seed % 3 == 0) AddWalker(actor); // some old-timers use a walking frame
             if (humanDriver == null) { humanDriver = people.gameObject.AddComponent<HumanRigDriver>(); humanDriver.View = this; }
         }
 
@@ -921,7 +1035,8 @@ namespace Cellblock.Unity
         {
             // Baked templates are assets (Resources), not ours to destroy.
             foreach (BodyTemplate t in bodyTemplates.Values) if (!t.Baked) foreach (Mesh mesh in t.Regions.Values) if (mesh != null) Destroy(mesh);
-            bodyTemplates.Clear(); hairMeshes.Clear(); humanRigs.Clear();
+            foreach (Texture2D ink in tattooTextures.Values) if (ink != null) Destroy(ink);
+            bodyTemplates.Clear(); hairMeshes.Clear(); humanRigs.Clear(); tattooTextures.Clear();
         }
     }
 

@@ -17,10 +17,10 @@ namespace Cellblock.Unity
         Transform structures, planned, ghost, people;
         sealed class Actor
         {
-            public Transform Root, Model, Body, Head, Blink, Marker, SecurityProp, WatchProp;
+            public Transform Root, Model, Body, Head, Blink, Marker, SecurityProp, WatchProp, Walker;
             public TextMesh NameTag;
             public Transform[] Limbs;
-            public float Speed, Gait, TurnRate;
+            public float Speed, Gait, TurnRate; public int Age = 30; // presentation age (FacilityHumanModels), drives posture and gait
             public List<Point> RenderRoute;
             public Point RouteTarget;
             public int RouteIndex, RouteRevision = -1;
@@ -734,14 +734,18 @@ namespace Cellblock.Unity
             unchecked { foreach (char letter in id ?? "") { seed ^= letter; seed *= 16777619u; } }
             return (int)(seed & 0x7fffffffu);
         }
+        static readonly Color[] SkinTones = {
+            new Color(.40f, .26f, .18f), new Color(.46f, .30f, .21f), new Color(.53f, .35f, .25f), new Color(.60f, .41f, .29f),
+            new Color(.63f, .45f, .32f), new Color(.71f, .54f, .40f), new Color(.80f, .64f, .52f), new Color(.87f, .71f, .60f) };
         Actor Person(string id, bool staff = false, string role = "Officer")
         {
             int index = IdentitySeed(id);
             var root = new GameObject((staff ? role : "Resident") + " · " + id).transform; root.SetParent(people, false);
             var model = new GameObject("Articulated model").transform; model.SetParent(root, false);
             var body = new GameObject("Body").transform; body.SetParent(model, false);
-            Color skin = index % 4 == 0 ? new Color(0.43f, 0.29f, 0.21f) : index % 4 == 1 ? new Color(0.65f, 0.45f, 0.32f) : index % 4 == 2 ? new Color(0.77f, 0.60f, 0.45f) : new Color(0.55f, 0.37f, 0.28f);
-            string skinName = "skin-" + index % 4;
+            // A real population's range, from deep brown through olive and tan to very fair (Claude, 2026-10-19).
+            Color skin = SkinTones[index / 3 % SkinTones.Length];
+            string skinName = "skin-" + index / 3 % SkinTones.Length;
             Color uniform = staff ? role == "Builder" ? new Color(0.91f, 0.60f, 0.12f) : role == "Officer" ? new Color(0.19f, 0.27f, 0.33f) : role == "Technician" ? new Color(0.30f, 0.39f, 0.44f) : new Color(0.39f, 0.47f, 0.43f) :
                 index % 2 == 0 ? new Color(0.38f, 0.48f, 0.51f) : new Color(0.44f, 0.52f, 0.53f);
             if(role=="Visitor")uniform=new[]{new Color(.37f,.43f,.51f),new Color(.46f,.31f,.27f),new Color(.34f,.43f,.35f),new Color(.57f,.50f,.35f)}[index%4];
@@ -864,6 +868,11 @@ namespace Cellblock.Unity
             { ResetFootContacts(actor); contactStride.ContactRevision = world.GeometryRevision; }
             // Soles on whatever the person stands on: room floors, paving or grass (FacilityMotion.StandHeight).
             Vector3 target = V(resident.Position, StandHeight(actor, resident.Position, world)), previous = actor.Root.position;
+            // Bodies steer around each other on screen (FacilityCrowdView.cs); scenes, routine poses and the player are left alone.
+            Vector3 simTarget = target;
+            bool crowdExempt = snap || SceneHoldsBody(contactStride, world) || RoutineOwnsFeet(actor) || actor.PoseArms ||
+                (contactStride.Resolved && (world.IsCharacterControlled(contactStride.Id) || world.HeldResidentId == contactStride.Id));
+            target += CrowdOffset(actor, resident, world, dt, crowdExempt);
             if (snap || (target - previous).sqrMagnitude > 200)
             {
                 actor.Root.position = target; actor.Speed = 0; previous = target; ResetFootContacts(actor);
@@ -906,13 +915,15 @@ namespace Cellblock.Unity
                 else { actor.RenderRoute = null; actor.RouteIndex = 0; }
                 float baseSpeed = 1.6f * Mathf.Max(1, world.Data.Speed) * resident.WalkSpeed;
                 // A sprinting escapee or a running responder moves faster than a walk; follow the simulation's own pace (FacilityMotion.cs).
-                float desiredSpeed = Mathf.Min(Mathf.Max(baseSpeed * 1.20f, TrackedPace(actor, target)), gap / (0.16f / Mathf.Sqrt(Mathf.Max(1,world.Data.Speed))));
+                float desiredSpeed = Mathf.Min(Mathf.Max(baseSpeed * 1.20f, TrackedPace(actor, simTarget)), gap / (0.16f / Mathf.Sqrt(Mathf.Max(1,world.Data.Speed))));
                 Stride stride = StrideFor(actor);
+                if (!crowdExempt) desiredSpeed = Mathf.Min(desiredSpeed, FollowCap(actor, simTarget)); // spacing behind a walker (FacilityCrowdView.cs)
                 actor.Speed = Mathf.SmoothDamp(actor.Speed, desiredSpeed, ref stride.SpeedVelocity, desiredSpeed > actor.Speed ? .12f : .18f, Mathf.Infinity, dt);
                 Vector3 candidate = Vector3.MoveTowards(previous, waypoint, actor.Speed * dt);
                 if (world.Routes.Clear(from, new Point(candidate.x, candidate.z))) actor.Root.position = candidate;
             }
             else actor.Speed = Mathf.MoveTowards(actor.Speed, 0, dt * 15);
+            SeparateBodies(actor, world, crowdExempt); // bodies never pass through each other on screen (FacilityCrowdView.cs)
             // Gait, posture and limbs for what the root just did (FacilityMotion.cs).
             Locomote(actor, resident, world, previous, dt);
         }
