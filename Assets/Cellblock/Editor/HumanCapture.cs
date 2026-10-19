@@ -31,7 +31,7 @@ namespace Cellblock.Editor
             ProjectSetup.Validate(); SurfaceLibrary.Ensure(); LightingSetup.Ensure();
             EditorSceneManager.OpenScene("Assets/Cellblock/Scenes/Main.unity");
             Directory.CreateDirectory(Output); foreach (string f in Directory.GetFiles(Output, "*.png")) File.Delete(f);
-            notes.Clear(); errors.Clear();
+            notes.Clear(); errors.Clear(); SessionState.SetBool("Cellblock.HumanCapture.Far", false);
             SessionState.SetBool(ActiveKey, true); SessionState.SetInt(StageKey, 0); SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + 4);
             EditorApplication.EnterPlaymode();
         }
@@ -65,6 +65,20 @@ namespace Cellblock.Editor
                         { game.FrameArt(at + Vector3.up * .95f, 1.9f, heading + 180 + yaw, 6); Render(game.ArtCamera, who + "-" + view); }
                     }
                     Next(.2f); return;
+                }
+                if (stage == 3 && !SessionState.GetBool("Cellblock.HumanCapture.Far", false))
+                {
+                    // The distance meshes, forced up close: they must still read as the same person.
+                    FacilityView.PreviewForceFar = true;
+                    foreach (var (who, id) in new[] { ("officer", officer.Id), ("resident", resident.Id) })
+                    {
+                        Vector3 at; if (!game.PreviewPersonPosition(id, out at)) continue;
+                        var root = GameObject.Find((who == "officer" ? "Officer · " : "Resident · ") + id);
+                        float heading = root == null ? 0 : root.transform.eulerAngles.y;
+                        game.FrameArt(at + Vector3.up * .95f, 1.9f, heading + 180 + 30, 6); Render(game.ArtCamera, who + "-far-mesh");
+                    }
+                    FacilityView.PreviewForceFar = false; SessionState.SetBool("Cellblock.HumanCapture.Far", true);
+                    return;
                 }
                 if (stage >= 3 && stage <= 6)
                 {

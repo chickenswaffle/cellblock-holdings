@@ -22,7 +22,7 @@ namespace Cellblock.Unity
         {
             public GameObject Prefab; public string[] BoneNames; public Transform RootBoneTemplate;
             public readonly Dictionary<string, Mesh> Regions = new Dictionary<string, Mesh>();
-            public Mesh Eyes, Brows; public string[] EyeBones, BrowBones; public float Scale; public bool Female;
+            public Mesh Eyes, Brows; public string[] EyeBones, BrowBones, FaceBones; public float Scale; public bool Female, HasEyes, HasBrows, Baked;
         }
         sealed class HumanRig
         {
@@ -33,13 +33,20 @@ namespace Cellblock.Unity
             public readonly List<Finger>[] Fingers = { new List<Finger>(), new List<Finger>() };
             public readonly float[] Curl = { .25f, .25f };
             public float SoleRest; // ankle pivot height (model space) when standing
+            public SkinnedMeshRenderer Body, Face; public Mesh BodyNear, BodyFar, FaceNear, FaceFar; public bool Far;
         }
         sealed class Finger { public Transform Bone; public Quaternion Rest; public Vector3 Axis; public float Max; public bool Thumb; }
         readonly Dictionary<string, BodyTemplate> bodyTemplates = new Dictionary<string, BodyTemplate>();
         readonly List<HumanRig> humanRigs = new List<HumanRig>();
         HumanRigDriver humanDriver;
         public static bool HumanModelsEnabled = true;
+        public static double TemplateMilliseconds; // time spent preparing bodies (clothing, merge, distance meshes)
+        // Distance meshes: triangle share kept, and the on-screen height (fraction of the screen) below which a person
+        // switches to them — earlier on lower tiers. 15% hysteresis so nobody flickers at the boundary.
+        const float FarKeep = .3f, FaceFarKeep = .5f;
+        static float FarBelow { get { return PresentationQuality.Current == PresentationQuality.Tier.High ? .10f : PresentationQuality.Current == PresentationQuality.Tier.Medium ? .16f : .24f; } }
 #if UNITY_EDITOR
+        public static bool PreviewForceFar; // review: draw everyone with the distance meshes
         public static float PreviewCurl = -1; // review: force every hand to one curl (0 open, .25 relaxed, .82 grip, 1 fist)
         public static int GeneratedHumanMeshes { get { return Resources.FindObjectsOfTypeAll<Mesh>().Count(m => m.name.StartsWith("Human ")); } }
 #endif
@@ -54,11 +61,21 @@ namespace Cellblock.Unity
             t = new BodyTemplate { Female = female }; bodyTemplates[key] = t;
             t.Prefab = Resources.Load<GameObject>("Characters/Superhero_" + (female ? "Female" : "Male") + "_FullBody");
             if (t.Prefab == null) return t;
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            if (!(UseBakedHumans && LoadBaked(t, key))) Prepare(t, key);
+            TemplateMilliseconds += timer.Elapsed.TotalMilliseconds;
+            return t;
+        }
+
+        // Clothing regions, merged part groups and distance meshes, from the imported body. Players load these baked
+        // (HumanBake, at build time); the editor prepares them from source so every review sees the current code.
+        static void Prepare(BodyTemplate t, string key)
+        {
             GameObject probe = Instantiate(t.Prefab); probe.SetActive(false); probe.transform.position = Vector3.zero;
             try
             {
                 SkinnedMeshRenderer body = probe.GetComponentsInChildren<SkinnedMeshRenderer>(true).OrderByDescending(r => r.sharedMesh == null ? 0 : r.sharedMesh.vertexCount).FirstOrDefault();
-                if (body == null || !body.sharedMesh.isReadable) { t.Prefab = null; return t; }
+                if (body == null || !body.sharedMesh.isReadable) { t.Prefab = null; return; }
                 t.BoneNames = body.bones.Select(b => b.name).ToArray();
                 Transform thigh = Find(probe.transform, "thigh_l"), foot = Find(probe.transform, "foot_l");
                 t.Scale = thigh != null && foot != null ? .83f / Mathf.Max(.5f, thigh.position.y - foot.position.y) : .94f;
@@ -67,17 +84,83 @@ namespace Cellblock.Unity
                 Vector3[] rest = baked.vertices.Select(v => body.transform.TransformPoint(v)).ToArray();
                 foreach (string region in new[] { "head", "skin", "top", "topshort", "skinshort", "bottom", "belt", "shoes" })
                     t.Regions[region] = Region(body, rest, region);
-                Destroy(baked);
+                Release(baked);
                 foreach (SkinnedMeshRenderer extra in probe.GetComponentsInChildren<SkinnedMeshRenderer>(true))
                 {
                     if (extra == body || extra.sharedMesh == null) continue;
                     if (extra.name.Contains("Eye") && !extra.name.Contains("brow")) { t.Eyes = extra.sharedMesh; t.EyeBones = extra.bones.Select(b => b.name).ToArray(); }
                     if (extra.name.Contains("brow")) { t.Brows = extra.sharedMesh; t.BrowBones = extra.bones.Select(b => b.name).ToArray(); }
                 }
+                // One renderer per part group, not per region: crowds pay per skinned renderer (skinning dispatch,
+                // culling, draw setup), so the clothes and hands are one mesh with a submesh per material, and the face,
+                // eyes and brows another. Merged once per body; the region pieces are released.
+                string[] noBones = t.BoneNames;
+                foreach (bool shortSleeves in new[] { false, true })
+                {
+                    string[] order = { shortSleeves ? "topshort" : "top", "bottom", "belt", "shoes", shortSleeves ? "skinshort" : "skin" };
+                    string[] merged;
+                    t.Regions[shortSleeves ? "bodyshort" : "body"] = Merge("Human body" + (shortSleeves ? " short" : ""), order.Select(r => (t.Regions[r], noBones)).ToArray(), out merged);
+                }
+                var faceParts = new List<(Mesh, string[])> { (t.Regions["head"], noBones) };
+                if (t.Eyes != null) faceParts.Add((t.Eyes, t.EyeBones));
+                if (t.Brows != null) faceParts.Add((t.Brows, t.BrowBones));
+                t.Regions["face"] = Merge("Human face", faceParts.ToArray(), out t.FaceBones);
+                t.HasEyes = t.Eyes != null; t.HasBrows = t.Brows != null;
+                foreach (string region in new[] { "head", "skin", "top", "topshort", "skinshort", "bottom", "belt", "shoes" }) { Release(t.Regions[region]); t.Regions.Remove(region); }
+                // Distance versions (about a third of the triangles) for people who are small on screen.
+                var reduceTimer = System.Diagnostics.Stopwatch.StartNew();
+                foreach (string key2 in new[] { "body", "bodyshort", "face" }) t.Regions[key2 + "-far"] = HumanMeshReduce.Reduce(t.Regions[key2], key2 == "face" ? FaceFarKeep : FarKeep, t.Regions[key2].name + " far");
+#if UNITY_EDITOR
+                foreach (string key2 in new[] { "body", "bodyshort", "face" }) Debug.Log("CELLBLOCK_HUMAN_LOD " + key + " " + key2 + " " + t.Regions[key2].vertexCount + " → " + t.Regions[key2 + "-far"].vertexCount + " vertices, " + t.Regions[key2].triangles.Length / 3 + " → " + t.Regions[key2 + "-far"].triangles.Length / 3 + " triangles (reduce " + reduceTimer.ElapsedMilliseconds + " ms total)");
+#endif
             }
-            finally { Destroy(probe); }
-            return t;
+            finally { Release(probe); }
         }
+        static void Release(Object o) { if (Application.isPlaying) Destroy(o); else DestroyImmediate(o); }
+
+        // ---- baked templates -----------------------------------------------------------------------------------------
+        // Players use the meshes HumanBake writes into Resources/Characters/Baked before every build (generated, not
+        // versioned). A missing or mismatched bake falls back to preparing from source.
+#if UNITY_EDITOR
+        public static bool UseBakedHumans = false;
+#else
+        public static bool UseBakedHumans = true;
+#endif
+        const int HumanBakeVersion = 1;
+        static readonly string[] BakedMeshes = { "body", "bodyshort", "face", "body-far", "bodyshort-far", "face-far" };
+        static bool LoadBaked(BodyTemplate t, string key)
+        {
+            TextAsset meta = Resources.Load<TextAsset>("Characters/Baked/" + key);
+            if (meta == null) return false;
+            string[] lines = meta.text.Split('\n');
+            if (lines.Length < 5 || lines[0].Trim() != "v" + HumanBakeVersion) return false;
+            var meshes = new Dictionary<string, Mesh>();
+            foreach (string name in BakedMeshes)
+            {
+                Mesh mesh = Resources.Load<Mesh>("Characters/Baked/" + key + "-" + name);
+                if (mesh == null) return false;
+                meshes[name] = mesh;
+            }
+            t.Scale = float.Parse(lines[1].Trim(), System.Globalization.CultureInfo.InvariantCulture);
+            t.BoneNames = lines[2].Trim().Split(','); t.FaceBones = lines[3].Trim().Split(',');
+            t.HasEyes = lines[4].Contains("eyes"); t.HasBrows = lines[4].Contains("brows");
+            foreach (var pair in meshes) t.Regions[pair.Key] = pair.Value;
+            t.Baked = true; return true;
+        }
+#if UNITY_EDITOR
+        // HumanBake: prepare one body from source and hand back its meshes and the text that LoadBaked reads.
+        public static Dictionary<string, Mesh> BakeHumanTemplate(bool female, out string meta)
+        {
+            var t = new BodyTemplate { Female = female, Prefab = Resources.Load<GameObject>("Characters/Superhero_" + (female ? "Female" : "Male") + "_FullBody") };
+            meta = null; if (t.Prefab == null) return null;
+            Prepare(t, female ? "female" : "male");
+            if (t.Prefab == null || BakedMeshes.Any(n => !t.Regions.ContainsKey(n))) return null;
+            meta = "v" + HumanBakeVersion + "\n" + t.Scale.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "\n" + string.Join(",", t.BoneNames) + "\n" + string.Join(",", t.FaceBones) + "\n" + (t.HasEyes ? "eyes " : "") + (t.HasBrows ? "brows" : "") + "\n";
+            return BakedMeshes.ToDictionary(n => n, n => t.Regions[n]);
+        }
+        public void PreviewResetHumanTemplates() { DisposeHumanModels(); }
+        public static int PreviewBakedTemplates(FacilityView view) { return view.bodyTemplates.Values.Count(t => t.Baked); }
+#endif
 
         // Geometric cut lines in the scan's rest pose (T-pose, metres): hems fall on the mesh's edge loops, so sleeves,
         // collar, waistband and shoe tops are clean rings rather than the zigzag a bone-weight split gives.
@@ -296,6 +379,51 @@ namespace Cellblock.Unity
             return mesh;
         }
 
+        // Concatenates skinned meshes into one, a submesh per part. Parts bound in another mesh space (the FBX eyes and
+        // brows) are carried into the first part's space through a shared bone: B_first(bone)^-1 * B_part(bone).
+        static Mesh Merge(string name, (Mesh mesh, string[] bones)[] parts, out string[] bones)
+        {
+            var names = new List<string>(parts[0].bones); var bind = new List<Matrix4x4>(parts[0].mesh.bindposes);
+            var pos = new List<Vector3>(); var nor = new List<Vector3>(); var tan = new List<Vector4>(); var uv = new List<Vector2>(); var weights = new List<BoneWeight>();
+            var submeshes = new List<int[]>();
+            foreach (var (mesh, partBones) in parts)
+            {
+                Matrix4x4[] partBind = mesh.bindposes; Matrix4x4 into = Matrix4x4.identity;
+                for (int b = 0; b < partBones.Length; b++)
+                {
+                    int u = names.IndexOf(partBones[b]);
+                    if (u >= 0 && u < parts[0].bones.Length) { into = bind[u].inverse * partBind[b]; break; }
+                }
+                var remap = new int[partBones.Length];
+                for (int b = 0; b < partBones.Length; b++)
+                {
+                    int u = names.IndexOf(partBones[b]);
+                    if (u < 0) { u = names.Count; names.Add(partBones[b]); bind.Add(partBind[b] * into.inverse); }
+                    remap[b] = u;
+                }
+                int offset = pos.Count; Vector3[] v = mesh.vertices, n = mesh.normals; Vector4[] t = mesh.tangents; Vector2[] tex = mesh.uv; BoneWeight[] w = mesh.boneWeights;
+                for (int i = 0; i < v.Length; i++)
+                {
+                    pos.Add(into.MultiplyPoint3x4(v[i]));
+                    nor.Add(n.Length == v.Length ? into.MultiplyVector(n[i]).normalized : Vector3.up);
+                    if (t.Length == v.Length) { Vector3 d = into.MultiplyVector(t[i]).normalized; tan.Add(new Vector4(d.x, d.y, d.z, t[i].w)); } else tan.Add(new Vector4(1, 0, 0, 1));
+                    uv.Add(tex.Length == v.Length ? tex[i] : Vector2.zero);
+                    BoneWeight bw = w.Length == v.Length ? w[i] : new BoneWeight { weight0 = 1 };
+                    bw.boneIndex0 = remap[bw.boneIndex0]; bw.boneIndex1 = remap[bw.boneIndex1]; bw.boneIndex2 = remap[bw.boneIndex2]; bw.boneIndex3 = remap[bw.boneIndex3];
+                    weights.Add(bw);
+                }
+                var tris = new List<int>();
+                for (int sub = 0; sub < mesh.subMeshCount; sub++) foreach (int index in mesh.GetTriangles(sub)) tris.Add(index + offset);
+                submeshes.Add(tris.ToArray());
+            }
+            var merged = new Mesh { name = name };
+            if (pos.Count > 65000) merged.indexFormat = IndexFormat.UInt32;
+            merged.SetVertices(pos); merged.SetNormals(nor); merged.SetTangents(tan); merged.SetUVs(0, uv); merged.boneWeights = weights.ToArray(); merged.bindposes = bind.ToArray();
+            merged.subMeshCount = submeshes.Count; for (int i = 0; i < submeshes.Count; i++) merged.SetTriangles(submeshes[i], i);
+            merged.RecalculateBounds();
+            bones = names.ToArray(); return merged;
+        }
+
         static Transform Find(Transform root, string name)
         {
             if (root.name == name) return root;
@@ -365,16 +493,12 @@ namespace Cellblock.Unity
             bool shortSleeves = seed % 2 == 0;
             Material top = Material(uniformName, uniform), trousers = Material("trousers", new Color(0.30f, 0.34f, 0.33f));
             Material shoes = Material("rubber", new Color(.10f, .12f, .12f)), skinMaterial = SkinMaterial(female, skin);
-            Skin(instance.transform, "Top", t.Regions[shortSleeves ? "topshort" : "top"], skeleton, pelvis, top);
-            Skin(instance.transform, "Trousers", t.Regions["bottom"], skeleton, pelvis, trousers);
-            Skin(instance.transform, "Belt", t.Regions["belt"], skeleton, pelvis, staff ? shoes : trousers);
-            Skin(instance.transform, "Shoes", t.Regions["shoes"], skeleton, pelvis, shoes);
-            Skin(instance.transform, "Hands", t.Regions[shortSleeves ? "skinshort" : "skin"], skeleton, pelvis, skinMaterial);
+            string bodyKey = shortSleeves ? "bodyshort" : "body";
+            SkinnedMeshRenderer bodyRenderer = Skin(instance.transform, "Body", t.Regions[bodyKey], skeleton, pelvis, top, trousers, staff ? shoes : trousers, shoes, skinMaterial);
             // The head (and hair, eyes, brows) live under the gaze pivot so first person hides them from your own eyes.
-            Skin(actor.Head, "Head", t.Regions["head"], skeleton, pelvis, skinMaterial);
             Color hairColor = seed % 5 == 0 ? new Color(.30f, .29f, .27f) : seed % 3 == 0 ? new Color(.17f, .12f, .08f) : new Color(.07f, .06f, .055f);
-            if (t.Eyes != null) Skin(actor.Head, "Eyes", t.Eyes, t.EyeBones.Select(n => bones.ContainsKey(n) ? bones[n] : null).ToArray(), pelvis, EyeMaterial());
-            if (t.Brows != null) Skin(actor.Head, "Brows", t.Brows, t.BrowBones.Select(n => bones.ContainsKey(n) ? bones[n] : null).ToArray(), pelvis, HairMaterial(1, hairColor));
+            var faceMaterials = new List<Material> { skinMaterial }; if (t.HasEyes) faceMaterials.Add(EyeMaterial()); if (t.HasBrows) faceMaterials.Add(HairMaterial(1, hairColor));
+            SkinnedMeshRenderer faceRenderer = Skin(actor.Head, "Head", t.Regions["face"], t.FaceBones.Select(n => bones.ContainsKey(n) ? bones[n] : null).ToArray(), pelvis, faceMaterials.ToArray());
             string[] styles = female ? new[] { "Hair_Buns", "Hair_Long", "Hair_BuzzedFemale" } : staff ? new[] { "Hair_SimpleParted", "Hair_Buzzed", "Hair_SimpleParted", "" } : new[] { "Hair_Buzzed", "Hair_Buzzed", "Hair_SimpleParted", "", "Hair_Buzzed" };
             string style = styles[seed / 7 % styles.Length];
             if (style != "") Hair(actor.Head, style, bones, pelvis, HairMaterial(style == "Hair_Long" || style == "Hair_Buns" ? 2 : 1, hairColor));
@@ -386,7 +510,14 @@ namespace Cellblock.Unity
                 if (r == null || Keep(actor, r)) continue;
                 r.forceRenderingOff = true;
             }
+            int rigs = humanRigs.Count;
             BindRig(actor, instance.transform, bones);
+            if (humanRigs.Count > rigs)
+            {
+                HumanRig rig = humanRigs[humanRigs.Count - 1];
+                rig.Body = bodyRenderer; rig.BodyNear = t.Regions[bodyKey]; rig.BodyFar = t.Regions[bodyKey + "-far"];
+                rig.Face = faceRenderer; rig.FaceNear = t.Regions["face"]; rig.FaceFar = t.Regions["face-far"];
+            }
             RefitHeadwear(actor, bones["head"]);
             if (humanDriver == null) { humanDriver = people.gameObject.AddComponent<HumanRigDriver>(); humanDriver.View = this; }
         }
@@ -413,13 +544,14 @@ namespace Cellblock.Unity
             materials["eye-model"] = value; return value;
         }
 
-        static void Skin(Transform parent, string name, Mesh mesh, Transform[] bones, Transform root, Material material)
+        static SkinnedMeshRenderer Skin(Transform parent, string name, Mesh mesh, Transform[] bones, Transform root, params Material[] materials)
         {
-            if (mesh == null || mesh.vertexCount == 0 || bones.Any(b => b == null)) return;
+            if (mesh == null || mesh.vertexCount == 0 || bones.Any(b => b == null)) return null;
             var go = new GameObject(name); go.transform.SetParent(parent, false);
-            var r = go.AddComponent<SkinnedMeshRenderer>(); r.sharedMesh = mesh; r.bones = bones; r.rootBone = root; r.sharedMaterial = material;
+            var r = go.AddComponent<SkinnedMeshRenderer>(); r.sharedMesh = mesh; r.bones = bones; r.rootBone = root; r.sharedMaterials = materials;
             r.updateWhenOffscreen = false; r.skinnedMotionVectors = false; r.quality = SkinQuality.Bone2;
             r.localBounds = new Bounds(new Vector3(0, 0, 0), new Vector3(2.4f, 2.4f, 2.4f));
+            return r;
         }
 
         readonly Dictionary<string, (Mesh mesh, string[] bones)> hairMeshes = new Dictionary<string, (Mesh, string[])>();
@@ -567,15 +699,30 @@ namespace Cellblock.Unity
         }
 
         // After every animator has written this frame's pose, before any camera renders.
-        internal void ApplyHumanRigs()
+        internal void ApplyHumanRigs(Camera camera = null)
         {
             World world = presentedWorld; bool running = world != null && world.Data.Speed > 0;
+            float farBelow = FarBelow, perMetre = 0; Vector3 eye = Vector3.zero;
+            if (camera != null) { eye = camera.transform.position; perMetre = camera.orthographic ? 1 / (2 * camera.orthographicSize) : 1 / (2 * Mathf.Tan(camera.fieldOfView * .5f * Mathf.Deg2Rad)); }
             float dt = Mathf.Min(Time.unscaledDeltaTime, .1f);
             for (int i = humanRigs.Count - 1; i >= 0; i--)
             {
                 HumanRig rig = humanRigs[i];
                 if (rig.Actor.Root == null || rig.Instance == null) { humanRigs.RemoveAt(i); continue; }
                 if (!rig.Actor.Root.gameObject.activeInHierarchy) continue;
+                if (camera != null)
+                {
+                    // Height of a 1.8 m person as a share of the screen.
+                    float share = camera.orthographic ? 1.8f * perMetre : 1.8f * perMetre / Mathf.Max(.1f, Vector3.Distance(eye, rig.Actor.Root.position));
+                    bool far = rig.Far ? share < farBelow * 1.15f : share < farBelow;
+#if UNITY_EDITOR
+                    if (PreviewForceFar) far = true;
+#endif
+                    if (far != rig.Far && rig.Body != null && rig.Face != null)
+                    {
+                        rig.Far = far; rig.Body.sharedMesh = far ? rig.BodyFar : rig.BodyNear; rig.Face.sharedMesh = far ? rig.FaceFar : rig.FaceNear;
+                    }
+                }
                 Transform modelT = rig.Actor.Model;
                 Quaternion model = modelT.rotation, inverse = Quaternion.Inverse(model);
                 // The pelvis rides with the hips (crouch, kneel, stance, gait bob); the spine base with the waist pivot.
@@ -619,10 +766,24 @@ namespace Cellblock.Unity
             }
         }
 
+#if UNITY_EDITOR
+        // Crowd review: CPU cost of one full rig pass (every visible person), averaged over repeated passes.
+        public double PreviewRigMilliseconds(int passes)
+        {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            bool sole = HumanContact.SoleCheck; HumanContact.SoleCheck = false;
+            for (int i = 0; i < passes; i++) ApplyHumanRigs();
+            HumanContact.SoleCheck = sole;
+            return watch.Elapsed.TotalMilliseconds / passes;
+        }
+        public int PreviewHumanRigs { get { return humanRigs.Count; } }
+        public int PreviewFarRigs { get { return humanRigs.Count(r => r.Far); } }
+#endif
         // Generated region meshes belong to this view; imported eye/hair/FBX meshes and Resources textures do not.
         internal void DisposeHumanModels()
         {
-            foreach (BodyTemplate t in bodyTemplates.Values) foreach (Mesh mesh in t.Regions.Values) if (mesh != null) Destroy(mesh);
+            // Baked templates are assets (Resources), not ours to destroy.
+            foreach (BodyTemplate t in bodyTemplates.Values) if (!t.Baked) foreach (Mesh mesh in t.Regions.Values) if (mesh != null) Destroy(mesh);
             bodyTemplates.Clear(); hairMeshes.Clear(); humanRigs.Clear();
         }
     }
@@ -650,7 +811,7 @@ namespace Cellblock.Unity
                 if (Mathf.Abs(local.y - rest) < .01f && Vector3.Dot(feet[s].up, root.up) > .9f) planted = s;
             }
             if (planted < 0) return;
-            SkinnedMeshRenderer shoes = instance.GetComponentsInChildren<SkinnedMeshRenderer>().FirstOrDefault(r => r.name == "Shoes");
+            SkinnedMeshRenderer shoes = instance.GetComponentsInChildren<SkinnedMeshRenderer>().FirstOrDefault(r => r.name == "Body");
             if (shoes == null) return;
             shoes.BakeMesh(baked, true); float lowest = float.MaxValue;
             foreach (Vector3 v in baked.vertices) lowest = Mathf.Min(lowest, shoes.transform.TransformPoint(v).y);
@@ -686,6 +847,11 @@ namespace Cellblock.Unity
 #endif
         }
         void OnDestroy() { if (View != null) View.DisposeHumanModels(); }
-        void Apply(ScriptableRenderContext context, List<Camera> cameras) { if (View != null) View.ApplyHumanRigs(); }
+        void Apply(ScriptableRenderContext context, List<Camera> cameras)
+        {
+            if (View == null) return;
+            Camera camera = null; foreach (Camera c in cameras) if (c != null && c.cameraType == CameraType.Game) { camera = c; break; }
+            View.ApplyHumanRigs(camera);
+        }
     }
 }
