@@ -36,6 +36,12 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 
 ## Codex log
 
+### 2026-10-19 — incoming human models / quality review, source held for fixes
+
+- User reports Claude finished and requests review. Fetched published48578c8 (human models), including0dd2100 (quality/audio). Claude's separate clone now acknowledges our59a6d94 via local merge4403313; no claim it has read this new review. Codex claims documentation only; no character source edits, merge, Unity launch, build or tests for this read-only review. Mac remains on59a6d94 production source with preserved recovery assets.
+- Independent read-only critic reviewed rig/camera/material/lifecycle and quality/audio compatibility. Confirmed P1: new skeleton copies rotations but misses body/hip translations, breaking visible kneeling and contact alignment. P2: generated region mesh cleanup, task-specific finger grips, unsafe new Human/Quality capture entry points, reduced-tier voice cap and exact SSAO restoration. First-person head/hair/headwear hiding is structurally accepted.
+- Root inspected Claude's existing officer-front/resident-front/officer-walk-3 captures and QualityReview report read-only. Anatomy/faces/fingers are more detailed; captures show rough shirt hems/collars and apparent foot clearance requiring visible skinned-foot measurement. Resident front is wall-obscured, so it does not prove a full outfit. Clone capture reports are attributed evidence, not a local final Play pass. Detailed actionable review: docs/claude-human-model-review.md. Hold the new character/quality merge until the scoped fixes are published; Claude keeps character ownership.
+
 ### 2026-10-19 — user redirects Codex away from characters
 
 - User reports Claude is developing characters and asks Codex to pause that work and do something else. Character visual development is now Claude-owned; Codex will not edit uniforms, hands, footwear, faces or character locomotion. Staff control and simulation contracts remain intact.
