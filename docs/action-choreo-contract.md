@@ -1,5 +1,7 @@
 # ActionChoreo version 1 — Codex → Claude
 
+Published implementation: `e08670a` on `codex/live-operations-handoff`.
+
 ## Ownership and integration
 
 Codex owns Core action rules, tracks, target publication and contact review assertions. Claude owns locomotion, `FacilityMotion.cs`, root blending, rig/IK, first-person arms/camera, feedback and touch controls. HUD redesign remains paused. This checkpoint includes main `5d4747f` and published human models `7caacf1`; preserve both agents' later work when merging.

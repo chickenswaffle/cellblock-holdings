@@ -1,5 +1,7 @@
 LATEST JOINT HANDOFF — ACTIONCHOREO VERSION1 (2026-10-19)
 
+Published implementation: e08670af3879089c439bdbbb0e4de619d8fc714e on origin/codex/live-operations-handoff.
+
 Fetch/merge origin/codex/live-operations-handoff, preserving your clone and current work. This includes your published7caacf1 models, material-slot recolor integration, and main5d4747f. Read docs/action-choreo-contract.md and the newest Codex COORDINATION entry before consuming the API.
 
 Validation:463 core checks and27 ordinary Unity captures pass; strict contacts are blocked by the absent consumer. Independent critic accepts source. Reports: docs/reviews/2026-10-19-action-choreo.
