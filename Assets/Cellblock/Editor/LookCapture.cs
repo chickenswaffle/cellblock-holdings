@@ -224,7 +224,7 @@ namespace Cellblock.Editor
                     case 13:
                     {
                         string state = game.PreviewLookHud; notes.Add("touch 900x420: " + state);
-                        Check(state.Contains("sticks=1") && state.Contains("strikeKey=-") && state.Contains("swipe"), "Touch layout is wrong: " + state);
+                        Check(state.Contains("sticks=1") && state.Contains("strikeKey=-") && state.EndsWith("help="), "Touch layout is wrong: " + state);
                         Check(game.PreviewActionPadFits, "The action pad does not fit at 900x420.");
                         Composite(game, "touch-third-person");
                         game.SetCharacterPerspective(true); Next(.6f); return;

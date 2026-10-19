@@ -107,6 +107,10 @@ namespace Cellblock.Unity
             ActionKey(actionUse, device == ControlDevice.Gamepad ? (ps ? "CROSS" : "A") : "E", device);
             ActionKey(actionRun, device == ControlDevice.Gamepad ? (ps ? "L3 / L2" : "L3 / LT") : "SHIFT · R", device);
             actionRun.EnableInClassList("selected", game.ActionRunToggle || game.GamepadRunHeld || world.ActionRunning);
+            // Touch: an action that can't be done right now isn't drawn (its slot stays, so buttons never move under the
+            // thumb). Keys and controller glyphs keep showing every action.
+            foreach (Button b in new[] { actionAttack, actionGrab, actionPickUp })
+                b.style.visibility = device == ControlDevice.Touch && !b.enabledSelf ? Visibility.Hidden : Visibility.Visible;
         }
         // Beside the look stick on touch screens, in the corner on desktop. Returns the width it keeps clear on the right.
         float LayoutActionPad(float right, float bottom, bool active, bool sticks)
@@ -115,7 +119,8 @@ namespace Cellblock.Unity
             bool show = active && game.CharacterDirect && !CharacterPhoneOpen && !BlocksWorldInput;
             actionPad.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
             if (!show) return 0;
-            float offset = right + 14 + (sticks ? 112 + 12 : 0);
+            float offset = right + 14; // the right thumb's rest spot (no LOOK stick)
+            actionRun.style.display = sticks ? DisplayStyle.None : DisplayStyle.Flex; // touch sprints by pushing the move ring
             actionPad.style.right = offset; actionPad.style.bottom = bottom + 14;
             return offset + 150;
         }
@@ -131,7 +136,7 @@ namespace Cellblock.Unity
                     " strikeKey=" + (key.resolvedStyle.display == DisplayStyle.Flex ? key.text : "-") + " help=" + characterControlHelp.text;
             }
         }
-        public bool PreviewActionPadFits { get { return actionPad.worldBound.yMax <= root.worldBound.yMax && actionPad.worldBound.xMin >= root.worldBound.xMin && actionAttack.worldBound.height >= 43 && actionRun.worldBound.height >= 43; } }
+        public bool PreviewActionPadFits { get { return actionPad.worldBound.yMax <= root.worldBound.yMax && actionPad.worldBound.xMin >= root.worldBound.xMin && actionAttack.worldBound.height >= 43 && (actionRun.resolvedStyle.display == DisplayStyle.None || actionRun.worldBound.height >= 43); } }
 #endif
     }
 }

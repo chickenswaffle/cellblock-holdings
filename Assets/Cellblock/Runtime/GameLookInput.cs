@@ -145,6 +145,7 @@ namespace Cellblock.Unity
         {
             get
             {
+                if (hud != null && hud.CharacterSprintPush) return true; // touch: the move ring pushed past its edge
 #if ENABLE_INPUT_SYSTEM
                 Gamepad pad = Pad;
                 if (pad != null && pad.leftTrigger.ReadValue() > .5f) return true;
@@ -313,7 +314,7 @@ namespace Cellblock.Unity
                 return GamepadPlayStation ? "L stick move · R stick look · Square strike · Circle grab · Triangle pick up · Cross actions · L1 face nearest · R3 behind you · R1 view · Options pause"
                     : "L stick move · R stick look · X strike · B grab · Y pick up · A actions · LB face nearest · R3 behind you · RB view · Start pause";
             if (controlDevice == ControlDevice.Touch)
-                return "Left stick moves · swipe right side or LOOK stick to look · double-tap to look ahead · buttons act";
+                return ""; // touch gestures are taught by the Guide; the pad and swipes speak for themselves
             return MouseLookCaptured ? "WASD move · mouse looks · click strike · right-click actions · E actions · Q pick up · Shift run · V view · Esc frees the cursor"
                 : "WASD move · click the world to look with the mouse · E actions · V view · P phone · Esc management";
         }

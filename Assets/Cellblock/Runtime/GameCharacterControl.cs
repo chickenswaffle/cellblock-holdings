@@ -312,7 +312,8 @@ namespace Cellblock.Unity
                     for (int i = 0; i < Input.touchCount; i++)
                     {
                         Touch touch = Input.GetTouch(i);
-                        if (touch.phase == TouchPhase.Began && characterLookFinger < 0 && touch.position.x > Screen.width * .4f && !CharacterPointOwned(touch.position)) characterLookFinger = touch.fingerId;
+                        // Any free touch looks (the move zone and buttons own theirs).
+                        if (touch.phase == TouchPhase.Began && characterLookFinger < 0 && !CharacterPointOwned(touch.position)) characterLookFinger = touch.fingerId;
                         if (touch.fingerId != characterLookFinger) continue;
                         LookTap(touch);
                         if (touch.phase == TouchPhase.Moved) look += CharacterDirect ? TouchLook(touch.deltaPosition) : new Vector2(touch.deltaPosition.x, -touch.deltaPosition.y) * (.16f * sensitivity);
@@ -346,14 +347,33 @@ namespace Cellblock.Unity
             return true;
         }
 
+        // Pinch with any two free fingers (the move thumb can stay down). Pinching in past the closest shoulder view goes
+        // to first person; pinching out of first person comes back (owner's direction: pinch to zoom, no view toggle).
+        float pinchPerspective;
         bool CharacterPinch()
         {
-            if (Input.touchCount != 2 || characterPerspective == CharacterPerspective.FirstPerson) return false;
-            Touch a = Input.GetTouch(0), b = Input.GetTouch(1);
-            if (CharacterPointOwned(a.position) || CharacterPointOwned(b.position)) return false;
-            if (characterPinchA != a.fingerId || characterPinchB != b.fingerId) { characterPinchA = a.fingerId; characterPinchB = b.fingerId; characterLookFinger = -1; return true; }
-            float before = Vector2.Distance(a.position - a.deltaPosition, b.position - b.deltaPosition), now = Vector2.Distance(a.position, b.position);
-            if (before > 8 && now > 8) ZoomCharacter(Mathf.Log(now / before) * 8);
+            int a = -1, b = -1;
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch t = Input.GetTouch(i);
+                bool known = t.fingerId == characterPinchA || t.fingerId == characterPinchB || t.fingerId == characterLookFinger;
+                if (!known && CharacterPointOwned(t.position)) continue;
+                if (a < 0) a = i; else if (b < 0) b = i;
+            }
+            if (b < 0) { characterPinchA = characterPinchB = -1; return false; }
+            Touch ta = Input.GetTouch(a), tb = Input.GetTouch(b);
+            if (characterPinchA != ta.fingerId || characterPinchB != tb.fingerId) { characterPinchA = ta.fingerId; characterPinchB = tb.fingerId; characterLookFinger = -1; pinchPerspective = 0; return true; }
+            float before = Vector2.Distance(ta.position - ta.deltaPosition, tb.position - tb.deltaPosition), now = Vector2.Distance(ta.position, tb.position);
+            if (before <= 8 || now <= 8) return true;
+            float amount = Mathf.Log(now / before) * 8;
+            bool eye = characterPerspective == CharacterPerspective.FirstPerson, closest = characterPerspective == CharacterPerspective.ThirdPerson && characterBoom <= 2.45f;
+            if (CharacterDirect && (eye && amount < 0 || closest && amount > 0))
+            {
+                pinchPerspective += amount;
+                if (Mathf.Abs(pinchPerspective) > 1.2f) { SetCharacterPerspective(!eye); pinchPerspective = 0; }
+                return true;
+            }
+            pinchPerspective = 0; ZoomCharacter(amount);
             return true;
         }
         void ZoomCharacter(float amount)
