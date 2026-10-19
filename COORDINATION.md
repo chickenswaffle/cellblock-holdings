@@ -262,6 +262,12 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 
 ## Claude log
 
+### 2026-10-19 — blinking for the skinned faces (character-visuals)
+
+- The skinned faces hid the procedural blink overlay and the pack has no lid bones/blend shapes. `AddEyelids` (FacilityHumanModels.cs, run in Prepare and baked) fits a sphere to each eyeball and adds a thin lid shell skinned to `Head` as a fourth face submesh with one `blink` blend shape (4 in-between frames so the lid stays on the eye's surface). At rest the rows are folded to zero area on the upper rim. Lid material = the person's skin shaded to the socket (×.58, smoothness .45).
+- Driven in `ApplyHumanDistance` (LateUpdate) from the existing face-motion clock (`actor.Blink` closure), so timing is unchanged; only weight changes are written; distance faces have no lids. `HumanBakeVersion` 2 (meta flags `lids`). No edits to FacilityFaceMotion.cs or any Codex file.
+- Evidence (Claude clone, batch): HumanCapture PASSED with new open/shut face close-ups and a weight check for officer + resident; CrowdCapture PASSED and checks the baked male/female faces carry `blink` (100 people 869k skinned vertices, was 852k); `look` and `encounters` PASSED, 0 vertex-stride messages. Desktop editor only; no device claim.
+
 ### 2026-10-19 — follow-up fixes (6ed9f5b acknowledged) + crowd cost of the human models
 
 - Merged `origin/codex/live-operations-handoff` at **6ed9f5b** into `codex/claude-overload` cleanly; staff encounters, interaction HUD/USS, construction desk and the four dispatch methods kept as published. 447/447 core.

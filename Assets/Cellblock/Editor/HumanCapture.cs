@@ -31,7 +31,7 @@ namespace Cellblock.Editor
             ProjectSetup.Validate(); SurfaceLibrary.Ensure(); LightingSetup.Ensure();
             EditorSceneManager.OpenScene("Assets/Cellblock/Scenes/Main.unity");
             Directory.CreateDirectory(Output); foreach (string f in Directory.GetFiles(Output, "*.png")) File.Delete(f);
-            notes.Clear(); errors.Clear(); SessionState.SetBool("Cellblock.HumanCapture.Far", false);
+            notes.Clear(); errors.Clear(); SessionState.SetBool("Cellblock.HumanCapture.Far", false); SessionState.SetBool("Cellblock.HumanCapture.Blink", false);
             SessionState.SetBool(ActiveKey, true); SessionState.SetInt(StageKey, 0); SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + 4);
             EditorApplication.EnterPlaymode();
         }
@@ -66,6 +66,27 @@ namespace Cellblock.Editor
                         { game.FrameArt(at + Vector3.up * .95f, 1.9f, heading + 180 + yaw, 6); Render(game.ArtCamera, who + "-" + view); }
                     }
                     Next(.2f); return;
+                }
+                if (stage == 3 && !SessionState.GetBool("Cellblock.HumanCapture.Blink", false))
+                {
+                    // Generated eyelids: face close-ups open, then shut (weights are written in LateUpdate, so a frame passes).
+                    bool shut = FacilityView.PreviewBlink >= 0;
+                    foreach (var (who, id) in new[] { ("officer", officer.Id), ("resident", resident.Id) })
+                    {
+                        Vector3 at; if (!game.PreviewPersonPosition(id, out at)) continue;
+                        var root = GameObject.Find((who == "officer" ? "Officer · " : "Resident · ") + id);
+                        float heading = root == null ? 0 : root.transform.eulerAngles.y;
+                        if (shut)
+                        {
+                            var face = root == null ? null : root.GetComponentsInChildren<SkinnedMeshRenderer>().FirstOrDefault(r => r.name == "Head");
+                            bool lids = face != null && face.sharedMesh != null && face.sharedMesh.GetBlendShapeIndex("blink") == 0;
+                            Check(lids && face.GetBlendShapeWeight(0) > 99, "The " + who + "'s face has no working blink (" + (lids ? "weight " + face.GetBlendShapeWeight(0) : "no blend shape") + ").");
+                            if (lids) notes.Add(who + " eyelids: " + face.sharedMesh.subMeshCount + " face submeshes, blink weight " + face.GetBlendShapeWeight(0));
+                        }
+                        game.FrameArt(at + Vector3.up * 1.6f, .5f, heading + 180 + 20, 4); Render(game.ArtCamera, who + "-face-" + (shut ? "shut" : "open"));
+                    }
+                    if (!shut) { FacilityView.PreviewBlink = 1; Render(game.ArtCamera, null); Wait(.3f); return; }
+                    FacilityView.PreviewBlink = -1; SessionState.SetBool("Cellblock.HumanCapture.Blink", true); Render(game.ArtCamera, null); Wait(.3f); return;
                 }
                 if (stage == 3 && !SessionState.GetBool("Cellblock.HumanCapture.Far", false) && !FacilityView.PreviewForceFar)
                 {
@@ -159,7 +180,7 @@ namespace Cellblock.Editor
         }
         static void Finish()
         {
-            HumanContact.Enabled = contactWas; FacilityView.PreviewCurl = -1; FacilityView.PreviewForceFar = false; if (spare != null) UnityEngine.Object.Destroy(spare);
+            HumanContact.Enabled = contactWas; FacilityView.PreviewCurl = -1; FacilityView.PreviewBlink = -1; FacilityView.PreviewForceFar = false; if (spare != null) UnityEngine.Object.Destroy(spare);
             bool passed = errors.Count == 0;
             File.WriteAllText(Path.Combine(Output, "report.txt"), (passed ? "PASSED" : "FAILED") + "\n\nNotes:\n" + string.Join("\n", notes) + "\n\nErrors:\n" + string.Join("\n", errors));
             if (passed) Debug.Log("CELLBLOCK_HUMAN_CAPTURE_PASSED"); else Debug.LogError("CELLBLOCK_HUMAN_CAPTURE_FAILED " + string.Join(" | ", errors.Take(4)));

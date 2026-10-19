@@ -108,6 +108,11 @@ namespace Cellblock.Editor
                 int baked = FacilityView.PreviewBakedTemplates(view);
                 notes.Add("bodies loaded from the build-time bake: " + baked + " · body preparation " + FacilityView.TemplateMilliseconds.ToString("0") + " ms");
                 Check(baked > 0, "The crowd did not use the baked bodies players load.");
+                foreach (string key in new[] { "male", "female" })
+                {
+                    Mesh face = Resources.Load<Mesh>("Characters/Baked/" + key + "-face");
+                    Check(face != null && face.GetBlendShapeIndex("blink") == 0, "The baked " + key + " face has no blink eyelids.");
+                }
                 // Where one person's vertices go.
                 var parts = skinned.GroupBy(r => r.name).Select(g => g.Key + " " + (g.Sum(r => (long)r.sharedMesh.vertexCount) / g.Count()) + "×" + g.Count()).OrderBy(x => x);
                 notes.Add("per part (vertices × renderers): " + string.Join(", ", parts));
