@@ -309,6 +309,18 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 
 ## Claude log
 
+### 2026-10-19 — ActionChoreo v1 consumer landed (418444d acknowledged)
+
+- Merged `origin/codex/live-operations-handoff` **418444d** cleanly into `codex/claude-overload` on top of `4b1dd0e`; 481/481 core.
+- **Consumer** `Runtime/FacilityChoreoRig.cs` (Claude), hooked at the start and end of `ApplyHumanRigs` (render time, after locomotion/poses, before skinning). Registers `ActionChoreoConsumerVersion = 1` only while human rigs exist and the adapter is enabled.
+  - Roots: ease to `Root.Ground`/`Yaw` in Approach/Setup, exact once contact starts; Guard/RecoverFromFall follow the authoritative root. **RootAlreadyAligned preserved:** with any published frame for the striker, `FacilityActionView` adds no render step-in or power lunge (Core's resolved root is the only step).
+  - Posture from the frame before IK: crouch/kneel from `Crouch`, `Lean`, two-bone arms toward the targets; prone control kneels the right knee onto the *rendered* shoulder blade (hips a thigh above it), beside the subject facing across the back, shoulders twisted ≤45° toward the hands, lean searched up to 78° for reach. Own fade/facing state so pose systems and the 1P camera re-facing don't cancel it.
+  - Subjects on the ground follow `ResidentPhase`: Prone = face-down, SideLying, Seated; >125° changes roll through the side.
+  - Second pass after every rig is posed (subjects first): hand bones onto targets by weight with ≤9% stretch, grips from the frame, right knee onto the blade with ≤6% thigh stretch. Crowd separation exempts anyone with a frame.
+- **Strict gates (Claude clone, batch):** `encounter-contacts` **PASSED ×3** — cuffs=2, knees≈124, roots 7–8; max hand 0.021–0.023 m, knee <1e-6 m, root 0. `action-contacts` FAILS before any contact at "Quick strike did not retain the aimed target: Nobody within reach." This step also failed in Claude's clone before today's changes and passes on the Mac; RefreshStaffAim projects through the live camera, whose screen shape differs in batch. **Codex: please run `action-contacts` (and `combat`) on the Mac editor now that the consumer registers.**
+- Visible, still Codex-side (resident poses / track hints): pat-down subject holds arms out in front rather than hands interlaced on the head; takedown officer stays fairly upright (Crouch .35) while the subject falls face-up; `ShoulderBlade`/`SmallOfBack` anchors for a downed body are derived from the capsule, which is why the old face-up lay put wrists below ground (now face-down while Prone).
+- Two-arm guard and first-person arm framing still need work on Claude's side; not advertised as finished.
+
 ### 2026-10-19 — Claude progress: touch controls, turning, punches, no walking through people, a varied population
 
 Owner gave Claude broad permission today ("do whatever you need to make this game great"); exact files below, all reviewed in Claude's clone (batch, muted).

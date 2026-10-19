@@ -936,6 +936,7 @@ namespace Cellblock.Unity
             float farBelow = FarBelow, perMetre = 0; Vector3 eye = Vector3.zero;
             if (camera != null) { eye = camera.transform.position; perMetre = camera.orthographic ? 1 / (2 * camera.orthographicSize) : 1 / (2 * Mathf.Tan(camera.fieldOfView * .5f * Mathf.Deg2Rad)); }
             float dt = Mathf.Min(Time.unscaledDeltaTime, .1f);
+            AlignChoreoRoots(dt); // ActionChoreo roots before the bones follow the pivots (FacilityChoreoRig.cs)
             for (int i = humanRigs.Count - 1; i >= 0; i--)
             {
                 HumanRig rig = humanRigs[i];
@@ -994,6 +995,7 @@ namespace Cellblock.Unity
                 if (HumanContact.Enabled) HumanContact.Sample(rig.Actor.Knees, rig.KneeBones, rig.Actor.Feet, rig.FootBones, rig.Actor.Forearms, rig.Actor.Hands, rig.HandBones, HandReach);
 #endif
             }
+            ApplyChoreoContacts(); // ActionChoreo hands and knee onto their targets, now every partner is posed (FacilityChoreoRig.cs)
         }
 
 #if UNITY_EDITOR

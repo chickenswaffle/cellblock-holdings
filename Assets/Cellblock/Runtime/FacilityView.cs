@@ -871,7 +871,7 @@ namespace Cellblock.Unity
             // Bodies steer around each other on screen (FacilityCrowdView.cs); scenes, routine poses and the player are left alone.
             Vector3 simTarget = target;
             bool crowdExempt = snap || SceneHoldsBody(contactStride, world) || RoutineOwnsFeet(actor) || actor.PoseArms ||
-                (contactStride.Resolved && (world.IsCharacterControlled(contactStride.Id) || world.HeldResidentId == contactStride.Id));
+                (contactStride.Resolved && (world.IsCharacterControlled(contactStride.Id) || world.HeldResidentId == contactStride.Id || choreoFrames.ContainsKey(contactStride.Id)));
             target += CrowdOffset(actor, resident, world, dt, crowdExempt);
             if (snap || (target - previous).sqrMagnitude > 200)
             {

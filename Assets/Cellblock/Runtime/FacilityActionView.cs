@@ -241,7 +241,11 @@ namespace Cellblock.Unity
                     // Close the distance: a short step in when the face is past arm's reach (Claude, 2026-10-19).
                     Vector3 shoulder = officer.Limbs[strikeArm].position; Vector3 gap = aim - shoulder; gap.y = 0;
                     float stepIn = Mathf.Clamp(gap.magnitude - .56f, 0, .3f);
-                    float lunge = Mathf.Max(beat.Power ? .35f : 0, stepIn) * extend * (1 - back);
+                    // Core resolves the step-in (ActionChoreo RootAlreadyAligned) and the rig adapter places the root there:
+                    // with a published frame, no presentation step is added, so the officer never steps twice.
+                    ActionChoreoFrame published;
+                    if (TryGetActionChoreoFrame(beat.ActorId, out published)) stepIn = 0;
+                    float lunge = published != null ? 0 : Mathf.Max(beat.Power ? .35f : 0, stepIn) * extend * (1 - back);
                     // The step carries the arm's frame forward with it, so the reach is measured from where the body ends up.
                     Vector3 guard = new Vector3(side * .18f, 1.32f, .12f), reach = officer.Model.InverseTransformPoint(aim) - new Vector3(0, 0, lunge);
                     Vector3 fist = Vector3.Lerp(Vector3.Lerp(new Vector3(side * .22f, 1.25f, -.05f), guard, wind), reach, extend * (1 - back));
