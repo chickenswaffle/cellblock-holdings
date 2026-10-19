@@ -272,6 +272,18 @@ namespace Cellblock.Unity
                 }
             }
             else faceTargetId = "";
+            // In a fight the shoulder camera keeps the opponent framed (a manual swipe takes over for a moment).
+            if (characterPerspective == CharacterPerspective.ThirdPerson && Time.unscaledTime - lastManualLook > .6f)
+            {
+                Resident foe = World.Data.Residents.FirstOrDefault(r => r.Id == World.StaffFightOpponentId);
+                StaffMember me = foe == null ? null : World.Data.Staff.FirstOrDefault(s => s.Id == characterViewId);
+                if (foe != null && me != null && Geometry.Distance(foe.Position, me.Position) < 6)
+                {
+                    float want = Mathf.Atan2(foe.Position.X - me.Position.X, foe.Position.Y - me.Position.Y) * Mathf.Rad2Deg - 8;
+                    look.x += Mathf.DeltaAngle(characterYaw, want) * Mathf.Min(1, dt * 5);
+                    return;
+                }
+            }
             bool follow = characterPerspective == CharacterPerspective.ThirdPerson && Preferences.CharacterCameraFollows && !MouseLookCaptured &&
                 controlDevice != ControlDevice.KeyboardMouse && Time.unscaledTime - lastManualLook > .8f;
             if (follow) look.x += LookResponse.FollowYawRate(move, 42) * dt;

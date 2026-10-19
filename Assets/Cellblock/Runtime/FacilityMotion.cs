@@ -158,6 +158,8 @@ namespace Cellblock.Unity
             if (moving)
             {
                 float desiredYaw = Mathf.Atan2(movement.x, movement.z) * Mathf.Rad2Deg;
+                // Squared up: the controlled officer in a fight faces the opponent and steps round, back and sideways.
+                float squared; if (SquaredUpYaw(stride, world, out squared)) desiredYaw = squared;
                 float heading = Mathf.SmoothDampAngle(actor.Root.eulerAngles.y, desiredYaw, ref stride.HeadingVelocity,
                     Mathf.Lerp(.16f, .10f, run) / rate, Mathf.Lerp(200, 420, run) * rate, dt);
                 actor.Root.rotation = Quaternion.Euler(0, heading, 0);
@@ -244,6 +246,14 @@ namespace Cellblock.Unity
 
         }
         readonly float[] legSwing = new float[2];
+        bool SquaredUpYaw(Stride stride, World world, out float yaw)
+        {
+            yaw = 0; if (!stride.Resolved || !world.IsCharacterControlled(stride.Id)) return false;
+            Actor foe = Live(world.StaffFightOpponentId), me; if (foe == null || !actors.TryGetValue(stride.Id, out me)) return false;
+            Vector3 to = foe.Root.position - me.Root.position; to.y = 0;
+            if (to.sqrMagnitude < .04f || to.sqrMagnitude > 36) return false;
+            yaw = Mathf.Atan2(to.x, to.z) * Mathf.Rad2Deg; return true;
+        }
 
         // A standing person turned by anything (facing someone, a routine, a scene that lets go) turns like a person: the
         // head leads, the chest follows, the hips come round over ~0.4 s and the feet step to keep up (the planted-foot
@@ -256,6 +266,7 @@ namespace Cellblock.Unity
             if (!stride.TurnKnown || moving || own) { stride.TurnKnown = true; stride.TurnTarget = stride.TurnShown = current; stride.TurnVelocity = 0; stride.TurnLead = 0; stride.Turning = false; return; }
             // Someone else set a new facing this frame: that is the target; the body keeps showing where it was.
             if (Mathf.Abs(Mathf.DeltaAngle(current, stride.TurnShown)) > .01f) stride.TurnTarget = current;
+            float squared; if (SquaredUpYaw(stride, world, out squared)) stride.TurnTarget = squared; // keep facing the opponent
             if (world.Data.Speed > 0)
             {
                 float rate = Mathf.Sqrt(Mathf.Max(1, world.Data.Speed));
