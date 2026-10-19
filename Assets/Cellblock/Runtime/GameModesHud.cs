@@ -101,7 +101,10 @@ namespace Cellblock.Unity
                 modeTiers.Add(card);
             }
             ModeLocation place = GameModes.Location(pickLocation);
-            foreach (FacilityType type in GameModes.TypesFor(pickTier))
+            // The complete county prison (every module built, unit timetable) heads the county list; it is not one of the
+            // tier's three catalog types. Only for a new holding: its layout is built at the start, not applied to a site.
+            var types = GameModes.TypesFor(pickTier).ToList(); if (pickTier == DemoPrison.Type.TierId && onCharter != null) types.Insert(0, DemoPrison.Type);
+            foreach (FacilityType type in types)
             {
                 FacilityType chosen = type;
                 Button card = Action("", () => { pickType = chosen.Id; RebuildModePicker(); }, "type-card");
