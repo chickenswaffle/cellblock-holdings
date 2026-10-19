@@ -16,9 +16,10 @@ namespace Cellblock.Unity
             var pipeline = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
             if (pipeline == null) return;
             if (original < 0) original = pipeline.shadowDistance;
-            float want = characterView ? 40 : Mathf.Clamp(cameraDistance * 2.3f + 12, 30, original);
+            float cap = Mathf.Min(original, PresentationQuality.SunShadowCap);
+            float want = characterView ? 40 : Mathf.Clamp(cameraDistance * 2.3f + 12, 30, cap);
             // Steps avoid re-fitting cascades (and shimmering) on every small zoom change.
-            want = Mathf.Min(original, Mathf.Ceil(want / 10) * 10);
+            want = Mathf.Min(cap, Mathf.Ceil(want / 10) * 10);
             if (Mathf.Approximately(want, applied)) return;
             pipeline.shadowDistance = applied = want;
         }

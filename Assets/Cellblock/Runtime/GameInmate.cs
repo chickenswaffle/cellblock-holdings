@@ -114,6 +114,9 @@ namespace Cellblock.Unity
             World.Data.Speed = 1; inmateFastForward = false; inmateRetryAt = 0;
         }
         public void PreviewHomeContinue() { hud.PreviewHomeContinue(); }
+        // Quality review: settings fit, and close the sheet without writing the shared preferences file.
+        public bool PreviewSettingsFit() { return hud.PreviewSettingsFit(); }
+        public void PreviewCloseSettingsWithoutSaving() { hud.PreviewCloseSettingsWithoutSaving(); }
         public void PreviewInmateSheet(bool open) { if (open) hud.ShowInmateSheet(); else hud.CloseInmateSheet(); }
         public bool PreviewBlocksSimulation { get { return hud.BlocksSimulation; } }
         public bool PreviewPersonPosition(string id, out Vector3 position) { return view.TryGetPersonPosition(id, out position); }
@@ -241,6 +244,7 @@ namespace Cellblock.Unity
         {
             ShowModePicker((t, l) => { }); pickTier = GameModes.Type(type).TierId; pickType = type; pickLocation = location; pickRandomLocation = false; modeStep = step; RebuildModePicker();
         }
+        public void PreviewCloseSettingsWithoutSaving() { settingsOpen = false; if (settingsOverlay != null) settingsOverlay.style.display = DisplayStyle.None; Refresh(true); }
         public bool PreviewDoTimeShown { get { return modeDoTime != null && modeDoTime.style.display != DisplayStyle.None; } }
         public void PreviewCloseCharter() { HideModePicker(); menu.style.display = DisplayStyle.None; workspace = Workspace.Facility; inspectorOpen = false; cameraOpen = false; previousSelection = null; }
         public string PreviewInmateState

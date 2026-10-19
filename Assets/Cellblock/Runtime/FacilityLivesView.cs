@@ -11,10 +11,13 @@ namespace Cellblock.Unity
     public sealed partial class FacilityView
     {
         enum LifePose { None, Talk, Eat, Sleep, SleepFloor, Cuffed, Riot, Sway, Read, Exercise, Watch, Study, Rest }
+        sealed class ClothingSlot
+        {
+            public Renderer Renderer; public int Index; public Material Original;
+        }
         sealed class Look
         {
-            public Renderer[] Shirt, Trousers;
-            public Material[] ShirtOriginal, TrousersOriginal;
+            public ClothingSlot[] Shirt, Trousers;
             public string Palette = "";
             public LifePose Pose;
             public float Weight, NextScan, Phase;
@@ -293,8 +296,8 @@ namespace Cellblock.Unity
             foreach(var pair in looks)
             {
                 if(pair.Key.Root==null)continue;
-                foreach(var renderer in pair.Value.Shirt)if(renderer==null)return false;
-                foreach(var renderer in pair.Value.Trousers)if(renderer==null)return false;
+                foreach(var slot in pair.Value.Shirt)if(slot.Renderer==null)return false;
+                foreach(var slot in pair.Value.Trousers)if(slot.Renderer==null)return false;
             }
             return true;
         }
@@ -320,13 +323,23 @@ namespace Cellblock.Unity
                 case "minimum": shirt = new Color(0.36f, 0.50f, 0.38f); trousers = new Color(0.30f, 0.42f, 0.32f); break;
                 case "medium": shirt = new Color(0.64f, 0.56f, 0.39f); trousers = new Color(0.52f, 0.46f, 0.32f); break;
                 default:
-                    for (int i = 0; i < look.Shirt.Length; i++) if(look.Shirt[i]!=null)look.Shirt[i].sharedMaterial = look.ShirtOriginal[i];
-                    for (int i = 0; i < look.Trousers.Length; i++) if(look.Trousers[i]!=null)look.Trousers[i].sharedMaterial = look.TrousersOriginal[i];
+                    ApplyClothing(look.Shirt, null); ApplyClothing(look.Trousers, null);
                     return;
             }
             Material top = Material("uniform-jumpsuit-" + palette, shirt), bottom = Material("uniform-jumpsuit-" + palette + "-legs", trousers);
-            foreach (Renderer r in look.Shirt) if(r!=null)r.sharedMaterial = top;
-            foreach (Renderer r in look.Trousers) if(r!=null)r.sharedMaterial = bottom;
+            ApplyClothing(look.Shirt, top); ApplyClothing(look.Trousers, bottom);
+        }
+        static void ApplyClothing(ClothingSlot[] slots, Material replacement)
+        {
+            // Runs only on a palette transition. Keep all unrelated submeshes/materials intact.
+            foreach (ClothingSlot slot in slots)
+            {
+                if (slot.Renderer == null) continue;
+                Material[] materials = slot.Renderer.sharedMaterials;
+                if (slot.Index >= materials.Length) continue;
+                materials[slot.Index] = replacement == null ? slot.Original : replacement;
+                slot.Renderer.sharedMaterials = materials;
+            }
         }
         void PruneLooks()
         {
@@ -341,19 +354,21 @@ namespace Cellblock.Unity
         {
             int seed = IdentitySeed(resident.Id);
             var look = new Look();
-            var shirts = new List<Renderer>(); var legs = new List<Renderer>();
+            var shirts = new List<ClothingSlot>(); var legs = new List<ClothingSlot>();
             foreach (Renderer r in actor.Model.GetComponentsInChildren<Renderer>(true))
             {
                 // Combine deactivates source objects and destroys them at frame end.
                 // Cache only the live combined renderers, never those retired sources.
                 if(!r.gameObject.activeInHierarchy)continue;
-                string name = r.sharedMaterial == null ? "" : r.sharedMaterial.name;
-                if (name.StartsWith("uniform-")) shirts.Add(r); else if (name == "trousers") legs.Add(r);
+                Material[] materials = r.sharedMaterials;
+                for (int slot = 0; slot < materials.Length; slot++)
+                {
+                    Material material = materials[slot]; string name = material == null ? "" : material.name;
+                    var binding = new ClothingSlot { Renderer = r, Index = slot, Original = material };
+                    if (name.StartsWith("uniform-")) shirts.Add(binding); else if (name == "trousers") legs.Add(binding);
+                }
             }
             look.Shirt = shirts.ToArray(); look.Trousers = legs.ToArray();
-            look.ShirtOriginal = new Material[look.Shirt.Length]; look.TrousersOriginal = new Material[look.Trousers.Length];
-            for (int i = 0; i < look.Shirt.Length; i++) look.ShirtOriginal[i] = look.Shirt[i].sharedMaterial;
-            for (int i = 0; i < look.Trousers.Length; i++) look.TrousersOriginal[i] = look.Trousers[i].sharedMaterial;
 
             // The shared Person factory already owns the detailed head, hair, glasses and ID.
             // Add resident-specific markings without stacking a second face over that head.

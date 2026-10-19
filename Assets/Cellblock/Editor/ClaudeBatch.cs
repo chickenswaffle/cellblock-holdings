@@ -8,7 +8,7 @@ namespace Cellblock.Editor
 {
     // Claude's batch wrapper for the shared PresentationPreview runner, for Claude's own clone only (never the Mac
     // checkout's open editor): Unity -batchmode -projectPath <clone> -executeMethod Cellblock.Editor.ClaudeBatch.Run
-    //   -cellblockFeature <look|pad|inmate|yard|actions|sanitation> -logFile <log>
+    //   -cellblockFeature <look|pad|inmate|yard|actions|sanitation|sound|workshop|projects|encounters> -logFile <log>
     // Files the same request the menu does, waits (across the Play domain reload) for this run's report and for Play to
     // stop, then exits 0 on a passing report.
     [InitializeOnLoad]
@@ -30,11 +30,31 @@ namespace Cellblock.Editor
         }
         static string Fresh(string mode)
         {
-            string root = Path.Combine("Temp/CellblockFeatureReviews", mode);
+            if (mode == "workshop") return WorkshopReport();
+            // Codex's projects gallery writes its report into its own folder.
+            string root = mode == "projects" ? "Temp/CellblockConstructionDeskArt" : Path.Combine("Temp/CellblockFeatureReviews", mode);
             if (!Directory.Exists(root)) return null;
             var launched = new DateTime(long.Parse(SessionState.GetString(LaunchKey, "0")), DateTimeKind.Utc);
             return Directory.GetDirectories(root).Select(d => Path.Combine(d, "report.json")).Where(File.Exists)
                 .Where(f => File.GetLastWriteTimeUtc(f) >= launched).OrderBy(f => File.GetLastWriteTimeUtc(f)).LastOrDefault();
+        }
+        // Codex's workshop is an art studio: it writes authored pose images (no pass/fail report) to its own folder.
+        // Once it has stopped, summarise that run: passed = images present and no abort recorded.
+        static string WorkshopReport()
+        {
+            const string root = "Temp/CellblockConstructionArt";
+            if (!Directory.Exists(root) || ConstructionStudio.IsRunning) return null;
+            var launched = new DateTime(long.Parse(SessionState.GetString(LaunchKey, "0")), DateTimeKind.Utc);
+            string run = Directory.GetDirectories(root).Where(d => Directory.GetLastWriteTimeUtc(d) >= launched).OrderBy(Directory.GetLastWriteTimeUtc).LastOrDefault();
+            if (run == null) return null;
+            int images = Directory.GetFiles(run, "*.png").Length;
+            string scope = Path.Combine(run, "scope.txt");
+            bool aborted = File.Exists(scope) && File.ReadAllText(scope).Contains("Aborted");
+            if (images == 0 && !aborted) return null;
+            string report = Path.Combine(run, "report.json");
+            File.WriteAllText(report, "{\"passed\": " + (images >= 12 && !aborted ? "true" : "false") + ", \"images\": " + images + "}");
+            File.WriteAllText(Path.Combine(run, "report.txt"), (images >= 12 && !aborted ? "PASSED" : "FAILED") + "\n" + images + " construction pose images" + (aborted ? "\n" + File.ReadAllText(scope) : ""));
+            return report;
         }
         static void Wait()
         {
