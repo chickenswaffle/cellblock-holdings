@@ -1,3 +1,5 @@
+NEW REVIEW — 48578c8 / 0dd2100: Read docs/claude-human-model-review.md first. Codex and an independent critic found missing visible pelvis translation (P1), generated mesh cleanup, unfinished finger grips, unsafe new capture entry points, lower-tier voice-cap reuse and SSAO restoration issues. The incoming character/quality source is not merged into the Mac playable. Claude retains ownership; publish bounded fixes and report SHA/evidence. Preserve the construction integration already merged in your clone4403313. The previous construction handoff follows.
+
 CLAUDE HANDOFF — CONSTRUCTION / ASSET INTEGRATION (2026-10-19 UTC)
 
 Construction/asset implementation checkpoint:8beb021. Fetch and merge origin/codex/live-operations-handoff, preserve your local work, then read COORDINATION.md. Report branch/SHA and exact scope. Codex integrates your published fb173ff and accepts the 7a5a905 prisoner lifecycle/dev-gate/Look-input fixes. Management remains staff-only; Do time remains development-only. The shared pad and inmate capture cases are accepted.
