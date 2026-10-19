@@ -2,6 +2,12 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
+## October19 physical officer backup
+
+**Actions → Call backup** now reserves a real available line officer, waits for dispatch, and routes them to a clear flank. Physical arrival improves compliance/cuff opportunities. Posts, assigned duties and higher-priority incidents retain their officers. Dismiss, cuffs, handback, authority loss and bounded timeouts release the helper. Paused reloads clear only our own live task labels; backup cannot persist as a phantom assignment. [Rules and controls](staff-backup.md).
+
+Final source **7e61952db02d** passes **490 core checks and46 actual Unity captures** (19 combat/backup,17 encounters,10 quick actions). Independent critic reviewed source and final backup images/report with no remaining gameplay blocker. [Evidence](reviews/2026-10-19-staff-backup/README.md). Mac ordinary Play/Home restored; Claude still owns helper facing, radio/support gestures, rig/IK/camera/touch and strict contact completion. No native phone or animation-fidelity claim.
+
 ## October 19 sustained staff fights and authored contact physics
 
 Staff play now supports repeated resident retaliation, delayed/revalidated hits, directional guard, stamina/balance, shoves, compliance and restraint without a knockout. Swept bounded kinematic impulses use authoritative navigation. Officer injuries persist across control/reload, connect to shift recovery and real nearby nursing care, and can require switching staff. Existing conduct/write-up consequences remain active. [Rules, controls and physics](staff-combat.md).

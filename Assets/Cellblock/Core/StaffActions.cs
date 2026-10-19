@@ -53,6 +53,7 @@ namespace Cellblock.Core
             if (state.StaffActionVersion < 0 || state.StaffActionVersion > Version) throw new ArgumentException("Unsupported staff action save version.");
             if (state.StaffActionVersion == 0 || state.StaffActions == null) { state.StaffActions = new StaffActionState { Version = Version }; state.StaffActionVersion = Version; }
             StaffCombatRules.Hydrate(state);
+            StaffBackupRules.Hydrate(state);
             StaffActionState s = state.StaffActions;
             if (s.Log == null || s.Log.Count > LogLimit || s.Log.Any(r => r == null || r.Minute > state.Minute || r.StaffId == null || r.ResidentId == null || r.Action == null || r.Ruling == null) ||
                 new[] { s.Strikes, s.Shoves, s.Justified, s.Excessive, s.Takedowns, s.Cuffed, s.Confined, s.Arbitrary, s.Searches, s.Finds, s.Pickups, s.AuditExcessive, s.AuditArbitrary }.Any(n => n < 0))
@@ -97,7 +98,7 @@ namespace Cellblock.Core
         void TakeOverActions(string officerId)
         {
             if (holdTarget != "") ReleaseHoldTarget("");
-            ResetStaffEncounter(); ClearStaffCombat(); liveOfficer = officerId; officerWind = 100; running = false; busyUntil = -1; officerStaggeredUntil = -1;
+            ResetStaffEncounter(); ClearStaffCombat(); ClearStaffBackup(); liveOfficer = officerId; officerWind = 100; running = false; busyUntil = -1; officerStaggeredUntil = -1;
         }
         bool CanAct(out StaffMember officer, out string why)
         {
@@ -262,7 +263,7 @@ namespace Cellblock.Core
                 if (holdPhase == "Cuffed") { ReleaseHoldTarget("Released " + held.Name + "."); return true; }
                 // Cuffing: certain on the floor or without resistance; otherwise a struggle the officer can lose.
                 bool certain = Downed(held) || !Resisting(held) || staffFight != null && staffFight.ResidentId == held.Id && (staffFight.Stamina <= 35 || staffFight.Balance <= 35);
-                if (!certain && Roll(officer, "cuff") > 0.45f + Experience(officer) * 0.015f)
+                if (!certain && Roll(officer, "cuff") > 0.45f + Experience(officer) * 0.015f + (BackupSupporting(held.Id) ? .20f : 0))
                 {
                     Beat("Cuff", officer, held, false);
                     Notice = held.Name + " twisted away from the cuffs. Take them down, or keep trying.";
@@ -400,6 +401,7 @@ namespace Cellblock.Core
             StaffMember officer = character == null ? null : character.Staff;
             // Control ended or changed hands: the hold ends and the next officer starts rested.
             if ((officer == null ? "" : officer.Id) != liveOfficer) TakeOverActions(officer == null ? "" : officer.Id);
+            AdvanceStaffBackup();
             if (officer == null) { AdvanceStaffCombat(null); return; }
             AdvanceStaffEncounter(officer);
             AdvanceStaffCombat(officer);

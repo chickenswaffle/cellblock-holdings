@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace Cellblock.Core
 {
-    public enum StaffInteraction { Talk, Punch, PatDown, PocketSearch, Grab, GroundAndCuff, Cuff, Escort, Release, Confine, Guard, Shove, Compliance }
+    public enum StaffInteraction { Talk, Punch, PatDown, PocketSearch, Grab, GroundAndCuff, Cuff, Escort, Release, Confine, Guard, Shove, Compliance, Backup, DismissBackup }
     public sealed class StaffInteractionOption
     {
         public StaffInteraction Command;
@@ -20,7 +20,7 @@ namespace Cellblock.Core
         public void SetStaffFocusTarget(string id) { staffFocusTargetId = id ?? ""; }
         public void SetStaffViewFacing(Point direction)
         { float length = direction.Length; if (length > .0001f && !float.IsInfinity(length) && !float.IsNaN(length)) actionFacing = direction * (1 / length); }
-        internal void EndStaffManualSession() { ReleaseHoldTarget(""); ClearStaffCombat(); ResetStaffEncounter(); busyUntil = -1; running = false; liveOfficer = ""; }
+        internal void EndStaffManualSession() { ReleaseHoldTarget(""); ClearStaffCombat(); ClearStaffBackup(); ResetStaffEncounter(); busyUntil = -1; running = false; liveOfficer = ""; }
         string explicitStaffTargetId, staffSearchTarget = "", staffSearchMode = "", staffStandingTarget = "";
         int staffAttackReadyMinute, staffInteractionStart;
         bool staffGroundCuffQueued, staffGroundedCuffed;
@@ -96,9 +96,11 @@ namespace Cellblock.Core
             void Add(StaffInteraction command, string label, string detail, string blocked = "", bool needsOfficer = false)
             {
                 choices.Add(new StaffInteractionOption { Command = command, Label = label, Detail = detail,
-                    Blocker = command == StaffInteraction.Release && held && !StaffStandingUp && officer != null && officer.Id == liveOfficer ? "" : common != "" ? common : needsOfficer && !officerRole ? "Officer role required." : blocked });
+                    Blocker = (command == StaffInteraction.Release && held && !StaffStandingUp || command == StaffInteraction.DismissBackup && staffBackup != null && staffBackup.Requester == officer?.Id) && officer != null && officer.Id == liveOfficer ? "" : common != "" ? common : needsOfficer && !officerRole ? "Officer role required." : blocked });
             }
             Add(StaffInteraction.Guard, staffCombatGuard ? "Lower guard" : "Raise guard", "Face incoming strikes. Guard costs stamina; it cannot stop attacks from behind.", held && !staffCombatGuard ? "Release custody before raising both forearms." : "");
+            if (staffBackup == null && !cuffed) Add(StaffInteraction.Backup, "Call backup", "Request one available line officer. Help counts only after they reach you.", "", true);
+            if (staffBackup != null) Add(StaffInteraction.DismissBackup, "Dismiss backup", "Release the responding officer to ordinary duties.", "", true);
             if (!cuffed)
             {
                 Add(StaffInteraction.Shove, "Shove / break balance", "Create space and reduce balance. Uses stamina; unjustified force still counts.", StaffRecoveryMinutes > 0 ? "Recovering from the last strike." : "", true);
@@ -128,6 +130,7 @@ namespace Cellblock.Core
         public bool ActStaffInteraction(string id, StaffInteraction command)
         {
             if (InmateActing) { Notice = "These are staff interactions."; return false; }
+            if (command == StaffInteraction.DismissBackup) return DismissStaffBackup();
             if (command == StaffInteraction.Release && !StaffStandingUp && !string.IsNullOrEmpty(id) && holdTarget == id)
             {
                 StaffMember controller = ActingOfficer();
@@ -153,6 +156,8 @@ namespace Cellblock.Core
                     case StaffInteraction.Guard: return SetStaffCombatGuard(!staffCombatGuard, id);
                     case StaffInteraction.Shove: return ActStaffShove(id);
                     case StaffInteraction.Compliance: return OrderStaffCompliance(id);
+                    case StaffInteraction.Backup: return RequestStaffBackup(id);
+                    case StaffInteraction.DismissBackup: return DismissStaffBackup();
                     case StaffInteraction.Grab: return ActGrab();
                     case StaffInteraction.Talk:
                         EndActivity(target); RemoveResidentPath(target);
