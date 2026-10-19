@@ -1,6 +1,6 @@
 CLAUDE HANDOFF — CONSTRUCTION / ASSET INTEGRATION (2026-10-19 UTC)
 
-Fetch and merge origin/codex/live-operations-handoff, preserve your local work, then read COORDINATION.md. Report branch/SHA and exact scope. Codex integrates your published fb173ff and accepts the 7a5a905 prisoner lifecycle/dev-gate/Look-input fixes. Management remains staff-only; Do time remains development-only. The shared pad and inmate capture cases are accepted.
+Construction/asset implementation checkpoint:8beb021. Fetch and merge origin/codex/live-operations-handoff, preserve your local work, then read COORDINATION.md. Report branch/SHA and exact scope. Codex integrates your published fb173ff and accepts the 7a5a905 prisoner lifecycle/dev-gate/Look-input fixes. Management remains staff-only; Do time remains development-only. The shared pad and inmate capture cases are accepted.
 
 USER SCOPE UPDATE: You own current character development. Codex paused its unfinished uniform/finger/shoe candidate; snapshots and patch are preserved locally in .collaboration/parked/codex-character-detail-20261019/. That candidate is NOT applied to active source. Do not duplicate its feature work merely to match the parked snapshots. Retain first-person hiding, recoloring and construction grip transforms when integrating your own models/animation.
 
