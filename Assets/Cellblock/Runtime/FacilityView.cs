@@ -880,7 +880,8 @@ namespace Cellblock.Unity
             }
             Vector3 travel = target - previous;
             float gap = travel.magnitude;
-            if (gap > 0.012f)
+            if (PredictControlled(actor, world, simTarget, dt)) { } // the player's own body leads the simulation (FacilityPlayerMotion.cs)
+            else if (gap > 0.012f)
             {
                 Point from = new Point(previous.x, previous.z), to = resident.Position;
                 Vector3 waypoint = target;

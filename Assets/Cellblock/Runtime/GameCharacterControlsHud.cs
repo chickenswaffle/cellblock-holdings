@@ -11,6 +11,9 @@ namespace Cellblock.Unity
         Button characterViewButton, characterPhoneButton, characterInteractButton, characterPauseButton;
         Vector2 characterMoveStick, characterLookStick;
         public Vector2 CharacterMoveInput { get { return characterMoveStick; } }
+#if UNITY_EDITOR
+        public void PreviewMoveStick(Vector2 value) { characterMoveStick = value; if (value.sqrMagnitude > 0) game.AcceptCharacterMoveStick(); else game.ReleaseCharacterMoveStick(); }
+#endif
         Button characterMoreButton; bool characterMoreOpen; string contextShown = ""; float contextSince;
         // Pushed past the move ring: sprint while held (touch), released back inside it.
         public bool CharacterSprintPush { get; private set; }

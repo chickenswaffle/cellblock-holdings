@@ -464,6 +464,22 @@ namespace Cellblock.Core
             }
         }
         // Speed hook for the controlled staff member: running, escorting and staggering.
+        // Read-only, for the renderer's input prediction (Claude, 2026-10-19): the controlled character's walking
+        // velocity in metres per game minute right now, from the same rules as AdvanceCharacterControl, without its
+        // side effects. Zero when they can't move freely (escort formation, staggered, busy, grounded, unresolved strike).
+        public Point CharacterPredictedVelocity
+        {
+            get
+            {
+                if (character == null || Data.Speed == 0 || character.Intent.Length < .0001f) return default(Point);
+                if (character.Staff == null || holdPhase == "Cuffed" || holdTarget != "") return default(Point);
+                if (OfficerStaggered || busyUntil > Data.Minute || StaffGroundedRestraint || StaffCombatHealth <= 20 || staffPlayerAttack != null && !staffPlayerAttack.Resolved) return default(Point);
+                float speed = IsOnShift(character.Staff) ? 0.37f : 0.34f;
+                if (staffCombatGuard) speed *= .65f;
+                if (ActionRunning && !staffCombatGuard) speed *= StaffActionRules.RunFactor;
+                return character.Intent * speed;
+            }
+        }
         void StaffActionSpeed(ref float speed)
         {
             InmateSpeed(ref speed);
