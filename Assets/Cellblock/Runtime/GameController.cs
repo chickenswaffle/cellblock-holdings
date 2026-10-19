@@ -73,7 +73,10 @@ namespace Cellblock.Unity
         void Awake()
         {
             InitializePreferences();
-            Screen.orientation = ScreenOrientation.LandscapeLeft;
+            // Landscape either way up (left-handed holds, cable side); never portrait on a phone.
+            Screen.autorotateToLandscapeLeft = true; Screen.autorotateToLandscapeRight = true;
+            Screen.autorotateToPortrait = false; Screen.autorotateToPortraitUpsideDown = false;
+            Screen.orientation = ScreenOrientation.AutoRotation;
             cameraRig = new GameObject("Management camera").AddComponent<Camera>();
             cameraRig.transform.SetParent(transform); cameraRig.tag = "MainCamera"; cameraRig.orthographic = false;
             cameraRig.fieldOfView = 42; cameraRig.nearClipPlane = 0.15f; cameraRig.farClipPlane = 350;

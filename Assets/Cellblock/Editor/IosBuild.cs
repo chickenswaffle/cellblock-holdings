@@ -33,6 +33,11 @@ namespace Cellblock.Editor
             try
             {
                 PlayerSettings.iOS.sdkVersion = sdk;
+                // Sticks and the dock sit at the screen edges: the first edge swipe goes to the game, not Home or
+                // Notification Centre; the home bar fades while playing. Signed for the owner's team.
+                PlayerSettings.iOS.deferSystemGesturesMode = UnityEngine.iOS.SystemGestureDeferMode.TopEdge | UnityEngine.iOS.SystemGestureDeferMode.BottomEdge;
+                PlayerSettings.iOS.hideHomeButton = true;
+                if (string.IsNullOrEmpty(PlayerSettings.iOS.appleDeveloperTeamID)) { PlayerSettings.iOS.appleDeveloperTeamID = "FX4R73M22M"; PlayerSettings.iOS.appleEnableAutomaticSigning = true; }
                 // The simulator runs the host's own architecture; this Mac Pro is Intel.
                 PlayerSettings.iOS.simulatorSdkArchitecture = RuntimeInformation.OSArchitecture == Architecture.Arm64
                     ? AppleMobileArchitectureSimulator.ARM64 : AppleMobileArchitectureSimulator.X86_64;
