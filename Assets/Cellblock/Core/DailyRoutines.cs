@@ -94,7 +94,8 @@ namespace Cellblock.Core
             if (index >= 0 && (MealTravelDue(index, r) || MealDue(index, r))) return "The meal timetable has priority.";
             TrustAccount a = AccountOf(r);
             if (a != null && a.Job != "" && EconomyRules.WorkTravel(a.Job, Data.Minute)) return "The work assignment has priority.";
-            if (PeopleDynamics.IsYardWindow(Data.Minute + r.RoutineOffset)) return "Scheduled yard time has priority.";
+            if (YardDue(r, Data.Minute)) return "Scheduled yard time has priority.";
+            if (ScheduleHome(r, Data.Minute)) return "Counts and lock-in keep the unit in its cells.";
             return "The facility timetable has priority.";
         }
         void AbandonRoutine(Resident r, string why)
@@ -193,7 +194,7 @@ namespace Cellblock.Core
                 foreach (Point side in new[] { new Point(.85f, 0), new Point(-.85f, 0), new Point(0, .85f), new Point(0, -.85f) })
                 {
                     Point q = p + side;
-                    if (ActivityPlaceFree(p, a, b) && ActivityPlaceFree(q, a, b) && SightLines.Clear(p, q) && Reachable(a, p) && Reachable(b, q))
+                    if (ActivityPlaceFree(p, a, b) && ActivityPlaceFree(q, a, b) && OnOwnUnit(a, p) && OnOwnUnit(b, q) && SightLines.Clear(p, q) && Reachable(a, p) && Reachable(b, q))
                     { first = p; second = q; return true; }
                 }
             }
@@ -250,8 +251,9 @@ namespace Cellblock.Core
                 { d.Goal = MealDue(index, r) && Geometry.Distance(r.Position, ServiceDestination(index, true)) < .8f ? "Eat the scheduled meal" : "Go to the assigned meal place"; d.Next = "Reach the assigned place, wait for the meal block, then eat."; }
                 else if (AccountOf(r)?.Job != null && AccountOf(r).Job != "" && EconomyRules.WorkTravel(AccountOf(r).Job, Data.Minute))
                 { d.Goal = "Attend the " + AccountOf(r).Job + " work assignment"; d.Next = "Reach the work station and complete the shift."; }
-                else if (PeopleDynamics.IsYardWindow(Data.Minute + r.RoutineOffset)) d.Goal = "Attend scheduled yard time";
+                else if (YardDue(r, Data.Minute)) d.Goal = "Attend scheduled yard time";
                 else if (Data.Minute % 1440 < 360 || Data.Minute % 1440 >= 1320) { d.Goal = "Rest in the assigned bed"; d.Next = "Rest until the morning timetable begins."; }
+                DescribeSchedule(r, d);
                 if (r.ActivityPhase == "Suspended") d.Next += " Resume " + r.Activity.ToLowerInvariant() + " afterward if the place and partner are still available.";
                 d.Blocker = r.Activity == "" ? "" : r.ActivityBlocker;
             }

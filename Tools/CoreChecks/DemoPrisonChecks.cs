@@ -28,7 +28,7 @@ static partial class Program
             Check(w.JobSlots().Any(s => s.Job == "kitchen") && w.JobSlots().Count(s => s.Job == "library") == 3, "Missing kitchen or library jobs");
             Check(w.IntakeStations().Count >= 1, "No intake lane");
             foreach (string id in new[] { "kitchen", "laundry", "commissary", "phones" }) Check(w.UpgradeLevel(id) > 0, "Service not owned: " + id);
-            Check(w.Data.Fixtures.Count(f => f.Kind == "Shower") == 6 && w.Data.Fixtures.Count(f => f.Kind == "Bed") == 27, "Unit washrooms or beds missing");
+            Check(w.Data.Fixtures.Count(f => f.Kind == "Shower") == 6 && w.Data.Fixtures.Count(f => f.Kind == "Bed") == 27 && w.HousingBeds().Count == 24, "Unit washrooms, beds or segregation cells missing");
             w.AdvanceMinutes(24 * 60);
             World again = new World(RoundTrip(w.Data));
             Check(again.Rooms.Count == w.Rooms.Count && again.Data.Fixtures.Count == w.Data.Fixtures.Count, "The complete prison did not reload intact");

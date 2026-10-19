@@ -231,6 +231,7 @@ namespace Cellblock.Core
         // Morning (0) or afternoon (1) yard window by the resident's own routine clock; -1 outside both.
         int YardWindowOf(Resident r, int atMinute)
         {
+            if (ScheduleActive) return ScheduleWashWindow(atMinute);
             if (!PeopleDynamics.IsYardWindow(atMinute + r.RoutineOffset)) return -1;
             int minute = ((atMinute + r.RoutineOffset) % 1440 + 1440) % 1440;
             return minute < 13 * 60 ? 0 : 1;
@@ -239,7 +240,7 @@ namespace Cellblock.Core
         // Who may walk to a wash station right now. Intake, custody, incidents, quarantine and separation keep people home.
         bool WashEligible(Resident r, int index)
         {
-            if (Data.Mode == null || !Data.Mode.Applied || Data.Operations.Lockdown || r == null) return false;
+            if (Data.Mode == null || !Data.Mode.Applied || Data.Operations.Lockdown || r == null || ScheduleHome(r, Data.Minute)) return false;
             if (!IsPresent(r) || InIntake(r) || IncidentOwnsResident(r) || (Escape.Phase != "None" && Escape.ResidentId == r.Id)) return false;
             if (!r.Legal.Ready || r.Legal.Custody != "In facility" || r.Legal.RestrictedUntil > Data.Minute || r.SeparatedUntil > Data.Minute || r.ProtectiveCustody) return false;
             if (Population.Riot.Phase != "None" && Population.Riot.Rioters.Contains(r.Id)) return false;
@@ -545,7 +546,7 @@ namespace Cellblock.Core
                 if (!IsPresent(r)) { r.WashStartMinute = -1; continue; }
                 SanitationAccess a = AccessOf(r);
                 float decay = night ? SanitationRules.DecayAsleep : SanitationRules.DecayAwake;
-                if (!night && YardWindowOf(r, Data.Minute) >= 0) decay += 0.008f;
+                if (!night && (ScheduleActive ? YardDue(r, Data.Minute) : YardWindowOf(r, Data.Minute) >= 0)) decay += 0.008f;
                 if (r.FloorBed) decay += 0.006f;
                 if (a.Toilet == "None") decay *= 1.35f;
                 else if (a.Toilet == "Shared") decay *= Math.Min(1.35f, 1.08f + Math.Max(0, a.ToiletLoad - SanitationRules.CrowdedToilet) * 0.02f);

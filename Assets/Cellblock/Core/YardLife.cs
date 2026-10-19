@@ -176,7 +176,7 @@ namespace Cellblock.Core
         // For the renderer and the resident card: the activity once the person is actually at it (walking ones while moving).
         bool YardAvailable(Resident r, int index)
         {
-            if (r == null || index < 0 || Data.Mode == null || !Data.Mode.Applied || Data.Operations.Lockdown || !IsPresent(r) || !PeopleDynamics.IsYardWindow(Data.Minute + r.RoutineOffset)) return false;
+            if (r == null || index < 0 || Data.Mode == null || !Data.Mode.Applied || Data.Operations.Lockdown || !IsPresent(r) || !YardDue(r, Data.Minute)) return false;
             if (!r.Legal.Ready || r.Legal.Custody != "In facility" || r.Legal.RestrictedUntil > Data.Minute) return false;
             if (RiotActive && Population.Riot.Rioters.Contains(r.Id) || Escape.Phase != "None" && Escape.ResidentId == r.Id) return false;
             if (MealTravelDue(index, r) || WashDue(r) || HeldByStaff(r) || Downed(r) || IncidentOwnsResident(r) || r.SeparatedUntil > Data.Minute || r.ProtectiveCustody || InIntake(r)) return false;

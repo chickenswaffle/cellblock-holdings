@@ -214,7 +214,7 @@ namespace Cellblock.Core
         public int Day { get { return Data.Minute / 1440 + 1; } }
         public int Capacity
         {
-            get { return Data.Fixtures.Count(f => f.Kind == "Bed" && Rooms.Any(r => Geometry.Contains(r, f.Position))); }
+            get { return Data.Fixtures.Count(f => f.Kind == "Bed" && HousingBed(f) && Rooms.Any(r => Geometry.Contains(r, f.Position))); }
         }
         public World(State data)
         {
@@ -446,6 +446,7 @@ namespace Cellblock.Core
         public bool MealDue(int index, Resident resident) { return MealDueAt(index, resident, Data.Minute); }
         internal bool MealDueAt(int index, Resident resident, int atMinute)
         {
+            if (ScheduleActive) return ScheduleMeal(index, resident, atMinute, false);
             int shifts = MealShifts, shift = MealShift(index);
             if (shift >= MaxMealShifts) return false;
             int minute = MealClock(resident, shifts, atMinute), block = 120 / shifts;
@@ -458,6 +459,7 @@ namespace Cellblock.Core
         public bool MealTravelDue(int index,Resident resident) { return MealTravelDueAt(index, resident, Data.Minute); }
         internal bool MealTravelDueAt(int index,Resident resident,int atMinute)
         {
+            if(ScheduleActive)return ScheduleMeal(index,resident,atMinute,true);
             int shifts=MealShifts,shift=MealShift(index);if(shift>=MaxMealShifts)return false;
             int minute=MealClock(resident,shifts,atMinute),block=120/shifts,lead=shifts>1?Math.Min(45,block-1):0;
             int grace = shifts > 1 && shift == shifts - 1 && resident.Food < MealSated ? 60 : 0;
@@ -904,6 +906,7 @@ namespace Cellblock.Core
                 AdvanceLives();
                 AdvanceCharacterControl();
                 AdvanceStaffActions();
+                AdvanceScheduleCounts();
                 MoveResidents();
                 AdvanceYardLife();
                 if (Data.Minute % 30 == 0) PeopleDynamics.Advance(this);
@@ -965,7 +968,7 @@ namespace Cellblock.Core
                 bool skip = false; UpdateResidentCustody(resident, ref skip); PressureMovement(resident, ref skip); if (skip) continue;
                 bool meals = !Data.Operations.Lockdown && MealDue(index,resident);
                 bool mealTravel = !Data.Operations.Lockdown && MealTravelDue(index,resident);
-                bool yard = !Data.Operations.Lockdown && PeopleDynamics.IsYardWindow(Data.Minute + resident.RoutineOffset);
+                bool yard = !Data.Operations.Lockdown && YardDue(resident, Data.Minute);
                 // When the dining room has fewer places than residents, meals run in up to four shifts.
                 // Anyone beyond four shifts of places has no seat this window and waits at home.
                 Point mealSeat=ServiceDestination(index,true);
@@ -998,7 +1001,8 @@ namespace Cellblock.Core
                 float remaining = 0.32f * resident.WalkSpeed;
                 // Arrive near the dining room early, then yield the occupied bench to the
                 // current shift. The final approach and eating begin only in our block.
-                if(mealTravel&&!meals&&Geometry.Distance(target,mealSeat)<.05f&&Routes.Clear(resident.Position,mealSeat))
+                // (The complete prison's first sitting takes its seats on the call and waits there for the trays.)
+                if(mealTravel&&!meals&&Geometry.Distance(target,mealSeat)<.05f&&Routes.Clear(resident.Position,mealSeat)&&!(ScheduleActive&&MealShift(index)==0))
                     remaining=Math.Min(remaining,Math.Max(0,Geometry.Distance(resident.Position,mealSeat)-1.1f));
                 // Follow one clear waypoint segment per simulation step. Spending leftover
                 // movement on a second segment can shortcut across the corner of a wall.

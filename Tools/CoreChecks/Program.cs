@@ -33,6 +33,7 @@ static partial class Program
     }
     static void Main()
     {
+        if (System.Environment.GetEnvironmentVariable("CELLBLOCK_AUDIT") == "1") { RunDayAudit(); return; }
         Test("three opening contracts have distinct terms and reconciled acquisition cash", () => {
             foreach (ContractOffer offer in World.Offers)
             {
@@ -527,7 +528,7 @@ static partial class Program
             resumed.AdvanceMinutes(1);
             Check(resumed.Data.Crews[0].WorkPhase == "Carrying" && resumed.Data.Crews[0].SupplyLoadMinutes == 3, "Loading discarded a delivered supply batch after handover");
         });
-        RunJusticeChecks(); RunIntegrationChecks(); RunLivesChecks(); RunRoutineChecks(); RunCharacterControlChecks(); RunCharacterPhoneChecks(); RunCharacterInteractionChecks(); RunSecurityChecks(); RunFacilityStoryChecks(); RunIncidentChecks(); RunEscapeChecks(); RunModeStartChecks();RunDemoPrisonChecks();RunDirectDoorChecks();RunMealFlowChecks();RunMovementMemoryChecks();
+        RunJusticeChecks(); RunIntegrationChecks(); RunLivesChecks(); RunRoutineChecks(); RunCharacterControlChecks(); RunCharacterPhoneChecks(); RunCharacterInteractionChecks(); RunSecurityChecks(); RunFacilityStoryChecks(); RunIncidentChecks(); RunEscapeChecks(); RunModeStartChecks();RunDemoPrisonChecks();RunDailyScheduleChecks();RunDirectDoorChecks();RunMealFlowChecks();RunMovementMemoryChecks();
         RunRearrangementChecks();
         RunStaffInteractionChecks();
         RunActionChoreoChecks();

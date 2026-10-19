@@ -10,7 +10,7 @@ namespace Cellblock.Unity
     // (PoseArms) and every local offset is eased back to neutral when the pose ends. No per-frame allocations.
     public sealed partial class FacilityView
     {
-        enum LifePose { None, Talk, Eat, Sleep, SleepFloor, Cuffed, Riot, Sway, Read, Exercise, Watch, Study, Rest }
+        enum LifePose { None, Talk, Eat, Sleep, SleepFloor, Cuffed, Riot, Sway, Read, Exercise, Watch, Study, Rest, WaitTable }
         sealed class ClothingSlot
         {
             public Renderer Renderer; public int Index; public Material Original;
@@ -83,6 +83,24 @@ namespace Cellblock.Unity
                     actor.Limbs[1].localRotation = Quaternion.Slerp(actor.Limbs[1].localRotation, Quaternion.Euler(-40, 0, -4), w);
                     actor.Forearms[1].localRotation = Quaternion.Slerp(actor.Forearms[1].localRotation, Quaternion.Euler(-55, 0, 0), w);
                     actor.Body.localRotation = Quaternion.Slerp(actor.Body.localRotation, Quaternion.Euler(10, 0, 0), w);
+                    break;
+                }
+                case LifePose.WaitTable:
+                {
+                    // Seated, forearms on the table, a slow look around the room while the trays come out.
+                    if (look.HasSeat) { modelPosition = look.SeatOffset * w + Vector3.down * 0.42f * w; actor.Root.rotation = Quaternion.Slerp(actor.Root.rotation, Quaternion.Euler(0, look.SeatYaw, 0), ease * 0.5f); }
+                    for (int leg = 0; leg < 2; leg++)
+                    {
+                        actor.Limbs[2 + leg].localRotation = Quaternion.Slerp(actor.Limbs[2 + leg].localRotation, Quaternion.Euler(-86 * w, 0, 0), w);
+                        actor.Knees[leg].localRotation = Quaternion.Slerp(actor.Knees[leg].localRotation, Quaternion.Euler(86 * w, 0, 0), w);
+                    }
+                    for (int arm = 0; arm < 2; arm++)
+                    {
+                        actor.Limbs[arm].localRotation = Quaternion.Slerp(actor.Limbs[arm].localRotation, Quaternion.Euler(-42, 0, arm == 0 ? 6 : -6), w);
+                        actor.Forearms[arm].localRotation = Quaternion.Slerp(actor.Forearms[arm].localRotation, Quaternion.Euler(-58, 0, 0), w);
+                    }
+                    actor.Body.localRotation = Quaternion.Slerp(actor.Body.localRotation, Quaternion.Euler(6, Mathf.Sin(t * 0.35f + look.Phase) * 5, 0), w);
+                    if (actor.Head != null) actor.Head.localRotation = Quaternion.Slerp(actor.Head.localRotation, Quaternion.Euler(2, Mathf.Sin(t * 0.22f + look.Phase) * 24, 0), w * .35f);
                     break;
                 }
                 case LifePose.Sleep:
@@ -227,15 +245,16 @@ namespace Cellblock.Unity
             LifePose pose = LifePose.None;
             bool still = actor.Speed < 0.06f && Vector3.Distance(actor.Root.position, V(resident.Position, .14f)) < .25f;
             Disturbance riot = world.Population.Riot;
-            int minute = world.Data.Minute % 1440;
             if (riot.Phase != "None" && riot.Rioters.Contains(resident.Id)) pose = LifePose.Riot;
             else if (world.InIntake(resident)) pose = LifePose.Cuffed;
-            else if (still && (minute >= 22 * 60 || minute < 6 * 60) && Geometry.Distance(resident.Position, resident.Home) < 0.3f) pose = resident.FloorBed ? LifePose.SleepFloor : LifePose.Sleep;
+            else if (still && world.LightsOut(world.Data.Minute) && Geometry.Distance(resident.Position, resident.Home) < 0.3f) pose = resident.FloorBed ? LifePose.SleepFloor : LifePose.Sleep;
             else if (still && (resident.HighUntil > world.Data.Minute || resident.DrunkUntil > world.Data.Minute)) pose = LifePose.Sway;
             else if (still)
             {
                 int index = world.Data.Residents.IndexOf(resident);
                 if (index >= 0 && world.MealDue(index, resident) && Geometry.Distance(resident.Position, world.ServiceDestination(index, true)) < 0.5f) pose = LifePose.Eat;
+                // Answered the chow call early: seated at the table, waiting for the trays.
+                else if (index >= 0 && world.MealTravelDue(index, resident) && Geometry.Distance(resident.Position, world.ServiceDestination(index, true)) < 0.5f) pose = LifePose.WaitTable;
                 else if (world.DoingActivity(resident))
                 {
                     switch (resident.Activity)
@@ -265,7 +284,7 @@ namespace Cellblock.Unity
                     look.SeatOffset = Quaternion.Inverse(Quaternion.Euler(0, look.SeatYaw, 0)) * (V(seat.Position) - V(resident.Position)); look.HasSeat = true;
                 }
             }
-            if (pose == LifePose.Eat || pose == LifePose.Study)
+            if (pose == LifePose.Eat || pose == LifePose.Study || pose == LifePose.WaitTable)
             {
                 Fixture table = null; float best = 3;
                 foreach (Fixture f in world.Data.Fixtures)

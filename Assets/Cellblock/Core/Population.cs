@@ -486,7 +486,7 @@ namespace Cellblock.Core
         public List<Fixture> HousingBeds()
         {
             var pendingRemoval = new HashSet<string>(Data.Projects.Where(pr => !pr.Completed).SelectMany(pr => pr.RemoveFixtures));
-            return Data.Fixtures.Where(f => f.Kind == "Bed" && !pendingRemoval.Contains(f.Id) && Rooms.Any(r => Geometry.Contains(r, f.Position))).OrderBy(f => f.Id, StringComparer.Ordinal).ToList();
+            return Data.Fixtures.Where(f => f.Kind == "Bed" && HousingBed(f) && !pendingRemoval.Contains(f.Id) && Rooms.Any(r => Geometry.Contains(r, f.Position))).OrderBy(f => f.Id, StringComparer.Ordinal).ToList();
         }
         bool BedTaken(Fixture bed)
         {

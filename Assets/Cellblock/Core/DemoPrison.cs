@@ -35,7 +35,7 @@ namespace Cellblock.Core
         public static readonly FacilityType Type = new FacilityType { Id = TypeId, TierId = "county", Name = "County Prison · complete", Stars = 3, Security = "Medium", Housing = "Secure cells",
             Challenge = "Run a whole prison", Pitch = "Two housing units, intake to infirmary, segregation, programs, a gym and a full kitchen — all built. Make the day run.",
             SignatureRule = "Everything is built on day one: every service, room and post is yours to staff and schedule.",
-            Residents = 24, Beds = 27, CapitalCents = 48000000, AcquisitionCents = 30000000, DailyRevenueCents = 980000, DailyOperatingCents = 720000, DailyServiceBonusCents = 60000, PaymentDays = 7,
+            Residents = 20, Beds = 24, CapitalCents = 48000000, AcquisitionCents = 30000000, DailyRevenueCents = 980000, DailyOperatingCents = 720000, DailyServiceBonusCents = 60000, PaymentDays = 7,
             Impulsivity = 56, Discipline = 48, Patience = 48, Stress = 34, Safety = 80, GangShare = 0.4f, PretrialShare = 0.6f,
             SeverityWeights = new[] { 0.15f, 0.35f, 0.35f, 0.15f }, Offenses = null, SentenceMinDays = 30, SentenceMaxDays = 365, HearingCadenceMin = 2, HearingCadenceMax = 6,
             ExtraOfficers = 2, StarterRooms = Rooms };
@@ -156,11 +156,18 @@ namespace Cellblock.Core
             // The yard lies between the two units' yard doors (west wall, y 6.2 and 17).
             state.Yard = new Point(-20, 11.5f);
             foreach (string id in Services) if (!state.Upgrades.Owned.Any(o => o.Id == id)) state.Upgrades.Owned.Add(new OwnedUpgrade { Id = id, Level = 1 });
-            // Residents: one per housing-unit bed (isolation beds, east of the spine, stay empty).
-            foreach (Fixture bed in state.Fixtures.Where(f => f.Kind == "Bed" && f.Position.X < 5))
-            { if (state.Residents.Count >= type.Residents) break; Point p = Geometry.AccessPoint(bed); state.Residents.Add(new Resident { Home = p, Position = p }); }
+            // Residents: the units filled alike, a few beds free for the intake bus (isolation beds stay empty).
+            var a = state.Fixtures.Where(f => f.Kind == "Bed" && f.Position.X < 5 && UnitOf(f.Position) == "A").ToList();
+            var b = state.Fixtures.Where(f => f.Kind == "Bed" && f.Position.X < 5 && UnitOf(f.Position) == "B").ToList();
+            for (int i = 0; i < Math.Max(a.Count, b.Count) && state.Residents.Count < type.Residents; i++)
+                foreach (var unit in new[] { a, b })
+                    if (i < unit.Count && state.Residents.Count < type.Residents) { Point p = Geometry.AccessPoint(unit[i]); state.Residents.Add(new Resident { Home = p, Position = p }); }
             PeopleDynamics.Hydrate(state);
         }
+        // Unit A is north of the unit divider (y 12), unit B south; floor mattresses and arrivals follow the same line.
+        public static string UnitOf(Point home) { return home.Y > 12 ? "A" : "B"; }
+        public static bool InUnit(Point p, string unit) { return p.X > -14 && p.X < 5 && (unit == "A" ? p.Y > 12 && p.Y < 22 : p.Y > 1 && p.Y < 12); }
+        public static bool InSegregation(Point p) { return p.X > 8 && p.X < 15 && p.Y > 18.5f && p.Y < 22; }
         static float[] CellDoors(float x0, float x1) { float w = (x1 - x0) / 6; return Enumerable.Range(0, 6).Select(i => x0 + (i + .5f) * w).ToArray(); }
         static float[] Partitions(float x0, float x1) { float w = (x1 - x0) / 6; return Enumerable.Range(1, 5).Select(i => x0 + i * w).ToArray(); }
     }

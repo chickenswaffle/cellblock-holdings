@@ -38,6 +38,8 @@ namespace Cellblock.Editor
             EditorApplication.EnterPlaymode();
         }
         static int Hour { get { string[] a = Environment.GetCommandLineArgs(); int i = Array.IndexOf(a, "-cellblockHour"); int h; return i >= 0 && i + 1 < a.Length && int.TryParse(a[i + 1], out h) ? h : 11; } }
+        // -cellblockClock 06:45 picks the exact minute (the timetable's calls and counts are minutes long).
+        static int StartMinute { get { string[] a = Environment.GetCommandLineArgs(); int i = Array.IndexOf(a, "-cellblockClock"); TimeSpan t; return i >= 0 && i + 1 < a.Length && TimeSpan.TryParse(a[i + 1], out t) ? (int)t.TotalMinutes : Hour * 60; } }
         static void Next(float s) { SessionState.SetInt(StageKey, SessionState.GetInt(StageKey, 0) + 1); SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + s); }
         static void Tick()
         {
@@ -48,10 +50,12 @@ namespace Cellblock.Editor
             try
             {
                 World w = game.World;
-                if (stage == 0) { game.StartArtPreview(DemoPrison.TypeId, GameModes.Tier("county").Locations[0], Hour * 60); Next(3); return; }
+                if (stage == 0) { game.StartArtPreview(DemoPrison.TypeId, GameModes.Tier("county").Locations[0], StartMinute); Next(3); return; }
                 if (stage == 1)
                 {
                     notes.Add("day " + (w.Data.Minute / 1440 + 1) + " " + (w.Data.Minute % 1440 / 60).ToString("00") + ":" + (w.Data.Minute % 60).ToString("00") + " · " + w.Rooms.Count + " rooms · " + w.Data.Residents.Count + " residents · " + w.Data.Staff.Count(s => s.Arrived) + " staff on site");
+                    notes.Add("timetable: unit A " + w.UnitBlockNow("A").Title + ", unit B " + w.UnitBlockNow("B").Title + (w.Counts.Count > 0 ? " · last count " + w.Counts.Last().Title + " " + w.Counts.Last().Unit + " " + w.Counts.Last().Present + "/" + w.Counts.Last().Expected : ""));
+                    notes.Add("doing: " + string.Join(", ", w.Data.Residents.GroupBy(r => w.DescribeRoutine(r).Goal).OrderByDescending(g => g.Count()).Select(g => g.Key + " " + g.Count())));
                     notes.Add("where residents are: " + string.Join(", ", w.Data.Residents.GroupBy(r => Where(w, r.Position)).OrderByDescending(g => g.Count()).Select(g => g.Key + " " + g.Count())));
                     Vector3 centre = new Vector3(7, 0, 7);
                     game.FrameArt(centre, 46, 0, 72); Render(game.ArtCamera, "00-overview", 1800, 1100);

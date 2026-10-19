@@ -171,7 +171,7 @@ namespace Cellblock.Core
                 title = "Meal"; target = ServiceDestination(index, true); hasTarget = Geometry.Distance(r.Position, target) > .8f;
                 hint = hasTarget ? "Head to your seat in the dining room." : "Eating."; return;
             }
-            if (PeopleDynamics.IsYardWindow(Data.Minute + r.RoutineOffset)) { title = "Yard time"; target = index >= 0 ? ServiceDestination(index, false) : r.Home; hint = "Get some air, work out or talk."; hasTarget = Geometry.Distance(r.Position, target) > 6; return; }
+            if (YardDue(r, Data.Minute)) { title = "Yard time"; target = index >= 0 ? ServiceDestination(index, false) : r.Home; hint = "Get some air, work out or talk."; hasTarget = Geometry.Distance(r.Position, target) > 6; return; }
             title = "Free time"; hint = "Your time. Wash, rest, talk, or make some money.";
         }
 

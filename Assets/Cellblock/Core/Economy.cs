@@ -368,7 +368,9 @@ namespace Cellblock.Core
             Resident resident = Find(residentId); TrustAccount a = AccountOf(residentId);
             string blocker = a == null ? "No account." : JobBlocker(resident, job);
             if (blocker != "") { Notice = blocker; return false; }
-            JobSlot slot = JobSlots().FirstOrDefault(s => s.Job == job && (a.JobSlot == s.Key || !Economy.Accounts.Any(x => x.JobSlot == s.Key)) && Routes.Find(resident.Home, WorkPoint(resident, s)) != null);
+            // The nearest open position (a resident's own unit servery before the main kitchen across the prison).
+            JobSlot slot = JobSlots().Where(s => s.Job == job && (a.JobSlot == s.Key || !Economy.Accounts.Any(x => x.JobSlot == s.Key))).OrderBy(s => a.JobSlot == s.Key ? 0 : 1)
+                .ThenBy(s => Geometry.Distance(resident.Home, WorkPoint(resident, s))).FirstOrDefault(s => Routes.Find(resident.Home, WorkPoint(resident, s)) != null);
             if (slot == null) { Notice = "No open " + EconomyRules.Job(job).Name.ToLowerInvariant() + " position that " + resident.Name + " can reach. " + (job == "orderly" ? "" : "Install more " + JobFixtureHint(job) + "."); return false; }
             a.Job = job; a.JobSlot = slot.Key; a.JobSinceMinute = Data.Minute;
             Remember(resident, "job", "Started work as " + Article(EconomyRules.Job(job).Name) + ".");

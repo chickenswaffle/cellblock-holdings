@@ -134,7 +134,7 @@ namespace Cellblock.Core
             if (!ignoreCurrentPhone && CharacterUsingPhone(r.Id)) return false;
             int index = Data.Residents.IndexOf(r);
             if (index >= 0 && (MealTravelDueAt(index, r, atMinute) || MealDueAt(index, r, atMinute))) return false;
-            if (PeopleDynamics.IsYardWindow(atMinute + r.RoutineOffset)) return false;
+            if (YardDue(r, atMinute) || ScheduleHome(r, atMinute)) return false;
             TrustAccount a = AccountOf(r);
             if (a != null && a.Job != "" && EconomyRules.WorkTravel(a.Job, atMinute)) return false;
             return true;
@@ -221,6 +221,7 @@ namespace Cellblock.Core
                 foreach (Fixture f in Data.Fixtures.Where(x => x.Kind == LifeRules.FixtureFor(activity) && (requestedFixture == "" || x.Id == requestedFixture) && !pending.Contains(x.Id) && (r.AvoidActivityUntil <= Data.Minute || x.Id != r.AvoidActivityFixture) && Rooms.Any(room => Geometry.Contains(room, x.Position))).OrderBy(x => Geometry.Distance(x.Position, r.Position)).Take(3))
                 {
                     if (activity == "Study" && Geometry.Distance(f.Position, Data.Dining) < 0.1f && PeopleDynamics.IsMealWindow(Data.Minute + 60)) continue;
+                    if (!OnOwnUnit(r, f.Position)) continue;
                     bool found = false; Point place = default(Point);
                     foreach (Point p in ActivityPlaces(f, activity))
                         if (ActivityPlaceFree(p, r) && Reachable(r, p) && RoutineJourneyMinutes(r, p) + 10 <= window) { place = p; found = true; break; }
@@ -232,7 +233,7 @@ namespace Cellblock.Core
             }
             // A friend who also has free time.
             Relationship friend = r.Relationships.Where(x => x.Trust >= 60 && x.Tension < 35).OrderByDescending(x => x.Trust).ThenBy(x => x.OtherId, StringComparer.Ordinal)
-                .FirstOrDefault(x => { Resident o = Find(x.OtherId); return o != null && o.Activity == "" && FreeTime(o) && Geometry.Distance(o.Position, r.Position) < 20; });
+                .FirstOrDefault(x => { Resident o = Find(x.OtherId); return o != null && o.Activity == "" && FreeTime(o) && SameUnit(r, o) && Geometry.Distance(o.Position, r.Position) < 20; });
             if (friend != null && (request == "" || request == "Talk"))
                 options.Add(("Talk", null, default(Point), 0.4f + r.Sociability / 110f + (r.Belonging < 40 ? 0.35f : 0) + Noise("Talk"), friend.OtherId));
             if (request == "" || request == "Quiet") options.Add(("Quiet", null, r.Home, 0.35f + (r.Stress > 70 ? 0.3f : 0) + (r.Safety < 40 ? .7f : 0) + (r.Health < 65 ? .5f : 0) + (100 - r.Sociability) / 220f + Noise("Quiet"), ""));

@@ -35,6 +35,8 @@ namespace Cellblock.Editor
         static readonly List<string> notes = new List<string>(), errors = new List<string>(), json = new List<string>();
         static RenderTexture hud; static string officerId, targetId;
         static HudAudit() { EditorApplication.update += Tick; }
+        // -cellblockType county-complete audits the complete prison (its timetable chip) instead of the default start.
+        static string AuditType { get { string[] a = Environment.GetCommandLineArgs(); int i = Array.IndexOf(a, "-cellblockType"); return i >= 0 && i + 1 < a.Length ? a[i + 1] : "county-maximum"; } }
 
         public static void Run()
         {
@@ -58,7 +60,7 @@ namespace Cellblock.Editor
             {
                 if (stage == 0)
                 {
-                    game.StartArtPreview("county-maximum", "briar-county", 10 * 60 + 30);
+                    game.StartArtPreview(AuditType, "briar-county", 10 * 60 + 30);
                     World w = game.World; w.Data.Speed = 0;
                     StaffMember officer = w.Data.Staff.First(s => s.Role == "Officer" && s.Arrived); officerId = officer.Id;
                     officer.Position = w.Data.Yard + new Point(0, -3);
@@ -141,6 +143,22 @@ namespace Cellblock.Editor
                 if (buttons[i].Contains(buttons[j]) || buttons[j].Contains(buttons[i])) continue;
                 Rect r = Intersect(buttons[i].worldBound, buttons[j].worldBound);
                 if (r.width > 4 && r.height > 4) overlaps.Add(Label(buttons[i]) + " × " + Label(buttons[j]));
+            }
+            // The phone status chip at its longest texts (timetable, counts, meters): inside the safe area and clear of the
+            // pressure alert, measured rather than eyeballed.
+            Label chip = root.Q<Label>(className: "phone-stat");
+            if (chip != null && Shown(chip))
+            {
+                VisualElement alert = root.Q<VisualElement>(className: "pressure-alert");
+                float pad = chip.resolvedStyle.paddingLeft + chip.resolvedStyle.paddingRight + chip.resolvedStyle.borderLeftWidth + chip.resolvedStyle.borderRightWidth;
+                foreach (string text in new[] { chip.text, "Count A 12/12 · B 12/12", "A Lock-in · B Showers", "All units · Breakfast", "A Dayroom · B Dinner", "Escape risk 100", "Beds 36/24" })
+                {
+                    float width = chip.MeasureTextSize(text, 0, VisualElement.MeasureMode.Undefined, 0, VisualElement.MeasureMode.Undefined).x + pad;
+                    Rect r = new Rect(chip.worldBound.x, chip.worldBound.y, width, chip.worldBound.height);
+                    if (!Inside(safe, r)) outside.Add("chip '" + text + "' " + width.ToString("0") + "×" + r.height.ToString("0"));
+                    if (alert != null && Shown(alert) && Intersect(r, alert.worldBound).width > 2) overlaps.Add("chip '" + text + "' × pressure alert");
+                }
+                notes.Add(name + ": chip '" + chip.text + "' at x " + chip.worldBound.x.ToString("0") + "–" + chip.worldBound.xMax.ToString("0") + " (safe area to " + safe.xMax.ToString("0") + ")");
             }
             // Where a world drag or pinch would be taken by the HUD instead (any picked element counts, as IsOverUI does).
             int pickable = 0, samples = 0;

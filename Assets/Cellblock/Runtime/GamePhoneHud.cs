@@ -47,9 +47,41 @@ namespace Cellblock.Unity
             if (capacityLevel >= stressLevel && capacityLevel >= riskLevel) { text = "Beds " + present + "/" + beds; level = capacityLevel > 1 ? 1.2f : capacityLevel > .85f ? .9f : .3f; }
             else if (stressLevel >= riskLevel) { text = "Stress " + Mathf.RoundToInt(stress); level = stressLevel; }
             else { text = "Escape risk " + Mathf.RoundToInt(risk); level = riskLevel; }
+            // The complete prison: while nothing is pressing, the chip is the timetable — what each unit is doing now, or
+            // the count as it is taken.
+            string schedule = ScheduleChip(world, ref level);
+            if (schedule != "") text = schedule;
             phoneStat.text = text;
             phoneStat.EnableInClassList("phone-stat-caution", level > .6f && level <= 1);
             phoneStat.EnableInClassList("phone-stat-danger", level > 1);
+        }
+
+        static string ScheduleChip(World world, ref float level)
+        {
+            if (!world.ScheduleActive) return "";
+            string title;
+            if (world.CountInProgress(world.Data.Minute, out title))
+            {
+                CountResult a = world.TakeCount("A", title), b = world.TakeCount("B", title);
+                level = Mathf.Max(level, a.Clear && b.Clear ? .3f : .9f);
+                return "Count A " + a.Present + "/" + a.Expected + " · B " + b.Present + "/" + b.Expected;
+            }
+            if (level > .6f) return "";
+            string ua = BlockWord(world.UnitBlockNow("A")), ub = BlockWord(world.UnitBlockNow("B"));
+            return ua == ub ? "All units · " + ua : "A " + ua + " · B " + ub;
+        }
+        static string BlockWord(ScheduleBlock b)
+        {
+            switch (b.Kind)
+            {
+                case "meal": return b.Title;
+                case "yard": return "Yard";
+                case "wash": return "Showers";
+                case "lock-in": return "Lock-in";
+                case "count": return "Count";
+                case "night": return "Night";
+            }
+            return "Dayroom";
         }
 
         // After the ordinary command layout: re-place everything for the phone frame.
@@ -90,7 +122,8 @@ namespace Cellblock.Unity
             // Pressure alert: a one-line chip at the top right.
             if (pressureAlert != null && pressureAlert.style.display.value == DisplayStyle.Flex)
             {
-                float room = width - right - (left + (float.IsNaN(header.resolvedStyle.width) ? 420 : header.resolvedStyle.width) + 140);
+                float chip = phoneStat != null && phoneStat.style.display.value == DisplayStyle.Flex && !float.IsNaN(phoneStat.resolvedStyle.width) ? phoneStat.resolvedStyle.width + 16 : 140;
+                float room = width - right - (left + (float.IsNaN(header.resolvedStyle.width) ? 420 : header.resolvedStyle.width) + chip);
                 pressureAlert.style.top = top + 4; pressureAlert.style.left = StyleKeyword.Auto; pressureAlert.style.right = right + (inspectorOpen ? inspector.resolvedStyle.width + 12 : 0);
                 pressureAlert.style.width = Mathf.Clamp(room, 120, 280);
                 if (room < 120) pressureAlert.style.display = DisplayStyle.None;
