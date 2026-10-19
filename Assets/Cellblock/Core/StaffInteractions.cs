@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace Cellblock.Core
 {
-    public enum StaffInteraction { Talk, Punch, PatDown, PocketSearch, Grab, GroundAndCuff, Cuff, Escort, Release, Confine }
+    public enum StaffInteraction { Talk, Punch, PatDown, PocketSearch, Grab, GroundAndCuff, Cuff, Escort, Release, Confine, Guard, Shove, Compliance }
     public sealed class StaffInteractionOption
     {
         public StaffInteraction Command;
@@ -20,10 +20,11 @@ namespace Cellblock.Core
         public void SetStaffFocusTarget(string id) { staffFocusTargetId = id ?? ""; }
         public void SetStaffViewFacing(Point direction)
         { float length = direction.Length; if (length > .0001f && !float.IsInfinity(length) && !float.IsNaN(length)) actionFacing = direction * (1 / length); }
-        internal void EndStaffManualSession() { ReleaseHoldTarget(""); ResetStaffEncounter(); busyUntil = -1; running = false; liveOfficer = ""; }
-        string explicitStaffTargetId, staffSearchTarget = "", staffSearchMode = "";
+        internal void EndStaffManualSession() { ReleaseHoldTarget(""); ClearStaffCombat(); ResetStaffEncounter(); busyUntil = -1; running = false; liveOfficer = ""; }
+        string explicitStaffTargetId, staffSearchTarget = "", staffSearchMode = "", staffStandingTarget = "";
         int staffAttackReadyMinute, staffInteractionStart;
         bool staffGroundCuffQueued, staffGroundedCuffed;
+        public bool StaffStandingUp { get { return staffStandingTarget != "" && busyUntil > Data.Minute; } }
         public bool StaffGroundedRestraint { get { return staffGroundedCuffed && holdPhase == "Cuffed"; } }
         public int StaffRecoveryMinutes { get { return Math.Max(0, staffAttackReadyMinute - Data.Minute); } }
         public int StaffBusyMinutes { get { return Math.Max(0, busyUntil - Data.Minute); } }
@@ -31,8 +32,8 @@ namespace Cellblock.Core
 
         void ResetStaffEncounter()
         {
-            staffFocusTargetId = ""; explicitStaffTargetId = null; staffSearchTarget = staffSearchMode = "";
-            staffGroundCuffQueued = staffGroundedCuffed = false; staffAttackReadyMinute = staffInteractionStart = 0;
+            staffFocusTargetId = ""; explicitStaffTargetId = null; staffSearchTarget = staffSearchMode = staffStandingTarget = "";
+            staffGroundCuffQueued = staffGroundedCuffed = staffCuffPending = false; staffHoldChoreo = null; staffAttackReadyMinute = staffInteractionStart = 0;
         }
         public bool CanFocusStaffSubject(Resident resident) { return resident != null && Actionable(resident); }
         public bool CanFocusStaffSubject(string id)
@@ -53,7 +54,6 @@ namespace Cellblock.Core
         string StaffCommandBlocker()
         {
             if (character == null || character.Staff == null) return "Direct staff control required.";
-            if (Data.Speed == 0) return "Paused · resume time to act.";
             if (OfficerStaggered) return "Recovering balance.";
             if (busyUntil > Data.Minute) return "Finishing " + busyAction.ToLowerInvariant() + ".";
             return "";
@@ -90,12 +90,19 @@ namespace Cellblock.Core
             string physical; Resident target = ResolveStaffSubject(officer, id, out physical);
             string common = StaffCommandBlocker(); if (common == "") common = physical;
             if (common == "" && holdTarget != "" && holdTarget != id) common = "Finish with the person already in your custody.";
+            if (common == "" && !CanEngageStaffCombatTarget(id)) common = "Disengage from the current opponent before switching targets.";
             bool held = holdTarget != "" && holdTarget == id, cuffed = held && holdPhase == "Cuffed";
             bool officerRole = officer != null && officer.Role == "Officer";
             void Add(StaffInteraction command, string label, string detail, string blocked = "", bool needsOfficer = false)
             {
                 choices.Add(new StaffInteractionOption { Command = command, Label = label, Detail = detail,
-                    Blocker = command == StaffInteraction.Release && held && StaffCommandBlocker() == "" ? "" : common != "" ? common : needsOfficer && !officerRole ? "Officer role required." : blocked });
+                    Blocker = command == StaffInteraction.Release && held && !StaffStandingUp && officer != null && officer.Id == liveOfficer ? "" : common != "" ? common : needsOfficer && !officerRole ? "Officer role required." : blocked });
+            }
+            Add(StaffInteraction.Guard, staffCombatGuard ? "Lower guard" : "Raise guard", "Face incoming strikes. Guard costs stamina; it cannot stop attacks from behind.", held && !staffCombatGuard ? "Release custody before raising both forearms." : "");
+            if (!cuffed)
+            {
+                Add(StaffInteraction.Shove, "Shove / break balance", "Create space and reduce balance. Uses stamina; unjustified force still counts.", StaffRecoveryMinutes > 0 ? "Recovering from the last strike." : "", true);
+                Add(StaffInteraction.Compliance, "Order compliance", "Exhausted or willing people can surrender without being knocked unconscious.", "", true);
             }
             Add(StaffInteraction.Talk, "Speak / identify", "Face the selected person and address them.");
             string searchBlock = target != null && Resisting(target) && !cuffed ? "Restrain the resisting person first." : "";
@@ -121,6 +128,12 @@ namespace Cellblock.Core
         public bool ActStaffInteraction(string id, StaffInteraction command)
         {
             if (InmateActing) { Notice = "These are staff interactions."; return false; }
+            if (command == StaffInteraction.Release && !StaffStandingUp && !string.IsNullOrEmpty(id) && holdTarget == id)
+            {
+                StaffMember controller = ActingOfficer();
+                if (controller != null && controller.Id == liveOfficer)
+                { ReleaseHoldTarget("Released the manual restraint."); return true; }
+            }
             StaffMember officer; string why;
             if (!CanAct(out officer, out why)) { Notice = why; return false; }
             // A deliberate air punch cannot fall back to somebody beside or behind the camera.
@@ -137,6 +150,9 @@ namespace Cellblock.Core
                 switch (command)
                 {
                     case StaffInteraction.Punch: return ActAttack();
+                    case StaffInteraction.Guard: return SetStaffCombatGuard(!staffCombatGuard, id);
+                    case StaffInteraction.Shove: return ActStaffShove(id);
+                    case StaffInteraction.Compliance: return OrderStaffCompliance(id);
                     case StaffInteraction.Grab: return ActGrab();
                     case StaffInteraction.Talk:
                         EndActivity(target); RemoveResidentPath(target);
@@ -146,18 +162,25 @@ namespace Cellblock.Core
                     case StaffInteraction.PocketSearch:
                         staffSearchTarget = id; staffSearchMode = command == StaffInteraction.PocketSearch ? "Pocket search" : "Pat search";
                         busyAction = staffSearchMode; busyTarget = id; staffInteractionStart = Data.Minute;
-                        busyUntil = Data.Minute + (command == StaffInteraction.PocketSearch ? 5 : 3);
+                        busyUntil = Data.Minute + ActionChoreo.GameMinutes(command == StaffInteraction.PocketSearch ? ChoreoAction.PocketSearch : ChoreoAction.PatDown);
                         EndActivity(target); RemoveResidentPath(target); running = false;
                         Beat("Search", officer, target); Notice = "Starting " + staffSearchMode.ToLowerInvariant() + " of " + target.Name + "."; return true;
                     case StaffInteraction.GroundAndCuff:
                         if (holdTarget == "" && !ActGrab()) return false;
+                        if (Downed(target)) return ActGrab();
                         if (!ActAttack()) return false;
                         staffGroundCuffQueued = true; busyAction = "Takedown"; busyTarget = id;
-                        staffInteractionStart = Data.Minute; busyUntil = Data.Minute + 4; return true;
+                        staffInteractionStart = Data.Minute; busyUntil = Data.Minute + ActionChoreo.GameMinutes(ChoreoAction.Takedown); return true;
                     case StaffInteraction.Cuff:
                         if (holdTarget == "" && !ActGrab()) return false;
                         return ActGrab();
                     case StaffInteraction.Escort:
+                        if (staffGroundedCuffed)
+                        {
+                            staffStandingTarget = id; busyAction = "Standing"; busyTarget = id;
+                            staffInteractionStart = Data.Minute; busyUntil = Data.Minute + 6; running = false;
+                            Beat("Stand", officer, target); Notice = "Helping " + target.Name + " to their feet. Escort begins once they are standing."; return true;
+                        }
                         staffGroundedCuffed = false; downUntil.Remove(id); escortTrail.Clear(); escortTrail.Add(target.Position); escortTrail.Add(officer.Position);
                         Notice = "Escorting " + target.Name + ". Walk them to their bunk; use Actions to search, release or confine."; return true;
                     case StaffInteraction.Release: ReleaseHoldTarget("Released " + target.Name + "."); return true;
@@ -170,6 +193,19 @@ namespace Cellblock.Core
 
         void AdvanceStaffEncounter(StaffMember officer)
         {
+            AdvancePendingCuff(officer);
+            if (staffStandingTarget != "")
+            {
+                string why; Resident target = ResolveStaffSubject(officer, staffStandingTarget, out why);
+                if (target == null || holdTarget != staffStandingTarget || holdPhase != "Cuffed" || officer.Role != "Officer")
+                {
+                    ReleaseHoldTarget("Assisted stand interrupted · " + (target == null ? why : "custody or authority changed.")); busyUntil = -1; return;
+                }
+                if (busyUntil > Data.Minute) return;
+                staffStandingTarget = ""; staffGroundedCuffed = false; downUntil.Remove(target.Id);
+                escortTrail.Clear(); escortTrail.Add(target.Position); escortTrail.Add(officer.Position);
+                Notice = target.Name + " is standing and ready to escort.";
+            }
             if (busyAction == "Speaking" && busyUntil > Data.Minute)
             {
                 string speechWhy;
@@ -195,7 +231,7 @@ namespace Cellblock.Core
                 Resident held = HeldResident();
                 if (held == null || !Actionable(held)) { ReleaseHoldTarget("Ground restraint interrupted by the response."); return; }
                 ActGrab();
-                if (staffGroundedCuffed) Notice = held.Name + " is cuffed on the ground. Choose Stand & escort, a search, or release.";
+                if (staffCuffPending) Notice = held.Name + " · applying ground cuffs: first wrist, second wrist, then double lock.";
             }
         }
     }

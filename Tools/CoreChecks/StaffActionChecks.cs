@@ -18,6 +18,8 @@ static partial class Program
         return w;
     }
     static void ActionMinute(World w) { w.AdvanceMinutes(1); }
+    static void FinishStaffWork(World w)
+    { int limit = 300; while (w.BusyAction != "" && limit-- > 0) ActionMinute(w); Check(limit > 0, "Staff work did not finish: " + w.Notice); }
     // Walk the officer along a real route, one minute and one waypoint at a time.
     static void WalkOfficerTo(World w, StaffMember o, Point target)
     {
@@ -49,10 +51,10 @@ static partial class Program
             try { new World(bad); } catch (ArgumentException) { refused = true; }
             Check(refused, "Negative action records loaded");
         });
-        Test("staff actions · only a staff member under direct control acts, and never while paused", () => {
+        Test("staff actions · only a staff member commits actions and committing resumes paused direct time", () => {
             StaffMember o; Resident t; World w = ActionWorld(out o, out t);
             w.Data.Speed = 0;
-            Check(!w.ActAttack() && w.Notice.Contains("resume") && w.StaffActions.Strikes == 0, "Acted while paused: " + w.Notice);
+            Check(w.ActAttack() && w.Data.Speed == 1 && w.StaffActions.Strikes == 1, "Paused commit did not resume: " + w.Notice);
             w.Data.Speed = 1; w.EndCharacterControl();
             Check(!w.ActGrab() && w.Notice.Contains("Play as a staff member"), "Acted without control: " + w.Notice);
             Check(w.StaffActionHints().TargetId == "", "Hints without control");
@@ -77,13 +79,14 @@ static partial class Program
         Test("staff actions · grab, cuff, walk them to their bunk and lock them in: six hours, arbitrary without cause", () => {
             StaffMember o; Resident t; World w = ActionWorld(out o, out t);
             Check(w.ActGrab() && w.HoldPhase == "Holding" && !w.Resisting(t), "Grab: " + w.Notice);
-            Check(w.ActGrab() && w.HoldPhase == "Cuffed" && w.StaffActions.Cuffed == 1, "Cuff: " + w.Notice);
+            Check(w.ActGrab() && w.HoldPhase == "Applying cuffs" && w.StaffActions.Cuffed == 0, "Cuff applied instantly: " + w.Notice);
+            FinishStaffWork(w); Check(w.HoldPhase == "Cuffed" && w.StaffActions.Cuffed == 1, "Cuff never completed");
             Check(w.StaffActionHints().Grab == "Release" && w.StaffActionHints().Use == "Walk them to their bunk", "Cuffed hints");
             for (int i = 0; i < 3; i++) ActionMinute(w);
             // Walk to the bunk through the doors: the held resident follows within arm's reach of the officer all the way.
             WalkOfficerTo(w, o, t.Home);
             Check(Geometry.Distance(t.Position, o.Position) < 1.0f && w.Routes.Clear(t.Position, t.Position), "The prisoner did not walk with the officer: " + Geometry.Distance(t.Position, o.Position));
-            Check(w.StaffActionHints().Use == "Lock in cell" && w.ActUse(), "Lock in: " + w.Notice + " (hint " + w.StaffActionHints().Use + ", " + Geometry.Distance(o.Position, t.Home).ToString("0.0") + " m from the bunk)");
+            Check(w.StaffActionHints().Use == "Lock in cell" && w.ActUse(), "Lock in: " + w.Notice + " (hint " + w.StaffActionHints().Use + ", " + Geometry.Distance(o.Position, t.Home).ToString("0.0") + " m from the bunk; officer " + o.Position.X + "," + o.Position.Y + "; resident " + t.Position.X + "," + t.Position.Y + "; blocker " + w.CharacterControlBlocker + ")");
             Check(t.SeparatedUntil >= w.Data.Minute + 360 && w.HeldResidentId == "" && t.Position.Equals(t.Home) && w.StaffActions.Arbitrary == 1 && WriteUps(w, o.Id, "Arbitrary confinement") == 1, "Confinement");
             Check(t.Memories.Any(m => m.Kind == "confined"), "No memory of the lock-in");
         });
@@ -91,26 +94,27 @@ static partial class Program
             StaffMember o; Resident t; World w = ActionWorld(out o, out t);
             w.ActGrab(); Check(w.ActAttack() && w.Downed(t) && w.StaffActions.Takedowns == 1, "Takedown: " + w.Notice);
             Check(w.StaffActions.Excessive == 1, "An unprovoked takedown was not excessive");
-            Check(w.ActGrab() && w.HoldPhase == "Cuffed" && w.Downed(t) && w.StaffGroundedRestraint, "Ground restraint was lost while cuffing: " + w.Notice);
+            Check(w.ActGrab() && w.HoldPhase == "Applying cuffs" && w.Downed(t), "Ground cuff did not begin: " + w.Notice);
+            FinishStaffWork(w); Check(w.HoldPhase == "Cuffed" && w.Downed(t) && w.StaffGroundedRestraint, "Ground restraint was lost while cuffing: " + w.Notice);
         });
         Test("staff actions · a pat search finds held contraband and makes restraint justified; a clean search costs a little trust", () => {
             StaffMember o; Resident t; World w = ActionWorld(out o, out t);
             w.Data.Upgrades.Owned.Add(new OwnedUpgrade { Id = "search-tools", Level = 2 });
             float trust = w.IntelWork.Trust;
             Check(w.ActUse() && w.BusyAction == "Pat search" && w.StaffActions.Searches == 0 && w.StaffActions.Finds == 0, "Search must start without instant findings: " + w.Notice);
-            for (int i = 0; i < 3; i++) ActionMinute(w);
+            FinishStaffWork(w);
             Check(Math.Abs(w.IntelWork.Trust - (trust - 0.5f)) < 0.01f, "Clean search trust");
             for (int i = 0; i < 3; i++) ActionMinute(w);
             int seized = w.Contraband.Seized;
             w.Contraband.Items.Add(new ContrabandItem { Id = "pills-1", Kind = "Pills", HolderId = t.Id, Place = "Held", Position = t.Position, ArrivedMinute = w.Data.Minute });
             t.Position = o.Position + new Point(0, 0.7f);
             Check(w.ActUse(), w.Notice);
-            for (int i = 0; i < 3; i++) ActionMinute(w);
+            FinishStaffWork(w);
             Check(w.StaffActions.Finds == 1 && w.Contraband.Seized == seized + 1 && !w.Contraband.Items.Any(i => i.Id == "pills-1"), "Search with tools did not find the pills: " + w.Notice);
             Check(WriteUps(w, t.Id, "Contraband found in a search") == 1, "No resident write-up");
             for (int i = 0; i < 3; i++) ActionMinute(w);
             t.Position = o.Position + new Point(0, 0.7f);
-            w.ActGrab(); w.ActGrab(); for (int i = 0; i < 3; i++) ActionMinute(w); WalkOfficerTo(w, o, t.Home);
+            w.ActGrab(); w.ActGrab(); FinishStaffWork(w); WalkOfficerTo(w, o, t.Home);
             Check(w.ActUse() && w.StaffActions.Arbitrary == 0 && w.StaffActions.Log.Last().Ruling == "Justified", "Confinement after a find was not justified: " + w.Notice);
         });
         Test("staff actions · a bunk search turns over the stash of the bunk within reach", () => {
@@ -170,11 +174,12 @@ static partial class Program
             {
                 t.Impulsivity = 100; t.Stress = 100; t.Health = 92; t.Position = o.Position + new Point(0, 0.7f);
                 w.ActAttack();
-                countered = w.Resisting(t);
                 for (int m = 0; m < 4; m++) ActionMinute(w);
+                countered = w.Resisting(t) && WriteUps(w, t.Id, "Assault on staff") > 0;
             }
             Check(countered && WriteUps(w, t.Id, "Assault on staff") >= 1, "Nobody swung back in twelve tries");
             t.Position = o.Position + new Point(0, 0.7f);
+            while (w.OfficerStaggered) ActionMinute(w);
             int justified = w.StaffActions.Justified; w.ActAttack();
             Check(w.StaffActions.Justified == justified + 1, "Force on a resisting resident was not justified");
         });

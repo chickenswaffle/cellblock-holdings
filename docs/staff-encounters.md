@@ -30,7 +30,7 @@ On touch, MOVE and LOOK are separate controls. Swipe the free right side to look
 - Commands retain the exact resident ID. Distance, walls/furnishings, presence and incident ownership are checked again. A lost target cannot silently substitute a nearby person. An untargeted punch hits air.
 - Each staff strike has a three-game-minute recovery. Force still records injuries, justification, memories, trust and write-ups under existing rules. No damage-reward loop was added.
 - Pat-downs take three game minutes; pocket searches take five. The subject and officer remain occupied. Contraband findings settle exactly once at completion, using existing search-tool/experience odds. Cancellation does not confiscate anything. These are game-clock durations, not real-world timings.
-- Ground and cuff first performs the takedown, then applies cuffs. The person remains on the ground with restrained hands. The officer must choose Stand & escort before walking away. Searches work while cuffed. Release is an explicit safe action, including if the subject was displaced.
+- Ground and cuff first performs the takedown, then applies cuffs. The person remains on the ground with restrained hands. The officer must choose Stand & escort, then complete a six-game-minute assisted recovery before walking away. Both people stay in place while the prisoner rolls up to sitting and rises with support; cuffs remain authoritative throughout. Pause freezes the sequence. A lost subject, changed authority or control handback cancels safely. Searches work while cuffed. Release is an explicit safe action, including if the subject was displaced.
 - Searches and conversations reserve the subject against routine wandering. End of control immediately clears manual custody and pending actions, even while paused. Live encounter timers are deliberately not restored as active manual control in a save.
 - New functional poses distinguish alternating strikes from two-handed takedown contact, kneeling cuffs and pat/pocket search hand paths. They use the current articulated rig; Claude's separate human-model corrections are not imported by this milestone.
 
@@ -44,6 +44,12 @@ Official references consulted for this pass:
 - [Unity Input System pointer documentation](https://docs.unity3d.com/Packages/com.unity.inputsystem@1.14/manual/Pointers.html): pointer pixel deltas and rate-based sticks have different time semantics. Existing device response math is retained; capture entry now suppresses its first warp/click frame.
 
 These are design references. Exact target IDs, game-clock staged custody, menu organization and consequence rules are our implementation choices.
+
+## Assisted recovery follow-up
+
+The current get-up uses fixed endpoints on the shared game clock, including a fractional start offset so a late-minute command begins at the ground pose. The officer rises from kneeling while supporting the subject. Completion explicitly restores model orientation, hip height, knees and foot contacts before handing movement back to escort. It does not reset a pose already taken over by an incident animator.
+
+Final451 core checks (15 focused encounters) and the extended Unity encounter/quick-action reviews cover the transition, pause, repeat commands, interruption and cleanup. Rendered start, seated midpoint and upright completion are checked. These are procedural poses; still frames and source checks do not establish production motion-capture quality.
 
 ## Verification limits
 

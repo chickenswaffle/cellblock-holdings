@@ -1,0 +1,23 @@
+CSSM_ModuleLoad(): One or more parameters passed to a function were not valid.
+OK social contact while away at court: no relationship change.
+PASS staff combat · initial contact is delayed once and recovery rejects spam
+PASS staff combat · residents telegraph and continue fighting instead of one random counter
+PASS staff combat · directional guard reduces damage and spends stamina
+PASS staff combat · guard cannot block an attack from behind
+PASS staff combat · moving out of reach makes an already telegraphed counter miss
+PASS staff combat · swept knockback stops at authoritative walls
+PASS staff combat · compliance reaches cuffs without a knockout and ends retaliation
+PASS staff combat · shoves break balance and enable a controlled takedown without beating health away
+PASS staff combat · handback cancels queued damage and live encounters never load
+PASS staff combat · officer injuries persist across control toggles and reloads
+PASS staff combat · on-duty personnel nurses heal nearby staff and suspension disables care
+PASS staff combat · paused fights and queries do not advance damage or stamina
+PASS staff combat · a target moving behind the officer cannot pull the queued step-in
+PASS staff combat · contact anchors match resolved space and custody disables two-hand guard
+PASS staff combat · authority takeover cancels pending damage without late retaliation
+PASS staff combat · cloned initial states produce the same fight and physics
+PASS staff combat · ordinary falls recover in stages with free hands and no renewed attack while down
+PASS staff combat · pending outcome holds the telegraph and impact fires once after resolution
+Filtered checks: staff combat
+
+18 passed, 0 failed. These checks exercise the C# core; they do not run Unity.

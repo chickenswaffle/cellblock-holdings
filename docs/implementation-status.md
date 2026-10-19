@@ -2,6 +2,24 @@
 
 This records a working local development milestone, with the broader game still in progress.
 
+## October 19 sustained staff fights and authored contact physics
+
+Staff play now supports repeated resident retaliation, delayed/revalidated hits, directional guard, stamina/balance, shoves, compliance and restraint without a knockout. Swept bounded kinematic impulses use authoritative navigation. Officer injuries persist across control/reload, connect to shift recovery and real nearby nursing care, and can require switching staff. Existing conduct/write-up consequences remain active. [Rules, controls and physics](staff-combat.md).
+
+**481 core checks and41 actual Unity captures pass**; independent critic found no remaining rules blocker. [Evidence and limits](reviews/2026-10-19-staff-combat/README.md), source fingerprint abfe1cf6c75b. Claude retains rig/IK/locomotion/camera/touch. Its e6ad823 was fetched and reviewed, not merged into this rules checkpoint. Guard's visual two-arm pose and exact contact fidelity still need its adapter; strict contacts are not passed. HUD redesign remains paused.
+
+## October 19 joint ActionChoreo version1 handoff
+
+Merged published Claude human bodies7caacf1 (with material-slot recolor correction) and main5d4747f. Codex publishes [ActionChoreo version1](action-choreo-contract.md): paired phases/progress, relative/world roots, named hand/knee/look targets, grips, directional reactions and once-only impact/cuff/lift/fall cues. Covers both-side searches, standing/kneeling/prone cuffs, takedown, escort, strike/counter/shove/grab and assisted get-up. Cuffs settle after the authored track, paused commits resume1x, preparation can cancel safely, and release clears unfinished application. Tight corners use bounded re-position/regrip instead of opposed escort roots.
+
+**463 core checks and27 actual Unity captures pass**, with final source/evidence in [the review](reviews/2026-10-19-action-choreo/README.md). The independent critic accepts the final contract/rules. Contact accuracy is **not passed**: strict contact review correctly fails until Claude's consuming rig adapter registers version1. New assertions measure rendered hand≤3cm at cuff clicks and knee/root≤5cm through prone control/contact. Claude owns FacilityMotion.cs, rig/IK, first-person camera/arms, feedback and touch controls; those sources were not changed in the contract implementation. HUD redesign remains paused. This is the choreography handoff, with physical fidelity and native-device testing still pending joint integration.
+
+## October 19 assisted custody recovery
+
+New six-game-minute Standing phase keeps custody/knockdown and both people stationary until assisted recovery completes. Repeated commands cannot reset it. Removal, authority loss and handback cancel safely, including cleanup of a removed subject's permanent down state. No save-schema or Claude model/quality changes.
+
+Final451/451 core checks and15 focused encounter checks pass. Unity6000.3.24f1 source `68680e44470d` passes the extended17-frame encounter review: prone start, supported seated midpoint, paused midpoint and restored upright hips/model at completion. Independent critic accepts source and actual poses; fractional starts are accounted for and incident pose owners are preserved. The final10-frame quick-action regression also passes:27 final captures with empty errors. Full frames: `Builds/StaffRecoveryReview/2026-10-19/final-68680e44470d`; reports/transcripts and a real midpoint image in `docs/reviews`. No physical-device or seamless-motion claim.
+
 ## October 19 explicit staff encounters and field controls
 
 Core checkpoint `1c23911` passes **447/447 core checks**, including11 new encounter checks. The final presentation source fingerprint is `0a78829f1538`. Staff aim now uses the visible body span and the closest-hit selection rule, commands retain their subject ID, searches reserve their subject and settle at completion, and ground/cuff/escort remains distinct. Ending control clears pending ownership immediately. Existing misconduct, incident authority, contraband and saved accounting remain authoritative. [Controls, state flow and research](staff-encounters.md).

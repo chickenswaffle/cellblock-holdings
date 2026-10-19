@@ -13,7 +13,7 @@ using UnityEngine.Rendering.Universal;
 namespace Cellblock.Editor
 {
     // Claude's staff action-pad review, adapted to the single-editor PresentationPreview runner:
-    //   Unity -batchmode -projectPath <clone> -executeMethod Cellblock.Editor.ActionCapture.Run -logFile <log>
+    //   Write actions (or action-contacts for strict rendered contacts) to Temp/CellblockPresentation.request.
     // A disposable county company: play as an officer, a resident in front, then strike, grab, cuff and walk them.
     // Each frame composites the HUD (rendered into a texture; batchmode reports a 640x480 screen) over the character
     // camera. Every runtime error fails the review. Output: unique Temp/CellblockFeatureReviews folders.
@@ -22,6 +22,8 @@ namespace Cellblock.Editor
     {
         const string StageKey = "Cellblock.Action.Stage", ActiveKey = "Cellblock.Action.Active", WaitKey = "Cellblock.Action.Wait";
         static string Output = "";
+        static ActionChoreoContactChecks contacts;
+        static bool requireContacts;
         internal static bool IsRunning { get { return SessionState.GetBool(ActiveKey, false); } }
         const int Width = 1600, Height = 900;
         static readonly List<string> errors = new List<string>(), notes = new List<string>();
@@ -41,11 +43,12 @@ namespace Cellblock.Editor
             };
         }
         public static void Run() { PresentationPreview.RequestFeatureReview("actions"); }
-        internal static void BeginExisting()
+        internal static void BeginExisting(bool strictContacts = false)
         {
             if (!EditorApplication.isPlaying) throw new InvalidOperationException("Feature review requires the shared Play runner.");
             Output = Path.Combine("Temp/CellblockFeatureReviews", "actions", DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N").Substring(0, 6));
             Directory.CreateDirectory(Output);
+            contacts?.Dispose(); contacts = null; requireContacts = strictContacts;
             errors.Clear(); notes.Clear(); shot = 0;
             SessionState.SetBool(ActiveKey, true); SessionState.SetInt(StageKey, 0);
             SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + 4);
@@ -83,6 +86,7 @@ namespace Cellblock.Editor
                         w.Data.Speed = 0;
                         hud = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32) { name = "Action HUD review" }; hud.Create();
                         game.PreviewUiTarget(hud);
+                        contacts = new ActionChoreoContactChecks(game, errors, notes, requireContacts);
                         Next(1.5f); return;
                     }
                     case 2:
@@ -107,6 +111,7 @@ namespace Cellblock.Editor
                         notes.Add("hints: " + h.Attack + " / " + h.Grab + " / " + h.PickUp + " / " + h.Use + " on " + h.TargetName);
                         if (h.TargetId != targetId) errors.Add("The pad did not target the resident in front: '" + h.TargetName + "'.");
                         Composite(game, "pad-target");
+                        game.PreviewAdvance(0); // Synchronize the rendered actor after staging a new simulation position.
                         game.ActionAttack();
                         notes.Add("strike: " + w.Notice);
                         if (w.StaffActions.Strikes != 1 || !w.ActionBeats.Any(b => b.TargetId == targetId && (b.Kind == "Strike" || b.Kind == "Swing"))) errors.Add("Quick strike did not retain the aimed target: " + w.Notice);
@@ -198,6 +203,7 @@ namespace Cellblock.Editor
         }
         static void Finish(GameController game, bool passed)
         {
+            contacts?.Finish(false); contacts = null; passed &= errors.Count == 0;
             SessionState.SetBool(ActiveKey, false);
             if (game == null) game = UnityEngine.Object.FindFirstObjectByType<GameController>();
             if (game != null) game.PreviewUiTarget(null);

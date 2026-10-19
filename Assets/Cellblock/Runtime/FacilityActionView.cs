@@ -18,14 +18,17 @@ namespace Cellblock.Unity
         readonly Dictionary<string, float> fellAt = new Dictionary<string, float>();
         Transform actionRing; Material actionRingMaterial; World actionWorld;
         float actionClock;
+        Actor staffRisingOfficer, staffRisingSubject;
+        int staffRiseMinute; float staffRiseFraction; string staffRiseSubjectId = "";
 #if UNITY_EDITOR
         public float PreviewActionClock { get { return actionClock; } }
         public float PreviewActionBodyPitch(string id) { Actor a = Live(id); return a == null ? 0 : Vector3.Angle(a.Model.up, a.Root.up); }
+        public float PreviewActionCentre(string id) { Actor a = Live(id); return a == null ? 10 : a.Model.TransformPoint(new Vector3(0, .95f, 0)).y - a.Root.position.y; }
         public float PreviewActionPelvis(string id) { Actor a = Live(id); return a == null ? 10 : a.Body.localPosition.y; }
 #endif
         void ResetActionPresentation()
         {
-            actionWorld = null; actionClock = 0;
+            actionWorld = null; actionClock = 0; staffRisingOfficer = staffRisingSubject = null; staffRiseSubjectId = "";
             liveBeats.Clear(); seenBeats.Clear(); fellAt.Clear();
             if (actionRing != null) actionRing.gameObject.SetActive(false);
         }
@@ -38,12 +41,18 @@ namespace Cellblock.Unity
             actionClock += dt;
             // A paused clock still evaluates its exact pose; it must not leave a newly observed restraint upright.
             float now = actionClock, blend = world.Data.Speed == 0 ? 1 : 1 - Mathf.Exp(-dt * 16);
+            RefreshActionChoreo(world);
             foreach (ActionBeat beat in world.ActionBeats)
                 if (seenBeats.Add(beat)) liveBeats.Add(new LiveBeat { Beat = beat, Start = now });
             liveBeats.RemoveAll(b => now - b.Start > BeatSeconds || (world.Data.Minute - b.Beat.Minute) * .2f > BeatSeconds);
             if (seenBeats.Count > 64) seenBeats.IntersectWith(world.ActionBeats);
 
             Actor officer = world.CharacterKind == "Staff" ? Live(world.CharacterId) : null;
+            if (staffRisingSubject != null && (!world.StaffStandingUp || officer != staffRisingOfficer || world.HeldResidentId != staffRiseSubjectId || world.BusyTarget != world.HeldResidentId))
+            {
+                ReleaseStaffRisePose(staffRisingOfficer); ReleaseStaffRisePose(staffRisingSubject);
+                staffRisingOfficer = staffRisingSubject = null; staffRiseSubjectId = "";
+            }
             // Prisoner mode: the pad belongs to the resident under control, and fights are between residents.
             RefreshActionRing(world, officer ?? (world.InmateMode && world.CharacterId != "" ? Live(world.CharacterId) : null));
 
@@ -92,6 +101,10 @@ namespace Cellblock.Unity
                             ArmPose(held, arm, held.Model.InverseTransformPoint(officer.Body.position + Vector3.up * 0.38f + officer.Root.right * (arm == 0 ? 0.12f : -0.12f)), blend);
                     }
                     else { Torso(held, -4, 0, 0, blend); for (int arm = 0; arm < 2; arm++) { Joint(held.Limbs[arm], new Vector3(-18, 0, arm == 0 ? 14 : -14), blend); Joint(held.Forearms[arm], new Vector3(-40, 0, 0), blend); } }
+                }
+                else if (busy == "Standing" && world.StaffStandingUp)
+                {
+                    StageStaffRise(world, officer, held);
                 }
                 else if (busy == "Cuffing")
                 {
@@ -143,6 +156,50 @@ namespace Cellblock.Unity
             }
 
             foreach (LiveBeat live in liveBeats) StageBeat(world, live, Live(live.Beat.ActorId) ?? officer, now, blend);
+        }
+
+        void StageStaffRise(World world, Actor officer, Actor subject)
+        {
+            int startMinute = world.Data.Minute - Mathf.RoundToInt(world.StaffInteractionProgress * 6);
+            if (staffRisingSubject != subject || staffRisingOfficer != officer || staffRiseMinute != startMinute)
+            {
+                staffRiseMinute = startMinute;
+                staffRiseFraction = world.StaffInteractionProgress < .0001f ? sceneFraction : 0;
+            }
+            staffRisingOfficer = officer; staffRisingSubject = subject; staffRiseSubjectId = world.HeldResidentId;
+            Take(officer, Hold.Body); Take(subject, Hold.Body); officer.PoseArms = subject.PoseArms = true;
+            // Fixed endpoints on the shared game clock: roll up to sitting, gather the legs, then rise with support.
+            float p = Mathf.Clamp01((world.StaffInteractionProgress * 6 + sceneFraction - staffRiseFraction) / Mathf.Max(1, 6 - staffRiseFraction));
+            float sit = Window(p, 0, .4f), rise = Window(p, .4f, 1);
+            float centre = Mathf.Lerp(Mathf.Lerp(.16f, .48f, sit), .95f, rise);
+            float pitch = Mathf.Lerp(Mathf.Lerp(-90, -28, sit), 0, rise);
+            Lay(subject, pitch, centre, Vector3.zero, 1);
+            float fold = Window(p, .04f, .35f) * (1 - rise);
+            for (int leg = 0; leg < 2; leg++)
+            {
+                subject.Limbs[leg + 2].localPosition = new Vector3(subject.Limbs[leg + 2].localPosition.x, HipHeight, 0);
+                Joint(subject.Limbs[leg + 2], new Vector3(-66 * fold, 0, leg == 0 ? -5 : 5), 1);
+                Joint(subject.Knees[leg], new Vector3(108 * fold, 0, 0), 1);
+            }
+            subject.Body.localPosition = new Vector3(0, HipHeight, 0); Torso(subject, 0, 0, 0, 1); BehindBack(subject, 1);
+            float stand = Window(p, .2f, 1);
+            KneelBoth(officer, .82f * (1 - stand), 1); Torso(officer, 20 * (1 - stand), 0, 0, 1);
+            for (int arm = 0; arm < 2; arm++)
+                ArmPose(officer, arm, officer.Model.InverseTransformPoint(subject.Body.position + subject.Root.right * (arm == 0 ? -.22f : .22f) + subject.Model.up * .22f), 1);
+            ResetFootContacts(subject); ResetFootContacts(officer);
+        }
+        void ReleaseStaffRisePose(Actor actor)
+        {
+            if (actor == null || actor.Model == null || heldThisFrame.Contains(actor)) return;
+            // Another incident animator can take ownership first; never erase its pose.
+            heldPoses.Remove(actor); Upright(actor); actor.Body.localPosition = new Vector3(0, HipHeight, 0);
+            actor.Body.localRotation = Quaternion.identity;
+            for (int leg = 0; leg < 2; leg++)
+            {
+                Transform hip = actor.Limbs[leg + 2]; hip.localPosition = new Vector3(hip.localPosition.x, HipHeight, 0);
+                hip.localRotation = Quaternion.identity; actor.Knees[leg].localRotation = Quaternion.identity;
+            }
+            ResetFootContacts(actor); StrideFor(actor).PelvisBase = HipHeight;
         }
 
         // One strike, counter, grab or shove, staged over half a second from the moment the core recorded it.
