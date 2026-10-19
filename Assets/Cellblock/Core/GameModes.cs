@@ -199,7 +199,8 @@ namespace Cellblock.Core
         };
 
         public static ModeTier Tier(string id) { return Tiers.FirstOrDefault(t => t.Id == id); }
-        public static FacilityType Type(string id) { return Types.FirstOrDefault(t => t.Id == id); }
+        // The complete demo prison (DemoPrison.cs) is a start of its own, outside the three-per-tier catalog.
+        public static FacilityType Type(string id) { return id == DemoPrison.TypeId ? DemoPrison.Type : Types.FirstOrDefault(t => t.Id == id); }
         public static ModeLocation Location(string id) { return Locations.FirstOrDefault(l => l.Id == id); }
         public static IEnumerable<FacilityType> TypesFor(string tierId) { return Types.Where(t => t.TierId == tierId); }
         public static IEnumerable<ModeLocation> LocationsFor(string tierId) { ModeTier tier = Tier(tierId); return tier == null ? new ModeLocation[0] : tier.Locations.Select(Location); }

@@ -527,7 +527,7 @@ static partial class Program
             resumed.AdvanceMinutes(1);
             Check(resumed.Data.Crews[0].WorkPhase == "Carrying" && resumed.Data.Crews[0].SupplyLoadMinutes == 3, "Loading discarded a delivered supply batch after handover");
         });
-        RunJusticeChecks(); RunIntegrationChecks(); RunLivesChecks(); RunRoutineChecks(); RunCharacterControlChecks(); RunCharacterPhoneChecks(); RunCharacterInteractionChecks(); RunSecurityChecks(); RunFacilityStoryChecks(); RunIncidentChecks(); RunEscapeChecks(); RunModeStartChecks();RunDirectDoorChecks();RunMealFlowChecks();RunMovementMemoryChecks();
+        RunJusticeChecks(); RunIntegrationChecks(); RunLivesChecks(); RunRoutineChecks(); RunCharacterControlChecks(); RunCharacterPhoneChecks(); RunCharacterInteractionChecks(); RunSecurityChecks(); RunFacilityStoryChecks(); RunIncidentChecks(); RunEscapeChecks(); RunModeStartChecks();RunDemoPrisonChecks();RunDirectDoorChecks();RunMealFlowChecks();RunMovementMemoryChecks();
         RunRearrangementChecks();
         RunStaffInteractionChecks();
         RunActionChoreoChecks();

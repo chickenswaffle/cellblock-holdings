@@ -26,6 +26,7 @@ namespace Cellblock.Core
         {
             void Wall(float ax,float ay,float bx,float by,float door=-1){var wall=Facility.Line(ax,ay,bx,by,door);wall.Id="charter-"+state.NextId++;state.Walls.Add(wall);}
             Fixture Item(string kind,float x,float y,float rotation=0,int level=0){var f=new Fixture{Id="charter-"+state.NextId++,Kind=kind,Position=new Point(x,y),Rotation=rotation,UpgradeLevel=level};state.Fixtures.Add(f);return f;}
+            if(type.Id==DemoPrison.TypeId){DemoPrison.Build(state,type);return;} // the complete prison (Claude)
             bool single=type.Housing=="Single cells",secure=type.Housing=="Secure cells",dorm=type.Housing=="Dormitory";
             if(!single&&!secure&&!dorm)
             {
