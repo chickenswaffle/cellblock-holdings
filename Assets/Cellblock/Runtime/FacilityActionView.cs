@@ -175,13 +175,24 @@ namespace Cellblock.Unity
                     float wind = Window(t, 0, 0.18f), extend = Window(t, 0.18f, 0.32f), back = Window(t, 0.62f, 1f);
                     Vector3 aim = target != null ? target.Head != null ? target.Head.position : target.Body.position + Vector3.up * 0.5f : officer.Body.position + officer.Root.forward * 0.8f + Vector3.up * 0.5f;
                     int strikeArm = beat.Variant % 2; float side = strikeArm == 0 ? -1 : 1;
-                    Vector3 guard = new Vector3(side * .18f, 1.32f, .12f), reach = officer.Model.InverseTransformPoint(aim);
+                    // Land on the face, not inside the skull: the front of the head as seen from the striker.
+                    if (target != null && target.Head != null)
+                    {
+                        Vector3 toward = target.Head.position - officer.Body.position; toward.y = 0;
+                        if (toward.sqrMagnitude > .0001f) aim -= toward.normalized * .09f;
+                    }
+                    // Close the distance: a short step in when the face is past arm's reach (Claude, 2026-10-19).
+                    Vector3 shoulder = officer.Limbs[strikeArm].position; Vector3 gap = aim - shoulder; gap.y = 0;
+                    float stepIn = Mathf.Clamp(gap.magnitude - .56f, 0, .3f);
+                    float lunge = Mathf.Max(beat.Power ? .35f : 0, stepIn) * extend * (1 - back);
+                    // The step carries the arm's frame forward with it, so the reach is measured from where the body ends up.
+                    Vector3 guard = new Vector3(side * .18f, 1.32f, .12f), reach = officer.Model.InverseTransformPoint(aim) - new Vector3(0, 0, lunge);
                     Vector3 fist = Vector3.Lerp(Vector3.Lerp(new Vector3(side * .22f, 1.25f, -.05f), guard, wind), reach, extend * (1 - back));
                     ArmPose(officer, strikeArm, fist, 1);
                     ArmPose(officer, 1 - strikeArm, new Vector3(-side * .16f, 1.34f, .16f), blend);
                     float twist = Mathf.Lerp(-18 * wind, 24, extend) * (1 - back) * side;
                     Torso(officer, beat.Power ? 24 * extend * (1 - back) : 6 + 6 * extend, twist, 0, 1);
-                    if (beat.Power) Offset(officer, Vector3.zero, new Vector3(0, 0, 0.35f * extend * (1 - back)), Quaternion.identity, 1);
+                    if (lunge > .001f) Offset(officer, Vector3.zero, new Vector3(0, 0, lunge), Quaternion.identity, 1);
                     if (!live.Hit && t >= 0.32f && beat.Landed && target != null)
                     {
                         live.Hit = true;
@@ -194,8 +205,9 @@ namespace Cellblock.Unity
                     {
                         float recoil = Window(t, 0.32f, 0.45f) * (1 - Window(t, 0.75f, 1));
                         Take(target, Hold.Upper); target.PoseArms = true;
-                        Torso(target, -16 * recoil, 14 * recoil, 0, 1);
-                        if (target.Head != null) Joint(target.Head, new Vector3(-22 * recoil, 18 * recoil, 0), 1);
+                        // Snapped away from the fist: a right hand turns the head to the target's right, a left to its left.
+                        Torso(target, -16 * recoil, 14 * recoil * -side, 0, 1);
+                        if (target.Head != null) Joint(target.Head, new Vector3(-22 * recoil, 26 * recoil * -side, 9 * recoil * side), 1);
                     }
                     break;
                 }

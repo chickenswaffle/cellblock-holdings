@@ -32,7 +32,7 @@ namespace Cellblock.Editor
         {
             if (mode == "workshop") return WorkshopReport();
             // Codex's projects gallery writes its report into its own folder.
-            string root = mode == "projects" ? "Temp/CellblockConstructionDeskArt" : Path.Combine("Temp/CellblockFeatureReviews", mode);
+            string root = mode == "projects" ? "Temp/CellblockConstructionDeskArt" : mode == "motion" ? "Temp/CellblockNaturalMotion" : Path.Combine("Temp/CellblockFeatureReviews", mode);
             if (!Directory.Exists(root)) return null;
             var launched = new DateTime(long.Parse(SessionState.GetString(LaunchKey, "0")), DateTimeKind.Utc);
             return Directory.GetDirectories(root).Select(d => Path.Combine(d, "report.json")).Where(File.Exists)

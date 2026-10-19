@@ -22,6 +22,8 @@ namespace Cellblock.Unity
             public int ContactRevision = -1;
             public float IdleTime, SpeedVelocity, HeadingVelocity, Clock, Step, Duty, HeadYaw, HeadYawVelocity;
             public Point StandAt; public float StandY = RoomStand; public int StandRevision = -1;
+            // Standing turns (Claude, 2026-10-19): the yaw last asked for, the yaw shown, and how far the head and chest lead.
+            public float TurnTarget, TurnShown, TurnVelocity, TurnLead; public bool Turning, TurnKnown;
         }
         readonly Dictionary<Actor, Stride> strides = new Dictionary<Actor, Stride>();
         readonly Dictionary<string, StaffMember> strideStaff = new Dictionary<string, StaffMember>();
@@ -151,6 +153,7 @@ namespace Cellblock.Unity
                 foreach (Transform ankle in actor.Feet) ankle.localRotation = Quaternion.identity;
                 stride.LastYaw = actor.Root.eulerAngles.y; stride.PelvisBase = actor.Body.localPosition.y; return;
             }
+            StandingTurn(actor, stride, world, moving, dt);
             // Heading: runners commit to turns faster; the yaw rate feeds the bank.
             if (moving)
             {
@@ -207,19 +210,21 @@ namespace Cellblock.Unity
 
             // Lean into speed and acceleration (a spring, so starts tip forward and stops rock back), bank into turns.
             float accel = dt > 0 ? (stride.Pace - stride.LastIntent) / dt : 0; stride.LastIntent = stride.Pace;
-            float leanTarget = Mathf.Lerp(2, Mathf.Lerp(9, 17, sprint), run) * g + Mathf.Clamp(accel * 1.6f, -6, 7) +
+            float leanTarget = Mathf.Lerp(3.5f, Mathf.Lerp(9, 17, sprint), run) * g + Mathf.Clamp(accel * 1.6f, -6, 7) +
                 (style == GaitStyle.Sneak ? 10 : style == GaitStyle.Winded ? 20 : style == GaitStyle.Cuffed ? 8 : 0);
             stride.Lean = Spring(stride.Lean, ref stride.LeanVelocity, leanTarget, 2.2f, dt);
             float bankTarget = Mathf.Clamp(-(yawRate / rate) * Mathf.Min(speed / rate, 6) * 0.012f, -11, 11) * (moving ? 1 : 0);
             stride.Bank = Spring(stride.Bank, ref stride.BankVelocity, bankTarget, 1.8f, dt);
-            float twist = -swing[0] * Mathf.Lerp(4, 9, run) * g;
+            float twist = -swing[0] * Mathf.Lerp(4, 9, run) * g + Mathf.Clamp(stride.TurnLead * .22f, -20, 20);
             if (!actor.PoseArms && style != GaitStyle.Escort)
             {
                 float breathe = moving ? 0 : Mathf.Sin(stride.Clock * 1.6f + IdentitySeed(stride.Id) % 19) * 0.6f;
                 actor.Body.localRotation = Quaternion.Slerp(actor.Body.localRotation, Quaternion.Euler(stride.Lean + breathe, twist, stride.Bank), blend);
-                float armAmplitude = Mathf.Lerp(17, Mathf.Lerp(36, 55, sprint), run) * g * (style == GaitStyle.Winded ? 0.6f : 1);
-                float armBase = -Mathf.Lerp(0, Mathf.Lerp(8, 14, sprint), run);
-                float elbowBase = -Mathf.Lerp(12, Mathf.Lerp(78, 92, sprint), run);
+                // Walking arms hang with a soft elbow and swing from the shoulder; running arms pump from about the hip to
+                // the chest, elbows near 80°, centred slightly behind the body so the hands never ride up in front.
+                float armAmplitude = Mathf.Lerp(22, Mathf.Lerp(34, 50, sprint), run) * g * (style == GaitStyle.Winded ? 0.6f : 1);
+                float armBase = Mathf.Lerp(2, Mathf.Lerp(8, 6, sprint), run);
+                float elbowBase = -Mathf.Lerp(16, Mathf.Lerp(72, 84, sprint), run);
                 for (int arm = 0; arm < 2; arm++)
                 {
                     if (style == GaitStyle.Cuffed) continue;   // the escort view holds the hands behind the back
@@ -236,6 +241,28 @@ namespace Cellblock.Unity
 
         }
         readonly float[] legSwing = new float[2];
+
+        // A standing person turned by anything (facing someone, a routine, a scene that lets go) turns like a person: the
+        // head leads, the chest follows, the hips come round over ~0.4 s and the feet step to keep up (the planted-foot
+        // planner steps when a foot is left twisted). The player's own first-person body turns at once so the eye camera
+        // never swims. Paused: nothing advances.
+        void StandingTurn(Actor actor, Stride stride, World world, bool moving, float dt)
+        {
+            float current = actor.Root.eulerAngles.y;
+            bool own = characterFirstPerson && actor == characterHiddenActor;
+            if (!stride.TurnKnown || moving || own) { stride.TurnKnown = true; stride.TurnTarget = stride.TurnShown = current; stride.TurnVelocity = 0; stride.TurnLead = 0; stride.Turning = false; return; }
+            // Someone else set a new facing this frame: that is the target; the body keeps showing where it was.
+            if (Mathf.Abs(Mathf.DeltaAngle(current, stride.TurnShown)) > .01f) stride.TurnTarget = current;
+            if (world.Data.Speed > 0)
+            {
+                float rate = Mathf.Sqrt(Mathf.Max(1, world.Data.Speed));
+                stride.TurnShown = Mathf.SmoothDampAngle(stride.TurnShown, stride.TurnTarget, ref stride.TurnVelocity, .2f / rate, 260 * rate, dt);
+            }
+            float remaining = Mathf.DeltaAngle(stride.TurnShown, stride.TurnTarget);
+            stride.TurnLead = Mathf.Clamp(remaining, -75, 75);
+            stride.Turning = Mathf.Abs(remaining) > 2;
+            actor.Root.rotation = Quaternion.Euler(0, stride.TurnShown, 0);
+        }
         bool SceneHoldsBody(Stride stride, World world)
         {
             if (!stride.Resolved) return false;

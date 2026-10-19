@@ -29,7 +29,9 @@ namespace Cellblock.Unity
                 pitch = Mathf.Sin(stride.Clock * .8f + seed % 11) * .7f;
             }
             stride.HeadYaw = Spring(stride.HeadYaw, ref stride.HeadYawVelocity, yaw, 2.4f, dt);
-            Quaternion target = Quaternion.Euler(pitch, stride.HeadYaw, -stride.Bank * .55f);
+            // A standing turn: the head leads the hips by part of what is left, applied directly so it never overshoots.
+            float lead = Mathf.Clamp(stride.TurnLead * .3f, -35, 35); // Claude, 2026-10-19
+            Quaternion target = Quaternion.Euler(pitch, stride.HeadYaw + lead, -stride.Bank * .55f);
             actor.Head.localRotation = Quaternion.Slerp(actor.Head.localRotation, target, 1 - Mathf.Exp(-dt * 10));
         }
     }

@@ -87,8 +87,10 @@ namespace Cellblock.Unity
                 {
                     // Once stopped, take alternating small settling steps. Retaining an
                     // old split stance indefinitely leaves the pelvis in a permanent squat.
-                    if (foot.Planted && stride.IdleTime > .25f && stride.Feet[1 - leg].Planted &&
-                        Vector2.Distance(new Vector2(foot.Desired.x, foot.Desired.z), new Vector2(neutral.x, neutral.z)) > .065f)
+                    // A standing turn steps as soon as a foot is left twisted or out of place (one foot at a time).
+                    bool twisted = Quaternion.Angle(foot.Rotation, actor.Root.rotation) > 22;
+                    if (foot.Planted && (stride.IdleTime > .25f || stride.Turning || twisted) && stride.Feet[1 - leg].Planted &&
+                        (twisted || Vector2.Distance(new Vector2(foot.Desired.x, foot.Desired.z), new Vector2(neutral.x, neutral.z)) > .065f))
                     {
                         foot.Planted = false; foot.Stopping = true; foot.Correcting = false; foot.Progress = 0;
                         foot.LiftFrom = foot.Desired; foot.Landing = neutral;
@@ -113,7 +115,10 @@ namespace Cellblock.Unity
                 // Abrupt reversals need a small recovery step, not a stretched/crossed leg.
                 Vector3 relative = actor.Model.InverseTransformPoint(foot.Desired);
                 Vector2 horizontal = new Vector2(relative.x - side, relative.z);
-                if (moving && foot.Planted && (horizontal.magnitude > .42f || Mathf.Abs(relative.x - side) > .23f))
+                // A planted foot the body has turned across its own midline steps out at once (people step out of a turn
+                // with the outside foot rather than scissoring their legs). Claude, 2026-10-19.
+                bool crossed = side * relative.x < -.01f;
+                if (moving && foot.Planted && (horizontal.magnitude > .42f || Mathf.Abs(relative.x - side) > .23f || crossed))
                 {
                     foot.Planted = false; foot.Correcting = true; foot.Progress = 0; foot.LiftFrom = foot.Desired;
                     foot.Duration = recoveryDuration;
