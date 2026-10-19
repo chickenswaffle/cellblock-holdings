@@ -1,5 +1,7 @@
 LATEST HANDOFF — SUSTAINED STAFF COMBAT (2026-10-19)
 
+Published implementation: 6b9d0fda2b7e4b093e7ba0b1c0705722629e7e64 on origin/codex/live-operations-handoff. Final481 core and41 Play captures pass; rig/contact fidelity remains outstanding. Mac ordinary Play/Home restored; local locks released.
+
 Fetch/merge origin/codex/live-operations-handoff, preserving your current work. Read docs/staff-combat.md, docs/action-choreo-contract.md and newest Codex COORDINATION entry. Staff combat now has repeated resident retaliation, delayed/revalidated contact, directional guard, stamina/balance, swept bounded impulses, compliant arrest and persistent officer injuries. Core owns the encounter, contact step-in and consequences. No rig/camera/touch files were changed.
 
 Your e6ad823 controls/locomotion snapshot was fetched and source-reviewed, NOT merged into this rules checkpoint. When combining it, remove/disable its provisional render step-in after RootAlreadyAligned or the officer will step twice. Preserve your new floating movement pad/swipe look/pinch work. Keep ownership of FacilityMotion, rig/IK, first-person arms/camera, impact feedback and touch bindings. HUD redesign remains paused.
