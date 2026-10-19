@@ -97,6 +97,8 @@ namespace Cellblock.Unity
             status = Panel("status");
             instruction = Text("", "instruction"); placement = Text("", "placement"); notice = Text("", "notice");
             status.Add(instruction); status.Add(placement); status.Add(notice);
+            // Read-only cards never swallow a world drag or pinch: only their buttons take touches.
+            status.pickingMode = PickingMode.Ignore; foreach (VisualElement label in status.Children()) label.pickingMode = PickingMode.Ignore;
             BuildQuote();
             menu = Panel("menu"); menu.style.display = DisplayStyle.None;
             guide = Panel("guide-overlay"); guide.style.display = DisplayStyle.None;
@@ -475,6 +477,7 @@ namespace Cellblock.Unity
         }
 
         Label directDoorHint;
+        string noticeShown; float noticeSince; const float NoticeSeconds = 8;
 #if UNITY_EDITOR
         public string PreviewDoorLayout {get{return "Quote "+quote.worldBound+" / approve "+approve.worldBound+" / viewport "+root.worldBound;}}
         public bool PreviewDoorControlsFit()
@@ -553,6 +556,10 @@ namespace Cellblock.Unity
             float scale = Screen.width > 0 ? root.resolvedStyle.width / Screen.width : 1;
             float left = Mathf.Max(12, safe.xMin * scale + 10), right = Mathf.Max(12, (Screen.width - safe.xMax) * scale + 10);
             float top = Mathf.Max(12, (Screen.height - safe.yMax) * scale + 10), bottom = Mathf.Max(12, safe.yMin * scale + 10);
+#if UNITY_EDITOR
+            // HUD audit: a device's safe-area insets (panel points: left, right, top, bottom); the editor reports none.
+            if (PreviewSafeInsets != Vector4.zero) { left = PreviewSafeInsets.x + 10; right = PreviewSafeInsets.y + 10; top = Mathf.Max(12, PreviewSafeInsets.z + 10); bottom = Mathf.Max(12, PreviewSafeInsets.w + 10); }
+#endif
             float headerHeight = compact ? 76 : 82, navTop = top + headerHeight + 8;
             header.style.left = left; header.style.right = right; header.style.top = top; header.style.height = headerHeight;
             navigation.style.left = left; navigation.style.right = right; navigation.style.top = navTop;
@@ -608,6 +615,11 @@ namespace Cellblock.Unity
             LayoutIncidentHud(left, right, top, bottom, menuOpen || InteractionModalOpen || guideOpen || game.CharacterViewActive || game.RideAlongActive || game.Draft != null || (compact && inspectorOpen));
         }
 
+#if UNITY_EDITOR
+        public static Vector4 PreviewSafeInsets;
+        public void PreviewCloseWorkspace() { inspectorOpen = false; cameraOpen = false; Layout(); }
+        public VisualElement PreviewRoot { get { return root; } }
+#endif
         public bool IsOverUI(Vector2 screen)
         {
             if (BlocksWorldInput) return true;
@@ -752,10 +764,16 @@ namespace Cellblock.Unity
             instruction.text = game.Tool == BuildTool.Inspect
                 ? "Drag to pan  ·  Drag a selected item to move it  ·  Arrows / WASD  ·  Right drag to orbit  ·  Pinch / scroll to zoom"
                 : game.Instruction;
-            if ((Application.isMobilePlatform || game.ActiveControlDevice == ControlDevice.Touch) && game.Tool == BuildTool.Inspect) instruction.text = "Drag to pan  ·  Drag a selected item to move it  ·  Pinch to zoom  ·  Twist to orbit";
+            // Touch: the gestures are taught by the Guide, not a permanent card over the world.
+            if ((Application.isMobilePlatform || game.ActiveControlDevice == ControlDevice.Touch) && game.Tool == BuildTool.Inspect) instruction.text = "";
+            instruction.style.display = instruction.text == "" ? DisplayStyle.None : DisplayStyle.Flex;
             if (game.ActiveControlDevice == ControlDevice.Gamepad && game.Tool == BuildTool.Inspect) instruction.text = "L stick move  ·  R stick orbit  ·  LT / RT zoom  ·  LB / RB speed  ·  D-pad buttons  ·  Start pause  ·  Select Holdings";
             placement.text = game.PlacementSummary; placement.style.display = string.IsNullOrEmpty(game.PlacementSummary) ? DisplayStyle.None : DisplayStyle.Flex;
-            notice.text = world.Notice; notice.style.display = string.IsNullOrEmpty(world.Notice) ? DisplayStyle.None : DisplayStyle.Flex;
+            // Notices are news, not furniture: shown when they change, then folded away (the journal keeps them).
+            if (world.Notice != noticeShown) { noticeShown = world.Notice; noticeSince = Time.unscaledTime; }
+            bool noticeFresh = !string.IsNullOrEmpty(world.Notice) && Time.unscaledTime - noticeSince < NoticeSeconds;
+            notice.text = world.Notice; notice.style.display = noticeFresh ? DisplayStyle.Flex : DisplayStyle.None;
+            status.EnableInClassList("status-empty", instruction.style.display == DisplayStyle.None && placement.style.display == DisplayStyle.None && !noticeFresh);
             bool company = workspace == Workspace.Company;
             sectionTitle.text = workspace == Workspace.Pressure ? "PRESSURE / OVERLOAD" : workspace == Workspace.Control ? "CONTROL / LIVE OPERATIONS" : company ? "COMPANY / ACCOUNTS" : workspace == Workspace.Build ? "BUILD / CATALOG" : workspace == Workspace.People ? "PEOPLE / CULTURE" : "FACILITY / OPERATIONS";
             FixtureDefinition selectedFixture = game.SelectedFixture != null ? FixtureCatalog.Get(game.SelectedFixture.Kind) : null;

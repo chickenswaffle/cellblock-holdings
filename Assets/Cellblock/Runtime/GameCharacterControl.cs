@@ -125,6 +125,8 @@ namespace Cellblock.Unity
             if (!World.BeginCharacterControl(canonical)) { hud.Refresh(true); return false; }
             CaptureCharacterCamera(); characterViewWorld = World; characterViewId = canonical;
             if (newSnapshot) characterSnapshot.Speed = previousSpeed;
+            // Taking direct control means acting now: a paused facility resumes at 1× (it is restored on return).
+            if (World.Data.Speed == 0 && !World.InmateMode) World.Data.Speed = 1;
             characterPerspective = CharacterPerspective.ThirdPerson; characterPitch = characterThirdPitch = CharacterThirdPitch;
             characterFirstPitch = 4; characterBoom = CharacterThirdBoom;
             characterYaw = Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg; characterCameraReady = false;
@@ -132,7 +134,7 @@ namespace Cellblock.Unity
             World.ReleaseRole();
             if (role == "Prisoner" || role == "Officer" || role == "Warden" || role == "Cook") World.TakeRole(canonical);
             SelectCharacterForView(canonical); ApplyCharacterHeight(); ClearCharacterInput(); accumulator = 0;
-            Message("Playing as " + label + ". " + (controlDevice == ControlDevice.Gamepad ? "Sticks move and look · face buttons act · RB view · Select phone · D-pad ← returns." : controlDevice == ControlDevice.Touch ? "Left stick moves · swipe to look · buttons act." : "WASD moves · the mouse looks · click strikes · right click / E opens actions · V view · P phone · Esc frees the cursor.") + (World.Data.Speed == 0 ? " Paused: press Space or Resume to walk." : ""));
+            Message("Playing as " + label + ". " + (controlDevice == ControlDevice.Gamepad ? "Sticks move and look · face buttons act · RB view · Select phone · D-pad ← returns." : controlDevice == ControlDevice.Touch ? "Left stick moves · swipe to look · buttons act." : "WASD moves · the mouse looks · click strikes · right click / E opens actions · V view · P phone · Esc frees the cursor.") + (World.Data.Speed == 0 ? (controlDevice == ControlDevice.Touch ? " Paused: tap Resume to walk." : " Paused: press Space or Resume to walk.") : ""));
             hud.Refresh(true); return true;
         }
 

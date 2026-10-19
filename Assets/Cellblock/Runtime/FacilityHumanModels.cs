@@ -22,7 +22,7 @@ namespace Cellblock.Unity
         {
             public GameObject Prefab; public string[] BoneNames; public Transform RootBoneTemplate;
             public readonly Dictionary<string, Mesh> Regions = new Dictionary<string, Mesh>();
-            public Mesh Eyes, Brows; public string[] EyeBones, BrowBones, FaceBones; public float Scale; public bool Female, HasEyes, HasBrows, Baked;
+            public Mesh Eyes, Brows; public string[] EyeBones, BrowBones, FaceBones; public float Scale; public bool Female, HasEyes, HasBrows, HasLids, Baked;
         }
         sealed class HumanRig
         {
@@ -33,7 +33,7 @@ namespace Cellblock.Unity
             public readonly List<Finger>[] Fingers = { new List<Finger>(), new List<Finger>() };
             public readonly float[] Curl = { .25f, .25f };
             public float SoleRest; // ankle pivot height (model space) when standing
-            public SkinnedMeshRenderer Body, Face; public Mesh BodyNear, BodyFar, FaceNear, FaceFar; public bool Far, WantFar;
+            public SkinnedMeshRenderer Body, Face; public Mesh BodyNear, BodyFar, FaceNear, FaceFar; public bool Far, WantFar, Lids; public float LidWeight = -1;
         }
         sealed class Finger { public Transform Bone; public Quaternion Rest; public Vector3 Axis; public float Max; public bool Thumb; }
         readonly Dictionary<string, BodyTemplate> bodyTemplates = new Dictionary<string, BodyTemplate>();
@@ -48,7 +48,7 @@ namespace Cellblock.Unity
         static float FarBelow { get { return PresentationQuality.Current == PresentationQuality.Tier.High ? .10f : PresentationQuality.Current == PresentationQuality.Tier.Medium ? .16f : .24f; } }
 #if UNITY_EDITOR
         public static bool PreviewForceFar; // review: draw everyone with the distance meshes
-        public static float PreviewCurl = -1; // review: force every hand to one curl (0 open, .25 relaxed, .82 grip, 1 fist)
+        public static float PreviewCurl = -1, PreviewBlink = -1; // review: force every hand to one curl (0 open, .25 relaxed, .82 grip, 1 fist); every lid to one closure (0 open, 1 shut)
         public static int GeneratedHumanMeshes { get { return Resources.FindObjectsOfTypeAll<Mesh>().Count(m => m.name.StartsWith("Human ")); } }
 #endif
 
@@ -107,6 +107,7 @@ namespace Cellblock.Unity
                 if (t.Brows != null) faceParts.Add((t.Brows, t.BrowBones));
                 t.Regions["face"] = Merge("Human face", faceParts.ToArray(), out t.FaceBones);
                 t.HasEyes = t.Eyes != null; t.HasBrows = t.Brows != null;
+                if (t.HasEyes) t.HasLids = AddEyelids(t.Regions["face"], 1, System.Array.IndexOf(t.FaceBones, "Head"), body.transform.InverseTransformDirection(Vector3.up).normalized);
                 foreach (string region in new[] { "head", "skin", "top", "topshort", "skinshort", "bottom", "belt", "shoes" }) { Release(t.Regions[region]); t.Regions.Remove(region); }
                 // Distance versions (about a third of the triangles) for people who are small on screen.
                 var reduceTimer = System.Diagnostics.Stopwatch.StartNew();
@@ -127,7 +128,7 @@ namespace Cellblock.Unity
 #else
         public static bool UseBakedHumans = true;
 #endif
-        const int HumanBakeVersion = 1;
+        const int HumanBakeVersion = 2;
         static readonly string[] BakedMeshes = { "body", "bodyshort", "face", "body-far", "bodyshort-far", "face-far" };
         static bool LoadBaked(BodyTemplate t, string key)
         {
@@ -144,7 +145,7 @@ namespace Cellblock.Unity
             }
             t.Scale = float.Parse(lines[1].Trim(), System.Globalization.CultureInfo.InvariantCulture);
             t.BoneNames = lines[2].Trim().Split(','); t.FaceBones = lines[3].Trim().Split(',');
-            t.HasEyes = lines[4].Contains("eyes"); t.HasBrows = lines[4].Contains("brows");
+            t.HasEyes = lines[4].Contains("eyes"); t.HasBrows = lines[4].Contains("brows"); t.HasLids = lines[4].Contains("lids");
             foreach (var pair in meshes) t.Regions[pair.Key] = pair.Value;
             t.Baked = true; return true;
         }
@@ -156,7 +157,7 @@ namespace Cellblock.Unity
             meta = null; if (t.Prefab == null) return null;
             Prepare(t, female ? "female" : "male");
             if (t.Prefab == null || BakedMeshes.Any(n => !t.Regions.ContainsKey(n))) return null;
-            meta = "v" + HumanBakeVersion + "\n" + t.Scale.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "\n" + string.Join(",", t.BoneNames) + "\n" + string.Join(",", t.FaceBones) + "\n" + (t.HasEyes ? "eyes " : "") + (t.HasBrows ? "brows" : "") + "\n";
+            meta = "v" + HumanBakeVersion + "\n" + t.Scale.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "\n" + string.Join(",", t.BoneNames) + "\n" + string.Join(",", t.FaceBones) + "\n" + (t.HasEyes ? "eyes " : "") + (t.HasBrows ? "brows " : "") + (t.HasLids ? "lids" : "") + "\n";
             return BakedMeshes.ToDictionary(n => n, n => t.Regions[n]);
         }
         // Review: the rig bound for this person carries their id (finger routing from action beats needs it), and what
@@ -429,6 +430,104 @@ namespace Cellblock.Unity
             bones = names.ToArray(); return merged;
         }
 
+        // Eyelids (Claude, 2026-10-19). The pack's faces have no lid bones or blend shapes, so each eye gets a thin skin
+        // shell just outside its eyeball (sphere fitted to the eye vertices), skinned to the head, with one "blink" blend
+        // shape. At rest every row lies folded on the upper rim (zero area, nothing drawn); closed, the rows spread down
+        // over the eye like an upper lid. In-between frames keep the lid on the sphere rather than cutting through the eye.
+        static bool AddEyelids(Mesh face, int eyeSubmesh, int headBone, Vector3 up)
+        {
+            if (headBone < 0 || face.subMeshCount <= eyeSubmesh) return false;
+            Vector3[] v = face.vertices;
+            var eye = new HashSet<int>(face.GetTriangles(eyeSubmesh)); var skin = new HashSet<int>(face.GetTriangles(0));
+            if (eye.Count < 32 || skin.Count == 0) return false;
+            Vector3 head = Average(skin.Select(i => v[i])), eyes = Average(eye.Select(i => v[i]));
+            Vector3 forward = Vector3.ProjectOnPlane(eyes - head, up).normalized, side = Vector3.Cross(up, forward).normalized;
+            if (forward.sqrMagnitude < .5f) return false;
+            Vector2[] uv = face.uv;
+            var pos = new List<Vector3>(); var nor = new List<Vector3>(); var tan = new List<Vector4>(); var tex = new List<Vector2>();
+            var closedPos = new List<Vector3>(); var tris = new List<int>();
+            const int Columns = 14, Rows = 7; const int Frames = 4;
+            const float Across = 58 * Mathf.Deg2Rad, Top = 52 * Mathf.Deg2Rad, Bottom = -30 * Mathf.Deg2Rad;
+            var frames = new List<Vector3>[Frames]; for (int k = 0; k < Frames; k++) frames[k] = new List<Vector3>();
+            float lastRadius = 0; Vector3 lastCentre = Vector3.zero;
+            foreach (int s in new[] { -1, 1 })
+            {
+                var points = eye.Where(i => Mathf.Sign(Vector3.Dot(v[i] - eyes, side)) == s).Select(i => v[i]).ToList();
+                Vector3 c; float r;
+                if (points.Count < 16 || !FitSphere(points, out c, out r)) return false;
+                // A sane eyeball: smaller than the gap between the eyes, and in front of the head's centre.
+                if (lastRadius > 0 && (Mathf.Abs(r / lastRadius - 1) > .25f || (c - lastCentre).magnitude < 2 * r)) return false;
+                if (Vector3.Dot(c - head, forward) <= 0) return false;
+                lastRadius = r; lastCentre = c;
+                float R = r * 1.035f;
+                Vector3 On(float theta, float phi) { return c + R * (Mathf.Cos(phi) * (Mathf.Cos(theta) * forward + Mathf.Sin(theta) * side) + Mathf.Sin(phi) * up); }
+                // Skin tone from the upper-lid crease under the brow (the lid rim itself is painted pink, inner lid).
+                Vector3 lidSkin = c + R * (.6f * forward + 1.35f * up);
+                int nearest = skin.OrderBy(i => (v[i] - lidSkin).sqrMagnitude).First();
+                int start = v.Length + pos.Count;
+                for (int row = 0; row < Rows; row++) for (int column = 0; column <= Columns; column++)
+                {
+                    float theta = Mathf.Lerp(-Across, Across, column / (float)Columns), shut = Mathf.Lerp(Top, Bottom, row / (float)(Rows - 1));
+                    Vector3 rest = On(theta, Top); pos.Add(rest); nor.Add((rest - c).normalized);
+                    Vector3 along = -Mathf.Sin(theta) * forward + Mathf.Cos(theta) * side; tan.Add(new Vector4(along.x, along.y, along.z, 1));
+                    tex.Add(uv.Length == v.Length ? uv[nearest] : Vector2.zero);
+                    for (int k = 0; k < Frames; k++) frames[k].Add(On(theta, Mathf.Lerp(Top, shut, (k + 1) / (float)Frames)));
+                }
+                for (int row = 0; row < Rows - 1; row++) for (int column = 0; column < Columns; column++)
+                {
+                    int a = start + row * (Columns + 1) + column, b = a + 1, d = a + Columns + 1, e = d + 1;
+                    // Outward facing, checked on the closed lid.
+                    Vector3 pa = frames[Frames - 1][a - v.Length], pb = frames[Frames - 1][b - v.Length], pd = frames[Frames - 1][d - v.Length];
+                    bool outward = Vector3.Dot(Vector3.Cross(pb - pa, pd - pa), pa - c) > 0;
+                    if (outward) { tris.Add(a); tris.Add(b); tris.Add(d); tris.Add(b); tris.Add(e); tris.Add(d); }
+                    else { tris.Add(a); tris.Add(d); tris.Add(b); tris.Add(b); tris.Add(d); tris.Add(e); }
+                }
+            }
+            var allPos = new List<Vector3>(v); allPos.AddRange(pos);
+            var allNor = new List<Vector3>(); face.GetNormals(allNor); allNor.AddRange(nor);
+            var allTan = new List<Vector4>(); face.GetTangents(allTan); allTan.AddRange(tan);
+            var allUv = new List<Vector2>(); face.GetUVs(0, allUv); allUv.AddRange(tex);
+            var weights = face.boneWeights.ToList(); weights.AddRange(pos.Select(_ => new BoneWeight { boneIndex0 = headBone, weight0 = 1 }));
+            if (allNor.Count != allPos.Count || allTan.Count != allPos.Count || allUv.Count != allPos.Count || weights.Count != allPos.Count) return false;
+            if (allPos.Count > 65000) face.indexFormat = IndexFormat.UInt32;
+            face.SetVertices(allPos); face.SetNormals(allNor); face.SetTangents(allTan); face.SetUVs(0, allUv); face.boneWeights = weights.ToArray();
+            int lidSubmesh = face.subMeshCount; face.subMeshCount = lidSubmesh + 1; face.SetTriangles(tris, lidSubmesh);
+            for (int k = 0; k < Frames; k++)
+            {
+                var dv = new Vector3[allPos.Count]; var dn = new Vector3[allPos.Count];
+                for (int i = 0; i < pos.Count; i++) dv[v.Length + i] = frames[k][i] - pos[i];
+                face.AddBlendShapeFrame("blink", 100f * (k + 1) / Frames, dv, dn, null);
+            }
+            face.RecalculateBounds();
+            return true;
+        }
+        static Vector3 Average(IEnumerable<Vector3> points) { Vector3 sum = Vector3.zero; int n = 0; foreach (Vector3 p in points) { sum += p; n++; } return n == 0 ? sum : sum / n; }
+        // Least-squares sphere: |p|^2 = 2 c.p + k, solved about the points' mean for conditioning.
+        static bool FitSphere(List<Vector3> points, out Vector3 centre, out float radius)
+        {
+            Vector3 mean = Average(points); var m = new double[4, 5];
+            foreach (Vector3 q in points)
+            {
+                Vector3 p = q - mean; double[] row = { 2 * p.x, 2 * p.y, 2 * p.z, 1 }; double y = p.sqrMagnitude;
+                for (int i = 0; i < 4; i++) { for (int j = 0; j < 4; j++) m[i, j] += row[i] * row[j]; m[i, 4] += row[i] * y; }
+            }
+            for (int col = 0; col < 4; col++)
+            {
+                int pivot = col; for (int r2 = col + 1; r2 < 4; r2++) if (System.Math.Abs(m[r2, col]) > System.Math.Abs(m[pivot, col])) pivot = r2;
+                if (System.Math.Abs(m[pivot, col]) < 1e-14) { centre = mean; radius = 0; return false; }
+                for (int j = 0; j < 5; j++) { double swap = m[col, j]; m[col, j] = m[pivot, j]; m[pivot, j] = swap; }
+                for (int r2 = 0; r2 < 4; r2++)
+                {
+                    if (r2 == col) continue; double f = m[r2, col] / m[col, col];
+                    for (int j = col; j < 5; j++) m[r2, j] -= f * m[col, j];
+                }
+            }
+            double cx = m[0, 4] / m[0, 0], cy = m[1, 4] / m[1, 1], cz = m[2, 4] / m[2, 2], k = m[3, 4] / m[3, 3];
+            double r2sum = k + cx * cx + cy * cy + cz * cz;
+            centre = mean + new Vector3((float)cx, (float)cy, (float)cz); radius = r2sum > 0 ? (float)System.Math.Sqrt(r2sum) : 0;
+            return radius > 0 && !float.IsNaN(radius);
+        }
+
         static Transform Find(Transform root, string name)
         {
             if (root.name == name) return root;
@@ -451,6 +550,17 @@ namespace Cellblock.Unity
             if (normal != null) { value.SetTexture("_BumpMap", normal); value.SetFloat("_BumpScale", .8f); value.EnableKeyword("_NORMALMAP"); }
             if (mask != null) { value.SetTexture("_MetallicGlossMap", mask); value.SetTexture("_OcclusionMap", mask); value.SetFloat("_Smoothness", 1); value.EnableKeyword("_METALLICSPECGLOSSMAP"); value.EnableKeyword("_OCCLUSIONMAP"); }
             value.SetFloat("_DetailAlbedoMapScale", 0);
+            materials[name] = value; return value;
+        }
+        // The lids sample one skin texel, so they miss the occlusion the mask paints into the socket around them and
+        // would read pale and glossy against it: the same skin, shaded down to the socket's level.
+        Material LidMaterial(Material skin)
+        {
+            string name = skin.name + "-lid";
+            Material value; if (materials.TryGetValue(name, out value)) return value;
+            Color tone = skin.color * .58f; tone.a = 1;
+            value = new Material(skin) { name = name, color = tone };
+            value.SetFloat("_Smoothness", .45f);
             materials[name] = value; return value;
         }
         Material HairMaterial(int style, Color color)
@@ -502,7 +612,7 @@ namespace Cellblock.Unity
             SkinnedMeshRenderer bodyRenderer = Skin(instance.transform, "Body", t.Regions[bodyKey], skeleton, pelvis, top, trousers, staff ? shoes : trousers, shoes, skinMaterial);
             // The head (and hair, eyes, brows) live under the gaze pivot so first person hides them from your own eyes.
             Color hairColor = seed % 5 == 0 ? new Color(.30f, .29f, .27f) : seed % 3 == 0 ? new Color(.17f, .12f, .08f) : new Color(.07f, .06f, .055f);
-            var faceMaterials = new List<Material> { skinMaterial }; if (t.HasEyes) faceMaterials.Add(EyeMaterial()); if (t.HasBrows) faceMaterials.Add(HairMaterial(1, hairColor));
+            var faceMaterials = new List<Material> { skinMaterial }; if (t.HasEyes) faceMaterials.Add(EyeMaterial()); if (t.HasBrows) faceMaterials.Add(HairMaterial(1, hairColor)); if (t.HasLids) faceMaterials.Add(LidMaterial(skinMaterial));
             SkinnedMeshRenderer faceRenderer = Skin(actor.Head, "Head", t.Regions["face"], t.FaceBones.Select(n => bones.ContainsKey(n) ? bones[n] : null).ToArray(), pelvis, faceMaterials.ToArray());
             string[] styles = female ? new[] { "Hair_Buns", "Hair_Long", "Hair_BuzzedFemale" } : staff ? new[] { "Hair_SimpleParted", "Hair_Buzzed", "Hair_SimpleParted", "" } : new[] { "Hair_Buzzed", "Hair_Buzzed", "Hair_SimpleParted", "", "Hair_Buzzed" };
             string style = styles[seed / 7 % styles.Length];
@@ -522,7 +632,7 @@ namespace Cellblock.Unity
                 HumanRig rig = humanRigs[humanRigs.Count - 1];
                 if (rig.Id != id) Debug.LogError("Human rig bound with id '" + rig.Id + "' for actor " + id + ".");
                 rig.Body = bodyRenderer; rig.BodyNear = t.Regions[bodyKey]; rig.BodyFar = t.Regions[bodyKey + "-far"];
-                rig.Face = faceRenderer; rig.FaceNear = t.Regions["face"]; rig.FaceFar = t.Regions["face-far"];
+                rig.Face = faceRenderer; rig.FaceNear = t.Regions["face"]; rig.FaceFar = t.Regions["face-far"]; rig.Lids = t.HasLids;
             }
             RefitHeadwear(actor, bones["head"]);
             if (humanDriver == null) { humanDriver = people.gameObject.AddComponent<HumanRigDriver>(); humanDriver.View = this; }
@@ -789,8 +899,20 @@ namespace Cellblock.Unity
         {
             foreach (HumanRig rig in humanRigs)
             {
-                if (rig.WantFar == rig.Far || rig.Body == null || rig.Face == null) continue;
-                rig.Far = rig.WantFar; rig.Body.sharedMesh = rig.Far ? rig.BodyFar : rig.BodyNear; rig.Face.sharedMesh = rig.Far ? rig.FaceFar : rig.FaceNear;
+                if (rig.Body == null || rig.Face == null) continue;
+                if (rig.WantFar != rig.Far)
+                {
+                    rig.Far = rig.WantFar; rig.Body.sharedMesh = rig.Far ? rig.BodyFar : rig.BodyNear; rig.Face.sharedMesh = rig.Far ? rig.FaceFar : rig.FaceNear;
+                    rig.LidWeight = -1;
+                }
+                // Blinks follow the shared face-motion clock (the procedural lid overlay's closure); distance faces have
+                // no lids to move. Only changes are written: an unchanged zero weight costs the skinning nothing.
+                if (!rig.Lids || rig.Far || rig.Actor.Blink == null) continue;
+                float lid = Mathf.Round(Mathf.Clamp01(rig.Actor.Blink.localScale.y) * 100);
+#if UNITY_EDITOR
+                if (PreviewBlink >= 0) lid = PreviewBlink * 100;
+#endif
+                if (lid != rig.LidWeight) { rig.Face.SetBlendShapeWeight(0, lid); rig.LidWeight = lid; }
             }
         }
 
