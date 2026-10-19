@@ -39,6 +39,7 @@ namespace Cellblock.Unity
                 float yaw = Mathf.LerpAngle(root.eulerAngles.y, frame.Root.Yaw, ease * Mathf.Clamp01(frame.Root.Weight));
                 root.rotation = Quaternion.Euler(0, yaw, 0);
             }
+            foreach (ActionChoreoFrame published in choreoFrames.Values) CollectHits(published); // FacilityHitReactions.cs
             // Posture from the frame, so the targets are within reach of a natural body (IK then closes only the
             // remainder): kneel on the right knee to put it on the shoulder blade, crouch or kneel as hinted, lean, and
             // bring the arms toward their targets so elbows bend as people's do.
@@ -103,6 +104,7 @@ namespace Cellblock.Unity
                     if (target.Active && TryResolveActionChoreoTarget(target, out point)) ArmPose(a, side, a.Model.InverseTransformPoint(point), settle * Mathf.Clamp01(target.Weight));
                 }
             }
+            ApplyHitReactions(); // on top of this frame's posture, once per frame (FacilityHitReactions.cs)
         }
         // The least forward lean (from `least` up to 78°) that brings both shoulders within arm's reach of their targets.
         // Shoulders turn toward the hands' work (up to 45°): the far hand is then within reach too.
