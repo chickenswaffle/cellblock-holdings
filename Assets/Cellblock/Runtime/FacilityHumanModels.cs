@@ -33,13 +33,14 @@ namespace Cellblock.Unity
             public readonly List<Finger>[] Fingers = { new List<Finger>(), new List<Finger>() };
             public readonly float[] Curl = { .25f, .25f };
             public float SoleRest; // ankle pivot height (model space) when standing
-            public SkinnedMeshRenderer Body, Face; public Mesh BodyNear, BodyFar, FaceNear, FaceFar; public bool Far;
+            public SkinnedMeshRenderer Body, Face; public Mesh BodyNear, BodyFar, FaceNear, FaceFar; public bool Far, WantFar;
         }
         sealed class Finger { public Transform Bone; public Quaternion Rest; public Vector3 Axis; public float Max; public bool Thumb; }
         readonly Dictionary<string, BodyTemplate> bodyTemplates = new Dictionary<string, BodyTemplate>();
         readonly List<HumanRig> humanRigs = new List<HumanRig>();
         HumanRigDriver humanDriver;
-        public static bool HumanModelsEnabled = true;
+        // -cellblockNoHumanModels (Claude's batch runs): keep the procedural bodies, to A/B a review or a cost.
+        public static bool HumanModelsEnabled = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-cellblockNoHumanModels") < 0;
         public static double TemplateMilliseconds; // time spent preparing bodies (clothing, merge, distance meshes)
         // Distance meshes: triangle share kept, and the on-screen height (fraction of the screen) below which a person
         // switches to them — earlier on lower tiers. 15% hysteresis so nobody flickers at the boundary.
@@ -158,6 +159,10 @@ namespace Cellblock.Unity
             meta = "v" + HumanBakeVersion + "\n" + t.Scale.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "\n" + string.Join(",", t.BoneNames) + "\n" + string.Join(",", t.FaceBones) + "\n" + (t.HasEyes ? "eyes " : "") + (t.HasBrows ? "brows" : "") + "\n";
             return BakedMeshes.ToDictionary(n => n, n => t.Regions[n]);
         }
+        // Review: the rig bound for this person carries their id (finger routing from action beats needs it), and what
+        // each hand is heading for right now (0 open, .25 relaxed, .82 grip, 1 fist).
+        public bool PreviewRigBound(string id) { return humanRigs.Any(r => r.Id == id && r.Actor.Root != null && r.Actor.Root.name.EndsWith(id)); }
+        public float PreviewHandTarget(string id, int side) { HumanRig rig = humanRigs.FirstOrDefault(r => r.Id == id); return rig == null ? -1 : HandTarget(rig, side, presentedWorld); }
         public void PreviewResetHumanTemplates() { DisposeHumanModels(); }
         public static int PreviewBakedTemplates(FacilityView view) { return view.bodyTemplates.Values.Count(t => t.Baked); }
 #endif
@@ -511,10 +516,11 @@ namespace Cellblock.Unity
                 r.forceRenderingOff = true;
             }
             int rigs = humanRigs.Count;
-            BindRig(actor, instance.transform, bones);
+            BindRig(actor, id, instance.transform, bones);
             if (humanRigs.Count > rigs)
             {
                 HumanRig rig = humanRigs[humanRigs.Count - 1];
+                if (rig.Id != id) Debug.LogError("Human rig bound with id '" + rig.Id + "' for actor " + id + ".");
                 rig.Body = bodyRenderer; rig.BodyNear = t.Regions[bodyKey]; rig.BodyFar = t.Regions[bodyKey + "-far"];
                 rig.Face = faceRenderer; rig.FaceNear = t.Regions["face"]; rig.FaceFar = t.Regions["face-far"];
             }
@@ -590,7 +596,8 @@ namespace Cellblock.Unity
         }
 
         // ---- the drive -------------------------------------------------------------------------------------------------
-        void BindRig(Actor actor, Transform instance, Dictionary<string, Transform> b)
+        // id is passed in: Person() builds the model before the actor is registered, so it cannot be looked up yet.
+        void BindRig(Actor actor, string id, Transform instance, Dictionary<string, Transform> b)
         {
             Transform model = actor.Model;
             for (int side = 0; side < 2; side++)
@@ -623,7 +630,7 @@ namespace Cellblock.Unity
             Quaternion inverse = Quaternion.Inverse(model.rotation);
             var rig = new HumanRig
             {
-                Actor = actor, Id = actors.FirstOrDefault(p => p.Value == actor).Key ?? "", Instance = instance, Pelvis = b["pelvis"], Spine = b["spine_01"],
+                Actor = actor, Id = id ?? "", Instance = instance, Pelvis = b["pelvis"], Spine = b["spine_01"],
                 Bones = pairs.Select(p => p.bone).ToArray(), Sources = pairs.Select(p => p.source).ToArray(), Blend = pairs.Select(p => p.blend).ToArray(), Snap = pairs.Select(p => p.snap).ToArray(),
             };
             rig.SourceRest = rig.Sources.Select(x => inverse * x.rotation).ToArray();
@@ -718,10 +725,9 @@ namespace Cellblock.Unity
 #if UNITY_EDITOR
                     if (PreviewForceFar) far = true;
 #endif
-                    if (far != rig.Far && rig.Body != null && rig.Face != null)
-                    {
-                        rig.Far = far; rig.Body.sharedMesh = far ? rig.BodyFar : rig.BodyNear; rig.Face.sharedMesh = far ? rig.FaceFar : rig.FaceNear;
-                    }
+                    // Only decided here: skinning buffers for this frame are already sized, so the mesh changes in
+                    // LateUpdate (ApplyHumanDistance), before the next frame skins.
+                    rig.WantFar = far;
                 }
                 Transform modelT = rig.Actor.Model;
                 Quaternion model = modelT.rotation, inverse = Quaternion.Inverse(model);
@@ -760,8 +766,8 @@ namespace Cellblock.Unity
                     foreach (Finger f in rig.Fingers[side]) f.Bone.localRotation = f.Rest * Quaternion.AngleAxis(f.Max * (f.Thumb ? Mathf.Min(curl, .7f) : curl), f.Axis);
                 }
 #if UNITY_EDITOR
-                if (HumanContact.SoleCheck && Time.frameCount % 7 == i % 7) HumanContact.Sole(rig.Actor.Root, rig.Instance, rig.Actor.Feet, rig.SoleRest);
-                HumanContact.Sample(rig.Actor.Knees, rig.KneeBones, rig.Actor.Feet, rig.FootBones, rig.Actor.Forearms, rig.Actor.Hands, rig.HandBones, HandReach);
+                if (HumanContact.Enabled && HumanContact.SoleCheck && Time.frameCount % 7 == i % 7) HumanContact.Sole(rig.Actor.Root, rig.Instance, rig.Actor.Feet, rig.SoleRest);
+                if (HumanContact.Enabled) HumanContact.Sample(rig.Actor.Knees, rig.KneeBones, rig.Actor.Feet, rig.FootBones, rig.Actor.Forearms, rig.Actor.Hands, rig.HandBones, HandReach);
 #endif
             }
         }
@@ -779,6 +785,15 @@ namespace Cellblock.Unity
         public int PreviewHumanRigs { get { return humanRigs.Count; } }
         public int PreviewFarRigs { get { return humanRigs.Count(r => r.Far); } }
 #endif
+        internal void ApplyHumanDistance()
+        {
+            foreach (HumanRig rig in humanRigs)
+            {
+                if (rig.WantFar == rig.Far || rig.Body == null || rig.Face == null) continue;
+                rig.Far = rig.WantFar; rig.Body.sharedMesh = rig.Far ? rig.BodyFar : rig.BodyNear; rig.Face.sharedMesh = rig.Far ? rig.FaceFar : rig.FaceNear;
+            }
+        }
+
         // Generated region meshes belong to this view; imported eye/hair/FBX meshes and Resources textures do not.
         internal void DisposeHumanModels()
         {
@@ -797,6 +812,9 @@ namespace Cellblock.Unity
         public static void Reset() { Frames = 0; Knee = Ankle = Hand = 0; kneeSum = ankleSum = handSum = 0; Soles = 0; SoleMin = 9; SoleMax = -9; soleSum = 0; soleSamples.Clear(); }
         // Lowest visible shoe point above the person's ground, sampled when a foot pivot is planted (within 1 cm of its
         // standing height). Measures the skinned mesh itself, not the hidden rig.
+        // Off in ordinary Editor Play (no mesh baking or sampling distorts what you measure). Reviews switch it on:
+        // HumanCapture in code, the shared feature reviews via -cellblockHumanContact on Claude's batch command line.
+        public static bool Enabled = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-cellblockHumanContact") >= 0;
         public static bool SoleCheck = true; public static int Soles; public static float SoleMin = 9, SoleMax = -9; static double soleSum;
         static readonly Mesh baked = new Mesh(); static readonly List<float> soleSamples = new List<float>();
         static float Percentile(float p) { if (soleSamples.Count == 0) return 0; var sorted = soleSamples.OrderBy(x => x).ToList(); return sorted[Mathf.Clamp(Mathf.RoundToInt(p * (sorted.Count - 1)), 0, sorted.Count - 1)]; }
@@ -804,20 +822,32 @@ namespace Cellblock.Unity
         {
             // Upright standing or walking only: kneeling, sitting, lying and falls legitimately put toes below the ankle.
             if (Vector3.Dot(instance.up, Vector3.up) < .97f) return;
-            int planted = -1;
+            bool[] planted = new bool[2];
             for (int s = 0; s < 2; s++)
             {
                 Vector3 local = root.InverseTransformPoint(feet[s].position);
-                if (Mathf.Abs(local.y - rest) < .01f && Vector3.Dot(feet[s].up, root.up) > .9f) planted = s;
+                planted[s] = Mathf.Abs(local.y - rest) < .01f && Vector3.Dot(feet[s].up, root.up) > .9f;
             }
-            if (planted < 0) return;
-            SkinnedMeshRenderer shoes = instance.GetComponentsInChildren<SkinnedMeshRenderer>().FirstOrDefault(r => r.name == "Body");
-            if (shoes == null) return;
-            shoes.BakeMesh(baked, true); float lowest = float.MaxValue;
-            foreach (Vector3 v in baked.vertices) lowest = Mathf.Min(lowest, shoes.transform.TransformPoint(v).y);
-            float height = lowest - root.position.y;
-            Soles++; soleSum += height; SoleMin = Mathf.Min(SoleMin, height); SoleMax = Mathf.Max(SoleMax, height);
-            if (soleSamples.Count < 50000) soleSamples.Add(height);
+            if (!planted[0] && !planted[1]) return;
+            SkinnedMeshRenderer body = instance.GetComponentsInChildren<SkinnedMeshRenderer>().FirstOrDefault(r => r.name == "Body");
+            if (body == null) return;
+            body.BakeMesh(baked, true); Vector3[] vertices = baked.vertices; Matrix4x4 toWorld = body.transform.localToWorldMatrix;
+            // Each planted foot on its own: only that shoe's vertices (near its ankle, horizontally) count, so a lifted
+            // or pitched other foot cannot stand in for it.
+            for (int s = 0; s < 2; s++)
+            {
+                if (!planted[s]) continue;
+                Vector3 ankle = feet[s].position; float lowest = float.MaxValue;
+                foreach (Vector3 v in vertices)
+                {
+                    Vector3 w = toWorld.MultiplyPoint3x4(v);
+                    if (w.y < ankle.y + .02f && new Vector2(w.x - ankle.x, w.z - ankle.z).sqrMagnitude < .18f * .18f) lowest = Mathf.Min(lowest, w.y);
+                }
+                if (lowest == float.MaxValue) continue;
+                float height = lowest - root.position.y;
+                Soles++; soleSum += height; SoleMin = Mathf.Min(SoleMin, height); SoleMax = Mathf.Max(SoleMax, height);
+                if (soleSamples.Count < 50000) soleSamples.Add(height);
+            }
         }
         internal static void Sample(Transform[] knees, Transform[] kneeBones, Transform[] feet, Transform[] footBones, Transform[] forearms, Transform[] hands, Transform[] handBones, float reach)
         {
@@ -847,6 +877,7 @@ namespace Cellblock.Unity
 #endif
         }
         void OnDestroy() { if (View != null) View.DisposeHumanModels(); }
+        void LateUpdate() { if (View != null) View.ApplyHumanDistance(); }
         void Apply(ScriptableRenderContext context, List<Camera> cameras)
         {
             if (View == null) return;

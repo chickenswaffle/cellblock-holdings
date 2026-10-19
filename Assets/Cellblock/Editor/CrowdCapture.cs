@@ -61,6 +61,8 @@ namespace Cellblock.Editor
                 {
                     w.Data.Speed = 0; Grow(w, Sizes[size]);
                     var watch = Stopwatch.StartNew(); game.PreviewAdvance(0); buildMs = watch.Elapsed.TotalMilliseconds;
+                    // One render from the wide shot picks distance meshes; they swap in during the frames before Measure.
+                    game.FrameArt(game.ArtCenter + Vector3.up, 16, 35, 38); Render(game.ArtCamera, null);
                     Next(1.5f); return;
                 }
                 Measure(game, view, Sizes[size]);

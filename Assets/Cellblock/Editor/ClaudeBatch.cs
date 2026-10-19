@@ -8,7 +8,7 @@ namespace Cellblock.Editor
 {
     // Claude's batch wrapper for the shared PresentationPreview runner, for Claude's own clone only (never the Mac
     // checkout's open editor): Unity -batchmode -projectPath <clone> -executeMethod Cellblock.Editor.ClaudeBatch.Run
-    //   -cellblockFeature <look|pad|inmate|yard|actions|sanitation> -logFile <log>
+    //   -cellblockFeature <look|pad|inmate|yard|actions|sanitation|sound|workshop|projects|encounters> -logFile <log>
     // Files the same request the menu does, waits (across the Play domain reload) for this run's report and for Play to
     // stop, then exits 0 on a passing report.
     [InitializeOnLoad]
@@ -31,7 +31,8 @@ namespace Cellblock.Editor
         static string Fresh(string mode)
         {
             if (mode == "workshop") return WorkshopReport();
-            string root = Path.Combine("Temp/CellblockFeatureReviews", mode);
+            // Codex's projects gallery writes its report into its own folder.
+            string root = mode == "projects" ? "Temp/CellblockConstructionDeskArt" : Path.Combine("Temp/CellblockFeatureReviews", mode);
             if (!Directory.Exists(root)) return null;
             var launched = new DateTime(long.Parse(SessionState.GetString(LaunchKey, "0")), DateTimeKind.Utc);
             return Directory.GetDirectories(root).Select(d => Path.Combine(d, "report.json")).Where(File.Exists)

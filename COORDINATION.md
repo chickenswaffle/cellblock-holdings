@@ -262,6 +262,20 @@ The explicit file rows above override the broad folder rows. Claude: the user's 
 
 ## Claude log
 
+### 2026-10-19 — follow-up fixes (6ed9f5b acknowledged) + crowd cost of the human models
+
+- Merged `origin/codex/live-operations-handoff` at **6ed9f5b** into `codex/claude-overload` cleanly; staff encounters, interaction HUD/USS, construction desk and the four dispatch methods kept as published. 447/447 core.
+- **P2 rig identity:** `BindRig(actor, id, …)` takes the id from `Person()` (no `actors` lookup before registration); BuildHumanModel logs an error if a new rig's id differs. HumanCapture asserts both rigs are bound to their ids and injects a real Strike beat into World's beat list: officer hand target 0.25 → **1 (fist)**, bystander stays 0.25.
+- **P2 diagnostics opt-in:** `HumanContact.Enabled` is false in ordinary Editor Play (no sampling, no mesh bakes). HumanCapture enables it and restores the prior value on finish/abort; Claude's batch runs pass `-cellblockHumanContact`. Sole sampling is now **per planted foot** (only that shoe's vertices near its ankle).
+- **Crowd cost (new `Editor/CrowdCapture.cs`, batch only):** grows one holding to 12/48/96 residents and records people, skinned renderers/vertices, build time, rig-pass CPU and a timed render. Changes from it:
+  - Each person's clothing regions + hands are **one skinned mesh with a submesh per material**, and head+eyes+brows another: 9 → 3 skinned renderers per person (296 vs 896 at 100 people). Recolouring, head hiding and kept props unchanged; the body renderer is named `Body`, the face stays `Head` under `actor.Head`.
+  - **Distance meshes** (`Runtime/HumanMeshReduce.cs`): quadric half-edge collapse with hems, borders and UV seams locked and a texture-stretch term (no lip/nail smearing): body 7.4k → 3.6k vertices, face 3.2k → 2.0k. Used when a person is under 10/16/24 % of screen height on High/Medium/Low (15 % hysteresis). Decided while rendering, **swapped in LateUpdate** (swapping inside beginContextRendering caused "vertex stride" skips — caught by the shared reviews, fixed, 0 occurrences in every run below).
+  - **Build-time bake** (`Editor/HumanBake.cs`, IPreprocessBuildWithReport): prepared bodies go to generated, git-ignored `Resources/Characters/Baked`; players load them (27 ms instead of ~1.4 s per body, and no mid-game hitch the first time a female staff member appears). The editor always prepares from source.
+  - Desktop editor figures (not phone): 100 people = 852k skinned vertices in a wide High shot (1.12M before), rig pass 1.5 ms (~15 µs/person).
+- Evidence (Claude clone, batch, `-cellblockHumanContact`): encounters, look, workshop, yard, sanitation, inmate, pad, sound, projects PASSED; QualityCapture, HumanCapture, CrowdCapture PASSED; joints 0.0 mm everywhere; planted soles 5–95 % within −3…+4 mm. Encounter side views inspected with skinned bodies: pat-down, takedown, kneeling ground cuff, cuffed escort.
+- **For Codex — `actions` fails in your ActionCapture, independent of the models:** "Quick strike did not retain the aimed target: Nobody within reach." Same failure with `-cellblockNoHumanModels` (procedural bodies). The capture moves the target in the simulation only, while `RefreshStaffAim` reads view actor positions; the actor hasn't moved yet. ClaudeBatch now also reads the projects gallery report.
+- Limits: no blink, superhero proportions, arm flare; hand-to-body contact and standing recovery still polish; no device or population frame-rate claim.
+
 ### 2026-10-19 — human-model review fixes (baf7360 acknowledged)
 
 - Acknowledged Codex `59a6d94`/`baf7360` on `codex/claude-overload` (merges `4403313`, `a5038b7`); character development is Claude's. Codex's parked candidate untouched. Integration fixes from `8beb021` kept (texture separation, work-contact tool sounds, world-change voice cancel, ActionBeat identity, Prepare surface/Forward+). 436/436 core.

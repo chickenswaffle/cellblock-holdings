@@ -22,7 +22,7 @@ namespace Cellblock.Editor
         const string ActiveKey = "Cellblock.HumanCapture.Active", StageKey = "Cellblock.HumanCapture.Stage", WaitKey = "Cellblock.HumanCapture.Wait";
         const string Output = "Builds/HumanReview";
         static readonly List<string> notes = new List<string>(), errors = new List<string>();
-        static int meshesBefore; static GameObject spare;
+        static int meshesBefore; static GameObject spare; static bool contactWas;
         static HumanCapture() { EditorApplication.update += Tick; }
         public static void Run()
         {
@@ -36,6 +36,7 @@ namespace Cellblock.Editor
             EditorApplication.EnterPlaymode();
         }
         static void Next(float s) { SessionState.SetInt(StageKey, SessionState.GetInt(StageKey, 0) + 1); SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + s); }
+        static void Wait(float s) { SessionState.SetFloat(WaitKey, (float)EditorApplication.timeSinceStartup + s); }
         static void Check(bool ok, string what) { if (!ok) errors.Add(what); }
         static void Tick()
         {
@@ -46,7 +47,7 @@ namespace Cellblock.Editor
             {
                 GameController game = UnityEngine.Object.FindFirstObjectByType<GameController>();
                 var w = game.World;
-                if (stage == 0) { HumanContact.Reset(); game.StartArtPreview("county-maximum", "briar-county", 15 * 60); Next(2); return; }
+                if (stage == 0) { contactWas = HumanContact.Enabled; HumanContact.Enabled = true; HumanContact.Reset(); game.StartArtPreview("county-maximum", "briar-county", 15 * 60); Next(2); return; }
                 var officer = w.Data.Staff.First(s => s.Arrived && s.Role == "Officer"); var resident = w.Data.Residents.First(r => w.IsPresent(r));
                 if (stage == 1)
                 {
@@ -66,10 +67,14 @@ namespace Cellblock.Editor
                     }
                     Next(.2f); return;
                 }
+                if (stage == 3 && !SessionState.GetBool("Cellblock.HumanCapture.Far", false) && !FacilityView.PreviewForceFar)
+                {
+                    // Distance meshes swap in LateUpdate after a render decides; let a couple of frames pass first.
+                    FacilityView.PreviewForceFar = true; game.FrameArt(Vector3.up, 2, 0, 6); Render(game.ArtCamera, null); Wait(.3f); return;
+                }
                 if (stage == 3 && !SessionState.GetBool("Cellblock.HumanCapture.Far", false))
                 {
                     // The distance meshes, forced up close: they must still read as the same person.
-                    FacilityView.PreviewForceFar = true;
                     foreach (var (who, id) in new[] { ("officer", officer.Id), ("resident", resident.Id) })
                     {
                         Vector3 at; if (!game.PreviewPersonPosition(id, out at)) continue;
@@ -78,6 +83,7 @@ namespace Cellblock.Editor
                         game.FrameArt(at + Vector3.up * .95f, 1.9f, heading + 180 + 30, 6); Render(game.ArtCamera, who + "-far-mesh");
                     }
                     FacilityView.PreviewForceFar = false; SessionState.SetBool("Cellblock.HumanCapture.Far", true);
+                    Render(game.ArtCamera, null); Wait(.3f); // back to full meshes before the hand close-ups
                     return;
                 }
                 if (stage >= 3 && stage <= 6)
@@ -91,6 +97,19 @@ namespace Cellblock.Editor
                     game.FrameArt(at + Vector3.up * .82f - right * .25f, .42f, heading + 180 - 35, 4); Render(game.ArtCamera, "hand-left-" + label[stage - 3]);
                     game.FrameArt(at + Vector3.up * .82f + right * .25f, .42f, heading + 180 + 35, 4); Render(game.ArtCamera, "hand-right-" + label[stage - 3]);
                     Next(.2f); return;
+                }
+                if (stage == 7)
+                {
+                    // Finger routing from the simulation's own action beats needs the rig to carry the actor id.
+                    FacilityView view = UnityEngine.Object.FindFirstObjectByType<FacilityView>();
+                    Check(view.PreviewRigBound(officer.Id) && view.PreviewRigBound(resident.Id), "A human rig was bound without its actor id.");
+                    float before = view.PreviewHandTarget(officer.Id, 0);
+                    var beats = (System.Collections.IList)typeof(World).GetField("beats", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(w);
+                    beats.Add(new ActionBeat { Kind = "Strike", ActorId = officer.Id, Minute = w.Data.Minute });
+                    float strike = view.PreviewHandTarget(officer.Id, 0), other = view.PreviewHandTarget(resident.Id, 0);
+                    beats.RemoveAt(beats.Count - 1);
+                    notes.Add("hand targets: officer before " + before + ", after a Strike beat " + strike + "; resident (not striking) " + other);
+                    Check(strike == 1 && other != 1, "A Strike beat did not close the striker's fist (" + strike + ") or closed someone else's (" + other + ").");
                 }
                 if (stage == 7) { FacilityView.PreviewCurl = -1; HumanContact.Reset(); w.Data.Speed = 1; Next(.1f); return; }
                 if (stage >= 8 && stage < 14)
@@ -127,6 +146,7 @@ namespace Cellblock.Editor
         }
         static void Render(Camera camera, string name)
         {
+            if (name == null) { var warm = new RenderTexture(64, 64, 24); RenderPipeline.SubmitRenderRequest(camera, new UniversalRenderPipeline.SingleCameraRequest { destination = warm }); warm.Release(); UnityEngine.Object.DestroyImmediate(warm); return; }
             var target = new RenderTexture(900, 1100, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 }; target.Create();
             float aspect = camera.aspect; camera.aspect = 900f / 1100;
             try
@@ -139,7 +159,7 @@ namespace Cellblock.Editor
         }
         static void Finish()
         {
-            FacilityView.PreviewCurl = -1; if (spare != null) UnityEngine.Object.Destroy(spare);
+            HumanContact.Enabled = contactWas; FacilityView.PreviewCurl = -1; FacilityView.PreviewForceFar = false; if (spare != null) UnityEngine.Object.Destroy(spare);
             bool passed = errors.Count == 0;
             File.WriteAllText(Path.Combine(Output, "report.txt"), (passed ? "PASSED" : "FAILED") + "\n\nNotes:\n" + string.Join("\n", notes) + "\n\nErrors:\n" + string.Join("\n", errors));
             if (passed) Debug.Log("CELLBLOCK_HUMAN_CAPTURE_PASSED"); else Debug.LogError("CELLBLOCK_HUMAN_CAPTURE_FAILED " + string.Join(" | ", errors.Take(4)));
